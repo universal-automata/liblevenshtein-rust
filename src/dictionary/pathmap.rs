@@ -143,7 +143,7 @@ impl Dictionary for PathMapDictionary {
     fn root(&self) -> Self::Node {
         PathMapNode {
             map: Arc::clone(&self.map),
-            path: Vec::new(),
+            path: Arc::new(Vec::new()),
         }
     }
 
@@ -171,10 +171,16 @@ impl Dictionary for PathMapDictionary {
 /// Nodes hold a read lock on the PathMap only while accessing it,
 /// allowing concurrent queries even while the dictionary is being modified
 /// (modifications will block until all reads complete).
+///
+/// # Performance
+///
+/// Uses `Arc<Vec<u8>>` for paths to enable sharing instead of cloning.
+/// Since paths are never mutated after creation, Arc provides efficient
+/// reference counting with minimal overhead compared to Vec cloning.
 #[derive(Clone)]
 pub struct PathMapNode {
     map: Arc<RwLock<PathMap<()>>>,
-    path: Vec<u8>,
+    path: Arc<Vec<u8>>,  // Arc for path sharing
 }
 
 impl PathMapNode {
@@ -189,7 +195,7 @@ impl PathMapNode {
         let zipper = if self.path.is_empty() {
             map.read_zipper()
         } else {
-            map.read_zipper_at_path(&self.path)
+            map.read_zipper_at_path(&**self.path)  // Deref Arc to get &Vec<u8>
         };
         f(zipper)
     }
@@ -201,19 +207,21 @@ impl DictionaryNode for PathMapNode {
     }
 
     fn transition(&self, label: u8) -> Option<Self> {
-        let mut new_path = self.path.clone();
-        new_path.push(label);
-
-        // Check if this path exists
+        // Check if this path exists first
         let exists = self.with_zipper(|mut z| {
             z.descend_to(&[label]);
             z.path_exists()
         });
 
         if exists {
+            // Only build new path if transition succeeds
+            let mut new_path = Vec::with_capacity(self.path.len() + 1);
+            new_path.extend_from_slice(&self.path);
+            new_path.push(label);
+
             Some(PathMapNode {
                 map: Arc::clone(&self.map),
-                path: new_path,
+                path: Arc::new(new_path),
             })
         } else {
             None
@@ -235,28 +243,31 @@ impl DictionaryNode for PathMapNode {
 
         // Step 2: Return lazy iterator that creates nodes on-demand
         // Key optimization: No Vec<(u8, Vec<u8>)> collection!
-        // Path clones and node creation happen only when iterator is consumed
+        // Arc sharing means cheap clones - just atomic ref count increment
         let map = Arc::clone(&self.map);
-        let base_path = self.path.clone();
+        let base_path = Arc::clone(&self.path);
 
         Box::new(edge_bytes.into_iter().filter_map(move |byte| {
-            let mut new_path = base_path.clone();
-            new_path.push(byte);
-
             // Verify path exists (acquire lock only when actually iterating)
             let map_guard = map.read().unwrap();
             let mut check_zipper = if base_path.is_empty() {
                 map_guard.read_zipper()
             } else {
-                map_guard.read_zipper_at_path(&base_path)
+                map_guard.read_zipper_at_path(&**base_path)  // Deref Arc to get &Vec<u8>
             };
             check_zipper.descend_to(&[byte]);
 
             if check_zipper.path_exists() {
                 drop(map_guard); // Release lock before creating node
+
+                // Build new path with Arc - only allocate Vec once
+                let mut new_path = Vec::with_capacity(base_path.len() + 1);
+                new_path.extend_from_slice(&base_path);
+                new_path.push(byte);
+
                 Some((byte, PathMapNode {
                     map: Arc::clone(&map),
-                    path: new_path,
+                    path: Arc::new(new_path),
                 }))
             } else {
                 None
