@@ -20,3 +20,9 @@ Thumbs.db
 # Testing
 *.profraw
 *.profdata
+
+# Profiling artifacts
+perf.data
+perf.data.old
+flamegraph.svg
+flamegraph_*.svg
