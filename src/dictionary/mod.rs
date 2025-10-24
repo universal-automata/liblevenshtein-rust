@@ -4,6 +4,7 @@
 //! implementations (tries, DAWGs, etc.) for use with Levenshtein automata.
 
 pub mod pathmap;
+pub mod dawg;
 
 /// Synchronization strategy for dictionary operations.
 ///

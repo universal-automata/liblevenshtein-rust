@@ -30,9 +30,19 @@ pub mod dictionary;
 pub mod transducer;
 pub mod distance;
 
+#[cfg(feature = "serialization")]
+pub mod serialization;
+
 /// Common imports for convenient usage
 pub mod prelude {
     pub use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
     pub use crate::dictionary::pathmap::PathMapDictionary;
-    pub use crate::transducer::{Transducer, Algorithm, Candidate};
+    pub use crate::dictionary::dawg::DawgDictionary;
+    pub use crate::transducer::{Transducer, Algorithm, Candidate, TransducerBuilder};
+
+    #[cfg(feature = "serialization")]
+    pub use crate::serialization::{
+        DictionarySerializer, DictionaryFromTerms,
+        BincodeSerializer, JsonSerializer
+    };
 }

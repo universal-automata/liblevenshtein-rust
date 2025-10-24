@@ -1,6 +1,8 @@
 //! PathMap-backed dictionary implementation.
 
 use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
+#[cfg(feature = "serialization")]
+use crate::serialization::DictionaryFromTerms;
 use pathmap::PathMap;
 use pathmap::zipper::{ZipperMoving, Zipper};
 use pathmap::utils::BitMask;
@@ -15,7 +17,7 @@ use smallvec::SmallVec;
 /// The dictionary uses `RwLock` for interior mutability, allowing:
 /// - Multiple concurrent readers (queries)
 /// - Exclusive write access for modifications (insert/remove)
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PathMapDictionary {
     map: Arc<RwLock<PathMap<()>>>,
     term_count: Arc<RwLock<usize>>,
@@ -134,6 +136,13 @@ impl PathMapDictionary {
 impl Default for PathMapDictionary {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(feature = "serialization")]
+impl DictionaryFromTerms for PathMapDictionary {
+    fn from_terms<I: IntoIterator<Item = String>>(terms: I) -> Self {
+        Self::from_iter(terms)
     }
 }
 

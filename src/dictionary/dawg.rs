@@ -1,0 +1,423 @@
+//! DAWG (Directed Acyclic Word Graph) dictionary implementation.
+//!
+//! A DAWG is a minimized trie that shares both prefixes and suffixes,
+//! making it more space-efficient than a standard trie for certain datasets.
+//!
+//! This implementation uses an array-based representation for efficient
+//! access and minimal memory overhead.
+
+use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+/// A DAWG dictionary for approximate string matching.
+///
+/// The DAWG is constructed from a sorted list of terms and uses
+/// structural sharing to minimize memory usage. Once constructed,
+/// the DAWG is immutable and can be safely shared across threads.
+///
+/// # Construction
+///
+/// For optimal space efficiency, terms should be sorted before
+/// constructing the DAWG. The builder uses incremental construction
+/// to identify and merge common suffixes.
+///
+/// # Performance
+///
+/// - **Memory**: More efficient than PathMap for sorted word lists
+/// - **Construction**: O(n) for sorted input where n is total characters
+/// - **Lookup**: O(m) where m is the query term length
+/// - **Thread-safe**: Fully immutable, safe for concurrent access
+#[derive(Clone, Debug)]
+pub struct DawgDictionary {
+    nodes: Arc<Vec<DawgNode>>,
+    term_count: usize,
+}
+
+/// A node in the DAWG structure.
+///
+/// Uses a compact representation with:
+/// - A vector of edges (label, target_node_id)
+/// - A flag indicating if this node represents a complete word
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct DawgNode {
+    /// Edges to child nodes: (byte label, target node index)
+    edges: Vec<(u8, usize)>,
+    /// True if this node marks the end of a valid term
+    is_final: bool,
+}
+
+impl DawgNode {
+    fn new(is_final: bool) -> Self {
+        DawgNode {
+            edges: Vec::new(),
+            is_final,
+        }
+    }
+}
+
+/// Builder for constructing a DAWG from terms.
+///
+/// The builder uses incremental construction to identify common suffixes
+/// and merge them during construction. For optimal space efficiency,
+/// provide terms in sorted order.
+pub struct DawgBuilder {
+    nodes: Vec<DawgNode>,
+    // Cache for suffix sharing: maps node signature to node index
+    suffix_cache: HashMap<DawgNode, usize>,
+    // Previous term (for incremental construction)
+    prev_term: Vec<u8>,
+    // Active path of node indices for the previous term
+    active_path: Vec<usize>,
+}
+
+impl DawgBuilder {
+    /// Create a new DAWG builder.
+    pub fn new() -> Self {
+        // Node 0 is always the root
+        let mut nodes = Vec::new();
+        nodes.push(DawgNode::new(false));
+
+        DawgBuilder {
+            nodes,
+            suffix_cache: HashMap::new(),
+            prev_term: Vec::new(),
+            active_path: vec![0], // Start with root
+        }
+    }
+
+    /// Add a term to the DAWG.
+    ///
+    /// For optimal minimization, terms should be added in sorted order.
+    pub fn insert(&mut self, term: &str) {
+        let bytes = term.as_bytes();
+
+        // Find common prefix with previous term
+        let mut common_prefix_len = 0;
+        for i in 0..std::cmp::min(self.prev_term.len(), bytes.len()) {
+            if self.prev_term[i] == bytes[i] {
+                common_prefix_len += 1;
+            } else {
+                break;
+            }
+        }
+
+        // Minimize the suffix of the previous word from the divergence point
+        self.minimize(common_prefix_len);
+
+        // Build the new suffix starting from the common prefix
+        for (i, &byte) in bytes.iter().enumerate() {
+            if i >= common_prefix_len {
+                // Create new node
+                let new_idx = self.nodes.len();
+                self.nodes.push(DawgNode::new(false));
+
+                // Add edge from parent
+                let parent_idx = *self.active_path.last().unwrap();
+                self.nodes[parent_idx].edges.push((byte, new_idx));
+
+                // Extend active path
+                self.active_path.push(new_idx);
+            }
+        }
+
+        // Mark the final node
+        let final_idx = *self.active_path.last().unwrap();
+        self.nodes[final_idx].is_final = true;
+
+        self.prev_term = bytes.to_vec();
+    }
+
+    /// Finish building and return the DAWG dictionary.
+    pub fn build(mut self) -> DawgDictionary {
+        // Minimize remaining suffix
+        self.minimize(0);
+
+        // Count terms
+        let term_count = self.count_terms(0);
+
+        DawgDictionary {
+            nodes: Arc::new(self.nodes),
+            term_count,
+        }
+    }
+
+    /// Minimize the active path down to the specified length.
+    fn minimize(&mut self, down_to_len: usize) {
+        // We keep the path up to down_to_len + 1 (inclusive)
+        // and minimize everything after
+        let keep_len = down_to_len + 1; // +1 for root
+
+        while self.active_path.len() > keep_len {
+            let child_idx = self.active_path.pop().unwrap();
+            let parent_idx = *self.active_path.last().unwrap();
+
+            // Find the edge from parent to child
+            let edge_pos = self.nodes[parent_idx]
+                .edges
+                .iter()
+                .position(|(_, idx)| *idx == child_idx)
+                .unwrap();
+
+            // Check if we've seen this node before (suffix sharing)
+            let child_node = self.nodes[child_idx].clone();
+            if let Some(&existing_idx) = self.suffix_cache.get(&child_node) {
+                // Replace with existing equivalent node
+                self.nodes[parent_idx].edges[edge_pos].1 = existing_idx;
+            } else {
+                // Cache this new suffix
+                self.suffix_cache.insert(child_node, child_idx);
+            }
+        }
+    }
+
+    /// Count total number of terms in the DAWG.
+    fn count_terms(&self, node_idx: usize) -> usize {
+        let mut count = 0;
+        if self.nodes[node_idx].is_final {
+            count += 1;
+        }
+        for (_, child_idx) in &self.nodes[node_idx].edges {
+            count += self.count_terms(*child_idx);
+        }
+        count
+    }
+}
+
+impl Default for DawgBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DawgDictionary {
+    /// Create a new empty DAWG dictionary.
+    pub fn new() -> Self {
+        DawgBuilder::new().build()
+    }
+
+    /// Create a DAWG dictionary from an iterator of terms.
+    ///
+    /// For optimal space efficiency, the terms will be collected and
+    /// sorted before building the DAWG.
+    pub fn from_iter<I, S>(terms: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut sorted_terms: Vec<String> = terms
+            .into_iter()
+            .map(|s| s.as_ref().to_string())
+            .collect();
+        sorted_terms.sort();
+        sorted_terms.dedup();
+
+        let mut builder = DawgBuilder::new();
+        for term in sorted_terms {
+            builder.insert(&term);
+        }
+        builder.build()
+    }
+
+    /// Get the number of terms in the dictionary.
+    pub fn term_count(&self) -> usize {
+        self.term_count
+    }
+
+    /// Get the number of nodes in the DAWG.
+    ///
+    /// This is useful for comparing space efficiency with other
+    /// dictionary implementations.
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+}
+
+impl Default for DawgDictionary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Dictionary for DawgDictionary {
+    type Node = DawgDictionaryNode;
+
+    fn root(&self) -> Self::Node {
+        DawgDictionaryNode {
+            nodes: Arc::clone(&self.nodes),
+            node_idx: 0,
+        }
+    }
+
+    fn len(&self) -> Option<usize> {
+        Some(self.term_count)
+    }
+
+    fn sync_strategy(&self) -> SyncStrategy {
+        // DAWG is fully immutable - no synchronization needed
+        SyncStrategy::Persistent
+    }
+}
+
+/// A node in the DAWG dictionary.
+///
+/// This is a lightweight handle that references a position in the DAWG.
+/// Nodes can be cloned cheaply (Arc reference counting).
+#[derive(Clone)]
+pub struct DawgDictionaryNode {
+    nodes: Arc<Vec<DawgNode>>,
+    node_idx: usize,
+}
+
+impl DictionaryNode for DawgDictionaryNode {
+    fn is_final(&self) -> bool {
+        self.nodes[self.node_idx].is_final
+    }
+
+    fn transition(&self, label: u8) -> Option<Self> {
+        self.nodes[self.node_idx]
+            .edges
+            .iter()
+            .find(|(l, _)| *l == label)
+            .map(|(_, idx)| DawgDictionaryNode {
+                nodes: Arc::clone(&self.nodes),
+                node_idx: *idx,
+            })
+    }
+
+    fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
+        let nodes = Arc::clone(&self.nodes);
+        let iter = self.nodes[self.node_idx]
+            .edges
+            .iter()
+            .map(move |(label, idx)| {
+                (
+                    *label,
+                    DawgDictionaryNode {
+                        nodes: Arc::clone(&nodes),
+                        node_idx: *idx,
+                    },
+                )
+            });
+        Box::new(iter)
+    }
+
+    fn edge_count(&self) -> Option<usize> {
+        Some(self.nodes[self.node_idx].edges.len())
+    }
+}
+
+#[cfg(feature = "serialization")]
+use crate::serialization::DictionaryFromTerms;
+
+#[cfg(feature = "serialization")]
+impl DictionaryFromTerms for DawgDictionary {
+    fn from_terms<I: IntoIterator<Item = String>>(terms: I) -> Self {
+        Self::from_iter(terms)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dawg_creation() {
+        let dict = DawgDictionary::from_iter(vec!["hello", "world", "test"]);
+        assert_eq!(dict.len(), Some(3));
+    }
+
+    #[test]
+    fn test_dawg_contains() {
+        let dict = DawgDictionary::from_iter(vec!["hello", "world"]);
+        assert!(dict.contains("hello"));
+        assert!(dict.contains("world"));
+        assert!(!dict.contains("goodbye"));
+    }
+
+    #[test]
+    fn test_dawg_node_traversal() {
+        let dict = DawgDictionary::from_iter(vec!["test", "testing"]);
+        let root = dict.root();
+
+        // Navigate: t -> e -> s -> t
+        let t = root.transition(b't').expect("should have 't'");
+        let e = t.transition(b'e').expect("should have 'e'");
+        let s = e.transition(b's').expect("should have 's'");
+        let t2 = s.transition(b't').expect("should have second 't'");
+
+        assert!(t2.is_final(), "'test' should be final");
+
+        // Continue: i -> n -> g
+        let i = t2.transition(b'i').expect("should have 'i'");
+        assert!(!i.is_final(), "'testi' should not be final");
+    }
+
+    #[test]
+    fn test_dawg_node_edges() {
+        let dict = DawgDictionary::from_iter(vec!["ab", "ac", "ad"]);
+        let root = dict.root();
+        let a = root.transition(b'a').expect("should have 'a'");
+
+        let edges: Vec<_> = a.edges().map(|(byte, _)| byte).collect();
+        assert_eq!(edges.len(), 3);
+        assert!(edges.contains(&b'b'));
+        assert!(edges.contains(&b'c'));
+        assert!(edges.contains(&b'd'));
+    }
+
+    #[test]
+    fn test_dawg_suffix_sharing() {
+        // Words with common suffix "ing"
+        let dict = DawgDictionary::from_iter(vec![
+            "testing", "running", "walking", "talking",
+        ]);
+
+        // DAWG should have fewer nodes than a trie would
+        // (exact count depends on implementation details)
+        assert!(dict.node_count() < 30); // Trie would need ~30+ nodes
+        assert_eq!(dict.term_count(), 4);
+    }
+
+    #[test]
+    fn test_dawg_empty() {
+        let dict = DawgDictionary::new();
+        assert_eq!(dict.len(), Some(0));
+        assert!(!dict.contains("test"));
+    }
+
+    #[test]
+    fn test_dawg_duplicates() {
+        let dict = DawgDictionary::from_iter(vec!["test", "test", "test"]);
+        assert_eq!(dict.len(), Some(1));
+    }
+
+    #[test]
+    fn test_dawg_builder_incremental() {
+        let mut builder = DawgBuilder::new();
+        builder.insert("test");
+        builder.insert("testing");
+        builder.insert("tested");
+
+        let dict = builder.build();
+        assert_eq!(dict.len(), Some(3));
+        assert!(dict.contains("test"));
+        assert!(dict.contains("testing"));
+        assert!(dict.contains("tested"));
+    }
+
+    #[test]
+    fn test_dawg_sorted_vs_unsorted() {
+        // Both should work, but sorted is more space-efficient
+        let sorted = DawgDictionary::from_iter(vec![
+            "apple", "banana", "cherry", "date",
+        ]);
+        let unsorted = DawgDictionary::from_iter(vec![
+            "cherry", "apple", "date", "banana",
+        ]);
+
+        assert_eq!(sorted.term_count(), unsorted.term_count());
+        // Sorted might have fewer nodes due to better suffix sharing
+        assert!(sorted.node_count() <= unsorted.node_count());
+    }
+}

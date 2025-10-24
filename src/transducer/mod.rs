@@ -10,6 +10,7 @@ mod pool;
 mod intersection;
 mod query;
 pub mod transition;
+pub mod builder;
 
 pub use algorithm::Algorithm;
 pub use position::Position;
@@ -17,6 +18,7 @@ pub use state::State;
 pub use pool::StatePool;
 pub use intersection::Intersection;
 pub use query::{QueryIterator, CandidateIterator, Candidate};
+pub use builder::{TransducerBuilder, BuilderError};
 
 use crate::dictionary::Dictionary;
 
@@ -37,7 +39,7 @@ use crate::dictionary::Dictionary;
 ///     println!("Found: {}", term);
 /// }
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Transducer<D: Dictionary> {
     dictionary: D,
     algorithm: Algorithm,
