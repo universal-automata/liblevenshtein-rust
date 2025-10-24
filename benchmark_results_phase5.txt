@@ -1,0 +1,420 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 43.49s
+     Running benches/benchmarks.rs (target/release/deps/benchmarks-65e4dcddf45c1d65)
+Benchmarking query_varying_dict_size/100
+Benchmarking query_varying_dict_size/100: Warming up for 3.0000 s
+Benchmarking query_varying_dict_size/100: Collecting 100 samples in estimated 5.4351 s (61k iterations)
+Benchmarking query_varying_dict_size/100: Analyzing
+query_varying_dict_size/100
+                        time:   [88.905 µs 89.300 µs 89.685 µs]
+                        thrpt:  [1.1150 Melem/s 1.1198 Melem/s 1.1248 Melem/s]
+                 change:
+                        time:   [-34.931% -34.390% -33.821%] (p = 0.00 < 0.05)
+                        thrpt:  [+51.106% +52.415% +53.683%]
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking query_varying_dict_size/500
+Benchmarking query_varying_dict_size/500: Warming up for 3.0000 s
+Benchmarking query_varying_dict_size/500: Collecting 100 samples in estimated 5.9245 s (20k iterations)
+Benchmarking query_varying_dict_size/500: Analyzing
+query_varying_dict_size/500
+                        time:   [288.33 µs 290.06 µs 291.86 µs]
+                        thrpt:  [1.7131 Melem/s 1.7238 Melem/s 1.7341 Melem/s]
+                 change:
+                        time:   [-10.300% -9.4517% -8.4610%] (p = 0.00 < 0.05)
+                        thrpt:  [+9.2431% +10.438% +11.482%]
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking query_varying_dict_size/1000
+Benchmarking query_varying_dict_size/1000: Warming up for 3.0000 s
+Benchmarking query_varying_dict_size/1000: Collecting 100 samples in estimated 5.8089 s (10k iterations)
+Benchmarking query_varying_dict_size/1000: Analyzing
+query_varying_dict_size/1000
+                        time:   [586.41 µs 589.42 µs 592.33 µs]
+                        thrpt:  [1.6882 Melem/s 1.6966 Melem/s 1.7053 Melem/s]
+                 change:
+                        time:   [-15.185% -14.288% -13.357%] (p = 0.00 < 0.05)
+                        thrpt:  [+15.416% +16.670% +17.903%]
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking query_varying_dict_size/5000
+Benchmarking query_varying_dict_size/5000: Warming up for 3.0000 s
+Benchmarking query_varying_dict_size/5000: Collecting 100 samples in estimated 9.1872 s (10k iterations)
+Benchmarking query_varying_dict_size/5000: Analyzing
+query_varying_dict_size/5000
+                        time:   [911.16 µs 914.44 µs 917.74 µs]
+                        thrpt:  [5.4482 Melem/s 5.4678 Melem/s 5.4875 Melem/s]
+                 change:
+                        time:   [-12.226% -11.582% -10.919%] (p = 0.00 < 0.05)
+                        thrpt:  [+12.257% +13.100% +13.930%]
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking query_varying_distance/0
+Benchmarking query_varying_distance/0: Warming up for 3.0000 s
+Benchmarking query_varying_distance/0: Collecting 100 samples in estimated 5.0156 s (520k iterations)
+Benchmarking query_varying_distance/0: Analyzing
+query_varying_distance/0
+                        time:   [9.7404 µs 9.7841 µs 9.8264 µs]
+                        change: [-10.710% -9.7344% -8.8252%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+Benchmarking query_varying_distance/1
+Benchmarking query_varying_distance/1: Warming up for 3.0000 s
+Benchmarking query_varying_distance/1: Collecting 100 samples in estimated 5.2115 s (71k iterations)
+Benchmarking query_varying_distance/1: Analyzing
+query_varying_distance/1
+                        time:   [73.458 µs 73.803 µs 74.152 µs]
+                        change: [-18.227% -17.339% -16.429%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking query_varying_distance/2
+Benchmarking query_varying_distance/2: Warming up for 3.0000 s
+Benchmarking query_varying_distance/2: Collecting 100 samples in estimated 5.9196 s (10k iterations)
+Benchmarking query_varying_distance/2: Analyzing
+query_varying_distance/2
+                        time:   [589.17 µs 591.47 µs 593.71 µs]
+                        change: [-17.146% -16.291% -15.398%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking query_varying_distance/3
+Benchmarking query_varying_distance/3: Warming up for 3.0000 s
+Benchmarking query_varying_distance/3: Collecting 100 samples in estimated 5.1430 s (2400 iterations)
+Benchmarking query_varying_distance/3: Analyzing
+query_varying_distance/3
+                        time:   [2.2125 ms 2.2250 ms 2.2385 ms]
+                        change: [-7.6751% -6.8436% -5.9894%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+Benchmarking query_varying_distance/4
+Benchmarking query_varying_distance/4: Warming up for 3.0000 s
+Benchmarking query_varying_distance/4: Collecting 100 samples in estimated 5.0936 s (1600 iterations)
+Benchmarking query_varying_distance/4: Analyzing
+query_varying_distance/4
+                        time:   [3.1678 ms 3.1813 ms 3.1954 ms]
+                        change: [-10.236% -9.6402% -9.0680%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+Benchmarking query_varying_query_length/1
+Benchmarking query_varying_query_length/1: Warming up for 3.0000 s
+Benchmarking query_varying_query_length/1: Collecting 100 samples in estimated 5.0005 s (520k iterations)
+Benchmarking query_varying_query_length/1: Analyzing
+query_varying_query_length/1
+                        time:   [10.176 µs 10.273 µs 10.364 µs]
+                        thrpt:  [94.229 KiB/s 95.064 KiB/s 95.971 KiB/s]
+                 change:
+                        time:   [-6.6503% -5.3206% -3.9686%] (p = 0.00 < 0.05)
+                        thrpt:  [+4.1326% +5.6196% +7.1240%]
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+Benchmarking query_varying_query_length/3
+Benchmarking query_varying_query_length/3: Warming up for 3.0000 s
+Benchmarking query_varying_query_length/3: Collecting 100 samples in estimated 5.0462 s (364k iterations)
+Benchmarking query_varying_query_length/3: Analyzing
+query_varying_query_length/3
+                        time:   [13.669 µs 13.773 µs 13.889 µs]
+                        thrpt:  [210.93 KiB/s 212.71 KiB/s 214.34 KiB/s]
+                 change:
+                        time:   [-3.6782% -2.6193% -1.6602%] (p = 0.00 < 0.05)
+                        thrpt:  [+1.6882% +2.6897% +3.8187%]
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high severe
+Benchmarking query_varying_query_length/5
+Benchmarking query_varying_query_length/5: Warming up for 3.0000 s
+Benchmarking query_varying_query_length/5: Collecting 100 samples in estimated 5.0095 s (651k iterations)
+Benchmarking query_varying_query_length/5: Analyzing
+query_varying_query_length/5
+                        time:   [7.7266 µs 7.7679 µs 7.8080 µs]
+                        thrpt:  [625.36 KiB/s 628.59 KiB/s 631.95 KiB/s]
+                 change:
+                        time:   [-8.6474% -7.6472% -6.6733%] (p = 0.00 < 0.05)
+                        thrpt:  [+7.1505% +8.2804% +9.4659%]
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking query_varying_query_length/7
+Benchmarking query_varying_query_length/7: Warming up for 3.0000 s
+Benchmarking query_varying_query_length/7: Collecting 100 samples in estimated 5.0337 s (490k iterations)
+Benchmarking query_varying_query_length/7: Analyzing
+query_varying_query_length/7
+                        time:   [10.129 µs 10.193 µs 10.263 µs]
+                        thrpt:  [666.06 KiB/s 670.63 KiB/s 674.88 KiB/s]
+                 change:
+                        time:   [-6.5551% -5.5906% -4.6395%] (p = 0.00 < 0.05)
+                        thrpt:  [+4.8652% +5.9216% +7.0150%]
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking query_varying_query_length/13
+Benchmarking query_varying_query_length/13: Warming up for 3.0000 s
+Benchmarking query_varying_query_length/13: Collecting 100 samples in estimated 5.0747 s (182k iterations)
+Benchmarking query_varying_query_length/13: Analyzing
+query_varying_query_length/13
+                        time:   [28.333 µs 28.615 µs 28.923 µs]
+                        thrpt:  [438.93 KiB/s 443.65 KiB/s 448.07 KiB/s]
+                 change:
+                        time:   [-9.7426% -8.7458% -7.7970%] (p = 0.00 < 0.05)
+                        thrpt:  [+8.4564% +9.5840% +10.794%]
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking query_many_results_distance_3
+Benchmarking query_many_results_distance_3: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.7s, enable flat sampling, or reduce sample count to 50.
+Benchmarking query_many_results_distance_3: Collecting 100 samples in estimated 7.7006 s (5050 iterations)
+Benchmarking query_many_results_distance_3: Analyzing
+query_many_results_distance_3
+                        time:   [1.4475 ms 1.4539 ms 1.4606 ms]
+                        change: [-5.8948% -4.9648% -4.0752%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+Benchmarking query_worst_case_similar_words
+Benchmarking query_worst_case_similar_words: Warming up for 3.0000 s
+Benchmarking query_worst_case_similar_words: Collecting 100 samples in estimated 5.1455 s (172k iterations)
+Benchmarking query_worst_case_similar_words: Analyzing
+query_worst_case_similar_words
+                        time:   [29.726 µs 29.889 µs 30.051 µs]
+                        change: [-12.279% -11.389% -10.431%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking algorithms/algorithm/Standard
+Benchmarking algorithms/algorithm/Standard: Warming up for 3.0000 s
+Benchmarking algorithms/algorithm/Standard: Collecting 100 samples in estimated 5.6909 s (20k iterations)
+Benchmarking algorithms/algorithm/Standard: Analyzing
+algorithms/algorithm/Standard
+                        time:   [281.61 µs 283.58 µs 285.53 µs]
+                        change: [-22.685% -22.024% -21.303%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking algorithms/algorithm/Transposition
+Benchmarking algorithms/algorithm/Transposition: Warming up for 3.0000 s
+Benchmarking algorithms/algorithm/Transposition: Collecting 100 samples in estimated 5.4636 s (15k iterations)
+Benchmarking algorithms/algorithm/Transposition: Analyzing
+algorithms/algorithm/Transposition
+                        time:   [357.10 µs 359.79 µs 362.72 µs]
+                        change: [-10.787% -9.9627% -9.1214%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
+Benchmarking algorithms/algorithm/MergeAndSplit
+Benchmarking algorithms/algorithm/MergeAndSplit: Warming up for 3.0000 s
+Benchmarking algorithms/algorithm/MergeAndSplit: Collecting 100 samples in estimated 6.8404 s (10k iterations)
+Benchmarking algorithms/algorithm/MergeAndSplit: Analyzing
+algorithms/algorithm/MergeAndSplit
+                        time:   [676.54 µs 681.10 µs 686.20 µs]
+                        change: [-2.3419% -1.4252% -0.5095%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+
+Benchmarking dictionary_operations/insert
+Benchmarking dictionary_operations/insert: Warming up for 3.0000 s
+Benchmarking dictionary_operations/insert: Collecting 100 samples in estimated 5.0011 s (20M iterations)
+Benchmarking dictionary_operations/insert: Analyzing
+dictionary_operations/insert
+                        time:   [214.12 ns 216.70 ns 219.52 ns]
+                        change: [+4.0876% +5.4754% +6.9671%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking dictionary_operations/remove
+Benchmarking dictionary_operations/remove: Warming up for 3.0000 s
+Benchmarking dictionary_operations/remove: Collecting 100 samples in estimated 5.0006 s (32M iterations)
+Benchmarking dictionary_operations/remove: Analyzing
+dictionary_operations/remove
+                        time:   [156.20 ns 157.60 ns 159.00 ns]
+                        change: [+7.5628% +9.1078% +10.550%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking dictionary_operations/contains
+Benchmarking dictionary_operations/contains: Warming up for 3.0000 s
+Benchmarking dictionary_operations/contains: Collecting 100 samples in estimated 5.0026 s (5.3M iterations)
+Benchmarking dictionary_operations/contains: Analyzing
+dictionary_operations/contains
+                        time:   [851.92 ns 856.72 ns 861.79 ns]
+                        change: [+5.2760% +6.2558% +7.3020%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking distance_computation/standard/6_7
+Benchmarking distance_computation/standard/6_7: Warming up for 3.0000 s
+Benchmarking distance_computation/standard/6_7: Collecting 100 samples in estimated 5.0017 s (14M iterations)
+Benchmarking distance_computation/standard/6_7: Analyzing
+distance_computation/standard/6_7
+                        time:   [347.05 ns 350.66 ns 354.71 ns]
+                        change: [+8.7028% +10.000% +11.234%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking distance_computation/transposition/6_7
+Benchmarking distance_computation/transposition/6_7: Warming up for 3.0000 s
+Benchmarking distance_computation/transposition/6_7: Collecting 100 samples in estimated 5.0012 s (14M iterations)
+Benchmarking distance_computation/transposition/6_7: Analyzing
+distance_computation/transposition/6_7
+                        time:   [357.65 ns 360.08 ns 362.48 ns]
+                        change: [+5.3186% +6.2734% +7.2883%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking distance_computation/standard/4_4
+Benchmarking distance_computation/standard/4_4: Warming up for 3.0000 s
+Benchmarking distance_computation/standard/4_4: Collecting 100 samples in estimated 5.0001 s (53M iterations)
+Benchmarking distance_computation/standard/4_4: Analyzing
+distance_computation/standard/4_4
+                        time:   [94.093 ns 95.042 ns 96.058 ns]
+                        change: [+3.5590% +4.9447% +6.2996%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking distance_computation/transposition/4_4
+Benchmarking distance_computation/transposition/4_4: Warming up for 3.0000 s
+Benchmarking distance_computation/transposition/4_4: Collecting 100 samples in estimated 5.0005 s (45M iterations)
+Benchmarking distance_computation/transposition/4_4: Analyzing
+distance_computation/transposition/4_4
+                        time:   [107.48 ns 108.23 ns 109.10 ns]
+                        change: [+5.8447% +7.0477% +8.2934%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking distance_computation/standard/1_8
+Benchmarking distance_computation/standard/1_8: Warming up for 3.0000 s
+Benchmarking distance_computation/standard/1_8: Collecting 100 samples in estimated 5.0003 s (32M iterations)
+Benchmarking distance_computation/standard/1_8: Analyzing
+distance_computation/standard/1_8
+                        time:   [155.08 ns 156.02 ns 157.04 ns]
+                        change: [-5.8678% -4.6676% -3.4820%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking distance_computation/transposition/1_8
+Benchmarking distance_computation/transposition/1_8: Warming up for 3.0000 s
+Benchmarking distance_computation/transposition/1_8: Collecting 100 samples in estimated 5.0002 s (29M iterations)
+Benchmarking distance_computation/transposition/1_8: Analyzing
+distance_computation/transposition/1_8
+                        time:   [165.17 ns 166.04 ns 166.94 ns]
+                        change: [-2.0106% -0.9543% +0.1225%] (p = 0.09 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking distance_computation/standard/11_10
+Benchmarking distance_computation/standard/11_10: Warming up for 3.0000 s
+Benchmarking distance_computation/standard/11_10: Collecting 100 samples in estimated 5.0020 s (7.7M iterations)
+Benchmarking distance_computation/standard/11_10: Analyzing
+distance_computation/standard/11_10
+                        time:   [654.78 ns 660.08 ns 665.67 ns]
+                        change: [-4.9182% -3.5579% -2.2619%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking distance_computation/transposition/11_10
+Benchmarking distance_computation/transposition/11_10: Warming up for 3.0000 s
+Benchmarking distance_computation/transposition/11_10: Collecting 100 samples in estimated 5.0010 s (6.9M iterations)
+Benchmarking distance_computation/transposition/11_10: Analyzing
+distance_computation/transposition/11_10
+                        time:   [825.37 ns 844.34 ns 863.19 ns]
+                        change: [+10.602% +12.815% +15.145%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking distance_computation/standard/21_17
+Benchmarking distance_computation/standard/21_17: Warming up for 3.0000 s
+Benchmarking distance_computation/standard/21_17: Collecting 100 samples in estimated 5.0031 s (2.7M iterations)
+Benchmarking distance_computation/standard/21_17: Analyzing
+distance_computation/standard/21_17
+                        time:   [1.7282 µs 1.7500 µs 1.7764 µs]
+                        change: [+17.089% +18.932% +20.970%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) high mild
+  4 (4.00%) high severe
+Benchmarking distance_computation/transposition/21_17
+Benchmarking distance_computation/transposition/21_17: Warming up for 3.0000 s
+Benchmarking distance_computation/transposition/21_17: Collecting 100 samples in estimated 5.0008 s (2.7M iterations)
+Benchmarking distance_computation/transposition/21_17: Analyzing
+distance_computation/transposition/21_17
+                        time:   [1.8117 µs 1.8207 µs 1.8331 µs]
+                        change: [+15.653% +16.841% +17.979%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 13 outliers among 100 measurements (13.00%)
+  4 (4.00%) high mild
+  9 (9.00%) high severe
+
+Benchmarking insertion_deletion/insertions
+Benchmarking insertion_deletion/insertions: Warming up for 3.0000 s
+Benchmarking insertion_deletion/insertions: Collecting 100 samples in estimated 5.0195 s (656k iterations)
+Benchmarking insertion_deletion/insertions: Analyzing
+insertion_deletion/insertions
+                        time:   [7.6021 µs 7.6691 µs 7.7724 µs]
+                        change: [-4.7368% -3.4013% -1.9055%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 12 outliers among 100 measurements (12.00%)
+  4 (4.00%) high mild
+  8 (8.00%) high severe
+Benchmarking insertion_deletion/deletions
+Benchmarking insertion_deletion/deletions: Warming up for 3.0000 s
+Benchmarking insertion_deletion/deletions: Collecting 100 samples in estimated 5.0283 s (646k iterations)
+Benchmarking insertion_deletion/deletions: Analyzing
+insertion_deletion/deletions
+                        time:   [6.9011 µs 6.9578 µs 7.0177 µs]
+                        change: [-6.1218% -4.9716% -3.7649%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking insertion_deletion/mixed
+Benchmarking insertion_deletion/mixed: Warming up for 3.0000 s
+Benchmarking insertion_deletion/mixed: Collecting 100 samples in estimated 5.0860 s (242k iterations)
+Benchmarking insertion_deletion/mixed: Analyzing
+insertion_deletion/mixed
+                        time:   [19.588 µs 19.892 µs 20.233 µs]
+                        change: [-11.858% -10.459% -8.9925%] (p = 0.00 < 0.05)
+                        Performance has improved.
+
+Benchmarking query_with_distance_calculation
+Benchmarking query_with_distance_calculation: Warming up for 3.0000 s
+Benchmarking query_with_distance_calculation: Collecting 100 samples in estimated 5.2758 s (15k iterations)
+Benchmarking query_with_distance_calculation: Analyzing
+query_with_distance_calculation
+                        time:   [325.27 µs 327.28 µs 329.46 µs]
+                        change: [-20.781% -20.090% -19.358%] (p = 0.00 < 0.05)
+                        Performance has improved.
+

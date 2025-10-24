@@ -10,7 +10,13 @@ use std::cmp::Ordering;
 ///
 /// The `is_special` flag is used by extended algorithms (Transposition,
 /// MergeAndSplit) to track additional state.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+///
+/// # Performance
+///
+/// Position is `Copy` (17 bytes: 2 usizes + bool) to eliminate allocation
+/// overhead when copying positions during state transitions. This reduces
+/// the overhead of Position cloning from ~7.44% to minimal bitwise copies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     /// Index into the query term (characters consumed)
     pub term_index: usize,

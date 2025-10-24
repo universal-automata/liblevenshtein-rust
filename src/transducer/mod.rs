@@ -6,6 +6,7 @@
 mod algorithm;
 mod position;
 mod state;
+mod pool;
 mod intersection;
 mod query;
 pub mod transition;
@@ -13,6 +14,7 @@ pub mod transition;
 pub use algorithm::Algorithm;
 pub use position::Position;
 pub use state::State;
+pub use pool::StatePool;
 pub use intersection::Intersection;
 pub use query::{QueryIterator, CandidateIterator, Candidate};
 

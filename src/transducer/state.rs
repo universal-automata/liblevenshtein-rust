@@ -94,6 +94,39 @@ impl State {
         self.positions.iter()
     }
 
+    /// Clear all positions from this state.
+    ///
+    /// This keeps the underlying Vec allocation, making it efficient for reuse
+    /// in a StatePool. After clearing, the state will be empty but retain its
+    /// capacity.
+    ///
+    /// # Performance
+    ///
+    /// - Time: O(1) - just sets Vec length to 0
+    /// - Memory: Vec capacity is preserved for reuse
+    #[inline]
+    pub fn clear(&mut self) {
+        self.positions.clear();
+    }
+
+    /// Copy all positions from another state into this one.
+    ///
+    /// This clears the current state and then copies all positions from the
+    /// source state. The source state is unchanged.
+    ///
+    /// # Performance
+    ///
+    /// - Time: O(n) where n is the number of positions in source
+    /// - Memory: Reuses this state's Vec allocation if capacity is sufficient
+    /// - Position is Copy, so this is a fast memcpy of the positions
+    pub fn copy_from(&mut self, other: &State) {
+        self.positions.clear();
+        self.positions.reserve(other.positions.len());
+        for pos in &other.positions {
+            self.positions.push(*pos); // Copy, not clone
+        }
+    }
+
     /// Get the minimum edit distance in this state
     ///
     /// Returns the smallest `num_errors` among all positions

@@ -1,6 +1,6 @@
 //! State transition logic for Levenshtein automata.
 
-use super::{Algorithm, Position, State};
+use super::{Algorithm, Position, State, StatePool};
 use smallvec::SmallVec;
 
 /// Compute the characteristic vector for a position in the query.
@@ -196,6 +196,30 @@ fn epsilon_closure(state: &State, query_length: usize, max_distance: usize) -> S
     result
 }
 
+/// Compute epsilon closure from source into target state (pool-friendly).
+///
+/// This function copies positions from the source state into the target state
+/// and then applies epsilon closure in-place. The target state is cleared first.
+///
+/// # Performance
+///
+/// This is optimized for use with StatePool:
+/// - Target state's Vec allocation is reused
+/// - Position is Copy, so no clone overhead
+/// - Eliminates one State::clone compared to epsilon_closure()
+fn epsilon_closure_into(
+    source: &State,
+    target: &mut State,
+    query_length: usize,
+    max_distance: usize,
+) {
+    // Copy positions from source to target
+    target.copy_from(source);
+
+    // Apply epsilon closure in-place
+    epsilon_closure_mut(target, query_length, max_distance);
+}
+
 /// Transition an entire state given a dictionary character.
 ///
 /// Computes the next state by transitioning all positions in the
@@ -230,6 +254,77 @@ pub fn transition_state(
     }
 
     if next_state.is_empty() {
+        None
+    } else {
+        Some(next_state)
+    }
+}
+
+/// Transition a state using a StatePool for allocation reuse (optimized).
+///
+/// This is the pool-aware version of `transition_state` that eliminates
+/// State cloning overhead by reusing allocations from the pool.
+///
+/// # Performance
+///
+/// Compared to `transition_state`:
+/// - Eliminates Vec allocation for expanded_state (reuses from pool)
+/// - Eliminates Vec allocation for next_state (reuses from pool)
+/// - Reduces State::clone overhead by ~6-10% of total runtime
+///
+/// # Arguments
+///
+/// * `state` - Current automaton state
+/// * `pool` - State pool for allocation reuse
+/// * `dict_char` - Dictionary character to transition on
+/// * `query` - Query term bytes
+/// * `max_distance` - Maximum edit distance
+/// * `algorithm` - Algorithm variant (Standard, Transposition, MergeAndSplit)
+///
+/// # Returns
+///
+/// The next state after transitioning, or None if no valid transitions exist.
+/// The returned state is acquired from the pool (caller should release it when done).
+pub fn transition_state_pooled(
+    state: &State,
+    pool: &mut StatePool,
+    dict_char: u8,
+    query: &[u8],
+    max_distance: usize,
+    algorithm: Algorithm,
+) -> Option<State> {
+    let window_size = max_distance + 1;
+    let query_length = query.len();
+
+    // Acquire a state from pool for epsilon closure (reuses allocation!)
+    let mut expanded_state = pool.acquire();
+
+    // Compute epsilon closure into the pooled state (no clone!)
+    epsilon_closure_into(state, &mut expanded_state, query_length, max_distance);
+
+    // Acquire another state from pool for next state
+    let mut next_state = pool.acquire();
+
+    // Stack-allocated buffer for characteristic vector
+    let mut cv_buffer = [false; 8];
+
+    for position in expanded_state.positions() {
+        let offset = position.term_index;
+        let cv = characteristic_vector(dict_char, query, window_size, offset, &mut cv_buffer);
+
+        let next_positions = transition_position(position, cv, query_length, max_distance, algorithm);
+
+        for next_pos in next_positions {
+            next_state.insert(next_pos);
+        }
+    }
+
+    // Return expanded_state to pool (no longer needed)
+    pool.release(expanded_state);
+
+    if next_state.is_empty() {
+        // Return empty state to pool
+        pool.release(next_state);
         None
     } else {
         Some(next_state)
