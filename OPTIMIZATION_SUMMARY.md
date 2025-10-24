@@ -165,23 +165,62 @@ The current implementation is production-ready with:
 - All tests passing
 - Clean, maintainable code
 
+### Phase 4: SmallVec for State Positions (Investigation - Not Adopted)
+
+**Motivation:** Post-Phase 3 profiling showed State cloning at 21.73% of runtime
+
+**Approach:** Tested `SmallVec<[Position; N]>` instead of `Vec<Position>` for State.positions
+- Size 4: Conservative (minimal stack pressure)
+- Size 8: Moderate (cover most states)
+- Size 12: Aggressive (eliminate most heap allocations)
+
+**Results:** Mixed performance - no universal winner
+
+| Size | Best Improvements | Worst Regressions |
+|------|-------------------|-------------------|
+| 4 | Standard -19%, Insertions -48% | Distance 4 +27%, Small dict +25% |
+| 8 | Distance 4 -17%, Distance 3 -8% | Query length +7%, Standard +4% |
+| 12 | MergeAndSplit -6% | Almost everything regressed +6-20% |
+
+**Root Cause:** State size varies dramatically:
+- Small states (distance 0-1): Benefit from size 4, hurt by larger sizes
+- Large states (distance 3-4): Benefit from size 8, hurt by size 4
+- No fixed size works for all workloads
+
+**Lesson:** SmallVec optimization fails when data structure size has high variance. Similar to Phase 2 experience with SmallVec in transitions.
+
+**Decision:** Reverted to `Vec<Position>`. Accepted 21.73% State cloning overhead as reasonable.
+
+**Documentation:** See `PHASE4_SMALLVEC_INVESTIGATION.md` for detailed analysis.
+
 ### Future Optimization Opportunities
 
-If further optimization is needed (it's already excellent):
+If further optimization is needed (current performance is already excellent):
 
-1. **Memory Profiling** - Measure memory usage improvements
+1. **In-Place State Mutation** - Highest potential impact
+   - Eliminate 21.73% State cloning overhead entirely
+   - Trade-off: Breaking API change for deterministic performance gain
+   - Recommended if State cloning becomes critical
+
+2. **Arc<Vec<u8>> for PathMapNode Paths** - Simple win
+   - Target: 5.14% path cloning overhead
+   - Low complexity, no API impact
+   - Good candidate for incremental improvement
+
+3. **Memory Profiling** - Measure memory usage improvements
    - Lazy evaluation likely reduces peak memory
    - Original goal included 50% memory reduction
+   - Not yet measured
 
-2. **Epsilon Closure HashSet** - Low priority
+4. **Epsilon Closure HashSet** - Low priority
    - Currently 0.59% of runtime (negligible)
    - Only optimize if profiling shows it's now significant
 
-3. **SIMD Characteristic Vector** - Speculative
+5. **SIMD Characteristic Vector** - Speculative
    - Parallel boolean comparisons
    - Would need careful benchmarking
 
-4. **State Caching** - For repeated queries
+6. **State Caching** - For repeated queries
    - Cache computed states
    - Good for autocomplete/typo correction use cases
 
@@ -192,7 +231,13 @@ The optimization journey demonstrates the value of profiling-guided optimization
 1. **Phase 1** improved transducer logic (7% of runtime) by 2-18%
 2. **Phase 2** profiling identified the real bottleneck (27% in dictionary layer)
 3. **Phase 3** lazy iterator eliminated the bottleneck, achieving 15-50% improvements
+4. **Phase 4** investigated SmallVec for State positions - found no viable solution due to workload variability
 
 **Final Result:** Production-ready code that's 15-50% faster across all workloads, with clean architecture and no regressions.
 
-**Key Takeaway:** Always profile before optimizing. Our initial assumptions were wrong, but profiling revealed the truth and enabled a proper fix that far exceeded original goals.
+**Key Takeaways:**
+- **Profile before optimizing** - Our initial assumptions about epsilon closure were wrong
+- **Benchmark every change** - Only way to discover SmallVec trade-offs
+- **Trust previous lessons** - Phase 2 SmallVec issues predicted Phase 4 results
+- **Revert quickly** - Don't commit to failed optimizations; gather data and move on
+- **Know when to stop** - Current performance is excellent; further optimization has diminishing returns
