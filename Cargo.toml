@@ -1,0 +1,42 @@
+[package]
+name = "liblevenshtein"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Dylon Edwards <dylon.edwards@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/F1R3FLY-io/liblevenshtein-rust"
+description = "Levenshtein/Universal Automata for approximate string matching using various dictionary backends"
+keywords = ["levenshtein", "edit-distance", "spell-checking", "fuzzy-search", "automata"]
+categories = ["algorithms", "data-structures", "text-processing"]
+readme = "README.md"
+
+[dependencies]
+# PathMap as the primary dictionary backend
+pathmap = { path = "../PathMap" }
+# SmallVec for stack-allocated vectors (performance optimization)
+smallvec = "1.13"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[lib]
+name = "liblevenshtein"
+path = "src/lib.rs"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
+[[bench]]
+name = "micro_benchmarks"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = true  # Enable debug symbols for profiling
+
+[profile.bench]
+inherits = "release"
