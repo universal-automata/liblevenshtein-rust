@@ -1,0 +1,459 @@
+   Compiling either v1.15.0
+   Compiling libc v0.2.177
+   Compiling rustix v1.1.2
+   Compiling getrandom v0.3.4
+   Compiling bytes v1.10.1
+   Compiling linux-raw-sys v0.11.0
+   Compiling hashbrown v0.16.0
+   Compiling equivalent v1.0.2
+   Compiling bitflags v2.10.0
+   Compiling regex-syntax v0.8.8
+   Compiling prettyplease v0.2.37
+   Compiling cfg-if v1.0.4
+   Compiling fastrand v2.3.0
+   Compiling fixedbitset v0.4.2
+   Compiling once_cell v1.21.3
+   Compiling anyhow v1.0.100
+   Compiling multimap v0.10.1
+   Compiling log v0.4.28
+   Compiling syn v2.0.108
+   Compiling itertools v0.10.5
+   Compiling indexmap v2.12.0
+   Compiling petgraph v0.6.5
+   Compiling regex-automata v0.4.13
+   Compiling tempfile v3.23.0
+   Compiling regex v1.12.2
+   Compiling prost-derive v0.12.6
+   Compiling serde_derive v1.0.228
+   Compiling zerocopy-derive v0.8.27
+   Compiling pathmap-derive v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap/pathmap-derive)
+   Compiling pathmap v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap)
+   Compiling zerocopy v0.8.27
+   Compiling prost v0.12.6
+   Compiling prost-types v0.12.6
+   Compiling serde v1.0.228
+   Compiling prost-build v0.12.6
+   Compiling tinytemplate v1.2.1
+   Compiling bincode v1.3.3
+   Compiling half v2.7.1
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+   Compiling ciborium-ll v0.2.2
+   Compiling ciborium v0.2.2
+   Compiling criterion v0.5.1
+warning: struct `DictionaryContainer` is never constructed
+  --> /home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust/target/release/build/liblevenshtein-b776c2f24375aa00/out/liblevenshtein.proto.rs:77:12
+   |
+77 | pub struct DictionaryContainer {
+   |            ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: enum `Format` is never used
+  --> /home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust/target/release/build/liblevenshtein-b776c2f24375aa00/out/liblevenshtein.proto.rs:85:14
+   |
+85 |     pub enum Format {
+   |              ^^^^^^
+
+warning: `liblevenshtein` (lib) generated 2 warnings
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 14s
+     Running benches/serialization_benchmarks.rs (target/release/deps/serialization_benchmarks-edeb94e6abf6155e)
+Benchmarking bincode_serialize/100
+Benchmarking bincode_serialize/100: Warming up for 3.0000 s
+Benchmarking bincode_serialize/100: Collecting 100 samples in estimated 5.2028 s (56k iterations)
+Benchmarking bincode_serialize/100: Analyzing
+bincode_serialize/100   time:   [93.517 µs 94.053 µs 94.594 µs]
+                        thrpt:  [1.0571 Melem/s 1.0632 Melem/s 1.0693 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking bincode_serialize/500
+Benchmarking bincode_serialize/500: Warming up for 3.0000 s
+Benchmarking bincode_serialize/500: Collecting 100 samples in estimated 6.8000 s (15k iterations)
+Benchmarking bincode_serialize/500: Analyzing
+bincode_serialize/500   time:   [449.23 µs 451.39 µs 453.77 µs]
+                        thrpt:  [1.1019 Melem/s 1.1077 Melem/s 1.1130 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking bincode_serialize/1000
+Benchmarking bincode_serialize/1000: Warming up for 3.0000 s
+Benchmarking bincode_serialize/1000: Collecting 100 samples in estimated 9.3064 s (10k iterations)
+Benchmarking bincode_serialize/1000: Analyzing
+bincode_serialize/1000  time:   [889.36 µs 893.53 µs 897.85 µs]
+                        thrpt:  [1.1138 Melem/s 1.1192 Melem/s 1.1244 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+Benchmarking bincode_serialize/5000
+Benchmarking bincode_serialize/5000: Warming up for 3.0000 s
+Benchmarking bincode_serialize/5000: Collecting 100 samples in estimated 5.1025 s (1200 iterations)
+Benchmarking bincode_serialize/5000: Analyzing
+bincode_serialize/5000  time:   [4.2137 ms 4.2358 ms 4.2583 ms]
+                        thrpt:  [1.1742 Melem/s 1.1804 Melem/s 1.1866 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high mild
+
+Benchmarking bincode_deserialize/100
+Benchmarking bincode_deserialize/100: Warming up for 3.0000 s
+Benchmarking bincode_deserialize/100: Collecting 100 samples in estimated 5.0816 s (212k iterations)
+Benchmarking bincode_deserialize/100: Analyzing
+bincode_deserialize/100 time:   [23.767 µs 23.980 µs 24.230 µs]
+                        thrpt:  [4.1272 Melem/s 4.1701 Melem/s 4.2076 Melem/s]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking bincode_deserialize/500
+Benchmarking bincode_deserialize/500: Warming up for 3.0000 s
+Benchmarking bincode_deserialize/500: Collecting 100 samples in estimated 5.1978 s (40k iterations)
+Benchmarking bincode_deserialize/500: Analyzing
+bincode_deserialize/500 time:   [127.95 µs 128.68 µs 129.42 µs]
+                        thrpt:  [3.8635 Melem/s 3.8855 Melem/s 3.9077 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking bincode_deserialize/1000
+Benchmarking bincode_deserialize/1000: Warming up for 3.0000 s
+Benchmarking bincode_deserialize/1000: Collecting 100 samples in estimated 5.4089 s (20k iterations)
+Benchmarking bincode_deserialize/1000: Analyzing
+bincode_deserialize/1000
+                        time:   [256.52 µs 257.96 µs 259.50 µs]
+                        thrpt:  [3.8536 Melem/s 3.8765 Melem/s 3.8983 Melem/s]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking bincode_deserialize/5000
+Benchmarking bincode_deserialize/5000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.5s, enable flat sampling, or reduce sample count to 60.
+Benchmarking bincode_deserialize/5000: Collecting 100 samples in estimated 6.4875 s (5050 iterations)
+Benchmarking bincode_deserialize/5000: Analyzing
+bincode_deserialize/5000
+                        time:   [1.2760 ms 1.2818 ms 1.2878 ms]
+                        thrpt:  [3.8825 Melem/s 3.9007 Melem/s 3.9186 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking json_serialize/100
+Benchmarking json_serialize/100: Warming up for 3.0000 s
+Benchmarking json_serialize/100: Collecting 100 samples in estimated 5.0273 s (50k iterations)
+Benchmarking json_serialize/100: Analyzing
+json_serialize/100      time:   [100.32 µs 100.76 µs 101.20 µs]
+                        thrpt:  [988.15 Kelem/s 992.47 Kelem/s 996.78 Kelem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking json_serialize/500
+Benchmarking json_serialize/500: Warming up for 3.0000 s
+Benchmarking json_serialize/500: Collecting 100 samples in estimated 6.9949 s (15k iterations)
+Benchmarking json_serialize/500: Analyzing
+json_serialize/500      time:   [448.73 µs 450.95 µs 453.39 µs]
+                        thrpt:  [1.1028 Melem/s 1.1088 Melem/s 1.1142 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking json_serialize/1000
+Benchmarking json_serialize/1000: Warming up for 3.0000 s
+Benchmarking json_serialize/1000: Collecting 100 samples in estimated 9.1625 s (10k iterations)
+Benchmarking json_serialize/1000: Analyzing
+json_serialize/1000     time:   [905.43 µs 909.69 µs 914.01 µs]
+                        thrpt:  [1.0941 Melem/s 1.0993 Melem/s 1.1045 Melem/s]
+Found 10 outliers among 100 measurements (10.00%)
+  7 (7.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking json_serialize/5000
+Benchmarking json_serialize/5000: Warming up for 3.0000 s
+Benchmarking json_serialize/5000: Collecting 100 samples in estimated 5.1680 s (1200 iterations)
+Benchmarking json_serialize/5000: Analyzing
+json_serialize/5000     time:   [4.4820 ms 4.5181 ms 4.5532 ms]
+                        thrpt:  [1.0981 Melem/s 1.1067 Melem/s 1.1156 Melem/s]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) low mild
+
+Benchmarking json_deserialize/100
+Benchmarking json_deserialize/100: Warming up for 3.0000 s
+Benchmarking json_deserialize/100: Collecting 100 samples in estimated 5.0773 s (177k iterations)
+Benchmarking json_deserialize/100: Analyzing
+json_deserialize/100    time:   [30.478 µs 31.388 µs 32.585 µs]
+                        thrpt:  [3.0689 Melem/s 3.1859 Melem/s 3.2811 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking json_deserialize/500
+Benchmarking json_deserialize/500: Warming up for 3.0000 s
+Benchmarking json_deserialize/500: Collecting 100 samples in estimated 5.4596 s (35k iterations)
+Benchmarking json_deserialize/500: Analyzing
+json_deserialize/500    time:   [142.02 µs 143.81 µs 145.96 µs]
+                        thrpt:  [3.4256 Melem/s 3.4767 Melem/s 3.5205 Melem/s]
+Benchmarking json_deserialize/1000
+Benchmarking json_deserialize/1000: Warming up for 3.0000 s
+Benchmarking json_deserialize/1000: Collecting 100 samples in estimated 5.4534 s (20k iterations)
+Benchmarking json_deserialize/1000: Analyzing
+json_deserialize/1000   time:   [279.45 µs 281.25 µs 283.36 µs]
+                        thrpt:  [3.5291 Melem/s 3.5555 Melem/s 3.5784 Melem/s]
+Found 6 outliers among 100 measurements (6.00%)
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking json_deserialize/5000
+Benchmarking json_deserialize/5000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.9s, enable flat sampling, or reduce sample count to 50.
+Benchmarking json_deserialize/5000: Collecting 100 samples in estimated 7.8593 s (5050 iterations)
+Benchmarking json_deserialize/5000: Analyzing
+json_deserialize/5000   time:   [1.5554 ms 1.5638 ms 1.5732 ms]
+                        thrpt:  [3.1783 Melem/s 3.1974 Melem/s 3.2147 Melem/s]
+Found 12 outliers among 100 measurements (12.00%)
+  1 (1.00%) low mild
+  7 (7.00%) high mild
+  4 (4.00%) high severe
+
+Benchmarking format_comparison_serialize/bincode
+Benchmarking format_comparison_serialize/bincode: Warming up for 3.0000 s
+Benchmarking format_comparison_serialize/bincode: Collecting 100 samples in estimated 9.0684 s (10k iterations)
+Benchmarking format_comparison_serialize/bincode: Analyzing
+format_comparison_serialize/bincode
+                        time:   [844.03 µs 849.16 µs 855.03 µs]
+                        thrpt:  [1.1695 Melem/s 1.1776 Melem/s 1.1848 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking format_comparison_serialize/json
+Benchmarking format_comparison_serialize/json: Warming up for 3.0000 s
+Benchmarking format_comparison_serialize/json: Collecting 100 samples in estimated 8.8325 s (10k iterations)
+Benchmarking format_comparison_serialize/json: Analyzing
+format_comparison_serialize/json
+                        time:   [835.86 µs 839.40 µs 843.46 µs]
+                        thrpt:  [1.1856 Melem/s 1.1913 Melem/s 1.1964 Melem/s]
+Found 10 outliers among 100 measurements (10.00%)
+  4 (4.00%) high mild
+  6 (6.00%) high severe
+Benchmarking format_comparison_serialize/protobuf_v1
+Benchmarking format_comparison_serialize/protobuf_v1: Warming up for 3.0000 s
+Benchmarking format_comparison_serialize/protobuf_v1: Collecting 100 samples in estimated 8.2889 s (10k iterations)
+Benchmarking format_comparison_serialize/protobuf_v1: Analyzing
+format_comparison_serialize/protobuf_v1
+                        time:   [821.67 µs 824.30 µs 827.46 µs]
+                        thrpt:  [1.2085 Melem/s 1.2132 Melem/s 1.2170 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+Benchmarking format_comparison_serialize/protobuf_v2
+Benchmarking format_comparison_serialize/protobuf_v2: Warming up for 3.0000 s
+Benchmarking format_comparison_serialize/protobuf_v2: Collecting 100 samples in estimated 8.1585 s (10k iterations)
+Benchmarking format_comparison_serialize/protobuf_v2: Analyzing
+format_comparison_serialize/protobuf_v2
+                        time:   [798.98 µs 801.50 µs 804.19 µs]
+                        thrpt:  [1.2435 Melem/s 1.2477 Melem/s 1.2516 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  4 (4.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking format_comparison_deserialize/bincode
+Benchmarking format_comparison_deserialize/bincode: Warming up for 3.0000 s
+Benchmarking format_comparison_deserialize/bincode: Collecting 100 samples in estimated 6.1740 s (25k iterations)
+Benchmarking format_comparison_deserialize/bincode: Analyzing
+format_comparison_deserialize/bincode
+                        time:   [242.54 µs 243.57 µs 244.85 µs]
+                        thrpt:  [4.0842 Melem/s 4.1057 Melem/s 4.1230 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+Benchmarking format_comparison_deserialize/json
+Benchmarking format_comparison_deserialize/json: Warming up for 3.0000 s
+Benchmarking format_comparison_deserialize/json: Collecting 100 samples in estimated 5.7140 s (20k iterations)
+Benchmarking format_comparison_deserialize/json: Analyzing
+format_comparison_deserialize/json
+                        time:   [278.22 µs 279.26 µs 280.51 µs]
+                        thrpt:  [3.5649 Melem/s 3.5809 Melem/s 3.5943 Melem/s]
+Found 6 outliers among 100 measurements (6.00%)
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking format_comparison_deserialize/protobuf_v1
+Benchmarking format_comparison_deserialize/protobuf_v1: Warming up for 3.0000 s
+Benchmarking format_comparison_deserialize/protobuf_v1: Collecting 100 samples in estimated 7.1045 s (15k iterations)
+Benchmarking format_comparison_deserialize/protobuf_v1: Analyzing
+format_comparison_deserialize/protobuf_v1
+                        time:   [468.42 µs 469.82 µs 471.37 µs]
+                        thrpt:  [2.1215 Melem/s 2.1285 Melem/s 2.1348 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  4 (4.00%) high mild
+  3 (3.00%) high severe
+Benchmarking format_comparison_deserialize/protobuf_v2
+Benchmarking format_comparison_deserialize/protobuf_v2: Warming up for 3.0000 s
+Benchmarking format_comparison_deserialize/protobuf_v2: Collecting 100 samples in estimated 6.7030 s (15k iterations)
+Benchmarking format_comparison_deserialize/protobuf_v2: Analyzing
+format_comparison_deserialize/protobuf_v2
+                        time:   [439.08 µs 440.35 µs 441.80 µs]
+                        thrpt:  [2.2635 Melem/s 2.2709 Melem/s 2.2775 Melem/s]
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking protobuf_v1_serialize/100
+Benchmarking protobuf_v1_serialize/100: Warming up for 3.0000 s
+Benchmarking protobuf_v1_serialize/100: Collecting 100 samples in estimated 5.0720 s (56k iterations)
+Benchmarking protobuf_v1_serialize/100: Analyzing
+protobuf_v1_serialize/100
+                        time:   [90.493 µs 90.777 µs 91.091 µs]
+                        thrpt:  [1.0978 Melem/s 1.1016 Melem/s 1.1051 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) high mild
+  3 (3.00%) high severe
+Benchmarking protobuf_v1_serialize/500
+Benchmarking protobuf_v1_serialize/500: Warming up for 3.0000 s
+Benchmarking protobuf_v1_serialize/500: Collecting 100 samples in estimated 6.2876 s (15k iterations)
+Benchmarking protobuf_v1_serialize/500: Analyzing
+protobuf_v1_serialize/500
+                        time:   [412.74 µs 414.08 µs 415.56 µs]
+                        thrpt:  [1.2032 Melem/s 1.2075 Melem/s 1.2114 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+Benchmarking protobuf_v1_serialize/1000
+Benchmarking protobuf_v1_serialize/1000: Warming up for 3.0000 s
+Benchmarking protobuf_v1_serialize/1000: Collecting 100 samples in estimated 8.2709 s (10k iterations)
+Benchmarking protobuf_v1_serialize/1000: Analyzing
+protobuf_v1_serialize/1000
+                        time:   [813.91 µs 815.91 µs 818.09 µs]
+                        thrpt:  [1.2224 Melem/s 1.2256 Melem/s 1.2286 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+Benchmarking protobuf_v1_serialize/5000
+Benchmarking protobuf_v1_serialize/5000: Warming up for 3.0000 s
+Benchmarking protobuf_v1_serialize/5000: Collecting 100 samples in estimated 5.0669 s (1300 iterations)
+Benchmarking protobuf_v1_serialize/5000: Analyzing
+protobuf_v1_serialize/5000
+                        time:   [3.9605 ms 4.0106 ms 4.0657 ms]
+                        thrpt:  [1.2298 Melem/s 1.2467 Melem/s 1.2625 Melem/s]
+Found 20 outliers among 100 measurements (20.00%)
+  10 (10.00%) high mild
+  10 (10.00%) high severe
+
+Benchmarking protobuf_v1_deserialize/100
+Benchmarking protobuf_v1_deserialize/100: Warming up for 3.0000 s
+Benchmarking protobuf_v1_deserialize/100: Collecting 100 samples in estimated 5.1955 s (101k iterations)
+Benchmarking protobuf_v1_deserialize/100: Analyzing
+protobuf_v1_deserialize/100
+                        time:   [51.009 µs 51.156 µs 51.320 µs]
+                        thrpt:  [1.9486 Melem/s 1.9548 Melem/s 1.9604 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+Benchmarking protobuf_v1_deserialize/500
+Benchmarking protobuf_v1_deserialize/500: Warming up for 3.0000 s
+Benchmarking protobuf_v1_deserialize/500: Collecting 100 samples in estimated 6.1505 s (25k iterations)
+Benchmarking protobuf_v1_deserialize/500: Analyzing
+protobuf_v1_deserialize/500
+                        time:   [242.26 µs 243.06 µs 243.96 µs]
+                        thrpt:  [2.0495 Melem/s 2.0571 Melem/s 2.0639 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+Benchmarking protobuf_v1_deserialize/1000
+Benchmarking protobuf_v1_deserialize/1000: Warming up for 3.0000 s
+Benchmarking protobuf_v1_deserialize/1000: Collecting 100 samples in estimated 7.2765 s (15k iterations)
+Benchmarking protobuf_v1_deserialize/1000: Analyzing
+protobuf_v1_deserialize/1000
+                        time:   [483.23 µs 485.18 µs 487.46 µs]
+                        thrpt:  [2.0515 Melem/s 2.0611 Melem/s 2.0694 Melem/s]
+Found 10 outliers among 100 measurements (10.00%)
+  3 (3.00%) high mild
+  7 (7.00%) high severe
+Benchmarking protobuf_v1_deserialize/5000
+Benchmarking protobuf_v1_deserialize/5000: Warming up for 3.0000 s
+Benchmarking protobuf_v1_deserialize/5000: Collecting 100 samples in estimated 5.1546 s (2200 iterations)
+Benchmarking protobuf_v1_deserialize/5000: Analyzing
+protobuf_v1_deserialize/5000
+                        time:   [2.3327 ms 2.3385 ms 2.3447 ms]
+                        thrpt:  [2.1325 Melem/s 2.1382 Melem/s 2.1435 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+
+Benchmarking protobuf_v2_serialize/100
+Benchmarking protobuf_v2_serialize/100: Warming up for 3.0000 s
+Benchmarking protobuf_v2_serialize/100: Collecting 100 samples in estimated 5.3668 s (61k iterations)
+Benchmarking protobuf_v2_serialize/100: Analyzing
+protobuf_v2_serialize/100
+                        time:   [88.360 µs 88.560 µs 88.780 µs]
+                        thrpt:  [1.1264 Melem/s 1.1292 Melem/s 1.1317 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+Benchmarking protobuf_v2_serialize/500
+Benchmarking protobuf_v2_serialize/500: Warming up for 3.0000 s
+Benchmarking protobuf_v2_serialize/500: Collecting 100 samples in estimated 6.1507 s (15k iterations)
+Benchmarking protobuf_v2_serialize/500: Analyzing
+protobuf_v2_serialize/500
+                        time:   [403.61 µs 404.51 µs 405.53 µs]
+                        thrpt:  [1.2330 Melem/s 1.2361 Melem/s 1.2388 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+Benchmarking protobuf_v2_serialize/1000
+Benchmarking protobuf_v2_serialize/1000: Warming up for 3.0000 s
+Benchmarking protobuf_v2_serialize/1000: Collecting 100 samples in estimated 8.1219 s (10k iterations)
+Benchmarking protobuf_v2_serialize/1000: Analyzing
+protobuf_v2_serialize/1000
+                        time:   [800.71 µs 803.03 µs 805.56 µs]
+                        thrpt:  [1.2414 Melem/s 1.2453 Melem/s 1.2489 Melem/s]
+Found 15 outliers among 100 measurements (15.00%)
+  10 (10.00%) high mild
+  5 (5.00%) high severe
+Benchmarking protobuf_v2_serialize/5000
+Benchmarking protobuf_v2_serialize/5000: Warming up for 3.0000 s
+Benchmarking protobuf_v2_serialize/5000: Collecting 100 samples in estimated 5.2633 s (1400 iterations)
+Benchmarking protobuf_v2_serialize/5000: Analyzing
+protobuf_v2_serialize/5000
+                        time:   [3.8220 ms 3.8532 ms 3.8871 ms]
+                        thrpt:  [1.2863 Melem/s 1.2976 Melem/s 1.3082 Melem/s]
+Found 15 outliers among 100 measurements (15.00%)
+  7 (7.00%) high mild
+  8 (8.00%) high severe
+
+Benchmarking protobuf_v2_deserialize/100
+Benchmarking protobuf_v2_deserialize/100: Warming up for 3.0000 s
+Benchmarking protobuf_v2_deserialize/100: Collecting 100 samples in estimated 5.0335 s (106k iterations)
+Benchmarking protobuf_v2_deserialize/100: Analyzing
+protobuf_v2_deserialize/100
+                        time:   [46.868 µs 46.997 µs 47.137 µs]
+                        thrpt:  [2.1215 Melem/s 2.1278 Melem/s 2.1336 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  3 (3.00%) high mild
+  5 (5.00%) high severe
+Benchmarking protobuf_v2_deserialize/500
+Benchmarking protobuf_v2_deserialize/500: Warming up for 3.0000 s
+Benchmarking protobuf_v2_deserialize/500: Collecting 100 samples in estimated 5.8145 s (25k iterations)
+Benchmarking protobuf_v2_deserialize/500: Analyzing
+protobuf_v2_deserialize/500
+                        time:   [230.20 µs 230.85 µs 231.58 µs]
+                        thrpt:  [2.1591 Melem/s 2.1659 Melem/s 2.1720 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  3 (3.00%) high mild
+  5 (5.00%) high severe
+Benchmarking protobuf_v2_deserialize/1000
+Benchmarking protobuf_v2_deserialize/1000: Warming up for 3.0000 s
+Benchmarking protobuf_v2_deserialize/1000: Collecting 100 samples in estimated 6.7295 s (15k iterations)
+Benchmarking protobuf_v2_deserialize/1000: Analyzing
+protobuf_v2_deserialize/1000
+                        time:   [446.00 µs 448.79 µs 452.39 µs]
+                        thrpt:  [2.2105 Melem/s 2.2282 Melem/s 2.2422 Melem/s]
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+Benchmarking protobuf_v2_deserialize/5000
+Benchmarking protobuf_v2_deserialize/5000: Warming up for 3.0000 s
+Benchmarking protobuf_v2_deserialize/5000: Collecting 100 samples in estimated 5.1919 s (2400 iterations)
+Benchmarking protobuf_v2_deserialize/5000: Analyzing
+protobuf_v2_deserialize/5000
+                        time:   [2.1884 ms 2.2097 ms 2.2332 ms]
+                        thrpt:  [2.2390 Melem/s 2.2627 Melem/s 2.2847 Melem/s]
+Found 17 outliers among 100 measurements (17.00%)
+  7 (7.00%) high mild
+  10 (10.00%) high severe
+

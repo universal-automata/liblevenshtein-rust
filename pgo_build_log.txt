@@ -1,0 +1,72 @@
+=== Profile-Guided Optimization Build ===
+
+Step 0: Cleaning previous PGO data...
+Clean complete.
+
+Step 1: Building with instrumentation...
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+    Finished `release` profile [optimized + debuginfo] target(s) in 11.62s
+Instrumented build complete.
+
+Step 2: Running profiling benchmark to collect data...
+Running: target/release/deps/profiling_benchmark-76f3d56e92fc7c61
+=== Profiling Benchmark: Realistic Workload ===
+
+Loading dictionary...
+Loaded 10000 words
+
+Building DAWG...
+DAWG built in 3.323069ms
+
+Building transducer...
+Transducer built in 48ns
+
+Performing queries...
+Completed 5000 queries in 5.517403106s
+Average: 1.10348ms per query
+Total results: 1084000
+
+Performing dictionary operations...
+Completed 1M contains() calls in 203.770501ms
+Found: 1000000 words
+
+=== Profiling Complete ===
+Profiling data collection complete.
+
+Step 3: Merging profiling data...
+Profiling data merged.
+
+Step 4: Building with PGO optimizations...
+   Compiling proc-macro2 v1.0.103
+   Compiling shlex v1.3.0
+   Compiling find-msvc-tools v0.1.4
+   Compiling unicode-ident v1.0.20
+   Compiling quote v1.0.41
+   Compiling rustversion v1.0.22
+   Compiling autocfg v1.5.0
+   Compiling libc v0.2.177
+   Compiling gxhash v3.5.0
+   Compiling smallvec v1.15.1
+   Compiling fast-slice-utils v0.1.1
+   Compiling arrayvec v0.7.6
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+   Compiling dyn-clone v1.0.20
+   Compiling local-or-heap v0.1.0
+   Compiling maybe-dangling v0.1.2
+   Compiling cc v1.2.42
+   Compiling reusing-vec v0.2.0
+   Compiling num-traits v0.2.19
+   Compiling syn v2.0.108
+   Compiling cmake v0.1.54
+   Compiling libz-ng-sys v1.1.22
+   Compiling pathmap-derive v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap/pathmap-derive)
+   Compiling pathmap v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap)
+    Finished `release` profile [optimized + debuginfo] target(s) in 14.76s
+PGO-optimized build complete.
+
+Step 5: Verifying PGO binary...
+-rwxr-xr-x 2 dylon dylon 11M Oct 24 17:08 target/release/liblevenshtein-cli
+
+=== PGO Build Complete ===
+The PGO-optimized library is in target/release/
+Run benchmarks with: RUSTFLAGS="-C target-cpu=native" cargo bench

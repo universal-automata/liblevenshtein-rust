@@ -1,0 +1,252 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: unused import: `std::sync::Arc`
+  --> benches/threshold_tuning.rs:37:5
+   |
+37 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused variable: `thresholds`
+  --> benches/threshold_tuning.rs:98:9
+   |
+98 |     let thresholds = [2, 4, 6, 8, 10, 12, 16, 32];
+   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_thresholds`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: function `search_with_threshold` is never used
+ --> benches/threshold_tuning.rs:6:4
+  |
+6 | fn search_with_threshold(
+  |    ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` on by default
+
+warning: function `extract_nodes` is never used
+  --> benches/threshold_tuning.rs:47:4
+   |
+47 | fn extract_nodes(dict: &DawgDictionary) -> Vec<DawgNode> {
+   |    ^^^^^^^^^^^^^
+
+warning: unused `Result` that must be used
+   --> benches/threshold_tuning.rs:161:21
+    |
+161 |                     black_box(result);
+    |                     ^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+161 |                     let _ = black_box(result);
+    |                     +++++++
+
+warning: `liblevenshtein` (bench "threshold_tuning") generated 5 warnings (run `cargo fix --bench "threshold_tuning"` to apply 1 suggestion)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 40.19s
+     Running benches/threshold_tuning.rs (target/release/deps/threshold_tuning-13b5d14a651274b2)
+Benchmarking threshold_impact_500/current_impl/threshold_8
+Benchmarking threshold_impact_500/current_impl/threshold_8: Warming up for 3.0000 s
+Benchmarking threshold_impact_500/current_impl/threshold_8: Collecting 100 samples in estimated 5.0125 s (1.9M iterations)
+Benchmarking threshold_impact_500/current_impl/threshold_8: Analyzing
+threshold_impact_500/current_impl/threshold_8
+                        time:   [2.6649 µs 2.6741 µs 2.6847 µs]
+                        thrpt:  [186.24 Melem/s 186.98 Melem/s 187.62 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking threshold_impact_1000/current_impl/threshold_8
+Benchmarking threshold_impact_1000/current_impl/threshold_8: Warming up for 3.0000 s
+Benchmarking threshold_impact_1000/current_impl/threshold_8: Collecting 100 samples in estimated 5.0091 s (763k iterations)
+Benchmarking threshold_impact_1000/current_impl/threshold_8: Analyzing
+threshold_impact_1000/current_impl/threshold_8
+                        time:   [6.5671 µs 6.5908 µs 6.6158 µs]
+                        thrpt:  [151.15 Melem/s 151.73 Melem/s 152.27 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking threshold_impact_5000/current_impl/threshold_8
+Benchmarking threshold_impact_5000/current_impl/threshold_8: Warming up for 3.0000 s
+Benchmarking threshold_impact_5000/current_impl/threshold_8: Collecting 100 samples in estimated 5.0321 s (152k iterations)
+Benchmarking threshold_impact_5000/current_impl/threshold_8: Analyzing
+threshold_impact_5000/current_impl/threshold_8
+                        time:   [33.096 µs 33.190 µs 33.291 µs]
+                        thrpt:  [150.19 Melem/s 150.65 Melem/s 151.07 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking search_strategy_comparison/linear_search/2
+Benchmarking search_strategy_comparison/linear_search/2: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/2: Collecting 100 samples in estimated 5.0000 s (3.4B iterations)
+Benchmarking search_strategy_comparison/linear_search/2: Analyzing
+search_strategy_comparison/linear_search/2
+                        time:   [1.4753 ns 1.4873 ns 1.5015 ns]
+Found 8 outliers among 100 measurements (8.00%)
+  3 (3.00%) high mild
+  5 (5.00%) high severe
+Benchmarking search_strategy_comparison/binary_search/2
+Benchmarking search_strategy_comparison/binary_search/2: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/2: Collecting 100 samples in estimated 5.0000 s (2.4B iterations)
+Benchmarking search_strategy_comparison/binary_search/2: Analyzing
+search_strategy_comparison/binary_search/2
+                        time:   [2.1973 ns 2.2051 ns 2.2138 ns]
+Found 12 outliers among 100 measurements (12.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  6 (6.00%) high mild
+  3 (3.00%) high severe
+Benchmarking search_strategy_comparison/linear_search/4
+Benchmarking search_strategy_comparison/linear_search/4: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/4: Collecting 100 samples in estimated 5.0000 s (2.3B iterations)
+Benchmarking search_strategy_comparison/linear_search/4: Analyzing
+search_strategy_comparison/linear_search/4
+                        time:   [2.1928 ns 2.2015 ns 2.2113 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking search_strategy_comparison/binary_search/4
+Benchmarking search_strategy_comparison/binary_search/4: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/4: Collecting 100 samples in estimated 5.0000 s (1.5B iterations)
+Benchmarking search_strategy_comparison/binary_search/4: Analyzing
+search_strategy_comparison/binary_search/4
+                        time:   [3.2319 ns 3.2434 ns 3.2566 ns]
+Found 6 outliers among 100 measurements (6.00%)
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_strategy_comparison/linear_search/6
+Benchmarking search_strategy_comparison/linear_search/6: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/6: Collecting 100 samples in estimated 5.0000 s (1.7B iterations)
+Benchmarking search_strategy_comparison/linear_search/6: Analyzing
+search_strategy_comparison/linear_search/6
+                        time:   [2.8090 ns 2.8236 ns 2.8383 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking search_strategy_comparison/binary_search/6
+Benchmarking search_strategy_comparison/binary_search/6: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/6: Collecting 100 samples in estimated 5.0000 s (1.1B iterations)
+Benchmarking search_strategy_comparison/binary_search/6: Analyzing
+search_strategy_comparison/binary_search/6
+                        time:   [4.3233 ns 4.3382 ns 4.3538 ns]
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  3 (3.00%) high severe
+Benchmarking search_strategy_comparison/linear_search/8
+Benchmarking search_strategy_comparison/linear_search/8: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/8: Collecting 100 samples in estimated 5.0000 s (1.5B iterations)
+Benchmarking search_strategy_comparison/linear_search/8: Analyzing
+search_strategy_comparison/linear_search/8
+                        time:   [3.4386 ns 3.4668 ns 3.4984 ns]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking search_strategy_comparison/binary_search/8
+Benchmarking search_strategy_comparison/binary_search/8: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/8: Collecting 100 samples in estimated 5.0000 s (1.1B iterations)
+Benchmarking search_strategy_comparison/binary_search/8: Analyzing
+search_strategy_comparison/binary_search/8
+                        time:   [4.4483 ns 4.4637 ns 4.4806 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_strategy_comparison/linear_search/10
+Benchmarking search_strategy_comparison/linear_search/10: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/10: Collecting 100 samples in estimated 5.0000 s (1.2B iterations)
+Benchmarking search_strategy_comparison/linear_search/10: Analyzing
+search_strategy_comparison/linear_search/10
+                        time:   [4.1827 ns 4.2013 ns 4.2197 ns]
+Found 11 outliers among 100 measurements (11.00%)
+  1 (1.00%) low severe
+  5 (5.00%) low mild
+  5 (5.00%) high mild
+Benchmarking search_strategy_comparison/binary_search/10
+Benchmarking search_strategy_comparison/binary_search/10: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/10: Collecting 100 samples in estimated 5.0000 s (844M iterations)
+Benchmarking search_strategy_comparison/binary_search/10: Analyzing
+search_strategy_comparison/binary_search/10
+                        time:   [6.0087 ns 6.0425 ns 6.0778 ns]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking search_strategy_comparison/linear_search/12
+Benchmarking search_strategy_comparison/linear_search/12: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/12: Collecting 100 samples in estimated 5.0000 s (1.1B iterations)
+Benchmarking search_strategy_comparison/linear_search/12: Analyzing
+search_strategy_comparison/linear_search/12
+                        time:   [4.3767 ns 4.3934 ns 4.4114 ns]
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+Benchmarking search_strategy_comparison/binary_search/12
+Benchmarking search_strategy_comparison/binary_search/12: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/12: Collecting 100 samples in estimated 5.0000 s (890M iterations)
+Benchmarking search_strategy_comparison/binary_search/12: Analyzing
+search_strategy_comparison/binary_search/12
+                        time:   [6.0371 ns 6.0577 ns 6.0792 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low severe
+  7 (7.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_strategy_comparison/linear_search/16
+Benchmarking search_strategy_comparison/linear_search/16: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/16: Collecting 100 samples in estimated 5.0000 s (827M iterations)
+Benchmarking search_strategy_comparison/linear_search/16: Analyzing
+search_strategy_comparison/linear_search/16
+                        time:   [6.0621 ns 6.1114 ns 6.1683 ns]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+Benchmarking search_strategy_comparison/binary_search/16
+Benchmarking search_strategy_comparison/binary_search/16: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/16: Collecting 100 samples in estimated 5.0000 s (860M iterations)
+Benchmarking search_strategy_comparison/binary_search/16: Analyzing
+search_strategy_comparison/binary_search/16
+                        time:   [6.0185 ns 6.0422 ns 6.0661 ns]
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_strategy_comparison/linear_search/20
+Benchmarking search_strategy_comparison/linear_search/20: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/20: Collecting 100 samples in estimated 5.0000 s (682M iterations)
+Benchmarking search_strategy_comparison/linear_search/20: Analyzing
+search_strategy_comparison/linear_search/20
+                        time:   [7.2096 ns 7.2367 ns 7.2671 ns]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_strategy_comparison/binary_search/20
+Benchmarking search_strategy_comparison/binary_search/20: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/20: Collecting 100 samples in estimated 5.0000 s (524M iterations)
+Benchmarking search_strategy_comparison/binary_search/20: Analyzing
+search_strategy_comparison/binary_search/20
+                        time:   [7.8317 ns 7.8657 ns 7.9003 ns]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_strategy_comparison/linear_search/26
+Benchmarking search_strategy_comparison/linear_search/26: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/linear_search/26: Collecting 100 samples in estimated 5.0000 s (555M iterations)
+Benchmarking search_strategy_comparison/linear_search/26: Analyzing
+search_strategy_comparison/linear_search/26
+                        time:   [9.1536 ns 9.2186 ns 9.2903 ns]
+Found 8 outliers among 100 measurements (8.00%)
+  3 (3.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_strategy_comparison/binary_search/26
+Benchmarking search_strategy_comparison/binary_search/26: Warming up for 3.0000 s
+Benchmarking search_strategy_comparison/binary_search/26: Collecting 100 samples in estimated 5.0000 s (633M iterations)
+Benchmarking search_strategy_comparison/binary_search/26: Analyzing
+search_strategy_comparison/binary_search/26
+                        time:   [7.8783 ns 7.9174 ns 7.9544 ns]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+

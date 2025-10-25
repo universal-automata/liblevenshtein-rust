@@ -1,0 +1,25 @@
+   Compiling find-msvc-tools v0.1.4
+   Compiling proc-macro2 v1.0.103
+   Compiling shlex v1.3.0
+   Compiling quote v1.0.41
+   Compiling unicode-ident v1.0.20
+   Compiling rustversion v1.0.22
+   Compiling autocfg v1.5.0
+   Compiling libc v0.2.177
+   Compiling gxhash v3.5.0
+   Compiling smallvec v1.15.1
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+   Compiling arrayvec v0.7.6
+   Compiling fast-slice-utils v0.1.1
+   Compiling local-or-heap v0.1.0
+   Compiling dyn-clone v1.0.20
+   Compiling maybe-dangling v0.1.2
+   Compiling cc v1.2.42
+   Compiling reusing-vec v0.2.0
+   Compiling num-traits v0.2.19
+   Compiling syn v2.0.108
+   Compiling cmake v0.1.54
+   Compiling libz-ng-sys v1.1.22
+   Compiling pathmap-derive v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap/pathmap-derive)
+   Compiling pathmap v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap)
+    Finished `release` profile [optimized + debuginfo] target(s) in 15.36s

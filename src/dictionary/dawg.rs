@@ -40,11 +40,11 @@ pub struct DawgDictionary {
 /// - A vector of edges (label, target_node_id)
 /// - A flag indicating if this node represents a complete word
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct DawgNode {
+pub struct DawgNode {
     /// Edges to child nodes: (byte label, target node index)
-    edges: Vec<(u8, usize)>,
+    pub edges: Vec<(u8, usize)>,
     /// True if this node marks the end of a valid term
-    is_final: bool,
+    pub is_final: bool,
 }
 
 impl DawgNode {
@@ -235,6 +235,15 @@ impl DawgDictionary {
     /// dictionary implementations.
     pub fn node_count(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// Get a reference to a node by index (for analysis/benchmarking).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
+    pub fn get_node(&self, idx: usize) -> &DawgNode {
+        &self.nodes[idx]
     }
 }
 

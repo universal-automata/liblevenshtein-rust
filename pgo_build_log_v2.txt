@@ -1,0 +1,136 @@
+=== Profile-Guided Optimization Build ===
+
+Step 0: Cleaning previous PGO data...
+Clean complete.
+
+Step 1: Building with instrumentation...
+   Compiling proc-macro2 v1.0.103
+   Compiling quote v1.0.41
+   Compiling unicode-ident v1.0.20
+   Compiling libc v0.2.177
+   Compiling shlex v1.3.0
+   Compiling crossbeam-utils v0.8.21
+   Compiling find-msvc-tools v0.1.4
+   Compiling serde_core v1.0.228
+   Compiling autocfg v1.5.0
+   Compiling zerocopy v0.8.27
+   Compiling rustversion v1.0.22
+   Compiling serde v1.0.228
+   Compiling cfg-if v1.0.4
+   Compiling gxhash v3.5.0
+   Compiling serde_json v1.0.145
+   Compiling rayon-core v1.13.0
+   Compiling either v1.15.0
+   Compiling ryu v1.0.20
+   Compiling regex-syntax v0.8.8
+   Compiling smallvec v1.15.1
+   Compiling ciborium-io v0.2.2
+   Compiling memchr v2.7.6
+   Compiling clap_lex v0.7.6
+   Compiling plotters-backend v0.3.7
+   Compiling itoa v1.0.15
+   Compiling anstyle v1.0.13
+   Compiling fast-slice-utils v0.1.1
+   Compiling same-file v1.0.6
+   Compiling cast v0.3.0
+   Compiling local-or-heap v0.1.0
+   Compiling arrayvec v0.7.6
+   Compiling dyn-clone v1.0.20
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+   Compiling maybe-dangling v0.1.2
+   Compiling once_cell v1.21.3
+   Compiling oorandom v11.1.5
+   Compiling anes v0.1.6
+   Compiling walkdir v2.5.0
+   Compiling cc v1.2.42
+   Compiling clap_builder v4.5.50
+   Compiling itertools v0.10.5
+   Compiling reusing-vec v0.2.0
+   Compiling plotters-svg v0.3.7
+   Compiling num-traits v0.2.19
+   Compiling crossbeam-epoch v0.9.18
+   Compiling syn v2.0.108
+   Compiling cmake v0.1.54
+   Compiling crossbeam-deque v0.8.6
+   Compiling libz-ng-sys v1.1.22
+   Compiling plotters v0.3.7
+   Compiling regex-automata v0.4.13
+   Compiling rayon v1.11.0
+   Compiling is-terminal v0.4.17
+   Compiling criterion-plot v0.5.0
+   Compiling clap v4.5.50
+   Compiling regex v1.12.2
+   Compiling zerocopy-derive v0.8.27
+   Compiling serde_derive v1.0.228
+   Compiling pathmap-derive v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap/pathmap-derive)
+   Compiling tinytemplate v1.2.1
+   Compiling half v2.7.1
+   Compiling ciborium-ll v0.2.2
+   Compiling ciborium v0.2.2
+   Compiling criterion v0.5.1
+   Compiling pathmap v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap)
+    Finished `release` profile [optimized + debuginfo] target(s) in 34.40s
+Instrumented build complete.
+
+Step 2: Running profiling benchmark to collect data...
+Running: target/release/deps/profiling_benchmark-76f3d56e92fc7c61
+=== Profiling Benchmark: Realistic Workload ===
+
+Loading dictionary...
+Loaded 10000 words
+
+Building DAWG...
+DAWG built in 3.237502ms
+
+Building transducer...
+Transducer built in 68ns
+
+Performing queries...
+Completed 5000 queries in 4.71177389s
+Average: 942.354µs per query
+Total results: 1084000
+
+Performing dictionary operations...
+Completed 1M contains() calls in 203.484858ms
+Found: 1000000 words
+
+=== Profiling Complete ===
+Profiling data collection complete.
+
+Step 3: Merging profiling data...
+Profiling data merged.
+
+Step 4: Building with PGO optimizations...
+   Compiling proc-macro2 v1.0.103
+   Compiling find-msvc-tools v0.1.4
+   Compiling shlex v1.3.0
+   Compiling unicode-ident v1.0.20
+   Compiling quote v1.0.41
+   Compiling autocfg v1.5.0
+   Compiling libc v0.2.177
+   Compiling rustversion v1.0.22
+   Compiling gxhash v3.5.0
+   Compiling smallvec v1.15.1
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+   Compiling maybe-dangling v0.1.2
+   Compiling local-or-heap v0.1.0
+   Compiling dyn-clone v1.0.20
+   Compiling fast-slice-utils v0.1.1
+   Compiling arrayvec v0.7.6
+   Compiling cc v1.2.42
+   Compiling reusing-vec v0.2.0
+   Compiling num-traits v0.2.19
+   Compiling syn v2.0.108
+   Compiling cmake v0.1.54
+   Compiling libz-ng-sys v1.1.22
+   Compiling pathmap-derive v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap/pathmap-derive)
+   Compiling pathmap v0.1.0 (/home/dylon/Workspace/f1r3fly.io/PathMap)
+    Finished `release` profile [optimized + debuginfo] target(s) in 14.21s
+PGO-optimized build complete.
+
+Step 5: Verifying PGO binary...
+Note: CLI binary not built (requires 'cli' feature)
+
+=== PGO Build Complete ===
+The PGO-optimized library is in target/release/
+Run benchmarks with: RUSTFLAGS="-C target-cpu=native" cargo bench

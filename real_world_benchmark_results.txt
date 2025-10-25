@@ -1,0 +1,100 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+    Finished `release` profile [optimized + debuginfo] target(s) in 9.09s
+     Running `target/release/examples/real_world_benchmark`
+=== Real-World Dictionary Analysis ===
+
+Loading real dictionary...
+Loaded 89545 words from English dictionary
+
+Generating synthetic dictionary...
+Generated 10000 synthetic words
+
+Building DAWG from real dictionary...
+Real DAWG built in 56.527855ms
+Real DAWG nodes: 205579
+
+Building DAWG from synthetic dictionary...
+Synthetic DAWG built in 4.24569ms
+Synthetic DAWG nodes: 11117
+
+=== Edge Distribution Analysis ===
+
+Real dictionary edge distribution:
+  Edges | Count    | Percent
+  ------|----------|--------
+      0 |    60727 |  29.54%
+      1 |   112640 |  54.79%
+      2 |    19847 |   9.65%
+      3 |     7035 |   3.42%
+      4 |     2366 |   1.15%
+      5 |     1048 |   0.51%
+      6 |      592 |   0.29%
+      7 |      348 |   0.17%
+      8 |      235 |   0.11%
+      9 |      170 |   0.08%
+     10 |      113 |   0.05%
+     11 |       93 |   0.05%
+     12 |       69 |   0.03%
+     13 |       47 |   0.02%
+     14 |       50 |   0.02%
+     15 |       40 |   0.02%
+     16 |       26 |   0.01%
+     17 |       21 |   0.01%
+     18 |       13 |   0.01%
+     19 |       16 |   0.01%
+     20 |       23 |   0.01%
+     21 |       14 |   0.01%
+     22 |       13 |   0.01%
+     23 |       13 |   0.01%
+     24 |        9 |   0.00%
+     25 |        7 |   0.00%
+     26 |        4 |   0.00%
+
+  Percentiles:
+  50th percentile: 1 edges
+  90th percentile: 2 edges
+  95th percentile: 3 edges
+  Maximum: 26 edges (4 nodes)
+
+Synthetic dictionary edge distribution:
+  Edges | Count    | Percent
+  ------|----------|--------
+      0 |    10000 |  89.95%
+      1 |        6 |   0.05%
+     10 |     1111 |   9.99%
+
+  Percentiles:
+  50th percentile: 0 edges
+  90th percentile: 1 edges
+  95th percentile: 10 edges
+  Maximum: 10 edges (1111 nodes)
+
+=== Performance Comparison ===
+
+Testing contains() performance...
+Real dictionary: 1000000 calls in 120.504061ms (0.12 µs/call)
+Found: 1000000
+Synthetic dictionary: 1000000 calls in 72.962617ms (0.07 µs/call)
+Found: 1000000
+
+Testing fuzzy query performance...
+Real dictionary: 1000 queries in 13.783144ms (13.78 µs/query)
+Total results: 4857
+Synthetic dictionary: 1000 queries in 2.246667875s (2246.67 µs/query)
+Total results: 568009
+
+=== Threshold Analysis ===
+
+Current threshold: 16 (linear search for <16 edges, binary for ≥16)
+
+Real dictionary:
+  Linear search: 205420 nodes (99.92%)
+  Binary search: 159 nodes (0.08%)
+  Near threshold (10-20 edges): 511 nodes (0.25%)
+
+Synthetic dictionary:
+  Linear search: 11117 nodes (100.00%)
+  Binary search: 0 nodes (0.00%)
+  Near threshold (10-20 edges): 1111 nodes (9.99%)
+
+=== Analysis Complete ===

@@ -1,0 +1,235 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: variable does not need to be mutable
+  --> benches/dawg_benchmarks.rs:71:21
+   |
+71 |                 let mut dawg = DynamicDawg::default();
+   |                     ----^^^^
+   |                     |
+   |                     help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> benches/dawg_benchmarks.rs:160:21
+    |
+160 |                 let mut dawg_clone = dawg.clone();
+    |                     ----^^^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> benches/dawg_benchmarks.rs:152:13
+    |
+152 |         let mut dawg = DynamicDawg::default();
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: `liblevenshtein` (bench "dawg_benchmarks") generated 3 warnings (run `cargo fix --bench "dawg_benchmarks"` to apply 3 suggestions)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 45.01s
+     Running benches/dawg_benchmarks.rs (target/release/deps/dawg_benchmarks-6005c94a1d9b6dc5)
+Benchmarking dawg_edge_lookup/100
+Benchmarking dawg_edge_lookup/100: Warming up for 3.0000 s
+Benchmarking dawg_edge_lookup/100: Collecting 100 samples in estimated 5.0566 s (318k iterations)
+Benchmarking dawg_edge_lookup/100: Analyzing
+dawg_edge_lookup/100    time:   [15.238 µs 15.316 µs 15.401 µs]
+                        thrpt:  [6.4932 Melem/s 6.5290 Melem/s 6.5624 Melem/s]
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking dawg_edge_lookup/500
+Benchmarking dawg_edge_lookup/500: Warming up for 3.0000 s
+Benchmarking dawg_edge_lookup/500: Collecting 100 samples in estimated 5.0199 s (333k iterations)
+Benchmarking dawg_edge_lookup/500: Analyzing
+dawg_edge_lookup/500    time:   [14.294 µs 14.435 µs 14.577 µs]
+                        thrpt:  [6.8601 Melem/s 6.9277 Melem/s 6.9957 Melem/s]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+Benchmarking dawg_edge_lookup/1000
+Benchmarking dawg_edge_lookup/1000: Warming up for 3.0000 s
+Benchmarking dawg_edge_lookup/1000: Collecting 100 samples in estimated 5.0124 s (308k iterations)
+Benchmarking dawg_edge_lookup/1000: Analyzing
+dawg_edge_lookup/1000   time:   [15.828 µs 15.911 µs 15.999 µs]
+                        thrpt:  [6.2505 Melem/s 6.2851 Melem/s 6.3181 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  4 (4.00%) high severe
+Benchmarking dawg_edge_lookup/5000
+Benchmarking dawg_edge_lookup/5000: Warming up for 3.0000 s
+Benchmarking dawg_edge_lookup/5000: Collecting 100 samples in estimated 5.0737 s (313k iterations)
+Benchmarking dawg_edge_lookup/5000: Analyzing
+dawg_edge_lookup/5000   time:   [16.389 µs 16.520 µs 16.646 µs]
+                        thrpt:  [6.0074 Melem/s 6.0534 Melem/s 6.1017 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking dynamic_dawg_insertion/100
+Benchmarking dynamic_dawg_insertion/100: Warming up for 3.0000 s
+Benchmarking dynamic_dawg_insertion/100: Collecting 100 samples in estimated 5.1333 s (106k iterations)
+Benchmarking dynamic_dawg_insertion/100: Analyzing
+dynamic_dawg_insertion/100
+                        time:   [48.599 µs 48.831 µs 49.055 µs]
+                        thrpt:  [2.0385 Melem/s 2.0479 Melem/s 2.0577 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+Benchmarking dynamic_dawg_insertion/500
+Benchmarking dynamic_dawg_insertion/500: Warming up for 3.0000 s
+Benchmarking dynamic_dawg_insertion/500: Collecting 100 samples in estimated 5.1525 s (30k iterations)
+Benchmarking dynamic_dawg_insertion/500: Analyzing
+dynamic_dawg_insertion/500
+                        time:   [173.29 µs 174.82 µs 176.43 µs]
+                        thrpt:  [2.8339 Melem/s 2.8601 Melem/s 2.8853 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+Benchmarking dynamic_dawg_insertion/1000
+Benchmarking dynamic_dawg_insertion/1000: Warming up for 3.0000 s
+Benchmarking dynamic_dawg_insertion/1000: Collecting 100 samples in estimated 5.8823 s (15k iterations)
+Benchmarking dynamic_dawg_insertion/1000: Analyzing
+dynamic_dawg_insertion/1000
+                        time:   [386.48 µs 389.14 µs 392.51 µs]
+                        thrpt:  [2.5477 Melem/s 2.5698 Melem/s 2.5874 Melem/s]
+
+Benchmarking dawg_edge_iteration/100
+Benchmarking dawg_edge_iteration/100: Warming up for 3.0000 s
+Benchmarking dawg_edge_iteration/100: Collecting 100 samples in estimated 5.0003 s (2.4M iterations)
+Benchmarking dawg_edge_iteration/100: Analyzing
+dawg_edge_iteration/100 time:   [2.1059 µs 2.1241 µs 2.1445 µs]
+                        thrpt:  [46.630 Melem/s 47.079 Melem/s 47.485 Melem/s]
+Found 11 outliers among 100 measurements (11.00%)
+  2 (2.00%) low mild
+  8 (8.00%) high mild
+  1 (1.00%) high severe
+Benchmarking dawg_edge_iteration/500
+Benchmarking dawg_edge_iteration/500: Warming up for 3.0000 s
+Benchmarking dawg_edge_iteration/500: Collecting 100 samples in estimated 5.0083 s (2.5M iterations)
+Benchmarking dawg_edge_iteration/500: Analyzing
+dawg_edge_iteration/500 time:   [1.9671 µs 1.9828 µs 2.0002 µs]
+                        thrpt:  [249.97 Melem/s 252.16 Melem/s 254.19 Melem/s]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+Benchmarking dawg_edge_iteration/1000
+Benchmarking dawg_edge_iteration/1000: Warming up for 3.0000 s
+Benchmarking dawg_edge_iteration/1000: Collecting 100 samples in estimated 5.0084 s (2.5M iterations)
+Benchmarking dawg_edge_iteration/1000: Analyzing
+dawg_edge_iteration/1000
+                        time:   [1.9759 µs 1.9857 µs 1.9967 µs]
+                        thrpt:  [500.83 Melem/s 503.60 Melem/s 506.10 Melem/s]
+Found 9 outliers among 100 measurements (9.00%)
+  3 (3.00%) low mild
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+Benchmarking dawg_edge_iteration/5000
+Benchmarking dawg_edge_iteration/5000: Warming up for 3.0000 s
+Benchmarking dawg_edge_iteration/5000: Collecting 100 samples in estimated 5.0041 s (2.6M iterations)
+Benchmarking dawg_edge_iteration/5000: Analyzing
+dawg_edge_iteration/5000
+                        time:   [1.9489 µs 1.9584 µs 1.9682 µs]
+                        thrpt:  [2.5405 Gelem/s 2.5531 Gelem/s 2.5655 Gelem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking dawg_contains/100
+Benchmarking dawg_contains/100: Warming up for 3.0000 s
+Benchmarking dawg_contains/100: Collecting 100 samples in estimated 5.0263 s (480k iterations)
+Benchmarking dawg_contains/100: Analyzing
+dawg_contains/100       time:   [10.401 µs 10.502 µs 10.610 µs]
+                        thrpt:  [9.4251 Melem/s 9.5220 Melem/s 9.6146 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+Benchmarking dawg_contains/500
+Benchmarking dawg_contains/500: Warming up for 3.0000 s
+Benchmarking dawg_contains/500: Collecting 100 samples in estimated 5.0352 s (480k iterations)
+Benchmarking dawg_contains/500: Analyzing
+dawg_contains/500       time:   [10.226 µs 10.319 µs 10.416 µs]
+                        thrpt:  [9.6007 Melem/s 9.6904 Melem/s 9.7788 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+Benchmarking dawg_contains/1000
+Benchmarking dawg_contains/1000: Warming up for 3.0000 s
+Benchmarking dawg_contains/1000: Collecting 100 samples in estimated 5.0289 s (460k iterations)
+Benchmarking dawg_contains/1000: Analyzing
+dawg_contains/1000      time:   [10.650 µs 10.712 µs 10.781 µs]
+                        thrpt:  [9.2755 Melem/s 9.3350 Melem/s 9.3898 Melem/s]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high severe
+Benchmarking dawg_contains/5000
+Benchmarking dawg_contains/5000: Warming up for 3.0000 s
+Benchmarking dawg_contains/5000: Collecting 100 samples in estimated 5.0412 s (465k iterations)
+Benchmarking dawg_contains/5000: Analyzing
+dawg_contains/5000      time:   [10.471 µs 10.532 µs 10.593 µs]
+                        thrpt:  [9.4400 Melem/s 9.4948 Melem/s 9.5503 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+
+Benchmarking dynamic_dawg_minimize/100
+Benchmarking dynamic_dawg_minimize/100: Warming up for 3.0000 s
+Benchmarking dynamic_dawg_minimize/100: Collecting 100 samples in estimated 6.5800 s (15k iterations)
+Benchmarking dynamic_dawg_minimize/100: Analyzing
+dynamic_dawg_minimize/100
+                        time:   [440.77 µs 443.71 µs 446.83 µs]
+                        thrpt:  [223.80 Kelem/s 225.37 Kelem/s 226.88 Kelem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking dynamic_dawg_minimize/500
+Benchmarking dynamic_dawg_minimize/500: Warming up for 3.0000 s
+Benchmarking dynamic_dawg_minimize/500: Collecting 100 samples in estimated 8.3889 s (10k iterations)
+Benchmarking dynamic_dawg_minimize/500: Analyzing
+dynamic_dawg_minimize/500
+                        time:   [811.00 µs 816.02 µs 821.33 µs]
+                        thrpt:  [608.77 Kelem/s 612.73 Kelem/s 616.52 Kelem/s]
+Found 6 outliers among 100 measurements (6.00%)
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+Benchmarking dynamic_dawg_minimize/1000
+Benchmarking dynamic_dawg_minimize/1000: Warming up for 3.0000 s
+Benchmarking dynamic_dawg_minimize/1000: Collecting 100 samples in estimated 5.1738 s (2600 iterations)
+Benchmarking dynamic_dawg_minimize/1000: Analyzing
+dynamic_dawg_minimize/1000
+                        time:   [2.0009 ms 2.0124 ms 2.0243 ms]
+                        thrpt:  [494.00 Kelem/s 496.92 Kelem/s 499.77 Kelem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+
+Benchmarking dawg_construction/100
+Benchmarking dawg_construction/100: Warming up for 3.0000 s
+Benchmarking dawg_construction/100: Collecting 100 samples in estimated 5.2751 s (56k iterations)
+Benchmarking dawg_construction/100: Analyzing
+dawg_construction/100   time:   [96.332 µs 96.843 µs 97.396 µs]
+                        thrpt:  [1.0267 Melem/s 1.0326 Melem/s 1.0381 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking dawg_construction/500
+Benchmarking dawg_construction/500: Warming up for 3.0000 s
+Benchmarking dawg_construction/500: Collecting 100 samples in estimated 5.9236 s (30k iterations)
+Benchmarking dawg_construction/500: Analyzing
+dawg_construction/500   time:   [192.00 µs 193.70 µs 195.51 µs]
+                        thrpt:  [2.5575 Melem/s 2.5814 Melem/s 2.6042 Melem/s]
+Benchmarking dawg_construction/1000
+Benchmarking dawg_construction/1000: Warming up for 3.0000 s
+Benchmarking dawg_construction/1000: Collecting 100 samples in estimated 6.6678 s (15k iterations)
+Benchmarking dawg_construction/1000: Analyzing
+dawg_construction/1000  time:   [435.83 µs 437.81 µs 439.78 µs]
+                        thrpt:  [2.2739 Melem/s 2.2841 Melem/s 2.2944 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  3 (3.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking dawg_construction/5000
+Benchmarking dawg_construction/5000: Warming up for 3.0000 s
+Benchmarking dawg_construction/5000: Collecting 100 samples in estimated 6.7232 s (15k iterations)
+Benchmarking dawg_construction/5000: Analyzing
+dawg_construction/5000  time:   [431.95 µs 435.55 µs 440.00 µs]
+                        thrpt:  [11.364 Melem/s 11.480 Melem/s 11.575 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+

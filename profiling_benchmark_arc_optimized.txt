@@ -1,0 +1,24 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 8.10s
+     Running benches/profiling_benchmark.rs (target/release/deps/profiling_benchmark-9ec71222186b1547)
+=== Profiling Benchmark: Realistic Workload ===
+
+Loading dictionary...
+Loaded 10000 words
+
+Building DAWG...
+DAWG built in 2.443449ms
+
+Building transducer...
+Transducer built in 35ns
+
+Performing queries...
+Completed 5000 queries in 4.059702255s
+Average: 811.94µs per query
+Total results: 1084000
+
+Performing dictionary operations...
+Completed 1M contains() calls in 87.178757ms
+Found: 1000000 words
+
+=== Profiling Complete ===

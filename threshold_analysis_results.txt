@@ -1,0 +1,160 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 42.87s
+     Running benches/threshold_analysis.rs (target/release/deps/threshold_analysis-87ff564f97dbcaff)
+
+
+=== Dictionary size: 100 terms ===
+
+=== Edge Count Distribution ===
+Total nodes: 119
+
+Edge Count | Frequency | Percentage | Cumulative
+-----------|-----------|------------|------------
+         0 |       100 |     84.03% |     84.03%
+         1 |         8 |      6.72% |     90.76%
+        10 |        11 |      9.24% |    100.00%
+
+=== Percentiles ===
+Median (p50): 0 edges
+p75: 0 edges
+p90: 1 edges
+p95: 10 edges
+p99: 10 edges
+Benchmarking adaptive_threshold/contains/100
+Benchmarking adaptive_threshold/contains/100: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/contains/100: Collecting 100 samples in estimated 5.0002 s (8.7M iterations)
+Benchmarking adaptive_threshold/contains/100: Analyzing
+adaptive_threshold/contains/100
+                        time:   [570.19 ns 572.23 ns 574.44 ns]
+Found 10 outliers among 100 measurements (10.00%)
+  7 (7.00%) high mild
+  3 (3.00%) high severe
+Benchmarking adaptive_threshold/edge_lookup/100
+Benchmarking adaptive_threshold/edge_lookup/100: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/edge_lookup/100: Collecting 100 samples in estimated 5.0001 s (354M iterations)
+Benchmarking adaptive_threshold/edge_lookup/100: Analyzing
+adaptive_threshold/edge_lookup/100
+                        time:   [14.078 ns 14.129 ns 14.182 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  2 (2.00%) low severe
+  3 (3.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+
+=== Dictionary size: 500 terms ===
+
+=== Edge Count Distribution ===
+Total nodes: 563
+
+Edge Count | Frequency | Percentage | Cumulative
+-----------|-----------|------------|------------
+         0 |       500 |     88.81% |     88.81%
+         1 |         7 |      1.24% |     90.05%
+         5 |         1 |      0.18% |     90.23%
+        10 |        55 |      9.77% |    100.00%
+
+=== Percentiles ===
+Median (p50): 0 edges
+p75: 0 edges
+p90: 1 edges
+p95: 10 edges
+p99: 10 edges
+Benchmarking adaptive_threshold/contains/500
+Benchmarking adaptive_threshold/contains/500: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/contains/500: Collecting 100 samples in estimated 5.0140 s (1.7M iterations)
+Benchmarking adaptive_threshold/contains/500: Analyzing
+adaptive_threshold/contains/500
+                        time:   [2.8776 µs 2.8864 µs 2.8955 µs]
+Found 14 outliers among 100 measurements (14.00%)
+  3 (3.00%) low severe
+  5 (5.00%) low mild
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking adaptive_threshold/edge_lookup/500
+Benchmarking adaptive_threshold/edge_lookup/500: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/edge_lookup/500: Collecting 100 samples in estimated 5.0001 s (354M iterations)
+Benchmarking adaptive_threshold/edge_lookup/500: Analyzing
+adaptive_threshold/edge_lookup/500
+                        time:   [14.038 ns 14.093 ns 14.153 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low severe
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
+
+=== Dictionary size: 1000 terms ===
+
+=== Edge Count Distribution ===
+Total nodes: 1118
+
+Edge Count | Frequency | Percentage | Cumulative
+-----------|-----------|------------|------------
+         0 |      1000 |     89.45% |     89.45%
+         1 |         7 |      0.63% |     90.07%
+        10 |       111 |      9.93% |    100.00%
+
+=== Percentiles ===
+Median (p50): 0 edges
+p75: 0 edges
+p90: 1 edges
+p95: 10 edges
+p99: 10 edges
+Benchmarking adaptive_threshold/contains/1000
+Benchmarking adaptive_threshold/contains/1000: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/contains/1000: Collecting 100 samples in estimated 5.0121 s (722k iterations)
+Benchmarking adaptive_threshold/contains/1000: Analyzing
+adaptive_threshold/contains/1000
+                        time:   [6.9789 µs 7.0079 µs 7.0381 µs]
+Found 8 outliers among 100 measurements (8.00%)
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+Benchmarking adaptive_threshold/edge_lookup/1000
+Benchmarking adaptive_threshold/edge_lookup/1000: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/edge_lookup/1000: Collecting 100 samples in estimated 5.0000 s (351M iterations)
+Benchmarking adaptive_threshold/edge_lookup/1000: Analyzing
+adaptive_threshold/edge_lookup/1000
+                        time:   [13.878 ns 14.008 ns 14.140 ns]
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+
+=== Dictionary size: 5000 terms ===
+
+=== Edge Count Distribution ===
+Total nodes: 5562
+
+Edge Count | Frequency | Percentage | Cumulative
+-----------|-----------|------------|------------
+         0 |      5000 |     89.90% |     89.90%
+         1 |         6 |      0.11% |     90.00%
+         5 |         1 |      0.02% |     90.02%
+        10 |       555 |      9.98% |    100.00%
+
+=== Percentiles ===
+Median (p50): 0 edges
+p75: 0 edges
+p90: 1 edges
+p95: 10 edges
+p99: 10 edges
+Benchmarking adaptive_threshold/contains/5000
+Benchmarking adaptive_threshold/contains/5000: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/contains/5000: Collecting 100 samples in estimated 5.0664 s (141k iterations)
+Benchmarking adaptive_threshold/contains/5000: Analyzing
+adaptive_threshold/contains/5000
+                        time:   [35.969 µs 36.114 µs 36.267 µs]
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low severe
+  6 (6.00%) low mild
+  2 (2.00%) high mild
+Benchmarking adaptive_threshold/edge_lookup/5000
+Benchmarking adaptive_threshold/edge_lookup/5000: Warming up for 3.0000 s
+Benchmarking adaptive_threshold/edge_lookup/5000: Collecting 100 samples in estimated 5.0000 s (361M iterations)
+Benchmarking adaptive_threshold/edge_lookup/5000: Analyzing
+adaptive_threshold/edge_lookup/5000
+                        time:   [14.148 ns 14.222 ns 14.302 ns]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+
