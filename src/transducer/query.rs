@@ -96,20 +96,22 @@ impl<N: DictionaryNode> QueryIterator<N> {
                 self.max_distance,
                 self.algorithm,
             ) {
-                // Clone the current intersection box to use as parent
-                // This preserves the full parent chain
-                let parent_box = Box::new(Intersection {
-                    label: intersection.label,
-                    node: intersection.node.clone(),
-                    state: intersection.state.clone(),
-                    parent: intersection.parent.clone(), // Keep parent chain
-                });
+                // ✅ Create lightweight PathNode (no Arc clone!)
+                // Only stores label and parent chain - dictionary node not needed in parent
+                let parent_path = if let Some(current_label) = intersection.label {
+                    Some(Box::new(super::intersection::PathNode::new(
+                        current_label,
+                        intersection.parent.clone(),  // Clone PathNode chain (cheap)
+                    )))
+                } else {
+                    None
+                };
 
                 let child = Box::new(Intersection::with_parent(
                     label,
                     child_node,
                     next_state,
-                    parent_box,
+                    parent_path,  // ← Lightweight path, no node cloning!
                 ));
 
                 self.pending.push_back(child);

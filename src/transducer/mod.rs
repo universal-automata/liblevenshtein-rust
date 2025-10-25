@@ -16,7 +16,7 @@ pub use algorithm::Algorithm;
 pub use position::Position;
 pub use state::State;
 pub use pool::StatePool;
-pub use intersection::Intersection;
+pub use intersection::{Intersection, PathNode};
 pub use query::{QueryIterator, CandidateIterator, Candidate};
 pub use builder::{TransducerBuilder, BuilderError};
 

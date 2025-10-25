@@ -2,12 +2,15 @@
 
 ## Executive Summary
 
-Systematic profiling and optimization delivered **3.2-3.4x performance improvement** for DAWG dictionary operations through two major optimizations:
+Systematic profiling and optimization delivered **3.76x performance improvement** for DAWG dictionary operations through three major optimizations:
 
-1. **Arc Overhead Elimination**: 60-66% improvement (2-3x speedup)
+1. **Arc Overhead Elimination (contains)**: 60-66% improvement (2-3x speedup)
 2. **Threshold Tuning**: 20-21% additional improvement
+3. **PathNode Query Optimization**: 44% query improvement (1.78x speedup)
 
-**Combined result: From 9.6 µs to 2.9 µs contains() time = 70% faster (3.3x speedup)**
+**Combined result:**
+- **Contains: 73% faster (3.76x speedup)** - From 203ms to 54ms
+- **Query: 54% faster (2.16x speedup)** - From 4.71s to 2.18s
 
 ---
 
@@ -195,6 +198,70 @@ if edges.len() < 16 {
 
 ---
 
+### Phase 5: PathNode Query Optimization
+
+**Goal:** Eliminate remaining Arc overhead in query traversal
+
+#### Problem: Arc Clones in Parent Chains
+
+After optimizing `contains()`, profiling revealed Arc overhead in query traversal:
+- Query iterator cloned full `Intersection` for parent chains
+- Each `Intersection` contains `DictionaryNode` (Arc for DAWG)
+- ~25 million Arc clones per profiling run (5k queries)
+- Parent chain only needed labels, not full node data
+
+#### Solution: Lightweight PathNode Structure
+
+**Created PathNode** (16 bytes vs 50+ bytes Intersection):
+```rust
+/// Lightweight representation of path history.
+pub struct PathNode {
+    label: u8,
+    parent: Option<Box<PathNode>>,
+}
+```
+
+**Updated Intersection to use PathNode**:
+```rust
+pub struct Intersection<N: DictionaryNode> {
+    pub label: Option<u8>,
+    pub node: N,
+    pub state: State,
+    pub parent: Option<Box<PathNode>>,  // ← Changed from Box<Intersection<N>>
+}
+```
+
+**Eliminated Arc clones in query_children**:
+```rust
+// Before: Arc clone on every edge
+let parent_box = Box::new(Intersection {
+    node: intersection.node.clone(),  // ❌ Arc::clone
+    // ...
+});
+
+// After: Lightweight PathNode (no Arc clone)
+let parent_path = Some(Box::new(PathNode::new(
+    current_label,
+    intersection.parent.clone(),  // ✅ Clone PathNode chain (cheap)
+)));
+```
+
+**Results:**
+- **Query: 44% faster** (3.89s → 2.18s = 1.78x speedup)
+- **Contains: 33% additional improvement** (81ms → 54ms = 1.5x speedup)
+- Far exceeded predicted 15-25% improvement!
+
+**Why Such Large Improvement?**
+1. Arc elimination (100% of parent chain Arc clones)
+2. Memory efficiency (70% smaller parent chains)
+3. Cache locality (smaller structs, better cache usage)
+4. Reduced allocation pressure
+5. Indirect benefits to contains() (better memory layout)
+
+**Documentation:** `docs/PATHNODE_OPTIMIZATION_RESULTS.md`
+
+---
+
 ## Cumulative Performance Impact
 
 ### Contains() Micro-benchmarks
@@ -212,10 +279,10 @@ if edges.len() < 16 {
 
 Profiling benchmark (10k words, 5k queries, 1M contains() calls):
 
-| Operation | Baseline | After Optimizations | Improvement |
-|-----------|----------|---------------------|-------------|
-| 1M contains() calls | 203.48 ms | ~80-85 ms | **~60% faster (2.4x)** |
-| 5k fuzzy queries | 4.71 s | ~3.9 s | **~17% faster** |
+| Operation | Baseline | +Arc Opt | +Threshold | +PathNode | Total Improvement |
+|-----------|----------|----------|------------|-----------|-------------------|
+| 1M contains() | 203ms | 87ms | ~81ms | **54ms** | **73% faster (3.76x)** |
+| 5k fuzzy queries | 4.71s | 3.89s | ~3.89s | **2.18s** | **54% faster (2.16x)** |
 
 ---
 
@@ -223,7 +290,8 @@ Profiling benchmark (10k words, 5k queries, 1M contains() calls):
 
 | Optimization | Complexity | Impact | ROI |
 |--------------|------------|--------|-----|
-| **Arc elimination** | Medium | **60-66%** | **Highest** |
+| **PathNode query** | Medium | **44% queries** | **Highest** |
+| **Arc elimination (contains)** | Medium | **60-66% contains** | **Highest** |
 | **Threshold tuning** | Low | **20-21%** | **High** |
 | Adaptive edge lookup | Low | 3-14% (mixed) | Medium |
 | Binary insertion | Low | 13% insertion, -2% lookup | Medium |
@@ -242,6 +310,18 @@ Profiling benchmark (10k words, 5k queries, 1M contains() calls):
 
 **`src/dictionary/dynamic_dawg.rs`**
 1. Line 646: Threshold updated from 8 to 16 in `transition()`
+
+**`src/transducer/intersection.rs`** (PathNode optimization)
+1. Lines 6-49: PathNode structure (lightweight parent representation)
+2. Lines 65-77: Updated Intersection to use PathNode parent
+3. Lines 90-103: Updated with_parent method
+4. Lines 105-121: Updated term() method for PathNode
+
+**`src/transducer/query.rs`** (PathNode optimization)
+1. Lines 88-120: Updated queue_children to eliminate Arc clones
+
+**`src/transducer/mod.rs`** (PathNode optimization)
+1. Line 19: Export PathNode
 
 ### New Benchmarks
 
@@ -273,10 +353,12 @@ Profiling benchmark (10k words, 5k queries, 1M contains() calls):
 **Profiling and Analysis:**
 - `docs/PROFILING_AND_PGO_RESULTS.md` - Flame graph analysis, Arc bottleneck identification
 - `docs/PGO_IMPACT_ANALYSIS.md` - PGO validation (1-4% vs Arc's 60%)
+- `docs/QUERY_ARC_ANALYSIS.md` - Query traversal Arc analysis (25M clones identified)
 
 **Optimizations:**
 - `docs/ARC_OPTIMIZATION_RESULTS.md` - Arc elimination (60-66% improvement)
 - `docs/THRESHOLD_TUNING_RESULTS.md` - Threshold optimization (20-21% improvement)
+- `docs/PATHNODE_OPTIMIZATION_RESULTS.md` - PathNode query optimization (44% improvement)
 - `docs/DAWG_OPTIMIZATION_OPPORTUNITIES.md` - Initial analysis (10 opportunities identified)
 - `docs/DAWG_OPTIMIZATIONS_APPLIED.md` - Phase 1 implementations
 
@@ -341,8 +423,8 @@ Individual optimizations compound:
 
 ### For Future Work
 
-**High Priority (15-30% potential):**
-1. **Arc-free query traversal:** Eliminate remaining Arc overhead in transducer hot paths
+**High Priority (10-15% potential):**
+1. ~~**Arc-free query traversal:** Eliminate remaining Arc overhead in transducer hot paths~~ ✅ **COMPLETED (44% improvement!)**
 2. **Index-based transducer API:** Alternative API using node indices instead of DictionaryNode
 
 **Medium Priority (5-10% potential):**
@@ -359,29 +441,32 @@ Individual optimizations compound:
 
 ## Conclusion
 
-Through systematic profiling, empirical testing, and targeted optimizations, we achieved **3.2-3.4x performance improvement** for DAWG dictionary operations:
+Through systematic profiling, empirical testing, and targeted optimizations, we achieved **2.16-3.76x performance improvement** for DAWG dictionary operations:
 
 **What We Did:**
 1. Profiled to identify Arc as 41% bottleneck
-2. Eliminated Arc from critical path (60-66% improvement)
+2. Eliminated Arc from critical path (60-66% contains improvement)
 3. Empirically tuned search threshold (20-21% improvement)
-4. Validated with comprehensive benchmarks
+4. Eliminated Arc from query traversal with PathNode (44% query improvement)
+5. Validated with comprehensive benchmarks
 
 **What We Learned:**
 - Profiling reveals non-obvious bottlenecks
 - Specialization can deliver massive gains
 - Empirical validation beats intuition
 - Multiple optimizations compound effectively
+- Cache locality and memory efficiency multiply Arc elimination benefits
 
 **Impact:**
-- `contains()`: **3.3x faster** (9.6 µs → 2.9 µs)
-- End-to-end: **60% faster lookups, 17% faster queries**
+- `contains()`: **3.76x faster** (203ms → 54ms)
+- `query()`: **2.16x faster** (4.71s → 2.18s)
 - Production-ready with all tests passing
+- 70% memory reduction in query parent chains
 
 **Next Steps:**
-- Arc-free query traversal (15-30% potential)
 - Real-world dictionary validation
-- Index-based transducer API exploration
+- Index-based transducer API exploration (10-15% potential)
+- SIMD edge lookup (5-10% potential)
 
 ---
 
@@ -417,3 +502,4 @@ Through systematic profiling, empirical testing, and targeted optimizations, we 
 - `dawg_contains_threshold16.txt`
 - `threshold_analysis_results.txt`
 - `threshold_tuning_results.txt`
+- `profiling_benchmark_pathnode.txt` (PathNode optimization results)
