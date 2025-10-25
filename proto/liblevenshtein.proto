@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package liblevenshtein.proto;
+
+option java_package = "com.github.liblevenshtein.proto";
+option java_outer_classname = "LibLevenshteinProtos";
+
+// Dictionary V1: Original format for backward compatibility
+//
+// This format is compatible with all liblevenshtein implementations
+// (Java, C++, Rust, etc.) for cross-language dictionary interchange.
+message Dictionary {
+    // Edge represents a transition between nodes labeled with a character.
+    message Edge {
+        uint64 source_id = 1;  // Source node ID
+        uint32 label = 2;       // Character/byte label (UTF-8)
+        uint64 target_id = 3;   // Target node ID
+    }
+
+    // List of all node IDs in the graph.
+    repeated uint64 node_id = 1;
+
+    // List of final/terminal node IDs (valid term endings).
+    repeated uint64 final_node_id = 2;
+
+    // List of all edges in the graph.
+    repeated Edge edge = 3;
+
+    // Root node ID (typically 0)
+    uint64 root_id = 4;
+
+    // Number of terms in the dictionary
+    uint64 size = 5;
+}
+
+// Dictionary V2: Optimized format
+//
+// Improvements over V1:
+// 1. Removed redundant node_id field (IDs are sequential 0..n-1)
+// 2. Packed edge format: [src0, lbl0, tgt0, src1, lbl1, tgt1, ...]
+// 3. Delta-encoded final node IDs for better compression
+// 4. More compact representation overall
+//
+// Space savings: ~40-60% compared to V1 for typical dictionaries
+message DictionaryV2 {
+    // Delta-encoded final node IDs
+    // Actual IDs computed as: cumulative sum of deltas
+    // Example: deltas=[5,3,2] → IDs=[5,8,10]
+    repeated uint64 final_node_delta = 1 [packed=true];
+
+    // Packed edges: triplets of (source_id, label, target_id)
+    // Access pattern: edge i = (edges[i*3], edges[i*3+1], edges[i*3+2])
+    repeated uint64 edge_data = 2 [packed=true];
+
+    // Root node ID (typically 0)
+    uint64 root_id = 3;
+
+    // Number of terms in the dictionary
+    uint64 size = 4;
+
+    // Number of edges (for validation)
+    // edge_data.length should equal edge_count * 3
+    uint64 edge_count = 5;
+}
+
+// Container message supporting both formats
+message DictionaryContainer {
+    oneof format {
+        Dictionary v1 = 1;
+        DictionaryV2 v2 = 2;
+    }
+}

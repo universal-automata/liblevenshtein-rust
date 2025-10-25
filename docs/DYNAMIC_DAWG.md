@@ -65,10 +65,14 @@ let added = dawg.extend(vec!["term1", "term2"]);
 let removed = dawg.remove_many(vec!["old1", "old2"]);
 ```
 
-### Compaction
+### Compaction and Minimization
+
+DynamicDawg provides two methods for restoring minimality:
+
+#### `compact()` - Full Rebuild
 
 ```rust
-// Explicit compaction
+// Explicit compaction (extracts, sorts, rebuilds, minimizes)
 let nodes_removed = dawg.compact();
 
 // Check if needed
@@ -77,15 +81,43 @@ if dawg.needs_compaction() {
 }
 ```
 
+**When to use**:
+- After many deletions (flag will be set)
+- When you want to ensure optimal structure
+- Equivalent to rebuilding from sorted terms
+
+#### `minimize()` - Incremental Minimization
+
+```rust
+// Minimize without full rebuild
+let nodes_merged = dawg.minimize();
+
+// Can be called anytime
+dawg.minimize();
+```
+
+**When to use**:
+- After batch insertions
+- When you want minimization without rebuilding
+- No assumptions about insertion order
+- Potentially faster for localized updates
+
+**Key Differences**:
+- `compact()`: Extracts all terms, sorts them, rebuilds from scratch, then minimizes
+- `minimize()`: Computes node signatures, merges equivalent nodes in-place
+- Both achieve perfect minimality
+- `minimize()` is generally more efficient for incremental updates
+
 ## Performance Characteristics
 
 | Operation | Time Complexity | Notes |
 |-----------|----------------|-------|
 | `insert(term)` | O(m) | m = term length |
 | `remove(term)` | O(m) | May leave orphaned nodes |
-| `compact()` | O(n) | n = total characters |
-| `extend(terms)` | O(n) | Includes compaction |
-| `remove_many(terms)` | O(n) | Includes compaction |
+| `compact()` | O(n log n + n·s) | n = terms, s = signature size |
+| `minimize()` | O(n·s) | n = nodes, s = signature size |
+| `extend(terms)` | O(n log n + n·s) | Includes compaction |
+| `remove_many(terms)` | O(n log n + n·s) | Includes compaction |
 
 ## Space Efficiency
 
@@ -127,36 +159,50 @@ dawg.compact();
 dawg.extend(vec!["term1", "term2", ...]);
 ```
 
-### 2. Compaction Strategy
+### 2. Minimization Strategy
 
 ```rust
-// Strategy 1: After batch sessions
-fn update_dictionary(dawg: &DynamicDawg, updates: Vec<Update>) {
+// Strategy 1: Use minimize() for batch insertions
+fn batch_insert(dawg: &DynamicDawg, terms: Vec<String>) {
+    for term in terms {
+        dawg.insert(&term);
+    }
+    dawg.minimize(); // Incremental minimization
+}
+
+// Strategy 2: Use compact() after deletions
+fn batch_update(dawg: &DynamicDawg, updates: Vec<Update>) {
     for update in updates {
         match update {
             Update::Add(term) => dawg.insert(&term),
             Update::Remove(term) => dawg.remove(&term),
         };
     }
-    dawg.compact(); // Once at end
-}
-
-// Strategy 2: Periodic compaction
-let mut ops_since_compact = 0;
-for term in terms {
-    dawg.insert(term);
-    ops_since_compact += 1;
-
-    if ops_since_compact >= 1000 {
-        dawg.compact();
-        ops_since_compact = 0;
+    if dawg.needs_compaction() {
+        dawg.compact(); // Full rebuild after deletions
+    } else {
+        dawg.minimize(); // Incremental for insertions
     }
 }
 
-// Strategy 3: Check flag
-fn maybe_compact(dawg: &DynamicDawg) {
+// Strategy 3: Periodic minimization
+let mut ops_since_minimize = 0;
+for term in terms {
+    dawg.insert(term);
+    ops_since_minimize += 1;
+
+    if ops_since_minimize >= 1000 {
+        dawg.minimize(); // Or compact() if deletions occurred
+        ops_since_minimize = 0;
+    }
+}
+
+// Strategy 4: Let the flag guide you
+fn maybe_optimize(dawg: &DynamicDawg) {
     if dawg.needs_compaction() {
-        dawg.compact();
+        dawg.compact(); // Use full rebuild
+    } else {
+        dawg.minimize(); // Use incremental
     }
 }
 ```

@@ -46,4 +46,7 @@ pub mod prelude {
         DictionarySerializer, DictionaryFromTerms,
         BincodeSerializer, JsonSerializer
     };
+
+    #[cfg(feature = "protobuf")]
+    pub use crate::serialization::{ProtobufSerializer, OptimizedProtobufSerializer};
 }
