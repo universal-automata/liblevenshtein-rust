@@ -134,10 +134,17 @@ impl State {
     /// Returns the smallest `num_errors` among all positions
     #[inline]
     pub fn min_distance(&self) -> Option<usize> {
-        self.positions
-            .iter()
-            .map(|p| p.num_errors)
-            .min()
+        // Optimization: positions are sorted, and since we maintain subsumption,
+        // the first position often has the minimum errors. Check it first.
+        self.positions.first().map(|first| {
+            // Fast path: if we only have one position, return it immediately
+            if self.positions.len() == 1 {
+                return first.num_errors;
+            }
+
+            // Otherwise, find the minimum
+            self.positions.iter().map(|p| p.num_errors).min().unwrap()
+        })
     }
 
     /// Infer the edit distance for a final state
@@ -146,6 +153,14 @@ impl State {
     /// distance based on remaining characters in query term
     #[inline]
     pub fn infer_distance(&self, query_length: usize) -> Option<usize> {
+        // Fast path: single position (common case)
+        if self.positions.len() == 1 {
+            let p = &self.positions[0];
+            let remaining = query_length.saturating_sub(p.term_index);
+            return Some(p.num_errors + remaining);
+        }
+
+        // General case: find minimum across all positions
         self.positions
             .iter()
             .map(|p| {
@@ -165,6 +180,17 @@ impl State {
     /// Returns None if no position has consumed the full query yet.
     #[inline]
     pub fn infer_prefix_distance(&self, query_length: usize) -> Option<usize> {
+        // Fast path: single position
+        if self.positions.len() == 1 {
+            let p = &self.positions[0];
+            return if p.term_index >= query_length {
+                Some(p.num_errors)
+            } else {
+                None
+            };
+        }
+
+        // General case: find minimum among positions that consumed the full query
         self.positions
             .iter()
             .filter(|p| p.term_index >= query_length)

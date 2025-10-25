@@ -316,6 +316,7 @@ pub fn transition_state(
 ///
 /// The next state after transitioning, or None if no valid transitions exist.
 /// The returned state is acquired from the pool (caller should release it when done).
+#[inline]
 pub fn transition_state_pooled(
     state: &State,
     pool: &mut StatePool,

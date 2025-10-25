@@ -27,6 +27,7 @@ pub struct PathNode {
 
 impl PathNode {
     /// Create a new path node
+    #[inline(always)]
     pub fn new(label: u8, parent: Option<Box<PathNode>>) -> Self {
         Self { label, parent }
     }
@@ -88,6 +89,7 @@ impl<N: DictionaryNode> Intersection<N> {
     }
 
     /// Create a child intersection with a parent path
+    #[inline]
     pub fn with_parent(
         label: u8,
         node: N,
@@ -129,11 +131,13 @@ impl<N: DictionaryNode> Intersection<N> {
     }
 
     /// Check if this intersection represents a complete match
+    #[inline(always)]
     pub fn is_final(&self) -> bool {
         self.node.is_final()
     }
 
     /// Get the minimum distance at this intersection
+    #[inline(always)]
     pub fn min_distance(&self) -> Option<usize> {
         self.state.min_distance()
     }
