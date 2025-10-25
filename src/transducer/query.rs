@@ -95,6 +95,7 @@ impl<N: DictionaryNode> QueryIterator<N> {
                 &self.query,
                 self.max_distance,
                 self.algorithm,
+                false,  // Exact matching (not prefix mode)
             ) {
                 // ✅ Create lightweight PathNode (no Arc clone!)
                 // Only stores label and parent chain - dictionary node not needed in parent

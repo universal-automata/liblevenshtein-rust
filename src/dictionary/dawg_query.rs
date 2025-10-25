@@ -188,6 +188,7 @@ impl DawgQueryIterator {
                 &self.query,
                 self.max_distance,
                 self.algorithm,
+                false,  // Exact matching (not prefix mode)
             ) {
                 // Create lightweight PathNode (no Arc clone!)
                 let parent_path = if let Some(current_label) = intersection.label {

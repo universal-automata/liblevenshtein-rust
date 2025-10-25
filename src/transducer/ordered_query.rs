@@ -74,6 +74,8 @@ pub struct OrderedQueryIterator<N: DictionaryNode> {
     algorithm: Algorithm,
     /// State pool for allocation reuse
     state_pool: StatePool,
+    /// Prefix matching mode
+    prefix_mode: bool,
 }
 
 impl<N: DictionaryNode> OrderedQueryIterator<N> {
@@ -100,6 +102,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             query: query_bytes,
             algorithm,
             state_pool: StatePool::new(),
+            prefix_mode: false,  // Exact matching by default
         }
     }
 
@@ -147,6 +150,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
                 &self.query,
                 self.max_distance,
                 self.algorithm,
+                self.prefix_mode,
             ) {
                 // Determine minimum possible distance from this state
                 if let Some(min_dist) = next_state.min_distance() {
@@ -218,7 +222,8 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     /// // Matches: "test" (d=0), "testing" (d=0), "tester" (d=0), "best" (d=1)
     /// query.prefix()
     /// ```
-    pub fn prefix(self) -> PrefixOrderedQueryIterator<N> {
+    pub fn prefix(mut self) -> PrefixOrderedQueryIterator<N> {
+        self.prefix_mode = true;  // Enable prefix matching
         PrefixOrderedQueryIterator { inner: self }
     }
 }
@@ -280,9 +285,14 @@ impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
         while self.inner.current_distance <= self.inner.max_distance {
             // Try to get next intersection from current distance level
             if let Some(intersection) = self.inner.pending_by_distance[self.inner.current_distance].pop_front() {
-                // Check if this intersection represents a valid prefix match
-                let should_return = if let Some(distance) = intersection.state.infer_prefix_distance(query_len) {
-                    distance <= self.inner.max_distance && distance == self.inner.current_distance
+                // Check if this is a complete word (final node) that matches our prefix
+                let should_return = if intersection.is_final() {
+                    // For prefix matching: check if we've consumed the entire query
+                    if let Some(distance) = intersection.state.infer_prefix_distance(query_len) {
+                        distance <= self.inner.max_distance && distance == self.inner.current_distance
+                    } else {
+                        false
+                    }
                 } else {
                     false
                 };
@@ -290,7 +300,7 @@ impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
                 // Always queue children for further exploration
                 self.inner.queue_children(&intersection);
 
-                // Return the result if it's a valid prefix match
+                // Return the result if it's a complete word matching our prefix
                 if should_return {
                     let term = intersection.term();
                     let distance = intersection.state.infer_prefix_distance(query_len).unwrap();
@@ -658,7 +668,7 @@ mod tests {
         let results: Vec<_> = query.prefix().collect();
 
         // Should match all terms starting with "test" exactly
-        assert!(results.len() >= 4);
+        assert!(results.len() >= 4, "Expected at least 4 results, got {}", results.len());
         assert!(results.iter().any(|c| c.term == "test" && c.distance == 0));
         assert!(results.iter().any(|c| c.term == "testing" && c.distance == 0));
         assert!(results.iter().any(|c| c.term == "tester" && c.distance == 0));

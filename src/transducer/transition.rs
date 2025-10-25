@@ -51,6 +51,11 @@ fn characteristic_vector<'a>(
 ///
 /// The characteristic vector tells us whether query[offset+k] matches
 /// for k in [0..window_size).
+///
+/// # Prefix Mode
+///
+/// When `prefix_mode` is true, characters beyond query_length are treated
+/// as free matches (no errors added), enabling autocomplete/prefix matching.
 #[inline]
 pub fn transition_position(
     position: &Position,
@@ -58,11 +63,12 @@ pub fn transition_position(
     query_length: usize,
     max_distance: usize,
     algorithm: Algorithm,
+    prefix_mode: bool,
 ) -> SmallVec<[Position; 4]> {
     match algorithm {
-        Algorithm::Standard => transition_standard(position, characteristic_vector, query_length, max_distance),
-        Algorithm::Transposition => transition_transposition(position, characteristic_vector, query_length, max_distance),
-        Algorithm::MergeAndSplit => transition_merge_split(position, characteristic_vector, query_length, max_distance),
+        Algorithm::Standard => transition_standard(position, characteristic_vector, query_length, max_distance, prefix_mode),
+        Algorithm::Transposition => transition_transposition(position, characteristic_vector, query_length, max_distance, prefix_mode),
+        Algorithm::MergeAndSplit => transition_merge_split(position, characteristic_vector, query_length, max_distance, prefix_mode),
     }
 }
 
@@ -70,15 +76,29 @@ pub fn transition_position(
 ///
 /// Returns SmallVec to avoid heap allocations for small result sets.
 /// Most transitions produce 2-3 positions, so we stack-allocate up to 4.
+///
+/// # Prefix Matching Support
+///
+/// When `prefix_mode` is true and term_index >= query_length, additional dictionary
+/// characters are treated as free matches, keeping the position "stuck" at query_length
+/// with the same error count.
 fn transition_standard(
     position: &Position,
     cv: &[bool],
-    _query_length: usize,
+    query_length: usize,
     max_distance: usize,
+    prefix_mode: bool,
 ) -> SmallVec<[Position; 4]> {
     let mut next = SmallVec::new();
     let i = position.term_index;
     let e = position.num_errors;
+
+    // Prefix matching: if enabled and we've consumed the full query, treat any character as a free match
+    if prefix_mode && i >= query_length {
+        // Keep position at query_length, don't add errors
+        next.push(Position::new(i, e));
+        return next;
+    }
 
     // Check cv[0] since the CV is already offset-adjusted
     // cv[0] corresponds to query[position.term_index]
@@ -112,9 +132,10 @@ fn transition_transposition(
     cv: &[bool],
     query_length: usize,
     max_distance: usize,
+    prefix_mode: bool,
 ) -> SmallVec<[Position; 4]> {
     // Start with standard transitions
-    let mut next = transition_standard(position, cv, query_length, max_distance);
+    let mut next = transition_standard(position, cv, query_length, max_distance, prefix_mode);
 
     let i = position.term_index;
     let e = position.num_errors;
@@ -136,9 +157,10 @@ fn transition_merge_split(
     cv: &[bool],
     query_length: usize,
     max_distance: usize,
+    prefix_mode: bool,
 ) -> SmallVec<[Position; 4]> {
     // Start with transposition transitions (which include standard)
-    let mut next = transition_transposition(position, cv, query_length, max_distance);
+    let mut next = transition_transposition(position, cv, query_length, max_distance, prefix_mode);
 
     let i = position.term_index;
     let e = position.num_errors;
@@ -230,6 +252,7 @@ pub fn transition_state(
     query: &[u8],
     max_distance: usize,
     algorithm: Algorithm,
+    prefix_mode: bool,
 ) -> Option<State> {
     let window_size = max_distance + 1;
     let query_length = query.len();
@@ -246,7 +269,7 @@ pub fn transition_state(
         let offset = position.term_index;
         let cv = characteristic_vector(dict_char, query, window_size, offset, &mut cv_buffer);
 
-        let next_positions = transition_position(position, cv, query_length, max_distance, algorithm);
+        let next_positions = transition_position(position, cv, query_length, max_distance, algorithm, prefix_mode);
 
         for next_pos in next_positions {
             next_state.insert(next_pos);
@@ -280,6 +303,7 @@ pub fn transition_state(
 /// * `query` - Query term bytes
 /// * `max_distance` - Maximum edit distance
 /// * `algorithm` - Algorithm variant (Standard, Transposition, MergeAndSplit)
+/// * `prefix_mode` - Enable prefix matching (characters beyond query treated as free matches)
 ///
 /// # Returns
 ///
@@ -292,6 +316,7 @@ pub fn transition_state_pooled(
     query: &[u8],
     max_distance: usize,
     algorithm: Algorithm,
+    prefix_mode: bool,
 ) -> Option<State> {
     let window_size = max_distance + 1;
     let query_length = query.len();
@@ -312,7 +337,7 @@ pub fn transition_state_pooled(
         let offset = position.term_index;
         let cv = characteristic_vector(dict_char, query, window_size, offset, &mut cv_buffer);
 
-        let next_positions = transition_position(position, cv, query_length, max_distance, algorithm);
+        let next_positions = transition_position(position, cv, query_length, max_distance, algorithm, prefix_mode);
 
         for next_pos in next_positions {
             next_state.insert(next_pos);
@@ -373,7 +398,7 @@ mod tests {
         let pos = Position::new(0, 0);
         let cv = vec![true, false, false]; // Matches at position 0
         let query_length = 4; // e.g., "test"
-        let next = transition_standard(&pos, &cv, query_length, 2);
+        let next = transition_standard(&pos, &cv, query_length, 2, false);
 
         // Should advance with no error on match
         assert!(next.contains(&Position::new(1, 0)));
@@ -384,7 +409,7 @@ mod tests {
         let pos = Position::new(1, 0);
         let cv = vec![false, false, true]; // No match at position 1
         let query_length = 4; // e.g., "test"
-        let next = transition_standard(&pos, &cv, query_length, 2);
+        let next = transition_standard(&pos, &cv, query_length, 2, false);
 
         // Should include:
         // - Substitution: (2, 1)
@@ -410,7 +435,7 @@ mod tests {
         let mut state = State::new();
         state.insert(Position::new(0, 0));
 
-        let next = transition_state(&state, b't', query, 2, Algorithm::Standard);
+        let next = transition_state(&state, b't', query, 2, Algorithm::Standard, false);
         assert!(next.is_some());
 
         let next_state = next.unwrap();
