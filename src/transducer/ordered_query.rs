@@ -177,11 +177,140 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     }
 }
 
+impl<N: DictionaryNode> OrderedQueryIterator<N> {
+    /// Add a filter predicate to this iterator.
+    ///
+    /// Returns a new iterator that only yields candidates matching the predicate.
+    /// The filter is applied during traversal, allowing early termination.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Filter to only identifiers starting with lowercase
+    /// query.filter(|candidate| {
+    ///     candidate.term.chars().next()
+    ///         .map(|c| c.is_lowercase())
+    ///         .unwrap_or(false)
+    /// })
+    /// ```
+    pub fn filter<F>(self, predicate: F) -> FilteredOrderedQueryIterator<N, F>
+    where
+        F: Fn(&OrderedCandidate) -> bool,
+    {
+        FilteredOrderedQueryIterator {
+            inner: self,
+            predicate,
+        }
+    }
+
+    /// Switch to prefix matching mode.
+    ///
+    /// In prefix mode, dictionary terms that START with something approximately
+    /// equal to the query are matched, allowing terms to be longer than the query.
+    ///
+    /// This is essential for autocomplete/code completion where users type partial
+    /// identifiers.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Query: "tes"
+    /// // Matches: "test" (d=0), "testing" (d=0), "tester" (d=0), "best" (d=1)
+    /// query.prefix()
+    /// ```
+    pub fn prefix(self) -> PrefixOrderedQueryIterator<N> {
+        PrefixOrderedQueryIterator { inner: self }
+    }
+}
+
 impl<N: DictionaryNode> Iterator for OrderedQueryIterator<N> {
     type Item = OrderedCandidate;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.advance()
+    }
+}
+
+/// Filtered ordered query iterator.
+///
+/// Wraps an OrderedQueryIterator and applies a filter predicate to results.
+/// Only candidates matching the predicate are yielded.
+pub struct FilteredOrderedQueryIterator<N: DictionaryNode, F>
+where
+    F: Fn(&OrderedCandidate) -> bool,
+{
+    inner: OrderedQueryIterator<N>,
+    predicate: F,
+}
+
+impl<N: DictionaryNode, F> Iterator for FilteredOrderedQueryIterator<N, F>
+where
+    F: Fn(&OrderedCandidate) -> bool,
+{
+    type Item = OrderedCandidate;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Keep advancing until we find a match or exhaust the iterator
+        loop {
+            let candidate = self.inner.next()?;
+            if (self.predicate)(&candidate) {
+                return Some(candidate);
+            }
+        }
+    }
+}
+
+/// Prefix ordered query iterator.
+///
+/// Performs approximate prefix matching where dictionary terms that START with
+/// something approximately equal to the query are matched. Terms can be longer
+/// than the query.
+///
+/// Essential for autocomplete and code completion.
+pub struct PrefixOrderedQueryIterator<N: DictionaryNode> {
+    inner: OrderedQueryIterator<N>,
+}
+
+impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
+    /// Advance to the next prefix match in order
+    fn advance_prefix(&mut self) -> Option<OrderedCandidate> {
+        let query_len = self.inner.query.len();
+
+        // Explore distance levels in ascending order
+        while self.inner.current_distance <= self.inner.max_distance {
+            // Try to get next intersection from current distance level
+            if let Some(intersection) = self.inner.pending_by_distance[self.inner.current_distance].pop_front() {
+                // Check if this intersection represents a valid prefix match
+                let should_return = if let Some(distance) = intersection.state.infer_prefix_distance(query_len) {
+                    distance <= self.inner.max_distance && distance == self.inner.current_distance
+                } else {
+                    false
+                };
+
+                // Always queue children for further exploration
+                self.inner.queue_children(&intersection);
+
+                // Return the result if it's a valid prefix match
+                if should_return {
+                    let term = intersection.term();
+                    let distance = intersection.state.infer_prefix_distance(query_len).unwrap();
+                    return Some(OrderedCandidate { distance, term });
+                }
+            } else {
+                // Current distance level exhausted, move to next
+                self.inner.current_distance += 1;
+            }
+        }
+
+        None
+    }
+}
+
+impl<N: DictionaryNode> Iterator for PrefixOrderedQueryIterator<N> {
+    type Item = OrderedCandidate;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.advance_prefix()
     }
 }
 
@@ -379,5 +508,310 @@ mod tests {
         unordered_terms.sort();
 
         assert_eq!(ordered_terms, unordered_terms);
+    }
+
+    #[test]
+    fn test_filtered_query() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "test", "Test", "TEST", "best", "Best", "rest",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            1,
+            Algorithm::Standard,
+        );
+
+        // Filter to only lowercase terms
+        let results: Vec<_> = query
+            .filter(|c| c.term.chars().all(|ch| ch.is_lowercase()))
+            .collect();
+
+        // Should only include lowercase results
+        for candidate in &results {
+            assert!(candidate.term.chars().all(|ch| ch.is_lowercase()));
+        }
+
+        // Should include lowercase matches
+        assert!(results.iter().any(|c| c.term == "test"));
+        assert!(results.iter().any(|c| c.term == "best"));
+        assert!(results.iter().any(|c| c.term == "rest"));
+
+        // Should NOT include uppercase matches
+        assert!(!results.iter().any(|c| c.term == "Test"));
+        assert!(!results.iter().any(|c| c.term == "TEST"));
+        assert!(!results.iter().any(|c| c.term == "Best"));
+    }
+
+    #[test]
+    fn test_filtered_query_with_distance() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "test", "testing", "best", "rest", "nest",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            3,
+            Algorithm::Standard,
+        );
+
+        // Filter to terms with exactly 4 characters
+        let results: Vec<_> = query
+            .filter(|c| c.term.len() == 4)
+            .collect();
+
+        // All results should have exactly 4 characters
+        for candidate in &results {
+            assert_eq!(candidate.term.len(), 4);
+        }
+
+        // Should include 4-letter matches
+        assert!(results.iter().any(|c| c.term == "test"));
+        assert!(results.iter().any(|c| c.term == "best"));
+        assert!(results.iter().any(|c| c.term == "rest"));
+        assert!(results.iter().any(|c| c.term == "nest"));
+
+        // Should NOT include longer terms
+        assert!(!results.iter().any(|c| c.term == "testing"));
+    }
+
+    #[test]
+    fn test_filtered_query_maintains_order() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "a", "aa", "aaa", "ab", "abc", "b", "ba", "baa",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "a".to_string(),
+            2,
+            Algorithm::Standard,
+        );
+
+        // Filter to terms starting with 'a'
+        let results: Vec<_> = query
+            .filter(|c| c.term.starts_with('a'))
+            .collect();
+
+        // Verify ordering is maintained (distance-first, then lexicographic)
+        for i in 1..results.len() {
+            assert!(
+                results[i - 1].distance <= results[i].distance,
+                "Distance ordering violated"
+            );
+
+            if results[i - 1].distance == results[i].distance {
+                assert!(
+                    results[i - 1].term <= results[i].term,
+                    "Lexicographic ordering violated within distance level"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_filtered_query_with_take() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "test", "testing", "tester", "best", "rest", "nest", "fest",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            2,
+            Algorithm::Standard,
+        );
+
+        // Filter to terms ending with 'st' and take first 3
+        let results: Vec<_> = query
+            .filter(|c| c.term.ends_with("st"))
+            .take(3)
+            .collect();
+
+        assert_eq!(results.len(), 3);
+
+        // All should end with 'st'
+        for candidate in &results {
+            assert!(candidate.term.ends_with("st"));
+        }
+
+        // Should be ordered by distance
+        assert!(results[0].distance <= results[1].distance);
+        assert!(results[1].distance <= results[2].distance);
+    }
+
+    #[test]
+    fn test_prefix_exact_match() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "test", "testing", "tester", "tested",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            0,
+            Algorithm::Standard,
+        );
+
+        let results: Vec<_> = query.prefix().collect();
+
+        // Should match all terms starting with "test" exactly
+        assert!(results.len() >= 4);
+        assert!(results.iter().any(|c| c.term == "test" && c.distance == 0));
+        assert!(results.iter().any(|c| c.term == "testing" && c.distance == 0));
+        assert!(results.iter().any(|c| c.term == "tester" && c.distance == 0));
+        assert!(results.iter().any(|c| c.term == "tested" && c.distance == 0));
+    }
+
+    #[test]
+    fn test_prefix_with_errors() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "test", "testing", "best", "resting", "rest",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "tes".to_string(),
+            1,
+            Algorithm::Standard,
+        );
+
+        let results: Vec<_> = query.prefix().collect();
+
+        // Should match:
+        // - "test", "testing" with d=0 (exact prefix match)
+        // - "best", "rest", "resting" with d=1 (one error in prefix)
+        assert!(results.iter().any(|c| c.term == "test" && c.distance == 0));
+        assert!(results.iter().any(|c| c.term == "testing" && c.distance == 0));
+        assert!(results.iter().any(|c| c.term == "best" && c.distance == 1));
+        assert!(results.iter().any(|c| c.term == "rest" && c.distance == 1));
+    }
+
+    #[test]
+    fn test_prefix_ordering() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "test", "testing", "tester", "best", "resting", "rest",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            2,
+            Algorithm::Standard,
+        );
+
+        let results: Vec<_> = query.prefix().collect();
+
+        // Verify distance-first ordering
+        for i in 1..results.len() {
+            assert!(
+                results[i - 1].distance <= results[i].distance,
+                "Distance ordering violated: {} (d={}) should come before {} (d={})",
+                results[i - 1].term,
+                results[i - 1].distance,
+                results[i].term,
+                results[i].distance
+            );
+        }
+
+        // First results should be distance=0
+        let first_distance = results[0].distance;
+        assert_eq!(first_distance, 0, "First result should have distance 0");
+    }
+
+    #[test]
+    fn test_prefix_vs_exact() {
+        let dict = PathMapDictionary::from_iter(vec![
+            "test", "testing", "tester",
+        ]);
+
+        // Exact matching
+        let exact_query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            0,
+            Algorithm::Standard,
+        );
+
+        let exact_results: Vec<_> = exact_query.collect();
+
+        // Prefix matching
+        let prefix_query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            0,
+            Algorithm::Standard,
+        );
+
+        let prefix_results: Vec<_> = prefix_query.prefix().collect();
+
+        // Exact should only match "test"
+        assert_eq!(exact_results.len(), 1);
+        assert_eq!(exact_results[0].term, "test");
+
+        // Prefix should match all terms starting with "test"
+        assert!(prefix_results.len() >= 3);
+        assert!(prefix_results.iter().any(|c| c.term == "test"));
+        assert!(prefix_results.iter().any(|c| c.term == "testing"));
+        assert!(prefix_results.iter().any(|c| c.term == "tester"));
+    }
+
+    #[test]
+    fn test_prefix_autocomplete_scenario() {
+        // Simulating code completion
+        let dict = PathMapDictionary::from_iter(vec![
+            "getValue", "getVariable", "getValue2", "setValue", "setVariable",
+            "removeValue", "hasValue",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "getVal".to_string(),
+            1,
+            Algorithm::Standard,
+        );
+
+        let results: Vec<_> = query.prefix().take(5).collect();
+
+        // Should prioritize exact prefix matches
+        // Results should be ordered by distance, then alphabetically
+        for candidate in &results {
+            println!("{}: {}", candidate.term, candidate.distance);
+        }
+
+        // Should include getValue family with low distance
+        assert!(results.iter().any(|c| c.term.starts_with("getValue")));
+    }
+
+    #[test]
+    fn test_prefix_with_filter() {
+        // Combining prefix matching with filtering
+        let dict = PathMapDictionary::from_iter(vec![
+            "TestCase", "testMethod", "testHelper", "bestPractice",
+        ]);
+
+        let query = OrderedQueryIterator::new(
+            dict.root(),
+            "test".to_string(),
+            1,
+            Algorithm::Standard,
+        );
+
+        // Prefix match + filter for lowercase
+        let results: Vec<_> = query
+            .prefix()
+            .filter(|c| c.term.chars().next().unwrap().is_lowercase())
+            .collect();
+
+        // Should only include lowercase-starting matches
+        for candidate in &results {
+            assert!(candidate.term.chars().next().unwrap().is_lowercase());
+        }
+
+        assert!(results.iter().any(|c| c.term == "testMethod"));
+        assert!(results.iter().any(|c| c.term == "testHelper"));
+        assert!(!results.iter().any(|c| c.term == "TestCase"));
     }
 }

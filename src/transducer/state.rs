@@ -151,6 +151,21 @@ impl State {
             })
             .min()
     }
+
+    /// Infer the edit distance for prefix matching
+    ///
+    /// For prefix matching, we only care if we've consumed the entire query
+    /// (allowing the dictionary term to be longer). Returns the minimum number
+    /// of errors among positions that have consumed >= query_length characters.
+    ///
+    /// Returns None if no position has consumed the full query yet.
+    pub fn infer_prefix_distance(&self, query_length: usize) -> Option<usize> {
+        self.positions
+            .iter()
+            .filter(|p| p.term_index >= query_length)
+            .map(|p| p.num_errors)
+            .min()
+    }
 }
 
 impl Default for State {

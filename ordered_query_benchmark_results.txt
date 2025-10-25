@@ -1,0 +1,31 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+    Finished `release` profile [optimized + debuginfo] target(s) in 9.85s
+     Running `target/release/examples/ordered_query_benchmark`
+=== Ordered vs Unordered Query Benchmark ===
+
+Loading English dictionary...
+Loaded 89545 words
+
+Building dictionary...
+Built in 24.332885ms
+
+=== Benchmark 1: Full Iteration (Distance 2) ===
+
+Unordered query:
+  Queries: 1000
+  Time: 3.960971063s
+  µs/query: 3960.97
+  Results: 37615
+
+Ordered query:
+  Queries: 1000
+  Time: 4.030459207s
+  µs/query: 4030.46
+  Results: 34237
+
+
+thread 'main' panicked at examples/ordered_query_benchmark.rs:68:5:
+assertion `left == right` failed: Result count mismatch!
+  left: 37615
+ right: 34237
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
