@@ -1,0 +1,50 @@
+   Compiling liblevenshtein v0.1.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+    Finished `release` profile [optimized + debuginfo] target(s) in 8.83s
+     Running `target/release/examples/dawg_query_comparison`
+=== DAWG Query Iterator Comparison ===
+
+Loading English dictionary...
+Loaded 89545 words
+
+Building DAWG...
+Built in 61.173243ms
+DAWG nodes: 205579
+
+=== Benchmark: Generic QueryIterator ===
+
+Generic QueryIterator:
+  Queries: 1000
+  Time: 15.544118ms
+  µs/query: 15.54
+  Results: 4857
+
+=== Benchmark: Optimized DawgQueryIterator ===
+
+Optimized DawgQueryIterator:
+  Queries: 1000
+  Time: 15.043677ms
+  µs/query: 15.04
+  Results: 4857
+
+=== Results ===
+
+✅ Both iterators return identical results (4857 matches)
+
+Performance Improvement:
+  Generic: 15.54 µs/query
+  Optimized: 15.04 µs/query
+  Speedup: 1.03x
+  Improvement: 3.22%
+
+⚠️  Improvement less than expected (predicted 10-15%)
+
+=== Additional Tests ===
+
+Distance 1:
+  Generic: 5.62 µs/query, Optimized: 4.78 µs/query, Speedup: 1.17x
+Distance 2:
+  Generic: 27.27 µs/query, Optimized: 27.91 µs/query, Speedup: 0.98x
+Distance 3:
+  Generic: 383.23 µs/query, Optimized: 346.65 µs/query, Speedup: 1.11x
+
+=== Benchmark Complete ===
