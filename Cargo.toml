@@ -65,6 +65,14 @@ name = "serialization_benchmarks"
 harness = false
 required-features = ["serialization"]
 
+[[bench]]
+name = "filtering_prefix_benchmarks"
+harness = false
+
+[[bench]]
+name = "prefix_profiling"
+harness = false
+
 [[bin]]
 name = "liblevenshtein-cli"
 path = "src/bin/liblevenshtein-cli.rs"

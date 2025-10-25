@@ -26,3 +26,5 @@ perf.data
 perf.data.old
 flamegraph.svg
 flamegraph_*.svg
+flamegraphs/
+perf.data*

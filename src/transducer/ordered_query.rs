@@ -90,7 +90,10 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
         let initial = initial_state(query_bytes.len(), max_distance);
 
         // Create buckets for each distance level (0..=max_distance)
-        let mut pending_by_distance = vec![VecDeque::new(); max_distance + 1];
+        // Pre-allocate capacity to reduce reallocations during traversal
+        let mut pending_by_distance: Vec<VecDeque<_>> = (0..=max_distance)
+            .map(|_| VecDeque::with_capacity(32))
+            .collect();
 
         // Start with root at distance 0
         pending_by_distance[0].push_back(Box::new(Intersection::new(root, initial)));
@@ -107,6 +110,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     }
 
     /// Advance to the next match in order
+    #[inline]
     fn advance(&mut self) -> Option<OrderedCandidate> {
         // Explore distance levels in ascending order
         while self.current_distance <= self.max_distance {
@@ -140,6 +144,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     }
 
     /// Queue child intersections into appropriate distance buckets
+    #[inline]
     fn queue_children(&mut self, intersection: &Box<Intersection<N>>) {
         // Edges are iterated in sorted order (lexicographic) thanks to DAWG construction
         for (label, child_node) in intersection.node.edges() {
@@ -231,6 +236,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
 impl<N: DictionaryNode> Iterator for OrderedQueryIterator<N> {
     type Item = OrderedCandidate;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.advance()
     }
@@ -254,6 +260,7 @@ where
 {
     type Item = OrderedCandidate;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         // Keep advancing until we find a match or exhaust the iterator
         loop {
@@ -278,6 +285,7 @@ pub struct PrefixOrderedQueryIterator<N: DictionaryNode> {
 
 impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
     /// Advance to the next prefix match in order
+    #[inline]
     fn advance_prefix(&mut self) -> Option<OrderedCandidate> {
         let query_len = self.inner.query.len();
 
@@ -319,6 +327,7 @@ impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
 impl<N: DictionaryNode> Iterator for PrefixOrderedQueryIterator<N> {
     type Item = OrderedCandidate;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.advance_prefix()
     }
