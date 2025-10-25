@@ -82,6 +82,7 @@ pub fn transition_position(
 /// When `prefix_mode` is true and term_index >= query_length, additional dictionary
 /// characters are treated as free matches, keeping the position "stuck" at query_length
 /// with the same error count.
+#[inline]
 fn transition_standard(
     position: &Position,
     cv: &[bool],
@@ -127,6 +128,7 @@ fn transition_standard(
 }
 
 /// Transposition algorithm transition (adds swap of adjacent chars)
+#[inline]
 fn transition_transposition(
     position: &Position,
     cv: &[bool],
@@ -152,6 +154,7 @@ fn transition_transposition(
 }
 
 /// Merge and split algorithm transition
+#[inline]
 fn transition_merge_split(
     position: &Position,
     cv: &[bool],
@@ -184,9 +187,10 @@ fn transition_merge_split(
 /// without consuming dictionary characters.
 ///
 /// Optimized version that modifies the state in-place to avoid cloning.
+#[inline]
 fn epsilon_closure_mut(state: &mut State, query_length: usize, max_distance: usize) {
-    // Track which positions we've already processed to avoid infinite loops
-    let mut to_process: SmallVec<[Position; 8]> = SmallVec::new();
+    // Pre-allocate with typical size to avoid reallocation
+    let mut to_process: SmallVec<[Position; 8]> = SmallVec::with_capacity(8);
 
     // Start with current positions
     for pos in state.positions() {
@@ -202,9 +206,11 @@ fn epsilon_closure_mut(state: &mut State, query_length: usize, max_distance: usi
         if position.num_errors < max_distance && position.term_index < query_length {
             let deleted = Position::new(position.term_index + 1, position.num_errors + 1);
 
-            // Check if this is a new position
-            if !to_process.contains(&deleted) {
-                state.insert(deleted.clone());
+            // Try to insert - State.insert handles deduplication efficiently
+            // Only add to to_process if it was actually inserted (new position)
+            let len_before = state.len();
+            state.insert(deleted.clone());
+            if state.len() > len_before {
                 to_process.push(deleted);
             }
         }
@@ -229,6 +235,7 @@ fn epsilon_closure(state: &State, query_length: usize, max_distance: usize) -> S
 /// - Target state's Vec allocation is reused
 /// - Position is Copy, so no clone overhead
 /// - Eliminates one State::clone compared to epsilon_closure()
+#[inline]
 fn epsilon_closure_into(
     source: &State,
     target: &mut State,

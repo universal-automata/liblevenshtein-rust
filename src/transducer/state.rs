@@ -73,6 +73,7 @@ impl State {
     }
 
     /// Get all positions
+    #[inline(always)]
     pub fn positions(&self) -> &[Position] {
         &self.positions
     }
@@ -119,6 +120,7 @@ impl State {
     /// - Time: O(n) where n is the number of positions in source
     /// - Memory: Reuses this state's Vec allocation if capacity is sufficient
     /// - Position is Copy, so this is a fast memcpy of the positions
+    #[inline]
     pub fn copy_from(&mut self, other: &State) {
         self.positions.clear();
         self.positions.reserve(other.positions.len());
@@ -130,6 +132,7 @@ impl State {
     /// Get the minimum edit distance in this state
     ///
     /// Returns the smallest `num_errors` among all positions
+    #[inline]
     pub fn min_distance(&self) -> Option<usize> {
         self.positions
             .iter()
@@ -141,6 +144,7 @@ impl State {
     ///
     /// For a final state (at end of dictionary term), infer the
     /// distance based on remaining characters in query term
+    #[inline]
     pub fn infer_distance(&self, query_length: usize) -> Option<usize> {
         self.positions
             .iter()
@@ -159,6 +163,7 @@ impl State {
     /// of errors among positions that have consumed >= query_length characters.
     ///
     /// Returns None if no position has consumed the full query yet.
+    #[inline]
     pub fn infer_prefix_distance(&self, query_length: usize) -> Option<usize> {
         self.positions
             .iter()
