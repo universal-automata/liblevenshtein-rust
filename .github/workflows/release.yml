@@ -148,28 +148,28 @@ jobs:
 
       - name: Create .deb package metadata
         run: |
-          cat >> Cargo.toml <<'EOF'
+          cat >> Cargo.toml <<'EOFTOML'
 
-[package.metadata.deb]
-maintainer = "Dylon Edwards <dylon.devo@gmail.com>"
-copyright = "2025, F1R3FLY.io <noreply@f1r3fly.io>"
-license-file = ["LICENSE", "0"]
-extended-description = """
-Fast approximate string matching using Levenshtein automata.
-Supports multiple dictionary backends, serialization formats,
-and includes a full-featured CLI tool with compression support.
-"""
-depends = "$auto"
-section = "utils"
-priority = "optional"
-assets = [
-    ["target/release/liblevenshtein", "usr/bin/", "755"],
-    ["target/release/liblevenshtein.so", "usr/lib/", "644"],
-    ["target/release/liblevenshtein.rlib", "usr/lib/", "644"],
-    ["README.md", "usr/share/doc/liblevenshtein/", "644"],
-    ["CHANGELOG.md", "usr/share/doc/liblevenshtein/", "644"],
-]
-EOF
+          [package.metadata.deb]
+          maintainer = "Dylon Edwards <dylon.devo@gmail.com>"
+          copyright = "2025, F1R3FLY.io <noreply@f1r3fly.io>"
+          license-file = ["LICENSE", "0"]
+          extended-description = """
+          Fast approximate string matching using Levenshtein automata.
+          Supports multiple dictionary backends, serialization formats,
+          and includes a full-featured CLI tool with compression support.
+          """
+          depends = "$auto"
+          section = "utils"
+          priority = "optional"
+          assets = [
+              ["target/release/liblevenshtein", "usr/bin/", "755"],
+              ["target/release/liblevenshtein.so", "usr/lib/", "644"],
+              ["target/release/liblevenshtein.rlib", "usr/lib/", "644"],
+              ["README.md", "usr/share/doc/liblevenshtein/", "644"],
+              ["CHANGELOG.md", "usr/share/doc/liblevenshtein/", "644"],
+          ]
+          EOFTOML
 
       - name: Create .deb package
         run: cargo deb --no-build --no-strip
