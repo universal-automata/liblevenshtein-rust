@@ -5,12 +5,14 @@ use colored::Colorize;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
+use crate::commands::core::QueryParams;
+use crate::commands::handlers::query::execute_query;
 use crate::dictionary::dawg::DawgDictionary;
 use crate::dictionary::dynamic_dawg::DynamicDawg;
 use crate::dictionary::pathmap::PathMapDictionary;
-use crate::dictionary::{Dictionary, DictionaryNode};
+use crate::dictionary::Dictionary;
 use crate::repl::state::{DictContainer, DictionaryBackend};
-use crate::transducer::{Algorithm, Transducer};
+use crate::transducer::Algorithm;
 
 #[cfg(feature = "serialization")]
 use crate::serialization::{BincodeSerializer, DictionarySerializer, JsonSerializer};
@@ -121,17 +123,22 @@ fn cmd_query(
     // Load dictionary
     let container = load_dictionary(&path, dict_format)?;
 
-    // Perform query
-    let mut results: Vec<(String, usize)> = match &container {
-        DictContainer::PathMap(d) => query_dict(d, term, max_distance, algorithm, prefix),
-        DictContainer::Dawg(d) => query_dict(d, term, max_distance, algorithm, prefix),
-        DictContainer::DynamicDawg(d) => query_dict(d, term, max_distance, algorithm, prefix),
+    // Create query parameters
+    let params = QueryParams {
+        term: term.to_string(),
+        max_distance,
+        algorithm,
+        prefix,
+        show_distances: false, // Not used by execute_query
+        limit,
     };
 
-    // Apply limit
-    if let Some(lim) = limit {
-        results.truncate(lim);
-    }
+    // Perform query using shared handler
+    let results: Vec<(String, usize)> = match &container {
+        DictContainer::PathMap(d) => execute_query(d, &params),
+        DictContainer::Dawg(d) => execute_query(d, &params),
+        DictContainer::DynamicDawg(d) => execute_query(d, &params),
+    };
 
     // Print results
     if results.is_empty() {
@@ -149,33 +156,6 @@ fn cmd_query(
     }
 
     Ok(())
-}
-
-/// Helper to query any dictionary type
-fn query_dict<D: Dictionary + Clone>(
-    dict: &D,
-    term: &str,
-    max_distance: usize,
-    algorithm: Algorithm,
-    prefix: bool,
-) -> Vec<(String, usize)>
-where
-    D::Node: DictionaryNode,
-{
-    let transducer = Transducer::new(dict.clone(), algorithm);
-
-    if prefix {
-        transducer
-            .query_ordered(term, max_distance)
-            .prefix()
-            .map(|c| (c.term, c.distance))
-            .collect()
-    } else {
-        transducer
-            .query_ordered(term, max_distance)
-            .map(|c| (c.term, c.distance))
-            .collect()
-    }
 }
 
 /// Info command
