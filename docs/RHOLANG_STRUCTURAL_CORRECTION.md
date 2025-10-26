@@ -4565,6 +4565,998 @@ P(wᵢ | wᵢ₋₁) = count(wᵢ₋₁, wᵢ) / count(wᵢ₋₁)
 
 ---
 
+## Required Changes to liblevenshtein
+
+This section brainstorms the necessary features, extensions, and modifications to the **liblevenshtein** library to support the complete Rholang structural error correction design.
+
+### Current liblevenshtein Capabilities
+
+**Existing Features:**
+1. ✅ **Universal Levenshtein Automata** - Efficient edit distance computation
+2. ✅ **Multiple algorithms** - Standard, Transposition, MergeAndSplit
+3. ✅ **DAWG dictionary** - Fast prefix/exact matching
+4. ✅ **Serialization** - Save/load dictionaries with protobuf/bincode
+5. ✅ **Prefix matching** - Query by prefix with distance bounds
+6. ✅ **Iterators** - Lazy evaluation, ordered/unordered results
+
+**Current Architecture:**
+```
+liblevenshtein/
+├── src/
+│   ├── levenshtein/         # Edit distance algorithms
+│   ├── transducer/          # Levenshtein automata
+│   ├── dictionary/          # DAWG/PathMap implementations
+│   ├── distance/            # Algorithm traits
+│   └── serialization/       # Protobuf/bincode support
+```
+
+---
+
+### Level 1: Lexical Correction Requirements
+
+**Already Supported:**
+- ✅ Keyword/identifier correction via existing Levenshtein automata
+- ✅ Edit distance computation for typos
+- ✅ Prefix matching for code completion
+
+**New Requirements:**
+
+#### 1.1 Context-Aware Suggestion Ranking
+
+**Problem:** Current ranking is purely distance-based. Need semantic context.
+
+**Proposed Addition:**
+```rust
+// New module: src/correction/context.rs
+pub struct ContextAwareCorrector<D: Dictionary> {
+    dictionary: D,
+    context_weights: HashMap<String, f64>,
+}
+
+impl<D: Dictionary> ContextAwareCorrector<D> {
+    pub fn suggest_with_context(
+        &self,
+        term: &str,
+        max_distance: usize,
+        context: &CorrectionContext,
+    ) -> Vec<WeightedSuggestion> {
+        // Get base suggestions from Levenshtein
+        let base_suggestions = self.dictionary.search(term, max_distance);
+
+        // Re-rank by context
+        base_suggestions
+            .map(|s| self.weight_by_context(s, context))
+            .collect()
+    }
+
+    fn weight_by_context(
+        &self,
+        suggestion: (String, usize),
+        context: &CorrectionContext,
+    ) -> WeightedSuggestion {
+        let (term, distance) = suggestion;
+        let base_score = 1.0 / (1.0 + distance as f64);
+
+        // Adjust by context
+        let context_bonus = match context {
+            CorrectionContext::AfterKeyword(kw) => {
+                self.context_weights
+                    .get(&format!("{}_{}", kw, term))
+                    .copied()
+                    .unwrap_or(0.0)
+            }
+            CorrectionContext::InExpression => {
+                // Prefer identifiers over keywords
+                if self.is_keyword(&term) { -0.2 } else { 0.1 }
+            }
+            _ => 0.0,
+        };
+
+        WeightedSuggestion {
+            term,
+            distance,
+            score: base_score + context_bonus,
+        }
+    }
+}
+
+pub enum CorrectionContext {
+    AfterKeyword(String),
+    InExpression,
+    InPattern,
+    AfterOperator,
+    Unknown,
+}
+```
+
+**Changes Needed:**
+- ✨ New module `src/correction/` for context-aware features
+- ✨ `ContextWeights` structure for storing learned associations
+- ✨ Integration with n-gram models (from hierarchical design)
+
+#### 1.2 Frequency-Based Ranking
+
+**Problem:** No frequency information for common terms.
+
+**Proposed Addition:**
+```rust
+// Extension to Dictionary trait
+pub trait FrequencyDictionary: Dictionary {
+    fn frequency(&self, term: &str) -> Option<u64>;
+
+    fn search_with_frequency(
+        &self,
+        query: &str,
+        max_distance: usize,
+    ) -> impl Iterator<Item = (String, usize, u64)>;
+}
+
+// Implementation for DAWG
+impl FrequencyDictionary for PathMapDictionary {
+    fn frequency(&self, term: &str) -> Option<u64> {
+        self.metadata.get(term).map(|m| m.frequency)
+    }
+
+    fn search_with_frequency(
+        &self,
+        query: &str,
+        max_distance: usize,
+    ) -> impl Iterator<Item = (String, usize, u64)> {
+        self.search(query, max_distance)
+            .map(|(term, dist)| {
+                let freq = self.frequency(&term).unwrap_or(0);
+                (term, dist, freq)
+            })
+    }
+}
+```
+
+**Changes Needed:**
+- 📝 Extend `PathMapDictionary` to store frequency metadata
+- 📝 Update serialization to include frequencies
+- 📝 Add `build_with_frequencies()` constructor
+
+---
+
+### Level 2: Syntactic Correction Requirements
+
+**Current Gap:** liblevenshtein focuses on **string correction**, not **parse tree correction**.
+
+**New Requirements:**
+
+#### 2.1 Grammar Pattern Matching
+
+**Problem:** Need to match error patterns against grammar rules.
+
+**Proposed Addition:**
+```rust
+// New module: src/grammar/pattern.rs
+pub struct GrammarPatternMatcher {
+    patterns: Vec<ErrorPattern>,
+}
+
+pub struct ErrorPattern {
+    pub name: &'static str,
+    pub tree_query: Query,  // Tree-sitter query
+    pub corrector: Box<dyn Fn(&Node, &str) -> Vec<Correction>>,
+}
+
+impl GrammarPatternMatcher {
+    pub fn match_error(&self, error_node: Node, source: &str) -> Option<Correction> {
+        for pattern in &self.patterns {
+            let matches = pattern.tree_query.matches(
+                error_node,
+                source.as_bytes(),
+            );
+
+            if !matches.is_empty() {
+                return Some((pattern.corrector)(error_node, source)[0].clone());
+            }
+        }
+
+        None
+    }
+}
+```
+
+**Changes Needed:**
+- ✨ New `src/grammar/` module for grammar-aware features
+- ✨ Integration with Tree-sitter (new dependency)
+- ✨ Pattern DSL for error rules
+
+#### 2.2 Token Sequence Correction
+
+**Problem:** Need n-gram models for token sequences (not just strings).
+
+**Proposed Addition:**
+```rust
+// New module: src/ngram/transducer.rs
+pub struct NgramTransducer<W: Weight> {
+    states: Vec<NgramState<W>>,
+    transitions: HashMap<(StateId, Token), Vec<Arc<W>>>,
+}
+
+pub struct NgramState<W: Weight> {
+    id: StateId,
+    backoff_weight: W,
+    backoff_state: Option<StateId>,
+}
+
+impl<W: Weight> NgramTransducer<W> {
+    pub fn from_corpus(
+        corpus: &str,
+        n: usize,
+        smoothing: SmoothingType,
+    ) -> Self {
+        // Build n-gram model from corpus
+        let ngrams = Self::extract_ngrams(corpus, n);
+        let counts = Self::count_ngrams(&ngrams);
+
+        // Apply smoothing
+        let smoothed = match smoothing {
+            SmoothingType::KneserNey { discount } => {
+                Self::kneser_ney_smoothing(&counts, discount)
+            }
+            SmoothingType::Laplace => {
+                Self::laplace_smoothing(&counts)
+            }
+        };
+
+        Self::build_transducer(smoothed, n)
+    }
+
+    pub fn score_sequence(&self, tokens: &[Token]) -> W {
+        // Compute probability of token sequence
+        let mut state = 0; // Start state
+        let mut total_weight = W::one();
+
+        for token in tokens {
+            if let Some(arcs) = self.transitions.get(&(state, token.clone())) {
+                let arc = &arcs[0]; // Take best arc
+                total_weight = W::times(&total_weight, &arc.weight);
+                state = arc.next_state;
+            } else {
+                // Backoff
+                total_weight = self.backoff(state, token, total_weight);
+            }
+        }
+
+        total_weight
+    }
+}
+
+pub enum SmoothingType {
+    KneserNey { discount: f64 },
+    Laplace,
+    GoodTuring,
+}
+```
+
+**Changes Needed:**
+- ✨ New `src/ngram/` module for language models
+- ✨ Weight abstraction (Tropical, Log, Probability semirings)
+- ✨ Backoff mechanism for unseen n-grams
+- ✨ Smoothing algorithms (Kneser-Ney, Laplace, Good-Turing)
+
+---
+
+### Level 3: Structural Correction Requirements
+
+**Current Gap:** No delimiter/bracket matching support.
+
+**New Requirements:**
+
+#### 3.1 Delimiter Automaton
+
+**Problem:** Need specialized automaton for delimiter balancing.
+
+**Proposed Addition:**
+```rust
+// New module: src/structural/delimiter.rs
+pub struct DelimiterAutomaton {
+    stack: Vec<Delimiter>,
+    state: DelimiterState,
+}
+
+#[derive(Clone, Debug)]
+pub enum DelimiterState {
+    Balanced,
+    InString { start_pos: usize, quote_type: QuoteType },
+    InComment { start_pos: usize, comment_type: CommentType },
+    Unbalanced { unclosed: Vec<Delimiter> },
+}
+
+impl DelimiterAutomaton {
+    pub fn process(&mut self, ch: char, pos: usize) -> Option<DelimiterError> {
+        match self.state {
+            DelimiterState::InString { .. } => {
+                self.process_string_char(ch, pos)
+            }
+            DelimiterState::InComment { .. } => {
+                self.process_comment_char(ch, pos)
+            }
+            _ => self.process_delimiter(ch, pos),
+        }
+    }
+
+    fn process_delimiter(&mut self, ch: char, pos: usize) -> Option<DelimiterError> {
+        match ch {
+            '{' | '(' | '[' | '"' => {
+                let delim = Delimiter::from_char(ch, pos);
+                self.stack.push(delim);
+                None
+            }
+            '}' | ')' | ']' => {
+                if let Some(opening) = self.stack.pop() {
+                    if !Delimiter::matches(opening.char, ch) {
+                        return Some(DelimiterError::Mismatched {
+                            expected: Delimiter::closing_for(opening.char),
+                            found: ch,
+                            opening_pos: opening.pos,
+                            closing_pos: pos,
+                        });
+                    }
+                } else {
+                    return Some(DelimiterError::UnmatchedClosing { ch, pos });
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+}
+```
+
+**Changes Needed:**
+- ✨ New `src/structural/` module for structural analysis
+- ✨ Delimiter stack automaton with error recovery
+- ✨ String/comment state tracking
+- ✨ Escape sequence handling
+
+#### 3.2 Dyck Language Recognition
+
+**Problem:** Formal recognition of balanced bracket languages.
+
+**Proposed Addition:**
+```rust
+// Extension to delimiter module
+pub struct DyckAutomaton {
+    k: usize,  // Number of bracket pairs
+    stack: Vec<usize>,  // Stack of bracket types
+}
+
+impl DyckAutomaton {
+    pub fn accepts(&mut self, input: &[BracketSymbol]) -> bool {
+        self.stack.clear();
+
+        for symbol in input {
+            match symbol {
+                BracketSymbol::Open(t) if *t < self.k => {
+                    self.stack.push(*t);
+                }
+                BracketSymbol::Close(t) if *t < self.k => {
+                    if let Some(top) = self.stack.pop() {
+                        if top != *t {
+                            return false; // Mismatch
+                        }
+                    } else {
+                        return false; // Unmatched closing
+                    }
+                }
+                _ => return false, // Invalid symbol
+            }
+        }
+
+        self.stack.is_empty() // Balanced if stack empty
+    }
+
+    pub fn minimal_correction(&self, input: &[BracketSymbol]) -> Vec<Edit> {
+        // Compute minimum edits to make input a valid Dyck word
+        // Using dynamic programming
+        let n = input.len();
+        let mut dp = vec![vec![usize::MAX; n + 1]; n + 1];
+        let mut edits = vec![vec![Vec::new(); n + 1]; n + 1];
+
+        // Base case
+        for i in 0..=n {
+            dp[i][i] = 0;
+        }
+
+        // Fill DP table
+        for len in 2..=n {
+            for i in 0..=n - len {
+                let j = i + len;
+                // Try matching i and j-1
+                if Self::can_match(&input[i], &input[j - 1]) {
+                    if i + 1 == j - 1 {
+                        dp[i][j] = 0;
+                    } else if dp[i + 1][j - 1] < usize::MAX {
+                        dp[i][j] = dp[i + 1][j - 1];
+                        edits[i][j] = edits[i + 1][j - 1].clone();
+                    }
+                }
+                // Try splitting
+                for k in i + 1..j {
+                    let cost = dp[i][k].saturating_add(dp[k][j]);
+                    if cost < dp[i][j] {
+                        dp[i][j] = cost;
+                        edits[i][j] = edits[i][k]
+                            .iter()
+                            .chain(edits[k][j].iter())
+                            .cloned()
+                            .collect();
+                    }
+                }
+                // Try insertion/deletion
+                if dp[i + 1][j] + 1 < dp[i][j] {
+                    dp[i][j] = dp[i + 1][j] + 1;
+                    edits[i][j] = edits[i + 1][j].clone();
+                    edits[i][j].push(Edit::Delete(i));
+                }
+                if dp[i][j - 1] + 1 < dp[i][j] {
+                    dp[i][j] = dp[i][j - 1] + 1;
+                    edits[i][j] = edits[i][j - 1].clone();
+                    edits[i][j].push(Edit::Insert(j - 1, input[j - 1].matching()));
+                }
+            }
+        }
+
+        edits[0][n].clone()
+    }
+}
+```
+
+**Changes Needed:**
+- ✨ Formal Dyck language automaton
+- ✨ Minimal correction algorithm (DP-based)
+- ✨ Edit sequence generation
+
+---
+
+### Level 4: Semantic Linting Requirements
+
+**Current Gap:** No dataflow or control flow analysis.
+
+**New Requirements:**
+
+#### 4.1 Control Flow Graph Construction
+
+**Problem:** Need CFG for semantic analysis.
+
+**Proposed Addition:**
+```rust
+// New module: src/semantic/cfg.rs
+pub struct ControlFlowGraph {
+    pub nodes: Vec<CFGNode>,
+    pub edges: Vec<CFGEdge>,
+    pub entry: NodeId,
+    pub exit: NodeId,
+}
+
+pub enum CFGNode {
+    Entry,
+    Exit,
+    Statement {
+        ast_node: Node<'static>,
+        definitions: HashSet<VarId>,
+        uses: HashSet<VarId>,
+    },
+    Branch {
+        condition: Node<'static>,
+    },
+}
+
+pub struct CFGEdge {
+    pub from: NodeId,
+    pub to: NodeId,
+    pub kind: EdgeKind,
+}
+
+pub enum EdgeKind {
+    Unconditional,
+    TrueBranch,
+    FalseBranch,
+}
+
+impl ControlFlowGraph {
+    pub fn from_ast(root: Node) -> Self {
+        let mut builder = CFGBuilder::new();
+        builder.visit(root);
+        builder.build()
+    }
+
+    pub fn reaching_definitions(&self) -> HashMap<NodeId, HashSet<VarId>> {
+        // Iterative dataflow analysis
+        let mut in_sets: HashMap<NodeId, HashSet<VarId>> = HashMap::new();
+        let mut out_sets: HashMap<NodeId, HashSet<VarId>> = HashMap::new();
+
+        // Initialize
+        out_sets.insert(self.entry, HashSet::new());
+
+        // Iterate until fixpoint
+        let mut changed = true;
+        while changed {
+            changed = false;
+
+            for node in &self.nodes {
+                let node_id = node.id();
+
+                // IN[n] = ∪(OUT[p] for p in predecessors(n))
+                let in_set = self.predecessors(node_id)
+                    .iter()
+                    .flat_map(|p| out_sets.get(p).cloned().unwrap_or_default())
+                    .collect();
+
+                // OUT[n] = GEN[n] ∪ (IN[n] - KILL[n])
+                let gen = node.gen_set();
+                let kill = node.kill_set();
+                let out_set = gen
+                    .union(&in_set.difference(&kill).cloned().collect())
+                    .cloned()
+                    .collect();
+
+                if in_sets.insert(node_id, in_set).is_none() {
+                    changed = true;
+                }
+                if out_sets.insert(node_id, out_set) != Some(out_set.clone()) {
+                    changed = true;
+                }
+            }
+        }
+
+        in_sets
+    }
+}
+```
+
+**Changes Needed:**
+- ✨ New `src/semantic/` module for program analysis
+- ✨ CFG construction from Tree-sitter AST
+- ✨ Dataflow analysis framework (reaching definitions, live variables)
+- ✨ Dominator tree computation
+
+#### 4.2 Channel Usage Analysis (Rholang-specific)
+
+**Problem:** Need to track channel definitions and uses for process calculus.
+
+**Proposed Addition:**
+```rust
+// Rholang-specific analysis
+pub struct ChannelAnalyzer {
+    definitions: HashMap<ChannelName, Vec<Location>>,
+    sends: HashMap<ChannelName, Vec<Location>>,
+    receives: HashMap<ChannelName, Vec<Location>>,
+}
+
+impl ChannelAnalyzer {
+    pub fn analyze(&mut self, tree: &Tree, source: &str) -> Vec<ChannelWarning> {
+        let mut warnings = Vec::new();
+
+        // Find all channels
+        self.collect_channels(tree, source);
+
+        // Check for common issues
+        for (channel, defs) in &self.definitions {
+            // Unused channel
+            if self.sends.get(channel).is_none() && self.receives.get(channel).is_none() {
+                warnings.push(ChannelWarning::UnusedChannel {
+                    name: channel.clone(),
+                    location: defs[0].clone(),
+                });
+            }
+
+            // Send without receive (potential deadlock)
+            if self.sends.get(channel).is_some() && self.receives.get(channel).is_none() {
+                warnings.push(ChannelWarning::SendWithoutReceive {
+                    name: channel.clone(),
+                    send_locations: self.sends[channel].clone(),
+                });
+            }
+
+            // Receive without send (will block forever)
+            if self.receives.get(channel).is_some() && self.sends.get(channel).is_none() {
+                warnings.push(ChannelWarning::ReceiveWithoutSend {
+                    name: channel.clone(),
+                    receive_locations: self.receives[channel].clone(),
+                });
+            }
+        }
+
+        warnings
+    }
+}
+```
+
+**Changes Needed:**
+- ✨ Channel/process-specific analysis
+- ✨ Deadlock detection heuristics
+- ✨ Communication pattern analysis
+
+---
+
+### Integration and Composition Requirements
+
+#### 5.1 Weighted Transducer Composition
+
+**Problem:** Need WFST composition for hierarchical correction.
+
+**Proposed Addition:**
+```rust
+// New module: src/transducer/composition.rs
+pub struct ComposedTransducer<W: Weight> {
+    left: Box<dyn Transducer<W>>,
+    right: Box<dyn Transducer<W>>,
+    cache: HashMap<(StateId, StateId), StateId>,
+}
+
+impl<W: Weight> ComposedTransducer<W> {
+    pub fn compose<T1, T2>(left: T1, right: T2) -> Self
+    where
+        T1: Transducer<W> + 'static,
+        T2: Transducer<W> + 'static,
+    {
+        Self {
+            left: Box::new(left),
+            right: Box::new(right),
+            cache: HashMap::new(),
+        }
+    }
+}
+
+impl<W: Weight> Transducer<W> for ComposedTransducer<W> {
+    fn transduce(&self, input: &[Symbol]) -> Vec<(Vec<Symbol>, W)> {
+        // Composition algorithm:
+        // Output of left becomes input to right
+
+        let intermediate = self.left.transduce(input);
+
+        let mut results = Vec::new();
+        for (inter_seq, weight1) in intermediate {
+            let final_outputs = self.right.transduce(&inter_seq);
+
+            for (output, weight2) in final_outputs {
+                results.push((output, W::times(&weight1, &weight2)));
+            }
+        }
+
+        results
+    }
+}
+
+// N-way composition
+pub fn compose_n<W: Weight>(transducers: Vec<Box<dyn Transducer<W>>>) -> Box<dyn Transducer<W>> {
+    transducers
+        .into_iter()
+        .reduce(|acc, t| Box::new(ComposedTransducer::compose(*acc, *t)))
+        .unwrap()
+}
+```
+
+**Changes Needed:**
+- ✨ Generic `Transducer` trait
+- ✨ Composition algorithms (eager and lazy)
+- ✨ State space optimization (composition pruning)
+- ✨ Multi-level composition support
+
+#### 5.2 Weight Semirings
+
+**Problem:** Need different weight types for different scoring strategies.
+
+**Proposed Addition:**
+```rust
+// New module: src/semiring/mod.rs
+pub trait Weight: Clone + PartialEq {
+    fn zero() -> Self;  // Additive identity
+    fn one() -> Self;   // Multiplicative identity
+    fn plus(a: &Self, b: &Self) -> Self;    // Addition
+    fn times(a: &Self, b: &Self) -> Self;   // Multiplication
+}
+
+// Tropical semiring (min, +)
+#[derive(Clone, PartialEq, PartialOrd)]
+pub struct TropicalWeight(pub f64);
+
+impl Weight for TropicalWeight {
+    fn zero() -> Self { TropicalWeight(f64::INFINITY) }
+    fn one() -> Self { TropicalWeight(0.0) }
+    fn plus(a: &Self, b: &Self) -> Self { TropicalWeight(a.0.min(b.0)) }
+    fn times(a: &Self, b: &Self) -> Self { TropicalWeight(a.0 + b.0) }
+}
+
+// Log semiring (log-add, +)
+#[derive(Clone, PartialEq)]
+pub struct LogWeight(pub f64);
+
+impl Weight for LogWeight {
+    fn zero() -> Self { LogWeight(f64::NEG_INFINITY) }
+    fn one() -> Self { LogWeight(0.0) }
+
+    fn plus(a: &Self, b: &Self) -> Self {
+        // log(exp(a) + exp(b))
+        if a.0 == f64::NEG_INFINITY {
+            b.clone()
+        } else if b.0 == f64::NEG_INFINITY {
+            a.clone()
+        } else {
+            let max = a.0.max(b.0);
+            LogWeight(max + ((a.0 - max).exp() + (b.0 - max).exp()).ln())
+        }
+    }
+
+    fn times(a: &Self, b: &Self) -> Self {
+        LogWeight(a.0 + b.0)
+    }
+}
+
+// Probability semiring (×, +)
+#[derive(Clone, PartialEq, PartialOrd)]
+pub struct ProbabilityWeight(pub f64);
+
+impl Weight for ProbabilityWeight {
+    fn zero() -> Self { ProbabilityWeight(0.0) }
+    fn one() -> Self { ProbabilityWeight(1.0) }
+    fn plus(a: &Self, b: &Self) -> Self { ProbabilityWeight(a.0 + b.0) }
+    fn times(a: &Self, b: &Self) -> Self { ProbabilityWeight(a.0 * b.0) }
+}
+```
+
+**Changes Needed:**
+- ✨ Weight abstraction layer
+- ✨ Multiple semiring implementations
+- ✨ Conversion between semirings
+
+---
+
+### Architecture Changes
+
+#### 6.1 Plugin System
+
+**Problem:** Need extensible architecture for language-specific analyzers.
+
+**Proposed Addition:**
+```rust
+// New module: src/plugin/mod.rs
+pub trait LanguagePlugin: Send + Sync {
+    fn name(&self) -> &str;
+
+    fn lexical_corrector(&self) -> Box<dyn LexicalCorrector>;
+    fn syntactic_analyzer(&self) -> Box<dyn SyntacticAnalyzer>;
+    fn structural_checker(&self) -> Box<dyn StructuralChecker>;
+    fn semantic_linter(&self) -> Option<Box<dyn SemanticLinter>> {
+        None
+    }
+}
+
+// Rholang plugin
+pub struct RholangPlugin {
+    dictionary: PathMapDictionary,
+    grammar: Language,
+}
+
+impl LanguagePlugin for RholangPlugin {
+    fn name(&self) -> &str { "rholang" }
+
+    fn lexical_corrector(&self) -> Box<dyn LexicalCorrector> {
+        Box::new(RholangLexicalCorrector::new(self.dictionary.clone()))
+    }
+
+    fn syntactic_analyzer(&self) -> Box<dyn SyntacticAnalyzer> {
+        Box::new(RholangSyntacticAnalyzer::new(self.grammar))
+    }
+
+    fn structural_checker(&self) -> Box<dyn StructuralChecker> {
+        Box::new(RholangStructuralChecker::new())
+    }
+
+    fn semantic_linter(&self) -> Option<Box<dyn SemanticLinter>> {
+        Some(Box::new(RholangSemanticLinter::new()))
+    }
+}
+```
+
+**Changes Needed:**
+- ✨ Plugin trait system
+- ✨ Dynamic loading support (optional)
+- ✨ Language registry
+
+#### 6.2 Configuration System
+
+**Problem:** Need configurable correction policies.
+
+**Proposed Addition:**
+```rust
+// New module: src/config/mod.rs
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CorrectionConfig {
+    pub max_edit_distance: usize,
+    pub confidence_threshold: f64,
+
+    pub lexical: LexicalConfig,
+    pub syntactic: SyntacticConfig,
+    pub structural: StructuralConfig,
+    pub semantic: SemanticConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LexicalConfig {
+    pub enabled: bool,
+    pub algorithm: AlgorithmChoice,
+    pub context_aware: bool,
+    pub frequency_weighting: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HierarchicalWeights {
+    pub lexical: f64,    // e.g., 0.2
+    pub syntactic: f64,  // e.g., 0.3
+    pub structural: f64, // e.g., 0.2
+    pub semantic: f64,   // e.g., 0.3
+}
+
+impl CorrectionConfig {
+    pub fn from_file(path: &Path) -> Result<Self> {
+        let contents = std::fs::read_to_string(path)?;
+        Ok(toml::from_str(&contents)?)
+    }
+
+    pub fn default_for_language(lang: &str) -> Self {
+        match lang {
+            "rholang" => Self::rholang_defaults(),
+            _ => Self::generic_defaults(),
+        }
+    }
+}
+```
+
+**Changes Needed:**
+- ✨ Configuration structures
+- ✨ TOML/JSON deserialization
+- ✨ Per-language default configs
+
+---
+
+### Performance Optimizations
+
+#### 7.1 Parallel Processing
+
+**Proposed Addition:**
+```rust
+// Add rayon for parallel iterators
+use rayon::prelude::*;
+
+impl<D: Dictionary + Sync> ContextAwareCorrector<D> {
+    pub fn batch_correct(
+        &self,
+        terms: &[String],
+        max_distance: usize,
+    ) -> Vec<Vec<WeightedSuggestion>> {
+        terms
+            .par_iter()
+            .map(|term| {
+                self.suggest_with_context(term, max_distance, &CorrectionContext::Unknown)
+            })
+            .collect()
+    }
+}
+```
+
+**Changes Needed:**
+- 📦 Add `rayon` dependency
+- ✨ Parallel batch correction
+- ✨ Thread-safe structures
+
+#### 7.2 Caching Layer
+
+**Proposed Addition:**
+```rust
+// New module: src/cache/mod.rs
+pub struct CorrectionCache {
+    lru: LruCache<CacheKey, Vec<WeightedSuggestion>>,
+}
+
+#[derive(Hash, Eq, PartialEq)]
+struct CacheKey {
+    term: String,
+    max_distance: usize,
+    context_hash: u64,
+}
+
+impl CorrectionCache {
+    pub fn get_or_compute<F>(
+        &mut self,
+        term: &str,
+        max_distance: usize,
+        context: &CorrectionContext,
+        compute: F,
+    ) -> Vec<WeightedSuggestion>
+    where
+        F: FnOnce() -> Vec<WeightedSuggestion>,
+    {
+        let key = CacheKey {
+            term: term.to_string(),
+            max_distance,
+            context_hash: Self::hash_context(context),
+        };
+
+        self.lru
+            .get_or_insert(key, || compute())
+            .clone()
+    }
+}
+```
+
+**Changes Needed:**
+- 📦 Add `lru` dependency
+- ✨ LRU cache for corrections
+- ✨ Cache invalidation strategy
+
+---
+
+### Dependency Changes
+
+**New Dependencies Required:**
+
+```toml
+[dependencies]
+# Existing
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+prost = "0.12"
+
+# New for grammar support
+tree-sitter = "0.20"
+
+# New for n-gram models
+ndarray = "0.15"  # For matrix operations
+
+# New for parallel processing
+rayon = "1.7"
+
+# New for caching
+lru = "0.11"
+
+# New for configuration
+toml = "0.8"
+serde_json = "1.0"
+
+# New for logging
+log = "0.4"
+env_logger = "0.11"
+
+[dev-dependencies]
+# New for property testing
+proptest = "1.4"
+```
+
+---
+
+### Summary of Required Changes
+
+**Core Library Extensions:**
+1. ✨ `src/correction/` - Context-aware suggestion ranking
+2. ✨ `src/grammar/` - Grammar pattern matching
+3. ✨ `src/ngram/` - N-gram language models
+4. ✨ `src/structural/` - Delimiter and bracket matching
+5. ✨ `src/semantic/` - CFG and dataflow analysis
+6. ✨ `src/transducer/composition.rs` - WFST composition
+7. ✨ `src/semiring/` - Weight abstractions
+8. ✨ `src/plugin/` - Language plugin system
+9. ✨ `src/config/` - Configuration management
+10. ✨ `src/cache/` - Caching layer
+
+**Trait Extensions:**
+- 📝 `FrequencyDictionary` trait
+- 📝 `Transducer` trait
+- 📝 `Weight` trait
+- 📝 `LanguagePlugin` trait
+
+**New Modules:** ~10 major modules
+**New Dependencies:** ~8 crates
+**Estimated LOC:** ~15,000-20,000 lines
+**Implementation Time:** 16-20 weeks for full system
+
+---
+
 ## Conclusion
 
 This design proposes a **comprehensive, multi-level error correction system** for Rholang that:
@@ -4585,7 +5577,7 @@ This design proposes a **comprehensive, multi-level error correction system** fo
 
 ---
 
-**Document Version:** 1.4
+**Document Version:** 1.5
 **Last Updated:** 2025-10-26
 **Author:** Claude (AI Assistant)
-**Status:** Design Proposal with Complete Theoretical Foundation, Comprehensive Parse/Syntax Error Coverage, Full Delimiter Matching, and Correction Strategies
+**Status:** Complete Design with Theoretical Foundation, Implementation Strategies, and Library Extension Roadmap
