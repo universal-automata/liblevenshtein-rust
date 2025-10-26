@@ -18,16 +18,28 @@ Thank you for your interest in contributing to liblevenshtein-rust!
 
 ### Building
 
-The project requires the PathMap dependency:
+The project automatically fetches PathMap from GitHub. Just build:
 
 ```bash
-# Clone PathMap (sibling directory)
+# Build with CPU-specific optimizations
+cargo build --all-features
+```
+
+**For local PathMap development** (optional):
+
+If you need to modify PathMap, uncomment the `[patch]` section in `Cargo.toml`:
+
+```bash
+# Clone PathMap as a sibling directory
 cd ..
-git clone https://github.com/F1R3FLY-io/PathMap.git
+git clone https://github.com/Adam-Vandervorst/PathMap.git PathMap
 cd liblevenshtein-rust
 
-# Build with CPU-specific optimizations
-RUSTFLAGS="-C target-cpu=native" cargo build --all-features
+# Uncomment the [patch] section at the end of Cargo.toml
+# [patch.'https://github.com/Adam-Vandervorst/PathMap.git']
+# pathmap = { path = "../PathMap" }
+
+cargo build --all-features
 ```
 
 See [BUILD.md](BUILD.md) for comprehensive build instructions.

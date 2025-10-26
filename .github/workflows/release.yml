@@ -60,12 +60,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Checkout PathMap dependency (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          cd ../
-          git clone --depth=1 --branch master https://github.com/F1R3FLY-io/PathMap.git PathMap
-
       - name: Install protobuf compiler (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler

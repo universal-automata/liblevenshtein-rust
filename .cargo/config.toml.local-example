@@ -1,0 +1,23 @@
+# Example configuration for local PathMap development
+#
+# To use a local PathMap checkout instead of the GitHub repository:
+#
+# 1. Copy this file to .cargo/config.toml (overwriting the existing one):
+#    cp .cargo/config.toml.local-example .cargo/config.toml
+#
+# 2. The [build] section with rustflags remains the same
+# 3. The [paths] section below will redirect PathMap to your local checkout
+#
+# Note: .cargo/config.toml is in .gitignore, so your local override won't
+# be committed accidentally.
+
+[build]
+# Use native CPU features for optimal performance
+rustflags = ["-C", "target-cpu=native"]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=native"]
+
+# Override PathMap to use local checkout
+[patch.'https://github.com/Adam-Vandervorst/PathMap.git']
+pathmap = { path = "../PathMap" }

@@ -13,7 +13,7 @@ readme = "README.md"
 
 [dependencies]
 # PathMap as the primary dictionary backend
-pathmap = { path = "../PathMap" }
+pathmap = { git = "https://github.com/Adam-Vandervorst/PathMap.git", branch = "master" }
 # SmallVec for stack-allocated vectors (performance optimization)
 smallvec = "1.13"
 # Serialization support (optional)
@@ -104,3 +104,10 @@ serialization = ["serde", "bincode", "serde_json"]
 protobuf = ["prost", "bytes", "prost-build", "serialization"]
 compression = ["flate2", "serialization"]
 cli = ["clap", "anyhow", "rustyline", "colored", "dirs"]
+
+# For local development: uncomment this section to use a local PathMap checkout
+# instead of the GitHub repository. This allows you to test changes to PathMap
+# without pushing to GitHub first.
+#
+# [patch.'https://github.com/Adam-Vandervorst/PathMap.git']
+# pathmap = { path = "../PathMap" }
