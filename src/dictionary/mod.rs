@@ -6,6 +6,7 @@
 pub mod dawg;
 pub mod dawg_query;
 pub mod dynamic_dawg;
+pub mod factory;
 pub mod pathmap;
 
 /// Synchronization strategy for dictionary operations.

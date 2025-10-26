@@ -67,70 +67,24 @@ pub trait DictionaryFromTerms: Sized {
 }
 
 /// Errors that can occur during serialization/deserialization.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SerializationError {
     /// Error during bincode serialization
-    Bincode(bincode::Error),
+    #[error("Bincode error")]
+    Bincode(#[from] bincode::Error),
     /// Error during JSON serialization
-    Json(serde_json::Error),
+    #[error("JSON error")]
+    Json(#[from] serde_json::Error),
     /// Error during protobuf serialization
     #[cfg(feature = "protobuf")]
-    Protobuf(prost::DecodeError),
+    #[error("Protobuf error")]
+    Protobuf(#[from] prost::DecodeError),
     /// I/O error
-    Io(std::io::Error),
+    #[error("I/O error")]
+    Io(#[from] std::io::Error),
     /// Dictionary iteration error
+    #[error("Dictionary error: {0}")]
     DictionaryError(String),
-}
-
-impl std::fmt::Display for SerializationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SerializationError::Bincode(e) => write!(f, "Bincode error: {}", e),
-            SerializationError::Json(e) => write!(f, "JSON error: {}", e),
-            #[cfg(feature = "protobuf")]
-            SerializationError::Protobuf(e) => write!(f, "Protobuf error: {}", e),
-            SerializationError::Io(e) => write!(f, "I/O error: {}", e),
-            SerializationError::DictionaryError(msg) => write!(f, "Dictionary error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for SerializationError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            SerializationError::Bincode(e) => Some(e),
-            SerializationError::Json(e) => Some(e),
-            #[cfg(feature = "protobuf")]
-            SerializationError::Protobuf(e) => Some(e),
-            SerializationError::Io(e) => Some(e),
-            SerializationError::DictionaryError(_) => None,
-        }
-    }
-}
-
-impl From<bincode::Error> for SerializationError {
-    fn from(err: bincode::Error) -> Self {
-        SerializationError::Bincode(err)
-    }
-}
-
-impl From<serde_json::Error> for SerializationError {
-    fn from(err: serde_json::Error) -> Self {
-        SerializationError::Json(err)
-    }
-}
-
-impl From<std::io::Error> for SerializationError {
-    fn from(err: std::io::Error) -> Self {
-        SerializationError::Io(err)
-    }
-}
-
-#[cfg(feature = "protobuf")]
-impl From<prost::DecodeError> for SerializationError {
-    fn from(err: prost::DecodeError) -> Self {
-        SerializationError::Protobuf(err)
-    }
 }
 
 /// Helper to extract all terms from a dictionary.

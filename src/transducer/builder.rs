@@ -25,28 +25,15 @@ pub struct TransducerBuilder<D: Dictionary> {
 }
 
 /// Error type for builder validation failures.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum BuilderError {
     /// No dictionary was provided
+    #[error("Dictionary is required. Use .dictionary() to set it.")]
     MissingDictionary,
     /// No algorithm was provided
+    #[error("Algorithm is required. Use .algorithm() to set it.")]
     MissingAlgorithm,
 }
-
-impl std::fmt::Display for BuilderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BuilderError::MissingDictionary => {
-                write!(f, "Dictionary is required. Use .dictionary() to set it.")
-            }
-            BuilderError::MissingAlgorithm => {
-                write!(f, "Algorithm is required. Use .algorithm() to set it.")
-            }
-        }
-    }
-}
-
-impl std::error::Error for BuilderError {}
 
 impl<D: Dictionary> TransducerBuilder<D> {
     /// Create a new empty builder.

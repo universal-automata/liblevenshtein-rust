@@ -45,6 +45,7 @@ pub mod cli;
 pub mod prelude {
     pub use crate::dictionary::dawg::DawgDictionary;
     pub use crate::dictionary::dynamic_dawg::DynamicDawg;
+    pub use crate::dictionary::factory::{DictionaryBackend, DictionaryContainer, DictionaryFactory};
     pub use crate::dictionary::pathmap::PathMapDictionary;
     pub use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
     pub use crate::transducer::{Algorithm, Candidate, QueryBuilder, Transducer, TransducerBuilder};
