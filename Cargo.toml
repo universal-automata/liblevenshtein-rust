@@ -107,6 +107,18 @@ protobuf = ["prost", "bytes", "prost-build", "serialization"]
 compression = ["flate2", "serialization"]
 cli = ["clap", "anyhow", "rustyline", "colored", "dirs"]
 
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/liblevenshtein", dest = "/usr/bin/liblevenshtein", mode = "755" },
+    { source = "target/release/libliblevenshtein.so", dest = "/usr/lib64/libliblevenshtein.so", mode = "644", doc = false },
+    { source = "target/release/libliblevenshtein.rlib", dest = "/usr/lib64/libliblevenshtein.rlib", mode = "644", doc = false },
+    { source = "README.md", dest = "/usr/share/doc/liblevenshtein/README.md", mode = "644", doc = true },
+    { source = "CHANGELOG.md", dest = "/usr/share/doc/liblevenshtein/CHANGELOG.md", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+glibc = "*"
+
 # For local development: uncomment this section to use a local PathMap checkout
 # instead of the GitHub repository. This allows you to test changes to PathMap
 # without pushing to GitHub first.

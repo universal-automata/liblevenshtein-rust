@@ -92,11 +92,11 @@ jobs:
           cp target/${{ matrix.platform.target }}/release/liblevenshtein dist/
 
           # Copy library files
-          cp target/${{ matrix.platform.target }}/release/liblevenshtein.rlib dist/
+          cp target/${{ matrix.platform.target }}/release/libliblevenshtein.rlib dist/
           if [ "${{ runner.os }}" = "Linux" ]; then
-            cp target/${{ matrix.platform.target }}/release/liblevenshtein.so dist/
+            cp target/${{ matrix.platform.target }}/release/libliblevenshtein.so dist/
           elif [ "${{ runner.os }}" = "macOS" ]; then
-            cp target/${{ matrix.platform.target }}/release/liblevenshtein.dylib dist/
+            cp target/${{ matrix.platform.target }}/release/libliblevenshtein.dylib dist/
           fi
 
           chmod +x dist/liblevenshtein
@@ -140,8 +140,8 @@ jobs:
           tar xzf liblevenshtein-linux-x86_64.tar.gz
           mkdir -p target/release
           mv liblevenshtein target/release/
-          mv liblevenshtein.so target/release/ 2>/dev/null || true
-          mv liblevenshtein.rlib target/release/
+          mv libliblevenshtein.so target/release/ 2>/dev/null || true
+          mv libliblevenshtein.rlib target/release/
 
       - name: Install cargo-deb
         run: cargo install cargo-deb
@@ -164,8 +164,8 @@ jobs:
           priority = "optional"
           assets = [
               ["target/release/liblevenshtein", "usr/bin/", "755"],
-              ["target/release/liblevenshtein.so", "usr/lib/", "644"],
-              ["target/release/liblevenshtein.rlib", "usr/lib/", "644"],
+              ["target/release/libliblevenshtein.so", "usr/lib/", "644"],
+              ["target/release/libliblevenshtein.rlib", "usr/lib/", "644"],
               ["README.md", "usr/share/doc/liblevenshtein/", "644"],
               ["CHANGELOG.md", "usr/share/doc/liblevenshtein/", "644"],
           ]
@@ -204,8 +204,226 @@ jobs:
       - name: Check shared libraries
         run: |
           ldd $(which liblevenshtein)
-          ls -lh /usr/lib/liblevenshtein.so || true
-          ls -lh /usr/lib/liblevenshtein.rlib
+          ls -lh /usr/lib/libliblevenshtein.so || true
+          ls -lh /usr/lib/libliblevenshtein.rlib
+
+      - name: Test basic functionality
+        run: |
+          echo -e "test\ntesting\ntested\ntester" > /tmp/test-dict.txt
+          liblevenshtein query "tset" --dict /tmp/test-dict.txt -m 2
+          echo "Basic query test passed!"
+
+  package-rpm:
+    name: Create .rpm package
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Linux x86_64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: liblevenshtein-linux-x86_64
+
+      - name: Extract binaries
+        run: |
+          tar xzf liblevenshtein-linux-x86_64.tar.gz
+          mkdir -p target/release
+          mv liblevenshtein target/release/
+          mv libliblevenshtein.so target/release/ 2>/dev/null || true
+          mv libliblevenshtein.rlib target/release/
+
+      - name: Install cargo-generate-rpm
+        run: cargo install cargo-generate-rpm
+
+      - name: Create .rpm package
+        run: cargo generate-rpm
+
+      - name: Upload .rpm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package
+          path: target/generate-rpm/*.rpm
+          retention-days: 30
+
+  package-arch:
+    name: Create Arch Linux packages
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - name: x86_64
+            artifact: liblevenshtein-linux-x86_64
+          - name: aarch64
+            artifact: liblevenshtein-linux-arm64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Linux build
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.arch.artifact }}
+
+      - name: Extract binaries
+        run: |
+          tar xzf ${{ matrix.arch.artifact }}.tar.gz
+          mkdir -p binaries
+          mv liblevenshtein binaries/
+          mv libliblevenshtein.so binaries/ 2>/dev/null || true
+          mv libliblevenshtein.rlib binaries/
+
+      - name: Build Arch package in container
+        run: |
+          # Create a build script with architecture override
+          ARCH_NAME="${{ matrix.arch.name }}"
+          cat > build-arch-pkg.sh <<EOF
+          #!/bin/bash
+          set -e
+
+          # Install required packages
+          pacman -Sy --noconfirm base-devel git
+
+          # Create build user (makepkg won't run as root)
+          useradd -m builder
+          chown -R builder:builder /build
+
+          # Build as non-root user with CARCH override
+          cd /build
+          su builder -c "CARCH=${ARCH_NAME} makepkg --nodeps --skipinteg --ignorearch"
+
+          # Copy package to output (exclude debug packages)
+          for pkg in *.pkg.tar.zst; do
+            if [[ ! "\$pkg" =~ -debug- ]]; then
+              cp "\$pkg" /output/
+            fi
+          done
+          EOF
+
+          chmod +x build-arch-pkg.sh
+
+          # Prepare PKGBUILD with pre-built binaries
+          mkdir -p build-context
+          cp packaging/arch/PKGBUILD build-context/
+          cp -r binaries build-context/
+
+          # Modify PKGBUILD to use pre-built binaries instead of building from source
+          cat > build-context/PKGBUILD <<'PKGBUILD_EOF'
+          # Maintainer: F1R3FLY.io <noreply@f1r3fly.io>
+          pkgname=liblevenshtein
+          pkgver=__VERSION__
+          pkgrel=1
+          pkgdesc="Fast approximate string matching using Levenshtein automata"
+          arch=('__ARCH__')
+          url="https://github.com/F1R3FLY-io/liblevenshtein-rust"
+          license=('Apache')
+          depends=('gcc-libs')
+          source=()
+          sha256sums=()
+
+          package() {
+              install -Dm755 "/build/binaries/liblevenshtein" "$pkgdir/usr/bin/liblevenshtein"
+              install -Dm644 "/build/binaries/libliblevenshtein.rlib" "$pkgdir/usr/lib/libliblevenshtein.rlib"
+              if [ -f "/build/binaries/libliblevenshtein.so" ]; then
+                  install -Dm644 "/build/binaries/libliblevenshtein.so" "$pkgdir/usr/lib/libliblevenshtein.so"
+              fi
+          }
+          PKGBUILD_EOF
+
+          # Replace placeholders
+          sed -i "s/__VERSION__/${GITHUB_REF_NAME#v}/" build-context/PKGBUILD
+          sed -i "s/__ARCH__/${{ matrix.arch.name }}/" build-context/PKGBUILD
+
+          # Debug: Show PKGBUILD content after substitution
+          echo "=== PKGBUILD for ${{ matrix.arch.name }} after sed ==="
+          cat build-context/PKGBUILD
+          echo "=== End PKGBUILD ==="
+
+          # Run build in container
+          mkdir -p output
+          docker run --rm \
+            -v "$PWD/build-context:/build" \
+            -v "$PWD/output:/output" \
+            -v "$PWD/build-arch-pkg.sh:/build-arch-pkg.sh" \
+            archlinux:latest \
+            /build-arch-pkg.sh
+
+          # Debug: Show what package was created
+          echo "=== Packages created for ${{ matrix.arch.name }} ==="
+          ls -la output/
+          echo "=== End package list ==="
+
+      - name: Upload Arch package
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-package-${{ matrix.arch.name }}
+          path: output/*.pkg.tar.zst
+          retention-days: 30
+
+  test-rpm-package:
+    name: Sanity Check - RPM Package
+    needs: package-rpm
+    runs-on: ubuntu-latest
+    container: fedora:40
+    steps:
+      - name: Download .rpm package
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package
+
+      - name: Install package
+        run: |
+          dnf install -y *.rpm
+
+      - name: Verify installation
+        run: |
+          command -v liblevenshtein
+          liblevenshtein --version || liblevenshtein --help
+
+      - name: Check shared libraries
+        run: |
+          ldd $(command -v liblevenshtein)
+          ls -lh /usr/lib64/libliblevenshtein.so || true
+          ls -lh /usr/lib64/libliblevenshtein.rlib
+
+      - name: Test basic functionality
+        run: |
+          echo -e "test\ntesting\ntested\ntester" > /tmp/test-dict.txt
+          liblevenshtein query "tset" --dict /tmp/test-dict.txt -m 2
+          echo "Basic query test passed!"
+
+  test-arch-package:
+    name: Sanity Check - Arch Package (${{ matrix.arch }})
+    needs: package-arch
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Only test x86_64 - aarch64 requires cross-architecture setup
+        arch: [x86_64]
+    container: archlinux:latest
+    steps:
+      - name: Download Arch package
+        uses: actions/download-artifact@v4
+        with:
+          name: arch-package-${{ matrix.arch }}
+
+      - name: Install package
+        run: |
+          pacman -Sy --noconfirm
+          pacman -U --noconfirm *.pkg.tar.zst
+
+      - name: Verify installation
+        run: |
+          command -v liblevenshtein
+          liblevenshtein --version || liblevenshtein --help
+
+      - name: Check shared libraries
+        run: |
+          ldd $(command -v liblevenshtein) || true
+          ls -lh /usr/lib/libliblevenshtein.so || true
+          ls -lh /usr/lib/libliblevenshtein.rlib
 
       - name: Test basic functionality
         run: |
@@ -215,7 +433,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [build-matrix, package-deb, test-deb-package]
+    needs: [build-matrix, package-deb, package-rpm, package-arch, test-deb-package, test-rpm-package, test-arch-package]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -231,6 +449,8 @@ jobs:
             liblevenshtein-macos-*/*.tar.gz
             liblevenshtein-macos-*/*.zip
             debian-package/*.deb
+            rpm-package/*.rpm
+            arch-package-*/*.pkg.tar.zst
           draft: false
           prerelease: false
           body: |
