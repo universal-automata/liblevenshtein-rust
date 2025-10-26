@@ -1,9 +1,9 @@
 [package]
 name = "liblevenshtein"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.70"
-authors = ["Dylon Edwards <dylon.edwards@gmail.com>"]
+authors = ["Dylon Edwards <dylon.devo@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/F1R3FLY-io/liblevenshtein-rust"
 description = "Levenshtein/Universal Automata for approximate string matching using various dictionary backends"
