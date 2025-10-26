@@ -6,9 +6,9 @@ use clap::Parser;
 use colored::Colorize;
 use std::process;
 
-use liblevenshtein::cli::{Cli, Commands};
 use liblevenshtein::cli::commands;
 use liblevenshtein::cli::paths::PersistentConfig;
+use liblevenshtein::cli::{Cli, Commands};
 use liblevenshtein::repl::{Command, CommandResult, LevenshteinHelper, ReplConfig, ReplState};
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor};
@@ -109,16 +109,23 @@ fn run_repl(
     } else {
         // Use default path if it exists
         let backend = merged_config.backend.unwrap_or(state.backend);
-        let format = merged_config.format.unwrap_or(liblevenshtein::cli::args::SerializationFormat::Text);
+        let format = merged_config
+            .format
+            .unwrap_or(liblevenshtein::cli::args::SerializationFormat::Text);
         default_dict_path(backend, format).ok()
     };
 
     // Try to auto-load dictionary if path exists
     if let Some(ref path) = dict_path {
         if path.exists() {
-            match detect_format(path, backend_opt.or(merged_config.backend), format_opt.or(merged_config.format)) {
+            match detect_format(
+                path,
+                backend_opt.or(merged_config.backend),
+                format_opt.or(merged_config.format),
+            ) {
                 Ok(detection) => {
-                    println!("  Loading dictionary from {} ({}, {})...",
+                    println!(
+                        "  Loading dictionary from {} ({}, {})...",
                         path.display().to_string().cyan(),
                         detection.format.backend.to_string().green(),
                         detection.format.format.to_string().green()
@@ -134,16 +141,14 @@ fn run_repl(
                             println!();
                         }
                         Err(e) => {
-                            eprintln!("  {}: Could not load dictionary: {}",
-                                "Warning".yellow(),
-                                e
-                            );
+                            eprintln!("  {}: Could not load dictionary: {}", "Warning".yellow(), e);
                             println!();
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("  {}: Could not detect dictionary format: {}",
+                    eprintln!(
+                        "  {}: Could not detect dictionary format: {}",
                         "Warning".yellow(),
                         e
                     );
@@ -225,7 +230,7 @@ fn run_repl(
             }
             Err(ReadlineError::Interrupted) => {
                 // Ctrl+C - cancel current line
-                println!("{}",  "^C (Use 'exit' or Ctrl+D to quit)".yellow());
+                println!("{}", "^C (Use 'exit' or Ctrl+D to quit)".yellow());
                 continue;
             }
             Err(ReadlineError::Eof) => {
@@ -243,11 +248,7 @@ fn run_repl(
     // Save history
     if let Some(history_path) = &repl_config.history_file {
         if let Err(e) = editor.save_history(history_path) {
-            eprintln!(
-                "{}: Failed to save history: {}",
-                "Warning".yellow(),
-                e
-            );
+            eprintln!("{}: Failed to save history: {}", "Warning".yellow(), e);
         }
     }
 
@@ -256,16 +257,34 @@ fn run_repl(
 
 fn print_banner() {
     println!();
-    println!("{}", "═══════════════════════════════════════════════════════".bright_cyan());
-    println!("{}", "   liblevenshtein - Fast Fuzzy String Matching".bright_cyan().bold());
-    println!("{}", "═══════════════════════════════════════════════════════".bright_cyan());
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════".bright_cyan()
+    );
+    println!(
+        "{}",
+        "   liblevenshtein - Fast Fuzzy String Matching"
+            .bright_cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════".bright_cyan()
+    );
     println!();
     println!("  Version: {}", env!("CARGO_PKG_VERSION").green());
     println!("  Type {} for available commands", "'help'".yellow().bold());
-    println!("  Type {} or press {} to exit", "'exit'".yellow().bold(), "Ctrl+D".yellow().bold());
+    println!(
+        "  Type {} or press {} to exit",
+        "'exit'".yellow().bold(),
+        "Ctrl+D".yellow().bold()
+    );
     println!();
     println!("{}", "  Quick Start:".bold());
-    println!("    • Load a dictionary: {}", "load /usr/share/dict/words".cyan());
+    println!(
+        "    • Load a dictionary: {}",
+        "load /usr/share/dict/words".cyan()
+    );
     println!("    • Query for matches: {}", "query test 2".cyan());
     println!("    • Insert terms:      {}", "insert hello world".cyan());
     println!("    • Show settings:     {}", "settings".cyan());

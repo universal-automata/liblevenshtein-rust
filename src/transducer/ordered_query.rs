@@ -6,8 +6,8 @@
 //!
 //! This ordering enables efficient "top-k" queries and take-while patterns.
 
-use super::{Algorithm, Intersection, PathNode, StatePool};
 use super::transition::{initial_state, transition_state_pooled};
+use super::{Algorithm, Intersection, PathNode, StatePool};
 use crate::dictionary::DictionaryNode;
 use std::collections::VecDeque;
 
@@ -80,12 +80,7 @@ pub struct OrderedQueryIterator<N: DictionaryNode> {
 
 impl<N: DictionaryNode> OrderedQueryIterator<N> {
     /// Create a new ordered query iterator
-    pub fn new(
-        root: N,
-        query: String,
-        max_distance: usize,
-        algorithm: Algorithm,
-    ) -> Self {
+    pub fn new(root: N, query: String, max_distance: usize, algorithm: Algorithm) -> Self {
         let query_bytes = query.into_bytes();
         let initial = initial_state(query_bytes.len(), max_distance);
 
@@ -105,7 +100,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             query: query_bytes,
             algorithm,
             state_pool: StatePool::new(),
-            prefix_mode: false,  // Exact matching by default
+            prefix_mode: false, // Exact matching by default
         }
     }
 
@@ -115,7 +110,8 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
         // Explore distance levels in ascending order
         while self.current_distance <= self.max_distance {
             // Try to get next intersection from current distance level
-            if let Some(intersection) = self.pending_by_distance[self.current_distance].pop_front() {
+            if let Some(intersection) = self.pending_by_distance[self.current_distance].pop_front()
+            {
                 // Check if this is a final match
                 if intersection.is_final() {
                     if let Some(distance) = intersection.state.infer_distance(self.query.len()) {
@@ -161,14 +157,10 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
                 if let Some(min_dist) = next_state.min_distance() {
                     if min_dist <= self.max_distance {
                         // Create lightweight PathNode for parent chain
-                        let parent_path = if let Some(current_label) = intersection.label {
-                            Some(Box::new(PathNode::new(
+                        let parent_path = intersection.label.map(|current_label| Box::new(PathNode::new(
                                 current_label,
                                 intersection.parent.clone(),
-                            )))
-                        } else {
-                            None
-                        };
+                            )));
 
                         let child = Box::new(Intersection::with_parent(
                             label,
@@ -228,7 +220,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     /// query.prefix()
     /// ```
     pub fn prefix(mut self) -> PrefixOrderedQueryIterator<N> {
-        self.prefix_mode = true;  // Enable prefix matching
+        self.prefix_mode = true; // Enable prefix matching
         PrefixOrderedQueryIterator { inner: self }
     }
 }
@@ -292,12 +284,15 @@ impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
         // Explore distance levels in ascending order
         while self.inner.current_distance <= self.inner.max_distance {
             // Try to get next intersection from current distance level
-            if let Some(intersection) = self.inner.pending_by_distance[self.inner.current_distance].pop_front() {
+            if let Some(intersection) =
+                self.inner.pending_by_distance[self.inner.current_distance].pop_front()
+            {
                 // Check if this is a complete word (final node) that matches our prefix
                 let should_return = if intersection.is_final() {
                     // For prefix matching: check if we've consumed the entire query
                     if let Some(distance) = intersection.state.infer_prefix_distance(query_len) {
-                        distance <= self.inner.max_distance && distance == self.inner.current_distance
+                        distance <= self.inner.max_distance
+                            && distance == self.inner.current_distance
                     } else {
                         false
                     }
@@ -342,12 +337,8 @@ mod tests {
     #[test]
     fn test_ordered_exact_match() {
         let dict = PathMapDictionary::from_iter(vec!["test"]);
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            0,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();
         assert_eq!(results.len(), 1);
@@ -365,12 +356,8 @@ mod tests {
             "nest",    // distance 1
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            3,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();
 
@@ -397,12 +384,8 @@ mod tests {
             "test", "best", "fest", "nest", "rest", "west", "zest",
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            1,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();
 
@@ -433,12 +416,8 @@ mod tests {
             "test", "best", "rest", "nest", "testing", "resting",
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            3,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
 
         // Take only first 3 results
         let results: Vec<_> = query.take(3).collect();
@@ -459,12 +438,8 @@ mod tests {
             "test", "best", "rest", "nest", "testing", "resting",
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            3,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
 
         // Take while distance <= 1
         let results: Vec<_> = query.take_while(|c| c.distance <= 1).collect();
@@ -486,12 +461,8 @@ mod tests {
     fn test_ordered_empty_query() {
         let dict = PathMapDictionary::from_iter(vec!["test", "best"]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "xyz".to_string(),
-            0,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "xyz".to_string(), 0, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();
         assert_eq!(results.len(), 0);
@@ -502,23 +473,13 @@ mod tests {
         // Verify ordered iterator returns same results as unordered, just in different order
         use crate::transducer::query::QueryIterator;
 
-        let dict = PathMapDictionary::from_iter(vec![
-            "test", "best", "rest", "nest", "fest", "testing",
-        ]);
+        let dict =
+            PathMapDictionary::from_iter(vec!["test", "best", "rest", "nest", "fest", "testing"]);
 
-        let ordered = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            2,
-            Algorithm::Standard,
-        );
+        let ordered =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
-        let unordered = QueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            2,
-            Algorithm::Standard,
-        );
+        let unordered = QueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
         let mut ordered_terms: Vec<_> = ordered.map(|c| c.term).collect();
         let mut unordered_terms: Vec<_> = unordered.collect();
@@ -531,16 +492,11 @@ mod tests {
 
     #[test]
     fn test_filtered_query() {
-        let dict = PathMapDictionary::from_iter(vec![
-            "test", "Test", "TEST", "best", "Best", "rest",
-        ]);
+        let dict =
+            PathMapDictionary::from_iter(vec!["test", "Test", "TEST", "best", "Best", "rest"]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            1,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
 
         // Filter to only lowercase terms
         let results: Vec<_> = query
@@ -565,21 +521,13 @@ mod tests {
 
     #[test]
     fn test_filtered_query_with_distance() {
-        let dict = PathMapDictionary::from_iter(vec![
-            "test", "testing", "best", "rest", "nest",
-        ]);
+        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "best", "rest", "nest"]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            3,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
 
         // Filter to terms with exactly 4 characters
-        let results: Vec<_> = query
-            .filter(|c| c.term.len() == 4)
-            .collect();
+        let results: Vec<_> = query.filter(|c| c.term.len() == 4).collect();
 
         // All results should have exactly 4 characters
         for candidate in &results {
@@ -598,21 +546,13 @@ mod tests {
 
     #[test]
     fn test_filtered_query_maintains_order() {
-        let dict = PathMapDictionary::from_iter(vec![
-            "a", "aa", "aaa", "ab", "abc", "b", "ba", "baa",
-        ]);
+        let dict =
+            PathMapDictionary::from_iter(vec!["a", "aa", "aaa", "ab", "abc", "b", "ba", "baa"]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "a".to_string(),
-            2,
-            Algorithm::Standard,
-        );
+        let query = OrderedQueryIterator::new(dict.root(), "a".to_string(), 2, Algorithm::Standard);
 
         // Filter to terms starting with 'a'
-        let results: Vec<_> = query
-            .filter(|c| c.term.starts_with('a'))
-            .collect();
+        let results: Vec<_> = query.filter(|c| c.term.starts_with('a')).collect();
 
         // Verify ordering is maintained (distance-first, then lexicographic)
         for i in 1..results.len() {
@@ -636,18 +576,11 @@ mod tests {
             "test", "testing", "tester", "best", "rest", "nest", "fest",
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            2,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
         // Filter to terms ending with 'st' and take first 3
-        let results: Vec<_> = query
-            .filter(|c| c.term.ends_with("st"))
-            .take(3)
-            .collect();
+        let results: Vec<_> = query.filter(|c| c.term.ends_with("st")).take(3).collect();
 
         assert_eq!(results.len(), 3);
 
@@ -663,39 +596,37 @@ mod tests {
 
     #[test]
     fn test_prefix_exact_match() {
-        let dict = PathMapDictionary::from_iter(vec![
-            "test", "testing", "tester", "tested",
-        ]);
+        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tester", "tested"]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            0,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let results: Vec<_> = query.prefix().collect();
 
         // Should match all terms starting with "test" exactly
-        assert!(results.len() >= 4, "Expected at least 4 results, got {}", results.len());
+        assert!(
+            results.len() >= 4,
+            "Expected at least 4 results, got {}",
+            results.len()
+        );
         assert!(results.iter().any(|c| c.term == "test" && c.distance == 0));
-        assert!(results.iter().any(|c| c.term == "testing" && c.distance == 0));
-        assert!(results.iter().any(|c| c.term == "tester" && c.distance == 0));
-        assert!(results.iter().any(|c| c.term == "tested" && c.distance == 0));
+        assert!(results
+            .iter()
+            .any(|c| c.term == "testing" && c.distance == 0));
+        assert!(results
+            .iter()
+            .any(|c| c.term == "tester" && c.distance == 0));
+        assert!(results
+            .iter()
+            .any(|c| c.term == "tested" && c.distance == 0));
     }
 
     #[test]
     fn test_prefix_with_errors() {
-        let dict = PathMapDictionary::from_iter(vec![
-            "test", "testing", "best", "resting", "rest",
-        ]);
+        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "best", "resting", "rest"]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "tes".to_string(),
-            1,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "tes".to_string(), 1, Algorithm::Standard);
 
         let results: Vec<_> = query.prefix().collect();
 
@@ -703,7 +634,9 @@ mod tests {
         // - "test", "testing" with d=0 (exact prefix match)
         // - "best", "rest", "resting" with d=1 (one error in prefix)
         assert!(results.iter().any(|c| c.term == "test" && c.distance == 0));
-        assert!(results.iter().any(|c| c.term == "testing" && c.distance == 0));
+        assert!(results
+            .iter()
+            .any(|c| c.term == "testing" && c.distance == 0));
         assert!(results.iter().any(|c| c.term == "best" && c.distance == 1));
         assert!(results.iter().any(|c| c.term == "rest" && c.distance == 1));
     }
@@ -714,12 +647,8 @@ mod tests {
             "test", "testing", "tester", "best", "resting", "rest",
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            2,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
         let results: Vec<_> = query.prefix().collect();
 
@@ -742,27 +671,17 @@ mod tests {
 
     #[test]
     fn test_prefix_vs_exact() {
-        let dict = PathMapDictionary::from_iter(vec![
-            "test", "testing", "tester",
-        ]);
+        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tester"]);
 
         // Exact matching
-        let exact_query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            0,
-            Algorithm::Standard,
-        );
+        let exact_query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let exact_results: Vec<_> = exact_query.collect();
 
         // Prefix matching
-        let prefix_query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            0,
-            Algorithm::Standard,
-        );
+        let prefix_query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let prefix_results: Vec<_> = prefix_query.prefix().collect();
 
@@ -781,16 +700,17 @@ mod tests {
     fn test_prefix_autocomplete_scenario() {
         // Simulating code completion
         let dict = PathMapDictionary::from_iter(vec![
-            "getValue", "getVariable", "getValue2", "setValue", "setVariable",
-            "removeValue", "hasValue",
+            "getValue",
+            "getVariable",
+            "getValue2",
+            "setValue",
+            "setVariable",
+            "removeValue",
+            "hasValue",
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "getVal".to_string(),
-            1,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "getVal".to_string(), 1, Algorithm::Standard);
 
         let results: Vec<_> = query.prefix().take(5).collect();
 
@@ -808,15 +728,14 @@ mod tests {
     fn test_prefix_with_filter() {
         // Combining prefix matching with filtering
         let dict = PathMapDictionary::from_iter(vec![
-            "TestCase", "testMethod", "testHelper", "bestPractice",
+            "TestCase",
+            "testMethod",
+            "testHelper",
+            "bestPractice",
         ]);
 
-        let query = OrderedQueryIterator::new(
-            dict.root(),
-            "test".to_string(),
-            1,
-            Algorithm::Standard,
-        );
+        let query =
+            OrderedQueryIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
 
         // Prefix match + filter for lowercase
         let results: Vec<_> = query

@@ -142,14 +142,18 @@ fn main() {
 
     // Set context to global scope only
     ctx_dict.set_context(|term| {
-        symbols.iter().any(|s| s.name == term && s.scope == "global")
+        symbols
+            .iter()
+            .any(|s| s.name == term && s.scope == "global")
     });
     let context_switch_time = start.elapsed();
 
     println!("Context switch time: {:?}", context_switch_time);
-    println!("Active symbols: {} ({}% of total)\n",
-             ctx_dict.active_count(),
-             ctx_dict.active_count() * 100 / symbols.len());
+    println!(
+        "Active symbols: {} ({}% of total)\n",
+        ctx_dict.active_count(),
+        ctx_dict.active_count() * 100 / symbols.len()
+    );
 
     // Query with context filtering
     print!("Searching for 'getv' in global scope: ");
@@ -170,14 +174,18 @@ fn main() {
 
     // Switch context to ClassA scope
     ctx_dict.set_context(|term| {
-        symbols.iter().any(|s| s.name == term && s.scope == "ClassA")
+        symbols
+            .iter()
+            .any(|s| s.name == term && s.scope == "ClassA")
     });
     let context_switch_time = start.elapsed();
 
     println!("Context switch time: {:?}", context_switch_time);
-    println!("Active symbols: {} ({}% of total)\n",
-             ctx_dict.active_count(),
-             ctx_dict.active_count() * 100 / symbols.len());
+    println!(
+        "Active symbols: {} ({}% of total)\n",
+        ctx_dict.active_count(),
+        ctx_dict.active_count() * 100 / symbols.len()
+    );
 
     print!("Searching for 'getv' in ClassA scope: ");
     let results: Vec<_> = Transducer::new(ctx_dict.dict().clone(), Algorithm::Standard)
@@ -197,14 +205,18 @@ fn main() {
 
     // Switch context to public symbols
     ctx_dict.set_context(|term| {
-        symbols.iter().any(|s| s.name == term && s.visibility == "public")
+        symbols
+            .iter()
+            .any(|s| s.name == term && s.visibility == "public")
     });
     let context_switch_time = start.elapsed();
 
     println!("Context switch time: {:?}", context_switch_time);
-    println!("Active symbols: {} ({}% of total)\n",
-             ctx_dict.active_count(),
-             ctx_dict.active_count() * 100 / symbols.len());
+    println!(
+        "Active symbols: {} ({}% of total)\n",
+        ctx_dict.active_count(),
+        ctx_dict.active_count() * 100 / symbols.len()
+    );
 
     print!("Searching for 'getv' (public only): ");
     let results: Vec<_> = Transducer::new(ctx_dict.dict().clone(), Algorithm::Standard)
@@ -226,17 +238,19 @@ fn main() {
     ctx_dict.set_context(|term| {
         symbols.iter().any(|s| {
             s.name == term
-            && s.scope == "ClassA"
-            && s.visibility == "public"
-            && s.kind == "function"
+                && s.scope == "ClassA"
+                && s.visibility == "public"
+                && s.kind == "function"
         })
     });
     let context_switch_time = start.elapsed();
 
     println!("Context switch time: {:?}", context_switch_time);
-    println!("Active symbols: {} ({}% of total)\n",
-             ctx_dict.active_count(),
-             ctx_dict.active_count() * 100 / symbols.len());
+    println!(
+        "Active symbols: {} ({}% of total)\n",
+        ctx_dict.active_count(),
+        ctx_dict.active_count() * 100 / symbols.len()
+    );
 
     print!("Searching for 'get' (ClassA public functions): ");
     let results: Vec<_> = Transducer::new(ctx_dict.dict().clone(), Algorithm::Standard)
@@ -265,11 +279,9 @@ fn main() {
             .prefix()
             .filter(|c| {
                 // Simulate complex filter logic
-                symbols.iter().any(|s| {
-                    s.name == c.term
-                    && s.scope == "ClassA"
-                    && s.visibility == "public"
-                })
+                symbols
+                    .iter()
+                    .any(|s| s.name == c.term && s.scope == "ClassA" && s.visibility == "public")
             })
             .take(5)
             .collect();
@@ -280,11 +292,9 @@ fn main() {
     // Approach 2: Bitmap masking (set once, query many times)
     let start = Instant::now();
     ctx_dict.set_context(|term| {
-        symbols.iter().any(|s| {
-            s.name == term
-            && s.scope == "ClassA"
-            && s.visibility == "public"
-        })
+        symbols
+            .iter()
+            .any(|s| s.name == term && s.scope == "ClassA" && s.visibility == "public")
     });
     let context_setup = start.elapsed();
 
@@ -293,7 +303,7 @@ fn main() {
         let _: Vec<_> = Transducer::new(ctx_dict.dict().clone(), Algorithm::Standard)
             .query_ordered("get", 1)
             .prefix()
-            .filter(|c| ctx_dict.is_active(&c.term))  // O(1) bitmap lookup
+            .filter(|c| ctx_dict.is_active(&c.term)) // O(1) bitmap lookup
             .take(5)
             .collect();
     }

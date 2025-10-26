@@ -3,13 +3,13 @@
 //! Manages the dictionary backend, algorithm selection, and query parameters.
 
 use crate::cli::args::SerializationFormat;
-use crate::dictionary::{Dictionary, DictionaryNode};
 use crate::dictionary::dawg::DawgDictionary;
 use crate::dictionary::dynamic_dawg::DynamicDawg;
 use crate::dictionary::pathmap::PathMapDictionary;
+use crate::dictionary::{Dictionary, DictionaryNode};
 use crate::transducer::{Algorithm, Transducer};
+use anyhow::Result;
 use std::path::Path;
-use anyhow::{Context, Result};
 
 /// Helper to extract all terms from any dictionary using DFS
 fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
@@ -17,11 +17,7 @@ fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
     let mut terms = Vec::with_capacity(est_size);
     let mut current_term = Vec::with_capacity(32);
 
-    fn dfs<N: DictionaryNode>(
-        node: &N,
-        current_term: &mut Vec<u8>,
-        terms: &mut Vec<String>
-    ) {
+    fn dfs<N: DictionaryNode>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
         if node.is_final() {
             if let Ok(term) = String::from_utf8(current_term.clone()) {
                 terms.push(term);
@@ -42,7 +38,10 @@ fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
 
 /// Dictionary backend type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum, serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "cli",
+    derive(clap::ValueEnum, serde::Serialize, serde::Deserialize)
+)]
 pub enum DictionaryBackend {
     /// PathMap-based trie (default, fast insertion/deletion)
     PathMap,
@@ -70,7 +69,10 @@ impl std::str::FromStr for DictionaryBackend {
             "pathmap" => Ok(Self::PathMap),
             "dawg" => Ok(Self::Dawg),
             "dynamic-dawg" | "dynamicdawg" => Ok(Self::DynamicDawg),
-            _ => Err(anyhow::anyhow!("Unknown backend: {}. Valid options: pathmap, dawg, dynamic-dawg", s)),
+            _ => Err(anyhow::anyhow!(
+                "Unknown backend: {}. Valid options: pathmap, dawg, dynamic-dawg",
+                s
+            )),
         }
     }
 }
@@ -190,9 +192,7 @@ impl DictContainer {
                 // PathMap doesn't need compaction
                 Ok(())
             }
-            Self::Dawg(_) => {
-                Err(anyhow::anyhow!("DAWG dictionary is already minimized"))
-            }
+            Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is already minimized")),
             Self::DynamicDawg(d) => {
                 d.minimize();
                 Ok(())
@@ -255,8 +255,8 @@ impl ReplState {
     pub fn load_from_file(&mut self, path: &Path, backend: DictionaryBackend) -> Result<usize> {
         #[cfg(feature = "cli")]
         {
-            use crate::cli::detect::detect_format;
             use crate::cli::commands::load_dictionary;
+            use crate::cli::detect::detect_format;
 
             // Detect format
             let detection = detect_format(path, Some(backend), None)?;
@@ -294,9 +294,7 @@ impl ReplState {
                 DictionaryBackend::PathMap => {
                     DictContainer::PathMap(PathMapDictionary::from_iter(terms))
                 }
-                DictionaryBackend::Dawg => {
-                    DictContainer::Dawg(DawgDictionary::from_iter(terms))
-                }
+                DictionaryBackend::Dawg => DictContainer::Dawg(DawgDictionary::from_iter(terms)),
                 DictionaryBackend::DynamicDawg => {
                     let dict = DynamicDawg::new();
                     for term in &terms {

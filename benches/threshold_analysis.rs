@@ -54,8 +54,10 @@ impl EdgeDistribution {
                 cumulative += freq;
                 let pct = (freq as f64 / self.total_nodes as f64) * 100.0;
                 let cum_pct = (cumulative as f64 / self.total_nodes as f64) * 100.0;
-                println!("{:10} | {:9} | {:9.2}% | {:9.2}%",
-                    edge_count, freq, pct, cum_pct);
+                println!(
+                    "{:10} | {:9} | {:9.2}% | {:9.2}%",
+                    edge_count, freq, pct, cum_pct
+                );
             }
         }
 
@@ -91,9 +93,7 @@ impl EdgeDistribution {
 
 /// Generate terms for testing
 fn generate_terms(count: usize) -> Vec<String> {
-    (0..count)
-        .map(|i| format!("word{:06}", i))
-        .collect()
+    (0..count).map(|i| format!("word{:06}", i)).collect()
 }
 
 /// Benchmark different threshold values for adaptive search
@@ -118,10 +118,7 @@ fn bench_threshold_values(c: &mut Criterion) {
             BenchmarkId::new("contains", dict_size),
             dict_size,
             |b, _| {
-                let test_terms: Vec<_> = terms.iter()
-                    .step_by(10)
-                    .map(|s| s.as_str())
-                    .collect();
+                let test_terms: Vec<_> = terms.iter().step_by(10).map(|s| s.as_str()).collect();
 
                 b.iter(|| {
                     for term in &test_terms {

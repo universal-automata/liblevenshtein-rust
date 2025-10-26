@@ -15,7 +15,10 @@ fn main() {
     // Load real dictionary
     println!("Loading real dictionary...");
     let real_words = load_real_dictionary();
-    println!("Loaded {} words from English dictionary\n", real_words.len());
+    println!(
+        "Loaded {} words from English dictionary\n",
+        real_words.len()
+    );
 
     // Load synthetic dictionary for comparison
     println!("Generating synthetic dictionary...");
@@ -66,7 +69,8 @@ fn main() {
         }
     }
     let real_contains_time = start.elapsed();
-    println!("Real dictionary: {} calls in {:?} ({:.2} µs/call)",
+    println!(
+        "Real dictionary: {} calls in {:?} ({:.2} µs/call)",
         real_test_words.len() * 100,
         real_contains_time,
         real_contains_time.as_micros() as f64 / (real_test_words.len() * 100) as f64
@@ -85,7 +89,8 @@ fn main() {
         }
     }
     let synthetic_contains_time = start.elapsed();
-    println!("Synthetic dictionary: {} calls in {:?} ({:.2} µs/call)",
+    println!(
+        "Synthetic dictionary: {} calls in {:?} ({:.2} µs/call)",
         synthetic_test_words.len() * 100,
         synthetic_contains_time,
         synthetic_contains_time.as_micros() as f64 / (synthetic_test_words.len() * 100) as f64
@@ -96,7 +101,8 @@ fn main() {
     println!("\nTesting fuzzy query performance...");
 
     // Real dictionary queries
-    let real_query_words: Vec<_> = real_words.iter()
+    let real_query_words: Vec<_> = real_words
+        .iter()
         .step_by(real_words.len() / 1000)
         .take(1000)
         .collect();
@@ -110,7 +116,8 @@ fn main() {
         }
     }
     let real_query_time = start.elapsed();
-    println!("Real dictionary: {} queries in {:?} ({:.2} µs/query)",
+    println!(
+        "Real dictionary: {} queries in {:?} ({:.2} µs/query)",
         real_query_words.len(),
         real_query_time,
         real_query_time.as_micros() as f64 / real_query_words.len() as f64
@@ -118,7 +125,8 @@ fn main() {
     println!("Total results: {}", real_results);
 
     // Synthetic dictionary queries
-    let synthetic_query_words: Vec<_> = synthetic_words.iter()
+    let synthetic_query_words: Vec<_> = synthetic_words
+        .iter()
         .step_by(synthetic_words.len() / 1000)
         .take(1000)
         .collect();
@@ -132,7 +140,8 @@ fn main() {
         }
     }
     let synthetic_query_time = start.elapsed();
-    println!("Synthetic dictionary: {} queries in {:?} ({:.2} µs/query)",
+    println!(
+        "Synthetic dictionary: {} queries in {:?} ({:.2} µs/query)",
         synthetic_query_words.len(),
         synthetic_query_time,
         synthetic_query_time.as_micros() as f64 / synthetic_query_words.len() as f64
@@ -149,16 +158,15 @@ fn load_real_dictionary() -> Vec<String> {
     let contents = fs::read_to_string("data/english_words.txt")
         .expect("Failed to read data/english_words.txt");
 
-    contents.lines()
+    contents
+        .lines()
         .map(|s| s.trim().to_lowercase())
         .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphabetic()))
         .collect()
 }
 
 fn generate_synthetic_dictionary(count: usize) -> Vec<String> {
-    (0..count)
-        .map(|i| format!("word{:06}", i))
-        .collect()
+    (0..count).map(|i| format!("word{:06}", i)).collect()
 }
 
 fn analyze_edge_distribution(dawg: &DawgDictionary) -> HashMap<usize, usize> {
@@ -210,29 +218,45 @@ fn print_distribution(dist: &HashMap<usize, usize>) {
     }
 }
 
-fn analyze_threshold_effectiveness(real_dist: &HashMap<usize, usize>, synthetic_dist: &HashMap<usize, usize>) {
+fn analyze_threshold_effectiveness(
+    real_dist: &HashMap<usize, usize>,
+    synthetic_dist: &HashMap<usize, usize>,
+) {
     println!("Current threshold: 16 (linear search for <16 edges, binary for ≥16)");
 
     // Calculate what percentage of nodes use each strategy
     let analyze = |dist: &HashMap<usize, usize>, name: &str| {
         let total: usize = dist.values().sum();
-        let linear: usize = dist.iter()
+        let linear: usize = dist
+            .iter()
             .filter(|(edges, _)| **edges < 16)
             .map(|(_, count)| count)
             .sum();
         let binary: usize = total - linear;
 
         println!("\n{}:", name);
-        println!("  Linear search: {} nodes ({:.2}%)", linear, (linear as f64 / total as f64) * 100.0);
-        println!("  Binary search: {} nodes ({:.2}%)", binary, (binary as f64 / total as f64) * 100.0);
+        println!(
+            "  Linear search: {} nodes ({:.2}%)",
+            linear,
+            (linear as f64 / total as f64) * 100.0
+        );
+        println!(
+            "  Binary search: {} nodes ({:.2}%)",
+            binary,
+            (binary as f64 / total as f64) * 100.0
+        );
 
         // Find nodes near threshold
-        let near_threshold: usize = dist.iter()
+        let near_threshold: usize = dist
+            .iter()
             .filter(|(edges, _)| **edges >= 10 && **edges <= 20)
             .map(|(_, count)| count)
             .sum();
-        println!("  Near threshold (10-20 edges): {} nodes ({:.2}%)",
-            near_threshold, (near_threshold as f64 / total as f64) * 100.0);
+        println!(
+            "  Near threshold (10-20 edges): {} nodes ({:.2}%)",
+            near_threshold,
+            (near_threshold as f64 / total as f64) * 100.0
+        );
     };
 
     analyze(real_dist, "Real dictionary");

@@ -138,7 +138,9 @@ impl DynamicDawg {
 
             // Try to find existing suffix for remaining characters
             let remaining = &bytes[i..];
-            if let Some(existing_idx) = inner.find_or_create_suffix(remaining, true, i == bytes.len() - 1) {
+            if let Some(existing_idx) =
+                inner.find_or_create_suffix(remaining, true, i == bytes.len() - 1)
+            {
                 // Add edge to existing suffix using binary insertion
                 inner.insert_edge_sorted(node_idx, byte, existing_idx);
                 inner.nodes[existing_idx].ref_count += 1;
@@ -371,7 +373,12 @@ impl DynamicDawg {
 }
 
 impl DynamicDawgInner {
-    fn find_or_create_suffix(&mut self, _suffix: &[u8], _is_final: bool, _last: bool) -> Option<usize> {
+    fn find_or_create_suffix(
+        &mut self,
+        _suffix: &[u8],
+        _is_final: bool,
+        _last: bool,
+    ) -> Option<usize> {
         // Simplified: would implement full suffix sharing here
         None
     }
@@ -731,7 +738,7 @@ mod tests {
 
     #[test]
     fn test_dynamic_dawg_with_transducer() {
-        use crate::transducer::{Transducer, Algorithm};
+        use crate::transducer::{Algorithm, Transducer};
 
         let dawg = DynamicDawg::from_iter(vec!["apple", "application", "apply"]);
         let transducer = Transducer::new(dawg.clone(), Algorithm::Standard);
@@ -775,9 +782,7 @@ mod tests {
 
     #[test]
     fn test_batch_remove_many() {
-        let dawg = DynamicDawg::from_iter(vec![
-            "test", "testing", "tested", "tester"
-        ]);
+        let dawg = DynamicDawg::from_iter(vec!["test", "testing", "tested", "tester"]);
 
         let to_remove = vec!["testing", "tester"];
         let removed = dawg.remove_many(to_remove);
@@ -831,13 +836,29 @@ mod tests {
         let merged1 = dawg1.minimize();
         let merged2 = dawg2.compact();
 
-        println!("After minimize: {} nodes (merged {})", dawg1.node_count(), merged1);
-        println!("After compact: {} nodes (removed {})", dawg2.node_count(), merged2);
+        println!(
+            "After minimize: {} nodes (merged {})",
+            dawg1.node_count(),
+            merged1
+        );
+        println!(
+            "After compact: {} nodes (removed {})",
+            dawg2.node_count(),
+            merged2
+        );
 
         // Both should contain same terms
         for term in ["zebra", "apple", "banana", "apricot", "band", "bandana"] {
-            assert!(dawg1.contains(term), "minimize() DAWG missing term: {}", term);
-            assert!(dawg2.contains(term), "compact() DAWG missing term: {}", term);
+            assert!(
+                dawg1.contains(term),
+                "minimize() DAWG missing term: {}",
+                term
+            );
+            assert!(
+                dawg2.contains(term),
+                "compact() DAWG missing term: {}",
+                term
+            );
         }
 
         // Check term counts match
@@ -847,16 +868,17 @@ mod tests {
         // TODO: Investigate why minimize() and compact() produce different node counts
         // If minimize() produces fewer nodes without false positives, it might be better!
         if dawg1.node_count() != dawg2.node_count() {
-            eprintln!("WARNING: minimize() produced {} nodes, compact() produced {} nodes",
-                     dawg1.node_count(), dawg2.node_count());
+            eprintln!(
+                "WARNING: minimize() produced {} nodes, compact() produced {} nodes",
+                dawg1.node_count(),
+                dawg2.node_count()
+            );
         }
     }
 
     #[test]
     fn test_minimize_after_deletions() {
-        let dawg = DynamicDawg::from_iter(vec![
-            "test", "testing", "tested", "tester", "testimony"
-        ]);
+        let dawg = DynamicDawg::from_iter(vec!["test", "testing", "tested", "tester", "testimony"]);
 
         // Remove some terms, creating potential orphaned nodes
         dawg.remove("testing");
@@ -927,9 +949,7 @@ mod tests {
 
     #[test]
     fn test_minimize_idempotent() {
-        let dawg = DynamicDawg::from_iter(vec![
-            "apple", "application", "apply", "apricot"
-        ]);
+        let dawg = DynamicDawg::from_iter(vec!["apple", "application", "apply", "apricot"]);
 
         // First minimization
         let _merged1 = dawg.minimize();
@@ -961,12 +981,20 @@ mod tests {
 
         // Check that inserted terms are still present
         for term in &inserted_terms {
-            assert!(dawg.contains(term), "Should contain inserted term: {}", term);
+            assert!(
+                dawg.contains(term),
+                "Should contain inserted term: {}",
+                term
+            );
         }
 
         // CRITICAL: Check that non-inserted terms are NOT present (no false positives)
         for term in &not_inserted_terms {
-            assert!(!dawg.contains(term), "Should NOT contain term that wasn't inserted: {}", term);
+            assert!(
+                !dawg.contains(term),
+                "Should NOT contain term that wasn't inserted: {}",
+                term
+            );
         }
     }
 
@@ -985,11 +1013,19 @@ mod tests {
         dawg.compact();
 
         for term in &inserted_terms {
-            assert!(dawg.contains(term), "Should contain inserted term: {}", term);
+            assert!(
+                dawg.contains(term),
+                "Should contain inserted term: {}",
+                term
+            );
         }
 
         for term in &not_inserted_terms {
-            assert!(!dawg.contains(term), "Should NOT contain term that wasn't inserted: {}", term);
+            assert!(
+                !dawg.contains(term),
+                "Should NOT contain term that wasn't inserted: {}",
+                term
+            );
         }
     }
 }

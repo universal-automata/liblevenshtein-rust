@@ -27,8 +27,8 @@
 #![warn(clippy::all)]
 
 pub mod dictionary;
-pub mod transducer;
 pub mod distance;
+pub mod transducer;
 
 #[cfg(feature = "serialization")]
 pub mod serialization;
@@ -43,20 +43,19 @@ pub mod cli;
 
 /// Common imports for convenient usage
 pub mod prelude {
-    pub use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
-    pub use crate::dictionary::pathmap::PathMapDictionary;
     pub use crate::dictionary::dawg::DawgDictionary;
     pub use crate::dictionary::dynamic_dawg::DynamicDawg;
-    pub use crate::transducer::{Transducer, Algorithm, Candidate, TransducerBuilder};
+    pub use crate::dictionary::pathmap::PathMapDictionary;
+    pub use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
+    pub use crate::transducer::{Algorithm, Candidate, Transducer, TransducerBuilder};
 
     #[cfg(feature = "serialization")]
     pub use crate::serialization::{
-        DictionarySerializer, DictionaryFromTerms,
-        BincodeSerializer, JsonSerializer
+        BincodeSerializer, DictionaryFromTerms, DictionarySerializer, JsonSerializer,
     };
 
     #[cfg(feature = "protobuf")]
-    pub use crate::serialization::{ProtobufSerializer, OptimizedProtobufSerializer};
+    pub use crate::serialization::{OptimizedProtobufSerializer, ProtobufSerializer};
 
     #[cfg(feature = "compression")]
     pub use crate::serialization::GzipSerializer;

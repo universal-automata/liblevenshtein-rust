@@ -3,10 +3,10 @@
 //! This module provides traits that abstract over different dictionary
 //! implementations (tries, DAWGs, etc.) for use with Levenshtein automata.
 
-pub mod pathmap;
 pub mod dawg;
 pub mod dawg_query;
 pub mod dynamic_dawg;
+pub mod pathmap;
 
 /// Synchronization strategy for dictionary operations.
 ///

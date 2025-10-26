@@ -14,9 +14,13 @@ fn main() {
     println!("================================\n");
 
     let dict = PathMapDictionary::from_iter(vec![
-        "apple", "application", "apply",
-        "banana", "bandana",
-        "cherry", "chocolate",
+        "apple",
+        "application",
+        "apply",
+        "banana",
+        "bandana",
+        "cherry",
+        "chocolate",
     ]);
 
     println!("1. Using the builder pattern:");
@@ -30,7 +34,10 @@ fn main() {
 
     println!("   ✓ Transducer created successfully");
     println!("   Algorithm: {:?}", transducer.algorithm());
-    println!("   Dictionary size: {} terms\n", transducer.dictionary().len().unwrap());
+    println!(
+        "   Dictionary size: {} terms\n",
+        transducer.dictionary().len().unwrap()
+    );
 
     println!("2. Testing with a query:");
     let query = "aple";
@@ -72,9 +79,7 @@ fn main() {
 
     // Missing algorithm
     println!("\n   Attempting to build without algorithm...");
-    let result2 = TransducerBuilder::new()
-        .dictionary(dict.clone())
-        .build();
+    let result2 = TransducerBuilder::new().dictionary(dict.clone()).build();
 
     match result2 {
         Ok(_) => println!("     ✗ Should have failed"),

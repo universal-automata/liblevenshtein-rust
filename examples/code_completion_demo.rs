@@ -44,7 +44,6 @@ fn main() {
         Identifier::new("userId", IdentifierType::Variable, false),
         Identifier::new("userName", IdentifierType::Variable, false),
         Identifier::new("userEmail", IdentifierType::Variable, false),
-
         // Functions
         Identifier::new("getUserById", IdentifierType::Function, true),
         Identifier::new("getUserName", IdentifierType::Function, true),
@@ -53,13 +52,11 @@ fn main() {
         Identifier::new("setValue", IdentifierType::Function, true),
         Identifier::new("calculate", IdentifierType::Function, true),
         Identifier::new("validateInput", IdentifierType::Function, true),
-
         // Classes
         Identifier::new("User", IdentifierType::Class, true),
         Identifier::new("UserService", IdentifierType::Class, true),
         Identifier::new("ValueObject", IdentifierType::Class, true),
         Identifier::new("Calculator", IdentifierType::Class, true),
-
         // Constants
         Identifier::new("MAX_VALUE", IdentifierType::Constant, true),
         Identifier::new("MIN_VALUE", IdentifierType::Constant, true),
@@ -115,9 +112,14 @@ fn main() {
         })
         .take(5)
     {
-        let id = identifiers.iter().find(|id| id.name == candidate.term).unwrap();
-        println!("  {} (distance: {}, type: {:?})",
-                 candidate.term, candidate.distance, id.id_type);
+        let id = identifiers
+            .iter()
+            .find(|id| id.name == candidate.term)
+            .unwrap();
+        println!(
+            "  {} (distance: {}, type: {:?})",
+            candidate.term, candidate.distance, id.id_type
+        );
     }
 
     // Scenario 4: Filter by visibility (public only)
@@ -136,9 +138,14 @@ fn main() {
         })
         .take(5)
     {
-        let id = identifiers.iter().find(|id| id.name == candidate.term).unwrap();
-        println!("  {} (type: {:?}, public: {})",
-                 candidate.term, id.id_type, id.is_public);
+        let id = identifiers
+            .iter()
+            .find(|id| id.name == candidate.term)
+            .unwrap();
+        println!(
+            "  {} (type: {:?}, public: {})",
+            candidate.term, id.id_type, id.is_public
+        );
     }
 
     // Scenario 5: Complex filtering - camelCase prefix matching
@@ -151,7 +158,11 @@ fn main() {
         .prefix()
         .filter(|c| {
             // Check if identifier follows camelCase (starts with lowercase)
-            c.term.chars().next().map(|ch| ch.is_lowercase()).unwrap_or(false)
+            c.term
+                .chars()
+                .next()
+                .map(|ch| ch.is_lowercase())
+                .unwrap_or(false)
         })
         .take(5)
     {
@@ -168,16 +179,20 @@ fn main() {
         .prefix()
         .filter(|c| {
             identifiers.iter().any(|id| {
-                id.name == c.term
-                && id.id_type == IdentifierType::Function
-                && id.is_public
+                id.name == c.term && id.id_type == IdentifierType::Function && id.is_public
             })
         })
-        .take(3)  // Only top 3
+        .take(3)
+    // Only top 3
     {
-        let id = identifiers.iter().find(|id| id.name == candidate.term).unwrap();
-        println!("  {} (type: {:?}, public: {})",
-                 candidate.term, id.id_type, id.is_public);
+        let id = identifiers
+            .iter()
+            .find(|id| id.name == candidate.term)
+            .unwrap();
+        println!(
+            "  {} (type: {:?}, public: {})",
+            candidate.term, id.id_type, id.is_public
+        );
     }
 
     // Scenario 7: Distance-bounded search
@@ -188,7 +203,8 @@ fn main() {
     for candidate in Transducer::new(dict.clone(), Algorithm::Standard)
         .query_ordered("calcul", 2)
         .prefix()
-        .take_while(|c| c.distance <= 1)  // Stop after distance 1
+        .take_while(|c| c.distance <= 1)
+    // Stop after distance 1
     {
         println!("  {} (distance: {})", candidate.term, candidate.distance);
     }

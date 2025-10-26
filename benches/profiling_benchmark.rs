@@ -1,6 +1,5 @@
 /// Profiling benchmark for realistic workload
 /// This benchmark is designed to exercise hot paths for profiling and PGO
-
 use liblevenshtein::prelude::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -47,11 +46,11 @@ fn main() {
     println!("Performing queries...");
     // Use queries that will actually match synthetic dictionary (word000000, word000001, etc.)
     let test_queries = vec![
-        ("wrd000050", 1),    // typo: word000050 (missing 'o')
-        ("word00050", 1),    // typo: word000050 (missing '0')
-        ("word000", 2),      // partial match: many words
-        ("word001000", 2),   // typo: word001000
-        ("word005000", 2),   // exact or near match
+        ("wrd000050", 1),  // typo: word000050 (missing 'o')
+        ("word00050", 1),  // typo: word000050 (missing '0')
+        ("word000", 2),    // partial match: many words
+        ("word001000", 2), // typo: word001000
+        ("word005000", 2), // exact or near match
     ];
 
     let start = std::time::Instant::now();
@@ -60,9 +59,7 @@ fn main() {
     // Run each query multiple times to generate enough profile data
     for _ in 0..1000 {
         for (query, max_distance) in &test_queries {
-            let results: Vec<_> = transducer
-                .query(query, *max_distance)
-                .collect();
+            let results: Vec<_> = transducer.query(query, *max_distance).collect();
             total_results += results.len();
         }
     }

@@ -16,8 +16,8 @@ fn main() {
     // Create test data with common suffixes
     let terms = vec![
         "testing", "running", "walking", "talking", // common suffix: "ing"
-        "tested", "wanted", "needed", "added",      // common suffix: "ed"
-        "runner", "walker", "talker", "worker",     // common suffix: "er"
+        "tested", "wanted", "needed", "added", // common suffix: "ed"
+        "runner", "walker", "talker", "worker", // common suffix: "er"
     ];
 
     println!("1. Creating PathMap dictionary...");
@@ -26,9 +26,11 @@ fn main() {
 
     println!("\n2. Creating DAWG dictionary...");
     let dawg_dict = DawgDictionary::from_iter(terms.clone());
-    println!("   DAWG: {} terms, {} nodes",
-             dawg_dict.term_count(),
-             dawg_dict.node_count());
+    println!(
+        "   DAWG: {} terms, {} nodes",
+        dawg_dict.term_count(),
+        dawg_dict.node_count()
+    );
 
     println!("\n3. Space efficiency:");
     println!("   DAWG uses suffix sharing to minimize node count");

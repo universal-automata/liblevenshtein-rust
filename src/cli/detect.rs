@@ -1,10 +1,10 @@
 //! Dictionary format auto-detection
 
-use std::path::Path;
-use std::io::Read;
-use anyhow::{Context, Result, bail};
-use crate::repl::state::DictionaryBackend;
 use super::args::SerializationFormat;
+use crate::repl::state::DictionaryBackend;
+use anyhow::{bail, Context, Result};
+use std::io::Read;
+use std::path::Path;
 
 /// Dictionary format detection result
 #[derive(Debug, Clone, Copy)]
@@ -141,7 +141,8 @@ fn detect_exact(path: &Path) -> Result<FormatDetection> {
         .with_context(|| format!("Failed to open file: {}", path.display()))?;
 
     let mut header = [0u8; 16];
-    let bytes_read = file.read(&mut header)
+    let bytes_read = file
+        .read(&mut header)
         .with_context(|| format!("Failed to read file header: {}", path.display()))?;
 
     if bytes_read < 4 {
@@ -182,7 +183,8 @@ fn detect_exact(path: &Path) -> Result<FormatDetection> {
 
 /// Detect format by file extension
 fn detect_by_extension(path: &Path) -> Result<FormatDetection> {
-    let ext = path.extension()
+    let ext = path
+        .extension()
         .and_then(|s| s.to_str())
         .context("No file extension")?;
 
@@ -197,7 +199,8 @@ fn detect_by_extension(path: &Path) -> Result<FormatDetection> {
     };
 
     // Try to detect backend from filename
-    let filename = path.file_name()
+    let filename = path
+        .file_name()
         .and_then(|s| s.to_str())
         .context("Invalid filename")?
         .to_lowercase();
@@ -230,9 +233,11 @@ fn detect_by_content(path: &Path) -> Result<FormatDetection> {
         // Plain text dictionary: one word per line
         if text.lines().take(10).all(|line| {
             let trimmed = line.trim();
-            trimmed.is_empty() ||
-            trimmed.starts_with('#') ||
-            trimmed.chars().all(|c| c.is_alphanumeric() || c.is_whitespace() || "-_'".contains(c))
+            trimmed.is_empty()
+                || trimmed.starts_with('#')
+                || trimmed
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c.is_whitespace() || "-_'".contains(c))
         }) {
             return Ok(FormatDetection {
                 format: DictFormat {

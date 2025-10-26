@@ -59,7 +59,11 @@ fn main() {
 
     // Add some specific identifiers we'll search for
     identifiers.push(Identifier::new("getValue", IdentifierType::Function, true));
-    identifiers.push(Identifier::new("getVariable", IdentifierType::Function, true));
+    identifiers.push(Identifier::new(
+        "getVariable",
+        IdentifierType::Function,
+        true,
+    ));
     identifiers.push(Identifier::new("getResult", IdentifierType::Function, true));
     identifiers.push(Identifier::new("setValue", IdentifierType::Function, true));
     identifiers.push(Identifier::new("calculate", IdentifierType::Function, true));
@@ -82,9 +86,7 @@ fn main() {
         .filter(|c| {
             // Filter to only public functions
             identifiers.iter().any(|id| {
-                id.name == c.term
-                && id.id_type == IdentifierType::Function
-                && id.is_public
+                id.name == c.term && id.id_type == IdentifierType::Function && id.is_public
             })
         })
         .take(5)
@@ -108,9 +110,11 @@ fn main() {
         .map(|id| id.name.as_str())
         .collect();
 
-    println!("Pre-filtered dictionary size: {} terms ({}% reduction)",
-             public_functions.len(),
-             100 - (public_functions.len() * 100 / all_names.len()));
+    println!(
+        "Pre-filtered dictionary size: {} terms ({}% reduction)",
+        public_functions.len(),
+        100 - (public_functions.len() * 100 / all_names.len())
+    );
 
     let filtered_dict = PathMapDictionary::from_iter(public_functions.clone());
 
@@ -142,22 +146,38 @@ fn main() {
 
     // Build context-specific dictionaries
     let contexts = vec![
-        ("Public Functions", identifiers.iter()
-            .filter(|id| id.id_type == IdentifierType::Function && id.is_public)
-            .map(|id| id.name.as_str())
-            .collect::<Vec<_>>()),
-        ("Private Functions", identifiers.iter()
-            .filter(|id| id.id_type == IdentifierType::Function && !id.is_public)
-            .map(|id| id.name.as_str())
-            .collect::<Vec<_>>()),
-        ("Classes", identifiers.iter()
-            .filter(|id| id.id_type == IdentifierType::Class)
-            .map(|id| id.name.as_str())
-            .collect::<Vec<_>>()),
-        ("Variables", identifiers.iter()
-            .filter(|id| id.id_type == IdentifierType::Variable)
-            .map(|id| id.name.as_str())
-            .collect::<Vec<_>>()),
+        (
+            "Public Functions",
+            identifiers
+                .iter()
+                .filter(|id| id.id_type == IdentifierType::Function && id.is_public)
+                .map(|id| id.name.as_str())
+                .collect::<Vec<_>>(),
+        ),
+        (
+            "Private Functions",
+            identifiers
+                .iter()
+                .filter(|id| id.id_type == IdentifierType::Function && !id.is_public)
+                .map(|id| id.name.as_str())
+                .collect::<Vec<_>>(),
+        ),
+        (
+            "Classes",
+            identifiers
+                .iter()
+                .filter(|id| id.id_type == IdentifierType::Class)
+                .map(|id| id.name.as_str())
+                .collect::<Vec<_>>(),
+        ),
+        (
+            "Variables",
+            identifiers
+                .iter()
+                .filter(|id| id.id_type == IdentifierType::Variable)
+                .map(|id| id.name.as_str())
+                .collect::<Vec<_>>(),
+        ),
     ];
 
     for (context_name, terms) in contexts {
@@ -174,13 +194,17 @@ fn main() {
 
     // Refine: only functions
     current_set.retain(|name| {
-        identifiers.iter().any(|id| &id.name == name && id.id_type == IdentifierType::Function)
+        identifiers
+            .iter()
+            .any(|id| &id.name == name && id.id_type == IdentifierType::Function)
     });
     println!("2. Filter to functions: {} terms", current_set.len());
 
     // Refine: only public
     current_set.retain(|name| {
-        identifiers.iter().any(|id| &id.name == name && id.is_public)
+        identifiers
+            .iter()
+            .any(|id| &id.name == name && id.is_public)
     });
     println!("3. Filter to public: {} terms", current_set.len());
 

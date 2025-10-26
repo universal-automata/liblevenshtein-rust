@@ -1,24 +1,27 @@
 //! Default paths and configuration directory management
 
-use std::path::{Path, PathBuf};
-use anyhow::{Context, Result};
-use crate::repl::state::DictionaryBackend;
 use super::args::SerializationFormat;
+use crate::repl::state::DictionaryBackend;
+use anyhow::{Context, Result};
+use std::path::{Path, PathBuf};
 
 /// Get the configuration directory for liblevenshtein
 pub fn config_dir() -> Result<PathBuf> {
-    let base = dirs::data_local_dir()
-        .context("Could not determine local data directory")?;
+    let base = dirs::data_local_dir().context("Could not determine local data directory")?;
     Ok(base.join("liblevenshtein"))
 }
 
 /// Get the default dictionary path for a given backend and format
-pub fn default_dict_path(backend: DictionaryBackend, format: SerializationFormat) -> Result<PathBuf> {
+pub fn default_dict_path(
+    backend: DictionaryBackend,
+    format: SerializationFormat,
+) -> Result<PathBuf> {
     let dir = config_dir()?;
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("Failed to create directory: {}", dir.display()))?;
 
-    let filename = format!("default-{}.{}",
+    let filename = format!(
+        "default-{}.{}",
         backend.to_string().to_lowercase(),
         file_extension(format)
     );
@@ -171,7 +174,8 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            user_config_path: default_user_config_path().unwrap_or_else(|_| PathBuf::from("config.json")),
+            user_config_path: default_user_config_path()
+                .unwrap_or_else(|_| PathBuf::from("config.json")),
         }
     }
 }

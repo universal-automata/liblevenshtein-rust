@@ -59,8 +59,8 @@ fn main() {
     // 5. Worst case similar words (maximum state expansion)
     println!("Running worst case queries...");
     let worst_dict = PathMapDictionary::from_iter(vec![
-        "aaaa", "aaab", "aaba", "aabb", "abaa", "abab", "abba", "abbb",
-        "baaa", "baab", "baba", "babb", "bbaa", "bbab", "bbba", "bbbb",
+        "aaaa", "aaab", "aaba", "aabb", "abaa", "abab", "abba", "abbb", "baaa", "baab", "baba",
+        "babb", "bbaa", "bbab", "bbba", "bbbb",
     ]);
     let worst_transducer = Transducer::new(worst_dict, Algorithm::Standard);
 

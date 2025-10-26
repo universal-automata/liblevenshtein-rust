@@ -4,7 +4,7 @@
 //! `Transducer` instances with optional configuration and validation.
 
 use crate::dictionary::Dictionary;
-use crate::transducer::{Transducer, Algorithm};
+use crate::transducer::{Algorithm, Transducer};
 
 /// Builder for constructing a `Transducer` with a fluent API.
 ///
@@ -114,10 +114,8 @@ impl<D: Dictionary> TransducerBuilder<D> {
     ///     .build()?;
     /// ```
     pub fn build(self) -> Result<Transducer<D>, BuilderError> {
-        let dictionary = self.dictionary
-            .ok_or(BuilderError::MissingDictionary)?;
-        let algorithm = self.algorithm
-            .ok_or(BuilderError::MissingAlgorithm)?;
+        let dictionary = self.dictionary.ok_or(BuilderError::MissingDictionary)?;
+        let algorithm = self.algorithm.ok_or(BuilderError::MissingAlgorithm)?;
 
         Ok(Transducer::new(dictionary, algorithm))
     }
@@ -160,9 +158,7 @@ mod tests {
     #[test]
     fn test_builder_missing_algorithm() {
         let dict = PathMapDictionary::from_iter(vec!["test"]);
-        let result = TransducerBuilder::new()
-            .dictionary(dict)
-            .build();
+        let result = TransducerBuilder::new().dictionary(dict).build();
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), BuilderError::MissingAlgorithm);
@@ -192,7 +188,11 @@ mod tests {
 
     #[test]
     fn test_builder_all_algorithms() {
-        for algo in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
+        for algo in [
+            Algorithm::Standard,
+            Algorithm::Transposition,
+            Algorithm::MergeAndSplit,
+        ] {
             let dict = PathMapDictionary::from_iter(vec!["test"]);
             let transducer = TransducerBuilder::new()
                 .dictionary(dict)

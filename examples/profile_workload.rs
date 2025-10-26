@@ -9,9 +9,7 @@ fn main() {
     println!("Starting profiling workload...");
 
     // Create a reasonably sized dictionary
-    let words: Vec<String> = (0..5000)
-        .map(|i| format!("word{:05}", i))
-        .collect();
+    let words: Vec<String> = (0..5000).map(|i| format!("word{:05}", i)).collect();
 
     let dict = PathMapDictionary::from_iter(words);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
@@ -38,11 +36,15 @@ fn main() {
     println!("Running insertion/deletion workload...");
     for _ in 0..50 {
         // Missing characters (insertions)
-        let results: Vec<_> = transducer.query(black_box("wrd00500"), black_box(2)).collect();
+        let results: Vec<_> = transducer
+            .query(black_box("wrd00500"), black_box(2))
+            .collect();
         black_box(results);
 
         // Extra characters (deletions)
-        let results: Vec<_> = transducer.query(black_box("woord00500"), black_box(2)).collect();
+        let results: Vec<_> = transducer
+            .query(black_box("woord00500"), black_box(2))
+            .collect();
         black_box(results);
     }
 

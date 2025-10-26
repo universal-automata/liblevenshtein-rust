@@ -4,23 +4,23 @@
 //! fuzzy string matching against dictionaries.
 
 mod algorithm;
-mod position;
-mod state;
-mod pool;
-mod intersection;
-mod query;
-mod ordered_query;
-pub mod transition;
 pub mod builder;
+mod intersection;
+mod ordered_query;
+mod pool;
+mod position;
+mod query;
+mod state;
+pub mod transition;
 
 pub use algorithm::Algorithm;
-pub use position::Position;
-pub use state::State;
-pub use pool::StatePool;
+pub use builder::{BuilderError, TransducerBuilder};
 pub use intersection::{Intersection, PathNode};
-pub use query::{QueryIterator, CandidateIterator, Candidate};
-pub use ordered_query::{OrderedQueryIterator, OrderedCandidate};
-pub use builder::{TransducerBuilder, BuilderError};
+pub use ordered_query::{OrderedCandidate, OrderedQueryIterator};
+pub use pool::StatePool;
+pub use position::Position;
+pub use query::{Candidate, CandidateIterator, QueryIterator};
+pub use state::State;
 
 use crate::dictionary::Dictionary;
 
@@ -72,7 +72,11 @@ impl<D: Dictionary> Transducer<D> {
     ///
     /// Returns an iterator over `Candidate` structs containing both
     /// the matching term and its computed distance
-    pub fn query_with_distance(&self, term: &str, max_distance: usize) -> CandidateIterator<D::Node> {
+    pub fn query_with_distance(
+        &self,
+        term: &str,
+        max_distance: usize,
+    ) -> CandidateIterator<D::Node> {
         CandidateIterator::new(
             self.dictionary.root(),
             term.to_string(),

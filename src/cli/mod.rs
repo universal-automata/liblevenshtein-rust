@@ -9,4 +9,4 @@ pub mod paths;
 
 pub use args::{Cli, Commands};
 pub use detect::{detect_format, DictFormat, FormatDetection};
-pub use paths::{default_dict_path, config_dir};
+pub use paths::{config_dir, default_dict_path};

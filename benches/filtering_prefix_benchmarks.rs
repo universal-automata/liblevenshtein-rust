@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use liblevenshtein::prelude::*;
 
 // Load real dictionary for realistic benchmarks
@@ -21,8 +21,12 @@ fn load_dictionary() -> Vec<String> {
 fn generate_code_identifiers(count: usize) -> Vec<String> {
     let mut identifiers = Vec::new();
 
-    let prefixes = ["get", "set", "is", "has", "create", "delete", "update", "find"];
-    let middles = ["User", "Value", "Item", "Data", "Record", "Entry", "Element"];
+    let prefixes = [
+        "get", "set", "is", "has", "create", "delete", "update", "find",
+    ];
+    let middles = [
+        "User", "Value", "Item", "Data", "Record", "Entry", "Element",
+    ];
     let suffixes = ["", "ById", "ByName", "FromCache", "Async", "Sync"];
 
     for prefix in &prefixes {
@@ -50,35 +54,27 @@ fn bench_prefix_vs_exact(c: &mut Criterion) {
         let query = "test".chars().take(query_len).collect::<String>();
 
         // Exact matching
-        group.bench_with_input(
-            BenchmarkId::new("exact", query_len),
-            &query,
-            |b, q| {
-                b.iter(|| {
-                    let results: Vec<_> = Transducer::new(dict.clone(), Algorithm::Standard)
-                        .query_ordered(black_box(q), 0)
-                        .take(10)
-                        .collect();
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("exact", query_len), &query, |b, q| {
+            b.iter(|| {
+                let results: Vec<_> = Transducer::new(dict.clone(), Algorithm::Standard)
+                    .query_ordered(black_box(q), 0)
+                    .take(10)
+                    .collect();
+                black_box(results);
+            });
+        });
 
         // Prefix matching
-        group.bench_with_input(
-            BenchmarkId::new("prefix", query_len),
-            &query,
-            |b, q| {
-                b.iter(|| {
-                    let results: Vec<_> = Transducer::new(dict.clone(), Algorithm::Standard)
-                        .query_ordered(black_box(q), 0)
-                        .prefix()
-                        .take(10)
-                        .collect();
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("prefix", query_len), &query, |b, q| {
+            b.iter(|| {
+                let results: Vec<_> = Transducer::new(dict.clone(), Algorithm::Standard)
+                    .query_ordered(black_box(q), 0)
+                    .prefix()
+                    .take(10)
+                    .collect();
+                black_box(results);
+            });
+        });
     }
 
     group.finish();
@@ -120,7 +116,7 @@ fn bench_filtering_strategies(c: &mut Criterion) {
     let public_identifiers: Vec<_> = identifiers
         .iter()
         .enumerate()
-        .filter(|(i, _)| i % 3 == 0)  // 33% are "public"
+        .filter(|(i, _)| i % 3 == 0) // 33% are "public"
         .map(|(_, s)| s.as_str())
         .collect();
 
@@ -291,27 +287,23 @@ fn bench_scalability(c: &mut Criterion) {
     let all_words = load_dictionary();
 
     let mut group = c.benchmark_group("scalability");
-    group.sample_size(20);  // Fewer samples for large benchmarks
+    group.sample_size(20); // Fewer samples for large benchmarks
 
     for size in [1000, 5000, 10000, 20000] {
         let words: Vec<_> = all_words.iter().take(size).map(|s| s.as_str()).collect();
         let dict = PathMapDictionary::from_iter(words);
 
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_with_input(
-            BenchmarkId::new("prefix_search", size),
-            &dict,
-            |b, d| {
-                b.iter(|| {
-                    let results: Vec<_> = Transducer::new(d.clone(), Algorithm::Standard)
-                        .query_ordered(black_box("test"), 1)
-                        .prefix()
-                        .take(10)
-                        .collect();
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("prefix_search", size), &dict, |b, d| {
+            b.iter(|| {
+                let results: Vec<_> = Transducer::new(d.clone(), Algorithm::Standard)
+                    .query_ordered(black_box("test"), 1)
+                    .prefix()
+                    .take(10)
+                    .collect();
+                black_box(results);
+            });
+        });
     }
 
     group.finish();
@@ -352,7 +344,7 @@ fn bench_iteration_limits(c: &mut Criterion) {
     group.bench_function("collect_all", |b| {
         b.iter(|| {
             let results: Vec<_> = Transducer::new(dict.clone(), Algorithm::Standard)
-                .query_ordered(black_box("xyz"), 1)  // Rare prefix
+                .query_ordered(black_box("xyz"), 1) // Rare prefix
                 .prefix()
                 .collect();
             black_box(results);

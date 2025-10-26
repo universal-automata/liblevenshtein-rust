@@ -90,12 +90,7 @@ impl<N: DictionaryNode> Intersection<N> {
 
     /// Create a child intersection with a parent path
     #[inline]
-    pub fn with_parent(
-        label: u8,
-        node: N,
-        state: State,
-        parent: Option<Box<PathNode>>,
-    ) -> Self {
+    pub fn with_parent(label: u8, node: N, state: State, parent: Option<Box<PathNode>>) -> Self {
         Self {
             label: Some(label),
             node,
@@ -126,7 +121,13 @@ impl<N: DictionaryNode> Intersection<N> {
     pub fn depth(&self) -> usize {
         match &self.parent {
             Some(parent) => 1 + parent.depth(),
-            None => if self.label.is_some() { 1 } else { 0 },
+            None => {
+                if self.label.is_some() {
+                    1
+                } else {
+                    0
+                }
+            }
         }
     }
 
@@ -185,7 +186,7 @@ mod tests {
             b't',
             t_node.clone(),
             State::new(),
-            None,  // Root parent
+            None, // Root parent
         );
 
         let e_node = t_node.transition(b'e').unwrap();
@@ -193,7 +194,7 @@ mod tests {
             b'e',
             e_node.clone(),
             State::new(),
-            Some(Box::new(PathNode::new(b't', None))),  // t -> root
+            Some(Box::new(PathNode::new(b't', None))), // t -> root
         );
 
         let s_node = e_node.transition(b's').unwrap();
@@ -201,7 +202,10 @@ mod tests {
             b's',
             s_node,
             State::new(),
-            Some(Box::new(PathNode::new(b'e', Some(Box::new(PathNode::new(b't', None)))))),  // e -> t -> root
+            Some(Box::new(PathNode::new(
+                b'e',
+                Some(Box::new(PathNode::new(b't', None))),
+            ))), // e -> t -> root
         );
 
         assert_eq!(i4.term(), "tes");

@@ -22,8 +22,8 @@
 //! let loaded_dict: PathMapDictionary = BincodeSerializer::deserialize(file)?;
 //! ```
 
-use std::io::{Read, Write};
 use crate::dictionary::{Dictionary, DictionaryNode};
+use std::io::{Read, Write};
 
 /// Trait for serializing and deserializing dictionaries.
 pub trait DictionarySerializer {
@@ -143,11 +143,7 @@ pub fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
     let mut terms = Vec::with_capacity(est_size);
     let mut current_term = Vec::with_capacity(32); // Most words < 32 bytes
 
-    fn dfs<N: DictionaryNode>(
-        node: &N,
-        current_term: &mut Vec<u8>,
-        terms: &mut Vec<String>
-    ) {
+    fn dfs<N: DictionaryNode>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
         if node.is_final() {
             // SAFETY: Dictionary implementations maintain the invariant that
             // all terms are valid UTF-8. We avoid the clone by using
@@ -314,7 +310,14 @@ impl ProtobufSerializer {
             }
         }
 
-        dfs(&root, 0, &mut next_id, &mut node_ids, &mut final_node_ids, &mut edges);
+        dfs(
+            &root,
+            0,
+            &mut next_id,
+            &mut node_ids,
+            &mut final_node_ids,
+            &mut edges,
+        );
 
         proto::Dictionary {
             node_id: node_ids,
@@ -337,8 +340,9 @@ impl DictionarySerializer for ProtobufSerializer {
 
         let proto_dict = Self::extract_graph(dict);
         let mut buf = Vec::new();
-        proto_dict.encode(&mut buf)
-            .map_err(|e| SerializationError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        proto_dict.encode(&mut buf).map_err(|e| {
+            SerializationError::Io(std::io::Error::new(std::io::ErrorKind::Other, e))
+        })?;
         writer.write_all(&buf)?;
         Ok(())
     }
@@ -363,13 +367,15 @@ impl DictionarySerializer for ProtobufSerializer {
         let est_nodes = proto_dict.node_id.len();
         let mut adjacency: HashMap<u64, Vec<(u8, u64)>> = HashMap::with_capacity(est_nodes);
         for edge in &proto_dict.edge {
-            adjacency.entry(edge.source_id)
-                .or_insert_with(Vec::new)
+            adjacency
+                .entry(edge.source_id)
+                .or_default()
                 .push((edge.label as u8, edge.target_id));
         }
 
         // Pre-allocate HashSet with known size
-        let mut final_set: std::collections::HashSet<u64> = std::collections::HashSet::with_capacity(proto_dict.final_node_id.len());
+        let mut final_set: std::collections::HashSet<u64> =
+            std::collections::HashSet::with_capacity(proto_dict.final_node_id.len());
         final_set.extend(proto_dict.final_node_id.iter().copied());
 
         // Extract all terms using DFS
@@ -401,7 +407,13 @@ impl DictionarySerializer for ProtobufSerializer {
             }
         }
 
-        dfs(proto_dict.root_id, &adjacency, &final_set, &mut current_term, &mut terms);
+        dfs(
+            proto_dict.root_id,
+            &adjacency,
+            &final_set,
+            &mut current_term,
+            &mut terms,
+        );
 
         Ok(D::from_terms(terms))
     }
@@ -519,8 +531,9 @@ impl DictionarySerializer for OptimizedProtobufSerializer {
 
         let proto_dict = Self::extract_graph_v2(dict);
         let mut buf = Vec::new();
-        proto_dict.encode(&mut buf)
-            .map_err(|e| SerializationError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        proto_dict.encode(&mut buf).map_err(|e| {
+            SerializationError::Io(std::io::Error::new(std::io::ErrorKind::Other, e))
+        })?;
         writer.write_all(&buf)?;
         Ok(())
     }
@@ -542,10 +555,10 @@ impl DictionarySerializer for OptimizedProtobufSerializer {
 
         // Validate edge_data length
         if proto_dict.edge_data.len() % 3 != 0 {
-            return Err(SerializationError::DictionaryError(
-                format!("Invalid edge_data length: {} (must be multiple of 3)",
-                        proto_dict.edge_data.len())
-            ));
+            return Err(SerializationError::DictionaryError(format!(
+                "Invalid edge_data length: {} (must be multiple of 3)",
+                proto_dict.edge_data.len()
+            )));
         }
 
         // Reconstruct final node IDs from deltas with pre-allocation
@@ -567,13 +580,15 @@ impl DictionarySerializer for OptimizedProtobufSerializer {
             let label = chunk[1] as u8;
             let target_id = chunk[2];
 
-            adjacency.entry(source_id)
-                .or_insert_with(Vec::new)
+            adjacency
+                .entry(source_id)
+                .or_default()
                 .push((label, target_id));
         }
 
         // Pre-allocate HashSet with known size
-        let mut final_set: std::collections::HashSet<u64> = std::collections::HashSet::with_capacity(final_node_ids.len());
+        let mut final_set: std::collections::HashSet<u64> =
+            std::collections::HashSet::with_capacity(final_node_ids.len());
         final_set.extend(final_node_ids.iter().copied());
 
         // Extract all terms using DFS with pre-allocation
@@ -605,7 +620,13 @@ impl DictionarySerializer for OptimizedProtobufSerializer {
             }
         }
 
-        dfs(proto_dict.root_id, &adjacency, &final_set, &mut current_term, &mut terms);
+        dfs(
+            proto_dict.root_id,
+            &adjacency,
+            &final_set,
+            &mut current_term,
+            &mut terms,
+        );
 
         Ok(D::from_terms(terms))
     }
@@ -651,8 +672,7 @@ impl<S: DictionarySerializer> DictionarySerializer for GzipSerializer<S> {
 
         let mut encoder = GzEncoder::new(writer, Compression::default());
         S::serialize(dict, &mut encoder)?;
-        encoder.finish()
-            .map_err(|e| SerializationError::Io(e))?;
+        encoder.finish().map_err(SerializationError::Io)?;
         Ok(())
     }
 
@@ -670,6 +690,7 @@ impl<S: DictionarySerializer> DictionarySerializer for GzipSerializer<S> {
 
 #[cfg(feature = "protobuf")]
 mod proto {
+    #![allow(dead_code)]
     include!(concat!(env!("OUT_DIR"), "/liblevenshtein.proto.rs"));
 }
 
@@ -696,8 +717,7 @@ mod tests {
         BincodeSerializer::serialize(&dict, &mut buffer).unwrap();
 
         // Deserialize
-        let loaded_dict: PathMapDictionary =
-            BincodeSerializer::deserialize(&buffer[..]).unwrap();
+        let loaded_dict: PathMapDictionary = BincodeSerializer::deserialize(&buffer[..]).unwrap();
 
         // Verify
         assert_eq!(loaded_dict.len(), Some(3));
@@ -721,8 +741,7 @@ mod tests {
         assert!(json_str.contains("baz"));
 
         // Deserialize
-        let loaded_dict: PathMapDictionary =
-            JsonSerializer::deserialize(&buffer[..]).unwrap();
+        let loaded_dict: PathMapDictionary = JsonSerializer::deserialize(&buffer[..]).unwrap();
 
         // Verify
         assert_eq!(loaded_dict.len(), Some(3));
@@ -738,8 +757,7 @@ mod tests {
         let mut buffer = Vec::new();
         BincodeSerializer::serialize(&dict, &mut buffer).unwrap();
 
-        let loaded_dict: PathMapDictionary =
-            BincodeSerializer::deserialize(&buffer[..]).unwrap();
+        let loaded_dict: PathMapDictionary = BincodeSerializer::deserialize(&buffer[..]).unwrap();
 
         assert_eq!(loaded_dict.len(), Some(0));
     }
@@ -747,9 +765,7 @@ mod tests {
     #[test]
     fn test_large_dictionary() {
         // Create dictionary with 1000 terms
-        let terms: Vec<String> = (0..1000)
-            .map(|i| format!("term{:04}", i))
-            .collect();
+        let terms: Vec<String> = (0..1000).map(|i| format!("term{:04}", i)).collect();
         let dict = PathMapDictionary::from_iter(terms.clone());
 
         // Serialize
@@ -757,8 +773,7 @@ mod tests {
         BincodeSerializer::serialize(&dict, &mut buffer).unwrap();
 
         // Deserialize
-        let loaded_dict: PathMapDictionary =
-            BincodeSerializer::deserialize(&buffer[..]).unwrap();
+        let loaded_dict: PathMapDictionary = BincodeSerializer::deserialize(&buffer[..]).unwrap();
 
         // Verify all terms present
         assert_eq!(loaded_dict.len(), Some(1000));
@@ -779,8 +794,7 @@ mod tests {
         ProtobufSerializer::serialize(&dict, &mut buffer).unwrap();
 
         // Deserialize
-        let loaded_dict: PathMapDictionary =
-            ProtobufSerializer::deserialize(&buffer[..]).unwrap();
+        let loaded_dict: PathMapDictionary = ProtobufSerializer::deserialize(&buffer[..]).unwrap();
 
         // Verify
         assert_eq!(loaded_dict.len(), Some(3));
@@ -794,8 +808,15 @@ mod tests {
     fn test_protobuf_vs_bincode_size() {
         use super::ProtobufSerializer;
 
-        let terms = vec!["apple", "application", "apply", "apricot",
-                        "banana", "band", "bandana"];
+        let terms = vec![
+            "apple",
+            "application",
+            "apply",
+            "apricot",
+            "banana",
+            "band",
+            "bandana",
+        ];
         let dict = PathMapDictionary::from_iter(terms);
 
         // Serialize with both formats
@@ -843,10 +864,19 @@ mod tests {
     #[cfg(feature = "protobuf")]
     #[test]
     fn test_optimized_vs_standard_protobuf() {
-        use super::{ProtobufSerializer, OptimizedProtobufSerializer};
+        use super::{OptimizedProtobufSerializer, ProtobufSerializer};
 
-        let terms = vec!["apple", "application", "apply", "apricot",
-                        "banana", "band", "bandana", "cherry", "chocolate"];
+        let terms = vec![
+            "apple",
+            "application",
+            "apply",
+            "apricot",
+            "banana",
+            "band",
+            "bandana",
+            "cherry",
+            "chocolate",
+        ];
         let dict = PathMapDictionary::from_iter(terms);
 
         // Serialize with both protobuf formats
@@ -862,11 +892,13 @@ mod tests {
         println!("Space savings: {:.1}%", savings);
 
         // V2 should be significantly smaller
-        assert!(v2_buf.len() < v1_buf.len(), "Optimized format should be smaller");
+        assert!(
+            v2_buf.len() < v1_buf.len(),
+            "Optimized format should be smaller"
+        );
 
         // Both should deserialize to same dictionary
-        let loaded_v1: PathMapDictionary =
-            ProtobufSerializer::deserialize(&v1_buf[..]).unwrap();
+        let loaded_v1: PathMapDictionary = ProtobufSerializer::deserialize(&v1_buf[..]).unwrap();
         let loaded_v2: PathMapDictionary =
             OptimizedProtobufSerializer::deserialize(&v2_buf[..]).unwrap();
 
@@ -879,9 +911,7 @@ mod tests {
         use super::OptimizedProtobufSerializer;
 
         // Create dict with sequential final nodes (good for delta encoding)
-        let dict = PathMapDictionary::from_iter(vec![
-            "a", "ab", "abc", "abcd", "abcde",
-        ]);
+        let dict = PathMapDictionary::from_iter(vec!["a", "ab", "abc", "abcd", "abcde"]);
 
         let mut buffer = Vec::new();
         OptimizedProtobufSerializer::serialize(&dict, &mut buffer).unwrap();
@@ -900,11 +930,9 @@ mod tests {
     #[cfg(feature = "protobuf")]
     #[test]
     fn test_all_formats_comparison() {
-        use super::{ProtobufSerializer, OptimizedProtobufSerializer};
+        use super::{OptimizedProtobufSerializer, ProtobufSerializer};
 
-        let terms: Vec<String> = (0..100)
-            .map(|i| format!("term{:03}", i))
-            .collect();
+        let terms: Vec<String> = (0..100).map(|i| format!("term{:03}", i)).collect();
         let dict = PathMapDictionary::from_iter(terms);
 
         // Serialize with all formats
@@ -926,15 +954,14 @@ mod tests {
         println!("Protobuf V1:       {} bytes", proto_v1_buf.len());
         println!("Protobuf V2 (opt): {} bytes", proto_v2_buf.len());
 
-        let v2_vs_v1_savings = ((proto_v1_buf.len() - proto_v2_buf.len()) as f64
-                               / proto_v1_buf.len() as f64) * 100.0;
+        let v2_vs_v1_savings =
+            ((proto_v1_buf.len() - proto_v2_buf.len()) as f64 / proto_v1_buf.len() as f64) * 100.0;
         println!("\nV2 vs V1 savings: {:.1}%", v2_vs_v1_savings);
 
         // All should deserialize correctly
         let loaded_bincode: PathMapDictionary =
             BincodeSerializer::deserialize(&bincode_buf[..]).unwrap();
-        let loaded_json: PathMapDictionary =
-            JsonSerializer::deserialize(&json_buf[..]).unwrap();
+        let loaded_json: PathMapDictionary = JsonSerializer::deserialize(&json_buf[..]).unwrap();
         let loaded_proto_v1: PathMapDictionary =
             ProtobufSerializer::deserialize(&proto_v1_buf[..]).unwrap();
         let loaded_proto_v2: PathMapDictionary =
@@ -973,9 +1000,7 @@ mod tests {
     fn test_gzip_compression_ratio() {
         use super::GzipSerializer;
 
-        let terms: Vec<String> = (0..100)
-            .map(|i| format!("term{:03}", i))
-            .collect();
+        let terms: Vec<String> = (0..100).map(|i| format!("term{:03}", i)).collect();
         let dict = PathMapDictionary::from_iter(terms);
 
         // Serialize without compression
@@ -989,13 +1014,17 @@ mod tests {
         println!("\n=== Compression Test ===");
         println!("Uncompressed: {} bytes", uncompressed.len());
         println!("Compressed:   {} bytes", compressed.len());
-        let ratio = (uncompressed.len() - compressed.len()) as f64 / uncompressed.len() as f64 * 100.0;
+        let ratio =
+            (uncompressed.len() - compressed.len()) as f64 / uncompressed.len() as f64 * 100.0;
         println!("Savings:      {:.1}%", ratio);
 
         // Compressed should be smaller
-        assert!(compressed.len() < uncompressed.len(),
+        assert!(
+            compressed.len() < uncompressed.len(),
             "Compressed ({} bytes) should be smaller than uncompressed ({} bytes)",
-            compressed.len(), uncompressed.len());
+            compressed.len(),
+            uncompressed.len()
+        );
 
         // Both should deserialize to same dictionary
         let loaded_uncompressed: PathMapDictionary =
@@ -1009,11 +1038,9 @@ mod tests {
     #[cfg(all(feature = "compression", feature = "protobuf"))]
     #[test]
     fn test_gzip_with_all_formats() {
-        use super::{GzipSerializer, ProtobufSerializer, OptimizedProtobufSerializer};
+        use super::{GzipSerializer, OptimizedProtobufSerializer, ProtobufSerializer};
 
-        let terms: Vec<String> = (0..50)
-            .map(|i| format!("word{:02}", i))
-            .collect();
+        let terms: Vec<String> = (0..50).map(|i| format!("word{:02}", i)).collect();
         let dict = PathMapDictionary::from_iter(terms);
 
         // Test gzip with bincode

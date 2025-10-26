@@ -63,7 +63,7 @@ impl State {
     /// Merge another state into this one
     pub fn merge(&mut self, other: &State) {
         for position in &other.positions {
-            self.insert(position.clone());
+            self.insert(*position);
         }
     }
 
@@ -261,7 +261,11 @@ mod tests {
         assert_eq!(state.len(), 2, "Should have replaced (5,2) with (5,1)");
 
         // Verify (5,1) is in the state
-        let pos_at_5 = state.positions().iter().find(|p| p.term_index == 5).unwrap();
+        let pos_at_5 = state
+            .positions()
+            .iter()
+            .find(|p| p.term_index == 5)
+            .unwrap();
         assert_eq!(pos_at_5.num_errors, 1);
     }
 

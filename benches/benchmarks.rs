@@ -1,6 +1,6 @@
 //! Comprehensive benchmarks for liblevenshtein profiling and performance analysis.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use liblevenshtein::prelude::*;
 
 /// Create a dictionary of the specified size with varied word lengths
@@ -26,7 +26,9 @@ fn bench_query_varying_dict_size(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let results: Vec<_> = transducer.query(black_box("word500"), black_box(2)).collect();
+                let results: Vec<_> = transducer
+                    .query(black_box("word500"), black_box(2))
+                    .collect();
                 black_box(results);
             });
         });
@@ -43,7 +45,9 @@ fn bench_query_varying_distance(c: &mut Criterion) {
     for distance in [0, 1, 2, 3, 4].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(distance), distance, |b, &d| {
             b.iter(|| {
-                let results: Vec<_> = transducer.query(black_box("word500"), black_box(d)).collect();
+                let results: Vec<_> = transducer
+                    .query(black_box("word500"), black_box(d))
+                    .collect();
                 black_box(results);
             });
         });
@@ -54,8 +58,18 @@ fn bench_query_varying_distance(c: &mut Criterion) {
 /// Benchmark: Query performance with different query lengths
 fn bench_query_varying_query_length(c: &mut Criterion) {
     let dict = PathMapDictionary::from_iter(vec![
-        "a", "ab", "abc", "abcd", "abcde", "abcdef", "abcdefg", "abcdefgh",
-        "test", "testing", "extraordinary", "incomprehensibilities",
+        "a",
+        "ab",
+        "abc",
+        "abcd",
+        "abcde",
+        "abcdef",
+        "abcdefg",
+        "abcdefgh",
+        "test",
+        "testing",
+        "extraordinary",
+        "incomprehensibilities",
     ]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("query_varying_query_length");
@@ -97,8 +111,8 @@ fn bench_query_many_results(c: &mut Criterion) {
 /// Benchmark: Worst-case queries (maximum state expansion)
 fn bench_query_worst_case(c: &mut Criterion) {
     let dict = PathMapDictionary::from_iter(vec![
-        "aaaa", "aaab", "aaba", "aabb", "abaa", "abab", "abba", "abbb",
-        "baaa", "baab", "baba", "babb", "bbaa", "bbab", "bbba", "bbbb",
+        "aaaa", "aaab", "aaba", "aabb", "abaa", "abab", "abba", "abbb", "baaa", "baab", "baba",
+        "babb", "bbaa", "bbab", "bbba", "bbbb",
     ]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
@@ -116,14 +130,26 @@ fn bench_algorithms(c: &mut Criterion) {
     let dict = create_dictionary(500);
     let mut group = c.benchmark_group("algorithms");
 
-    for algo in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit].iter() {
+    for algo in [
+        Algorithm::Standard,
+        Algorithm::Transposition,
+        Algorithm::MergeAndSplit,
+    ]
+    .iter()
+    {
         let transducer = Transducer::new(dict.clone(), *algo);
-        group.bench_with_input(BenchmarkId::new("algorithm", format!("{:?}", algo)), algo, |b, _| {
-            b.iter(|| {
-                let results: Vec<_> = transducer.query(black_box("word250"), black_box(2)).collect();
-                black_box(results);
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("algorithm", format!("{:?}", algo)),
+            algo,
+            |b, _| {
+                b.iter(|| {
+                    let results: Vec<_> = transducer
+                        .query(black_box("word250"), black_box(2))
+                        .collect();
+                    black_box(results);
+                });
+            },
+        );
     }
     group.finish();
 }
@@ -152,9 +178,7 @@ fn bench_dictionary_operations(c: &mut Criterion) {
 
     group.bench_function("contains", |b| {
         let dict = create_dictionary(1000);
-        b.iter(|| {
-            dict.contains(black_box("word500"))
-        });
+        b.iter(|| dict.contains(black_box("word500")));
     });
 
     group.finish();
@@ -178,10 +202,7 @@ fn bench_distance_computation(c: &mut Criterion) {
             &(s1, s2),
             |bencher, &(a, b)| {
                 bencher.iter(|| {
-                    liblevenshtein::distance::standard_distance(
-                        black_box(a),
-                        black_box(b),
-                    )
+                    liblevenshtein::distance::standard_distance(black_box(a), black_box(b))
                 });
             },
         );
@@ -191,10 +212,7 @@ fn bench_distance_computation(c: &mut Criterion) {
             &(s1, s2),
             |bencher, &(a, b)| {
                 bencher.iter(|| {
-                    liblevenshtein::distance::transposition_distance(
-                        black_box(a),
-                        black_box(b),
-                    )
+                    liblevenshtein::distance::transposition_distance(black_box(a), black_box(b))
                 });
             },
         );
@@ -206,7 +224,12 @@ fn bench_distance_computation(c: &mut Criterion) {
 /// Benchmark: Insertion/deletion heavy queries
 fn bench_insertion_deletion_queries(c: &mut Criterion) {
     let dict = PathMapDictionary::from_iter(vec![
-        "apple", "application", "apply", "test", "testing", "tested",
+        "apple",
+        "application",
+        "apply",
+        "test",
+        "testing",
+        "tested",
     ]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("insertion_deletion");
@@ -222,7 +245,9 @@ fn bench_insertion_deletion_queries(c: &mut Criterion) {
     // Query with extra characters (requires deletions)
     group.bench_function("deletions", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer.query(black_box("appple"), black_box(1)).collect();
+            let results: Vec<_> = transducer
+                .query(black_box("appple"), black_box(1))
+                .collect();
             black_box(results);
         });
     });
@@ -230,7 +255,9 @@ fn bench_insertion_deletion_queries(c: &mut Criterion) {
     // Mixed operations
     group.bench_function("mixed", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer.query(black_box("aplication"), black_box(2)).collect();
+            let results: Vec<_> = transducer
+                .query(black_box("aplication"), black_box(2))
+                .collect();
             black_box(results);
         });
     });

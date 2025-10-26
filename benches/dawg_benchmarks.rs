@@ -9,9 +9,15 @@ fn generate_terms(size: usize) -> Vec<String> {
     let mut terms = Vec::with_capacity(size);
 
     // Common English prefixes and suffixes for realistic dictionary
-    let prefixes = ["pre", "un", "re", "in", "dis", "en", "non", "over", "mis", "sub"];
-    let roots = ["test", "code", "data", "work", "play", "read", "write", "run", "walk", "talk"];
-    let suffixes = ["ing", "ed", "er", "est", "ly", "ness", "ment", "tion", "able", "ful"];
+    let prefixes = [
+        "pre", "un", "re", "in", "dis", "en", "non", "over", "mis", "sub",
+    ];
+    let roots = [
+        "test", "code", "data", "work", "play", "read", "write", "run", "walk", "talk",
+    ];
+    let suffixes = [
+        "ing", "ed", "er", "est", "ly", "ness", "ment", "tion", "able", "ful",
+    ];
 
     // Generate realistic word combinations
     for i in 0..size {

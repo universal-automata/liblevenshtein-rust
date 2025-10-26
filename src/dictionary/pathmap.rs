@@ -3,11 +3,11 @@
 use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 #[cfg(feature = "serialization")]
 use crate::serialization::DictionaryFromTerms;
-use pathmap::PathMap;
-use pathmap::zipper::{ZipperMoving, Zipper};
 use pathmap::utils::BitMask;
-use std::sync::{Arc, RwLock};
+use pathmap::zipper::{Zipper, ZipperMoving};
+use pathmap::PathMap;
 use smallvec::SmallVec;
+use std::sync::{Arc, RwLock};
 
 /// PathMap-backed dictionary for approximate string matching.
 ///
@@ -231,7 +231,7 @@ impl Dictionary for PathMapDictionary {
 #[derive(Clone)]
 pub struct PathMapNode {
     map: Arc<RwLock<PathMap<()>>>,
-    path: Arc<Vec<u8>>,  // Arc for path sharing
+    path: Arc<Vec<u8>>, // Arc for path sharing
 }
 
 impl PathMapNode {
@@ -246,7 +246,7 @@ impl PathMapNode {
         let zipper = if self.path.is_empty() {
             map.read_zipper()
         } else {
-            map.read_zipper_at_path(&**self.path)  // Deref Arc to get &Vec<u8>
+            map.read_zipper_at_path(&**self.path) // Deref Arc to get &Vec<u8>
         };
         f(zipper)
     }
@@ -260,7 +260,7 @@ impl DictionaryNode for PathMapNode {
     fn transition(&self, label: u8) -> Option<Self> {
         // Check if this path exists first
         let exists = self.with_zipper(|mut z| {
-            z.descend_to(&[label]);
+            z.descend_to([label]);
             z.path_exists()
         });
 
@@ -287,9 +287,7 @@ impl DictionaryNode for PathMapNode {
         // This is cheap - just bit tests, no allocations
         let edge_bytes: SmallVec<[u8; 8]> = self.with_zipper(|zipper| {
             let mask = zipper.child_mask();
-            (0..=255u8)
-                .filter(|byte| mask.test_bit(*byte))
-                .collect()
+            (0..=255u8).filter(|byte| mask.test_bit(*byte)).collect()
         });
 
         // Step 2: Return lazy iterator that creates nodes on-demand
@@ -304,9 +302,9 @@ impl DictionaryNode for PathMapNode {
             let mut check_zipper = if base_path.is_empty() {
                 map_guard.read_zipper()
             } else {
-                map_guard.read_zipper_at_path(&**base_path)  // Deref Arc to get &Vec<u8>
+                map_guard.read_zipper_at_path(&**base_path) // Deref Arc to get &Vec<u8>
             };
-            check_zipper.descend_to(&[byte]);
+            check_zipper.descend_to([byte]);
 
             if check_zipper.path_exists() {
                 drop(map_guard); // Release lock before creating node
@@ -316,10 +314,13 @@ impl DictionaryNode for PathMapNode {
                 new_path.extend_from_slice(&base_path);
                 new_path.push(byte);
 
-                Some((byte, PathMapNode {
-                    map: Arc::clone(&map),
-                    path: Arc::new(new_path),
-                }))
+                Some((
+                    byte,
+                    PathMapNode {
+                        map: Arc::clone(&map),
+                        path: Arc::new(new_path),
+                    },
+                ))
             } else {
                 None
             }

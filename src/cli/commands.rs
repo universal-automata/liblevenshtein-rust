@@ -1,19 +1,19 @@
 //! CLI command implementations
 
-use std::path::{Path, PathBuf};
-use std::io::BufRead;
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use colored::Colorize;
+use std::io::BufRead;
+use std::path::{Path, PathBuf};
 
-use crate::dictionary::{Dictionary, DictionaryNode};
-use crate::dictionary::pathmap::PathMapDictionary;
 use crate::dictionary::dawg::DawgDictionary;
 use crate::dictionary::dynamic_dawg::DynamicDawg;
-use crate::transducer::{Transducer, Algorithm};
-use crate::repl::state::{DictionaryBackend, DictContainer};
+use crate::dictionary::pathmap::PathMapDictionary;
+use crate::dictionary::{Dictionary, DictionaryNode};
+use crate::repl::state::{DictContainer, DictionaryBackend};
+use crate::transducer::{Algorithm, Transducer};
 
 #[cfg(feature = "serialization")]
-use crate::serialization::{DictionarySerializer, BincodeSerializer, JsonSerializer};
+use crate::serialization::{BincodeSerializer, DictionarySerializer, JsonSerializer};
 
 use super::args::{Commands, SerializationFormat};
 use super::detect::{detect_format, DictFormat};
@@ -36,19 +36,17 @@ pub fn execute(command: Commands) -> Result<()> {
             prefix,
             show_distances,
             limit,
-        } => {
-            cmd_query(
-                &term,
-                dict,
-                backend,
-                format,
-                max_distance,
-                algorithm,
-                prefix,
-                show_distances,
-                limit,
-            )
-        }
+        } => cmd_query(
+            &term,
+            dict,
+            backend,
+            format,
+            max_distance,
+            algorithm,
+            prefix,
+            show_distances,
+            limit,
+        ),
         Commands::Info { dict } => cmd_info(dict),
         Commands::Convert {
             input,
@@ -57,7 +55,14 @@ pub fn execute(command: Commands) -> Result<()> {
             to_backend,
             from_format,
             to_format,
-        } => cmd_convert(&input, &output, from_backend, to_backend, from_format, to_format),
+        } => cmd_convert(
+            &input,
+            &output,
+            from_backend,
+            to_backend,
+            from_format,
+            to_format,
+        ),
         Commands::Insert {
             terms,
             dict,
@@ -87,11 +92,15 @@ pub fn execute(command: Commands) -> Result<()> {
             set_algorithm,
             set_max_distance,
             reset,
-        } => cmd_settings(set_dict, set_backend, set_format, set_algorithm, set_max_distance, reset),
-        Commands::Config {
-            switch,
-            show,
-        } => cmd_config(switch, show),
+        } => cmd_settings(
+            set_dict,
+            set_backend,
+            set_format,
+            set_algorithm,
+            set_max_distance,
+            reset,
+        ),
+        Commands::Config { switch, show } => cmd_config(switch, show),
     }
 }
 
@@ -179,11 +188,13 @@ fn cmd_info(dict_path: Option<PathBuf>) -> Result<()> {
 
     // Detect format
     let detection = detect_format(&path, None, None)?;
-    println!("  Backend: {} (detected via {})",
+    println!(
+        "  Backend: {} (detected via {})",
         detection.format.backend.to_string().green(),
         detection.method.to_string().yellow()
     );
-    println!("  Format:  {} (detected via {})",
+    println!(
+        "  Format:  {} (detected via {})",
         detection.format.format.to_string().green(),
         detection.method.to_string().yellow()
     );
@@ -224,7 +235,8 @@ fn cmd_convert(
 ) -> Result<()> {
     // Detect input format
     let detection = detect_format(input, from_backend, from_format)?;
-    println!("{}  Input:  {} ({}, detected via {})",
+    println!(
+        "{}  Input:  {} ({}, detected via {})",
         "→".cyan(),
         input.display().to_string().yellow(),
         detection.format.backend.to_string().green(),
@@ -237,7 +249,8 @@ fn cmd_convert(
 
     // Convert backend if needed
     let output_container = if detection.format.backend != to_backend {
-        println!("  Converting from {} to {}...",
+        println!(
+            "  Converting from {} to {}...",
             detection.format.backend.to_string().yellow(),
             to_backend.to_string().green()
         );
@@ -247,7 +260,8 @@ fn cmd_convert(
     };
 
     // Save to output
-    println!("{}  Output: {} ({})",
+    println!(
+        "{}  Output: {} ({})",
         "→".cyan(),
         output.display().to_string().yellow(),
         to_backend.to_string().green()
@@ -273,7 +287,10 @@ fn cmd_insert(
     let mut container = if path.exists() {
         load_dictionary(&path, dict_format)?
     } else {
-        println!("  Creating new dictionary at {}", path.display().to_string().cyan());
+        println!(
+            "  Creating new dictionary at {}",
+            path.display().to_string().cyan()
+        );
         create_empty_dict(dict_format.backend)
     };
 
@@ -344,7 +361,10 @@ fn cmd_minimize(
     // Load dictionary
     let mut container = load_dictionary(&path, dict_format)?;
 
-    println!("  Minimizing dictionary at {}...", path.display().to_string().cyan());
+    println!(
+        "  Minimizing dictionary at {}...",
+        path.display().to_string().cyan()
+    );
 
     // Try to compact/minimize
     match container.compact() {
@@ -355,18 +375,16 @@ fn cmd_minimize(
             println!("  {}", "Dictionary minimized successfully".green().bold());
 
             // Show stats if available
-            match &container {
-                DictContainer::DynamicDawg(d) => {
-                    let nodes = d.node_count();
-                    let terms = container.len();
-                    let ratio = nodes as f64 / terms as f64;
-                    println!("  Terms: {}, Nodes: {}, Ratio: {:.2}x",
-                        terms.to_string().cyan(),
-                        nodes.to_string().cyan(),
-                        ratio
-                    );
-                }
-                _ => {}
+            if let DictContainer::DynamicDawg(d) = &container {
+                let nodes = d.node_count();
+                let terms = container.len();
+                let ratio = nodes as f64 / terms as f64;
+                println!(
+                    "  Terms: {}, Nodes: {}, Ratio: {:.2}x",
+                    terms.to_string().cyan(),
+                    nodes.to_string().cyan(),
+                    ratio
+                );
             }
         }
         Err(e) => {
@@ -409,7 +427,8 @@ fn cmd_clear(
     }
 
     // Confirm
-    print!("  {} {} ",
+    print!(
+        "  {} {} ",
         format!("Clear {} term(s) from {}?", original_count, path.display()).yellow(),
         "(y/N):".yellow().bold()
     );
@@ -451,8 +470,12 @@ fn resolve_dict_path_and_format(
         p
     } else {
         // Use default path
-        let backend = backend.or(config.backend).unwrap_or(DictionaryBackend::PathMap);
-        let format = format.or(config.format).unwrap_or(SerializationFormat::Text);
+        let backend = backend
+            .or(config.backend)
+            .unwrap_or(DictionaryBackend::PathMap);
+        let format = format
+            .or(config.format)
+            .unwrap_or(SerializationFormat::Text);
         default_dict_path(backend, format)?
     };
 
@@ -501,14 +524,15 @@ fn load_text_dict(path: &Path, backend: DictionaryBackend) -> Result<DictContain
     let terms: Vec<String> = reader
         .lines()
         .filter_map(|line| {
-            line.ok().map(|l| {
-                let trimmed = l.trim();
-                if trimmed.is_empty() || trimmed.starts_with('#') {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                }
-            }).flatten()
+            line.ok()
+                .and_then(|l| {
+                    let trimmed = l.trim();
+                    if trimmed.is_empty() || trimmed.starts_with('#') {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                })
         })
         .collect();
 
@@ -636,9 +660,9 @@ where
 /// Create dictionary from terms
 fn create_dict_from_terms(terms: Vec<String>, backend: DictionaryBackend) -> Result<DictContainer> {
     let container = match backend {
-        DictionaryBackend::PathMap => {
-            DictContainer::PathMap(PathMapDictionary::from_iter(terms.iter().map(|s| s.as_str())))
-        }
+        DictionaryBackend::PathMap => DictContainer::PathMap(PathMapDictionary::from_iter(
+            terms.iter().map(|s| s.as_str()),
+        )),
         DictionaryBackend::Dawg => {
             DictContainer::Dawg(DawgDictionary::from_iter(terms.iter().map(|s| s.as_str())))
         }
@@ -658,13 +682,19 @@ fn create_dict_from_terms(terms: Vec<String>, backend: DictionaryBackend) -> Res
 fn create_empty_dict(backend: DictionaryBackend) -> DictContainer {
     match backend {
         DictionaryBackend::PathMap => DictContainer::PathMap(PathMapDictionary::new()),
-        DictionaryBackend::Dawg => DictContainer::Dawg(DawgDictionary::from_iter(Vec::<&str>::new())),
+        DictionaryBackend::Dawg => {
+            DictContainer::Dawg(DawgDictionary::from_iter(Vec::<&str>::new()))
+        }
         DictionaryBackend::DynamicDawg => DictContainer::DynamicDawg(DynamicDawg::new()),
     }
 }
 
 /// Save dictionary to file
-pub fn save_dictionary(container: &DictContainer, path: &Path, format: SerializationFormat) -> Result<()> {
+pub fn save_dictionary(
+    container: &DictContainer,
+    path: &Path,
+    format: SerializationFormat,
+) -> Result<()> {
     match format {
         SerializationFormat::Text => save_text_dict(container, path),
         #[cfg(feature = "serialization")]
@@ -795,7 +825,10 @@ fn cmd_settings(
 
     if let Some(dict) = set_dict {
         config.dict_path = Some(dict.clone());
-        println!("  Set default dictionary path: {}", dict.display().to_string().cyan());
+        println!(
+            "  Set default dictionary path: {}",
+            dict.display().to_string().cyan()
+        );
         changed = true;
     }
 
@@ -808,16 +841,25 @@ fn cmd_settings(
     if let Some(format) = set_format {
         // If we have a dict_path, validate it matches the new format
         if let Some(ref dict_path) = config.dict_path {
-            use super::paths::{validate_dict_path, change_extension, file_extension};
+            use super::paths::{change_extension, file_extension, validate_dict_path};
 
             if let Err(_) = validate_dict_path(dict_path, format) {
                 let new_path = change_extension(dict_path, format);
                 let expected_ext = file_extension(format);
 
-                eprintln!("  {}: Dictionary path extension doesn't match new format", "Warning".yellow().bold());
-                eprintln!("    Current path: {}", dict_path.display().to_string().yellow());
+                eprintln!(
+                    "  {}: Dictionary path extension doesn't match new format",
+                    "Warning".yellow().bold()
+                );
+                eprintln!(
+                    "    Current path: {}",
+                    dict_path.display().to_string().yellow()
+                );
                 eprintln!("    Expected extension: .{}", expected_ext);
-                eprintln!("    Suggested path: {}", new_path.display().to_string().cyan());
+                eprintln!(
+                    "    Suggested path: {}",
+                    new_path.display().to_string().cyan()
+                );
                 return Err(anyhow::anyhow!(
                     "Dictionary path must have .{} extension for {} format. Use --set-dict to update the path.",
                     expected_ext,
@@ -839,7 +881,10 @@ fn cmd_settings(
 
     if let Some(distance) = set_max_distance {
         config.max_distance = Some(distance);
-        println!("  Set default max distance: {}", distance.to_string().green());
+        println!(
+            "  Set default max distance: {}",
+            distance.to_string().green()
+        );
         changed = true;
     }
 
@@ -856,10 +901,7 @@ fn cmd_settings(
 }
 
 /// Config file management command
-fn cmd_config(
-    switch: Option<PathBuf>,
-    show: bool,
-) -> Result<()> {
+fn cmd_config(switch: Option<PathBuf>, show: bool) -> Result<()> {
     use super::paths::AppConfig;
 
     if let Some(new_path) = switch {
@@ -875,7 +917,10 @@ fn cmd_config(
         if !new_path.exists() {
             let current_config = PersistentConfig::load()?;
             current_config.copy_to(&new_path)?;
-            println!("  Copied current configuration to {}", new_path.display().to_string().cyan());
+            println!(
+                "  Copied current configuration to {}",
+                new_path.display().to_string().cyan()
+            );
         }
 
         app_config.switch_user_config(new_path.clone())?;
@@ -892,8 +937,17 @@ fn cmd_config(
         let app_config = AppConfig::load()?;
         println!("{}", "Config File Location:".bold().underline());
         println!();
-        println!("  App Config:  {}", super::paths::app_config_path()?.display().to_string().cyan());
-        println!("  User Config: {}", app_config.user_config_path.display().to_string().cyan());
+        println!(
+            "  App Config:  {}",
+            super::paths::app_config_path()?
+                .display()
+                .to_string()
+                .cyan()
+        );
+        println!(
+            "  User Config: {}",
+            app_config.user_config_path.display().to_string().cyan()
+        );
     } else {
         // No arguments - show help
         println!("{}", "Config File Management".bold().underline());
@@ -920,9 +974,13 @@ fn print_config(config: &PersistentConfig) {
             fmt
         } else {
             #[cfg(feature = "protobuf")]
-            { SerializationFormat::Protobuf }
+            {
+                SerializationFormat::Protobuf
+            }
             #[cfg(not(feature = "protobuf"))]
-            { SerializationFormat::Bincode }
+            {
+                SerializationFormat::Bincode
+            }
         };
 
         super::paths::default_dict_path(default_backend, default_format)
@@ -936,22 +994,46 @@ fn print_config(config: &PersistentConfig) {
     println!("  Backend:         {}", backend.to_string().yellow());
 
     // Serialization
-    let format = config.format.unwrap_or_else(|| {
+    let format = config.format.unwrap_or({
         #[cfg(feature = "protobuf")]
-        { SerializationFormat::Protobuf }
+        {
+            SerializationFormat::Protobuf
+        }
         #[cfg(not(feature = "protobuf"))]
-        { SerializationFormat::Bincode }
+        {
+            SerializationFormat::Bincode
+        }
     });
     println!("  Serialization:   {}", format.to_string().yellow());
 
-    println!("  Algorithm:       {}",
-        config.algorithm.unwrap_or(Algorithm::Standard).to_string().yellow());
-    println!("  Max Distance:    {}",
-        config.max_distance.unwrap_or(2).to_string().yellow());
-    println!("  Prefix Mode:     {}",
-        if config.prefix_mode.unwrap_or(false) { "enabled".green() } else { "disabled".red() });
-    println!("  Show Distances:  {}",
-        if config.show_distances.unwrap_or(false) { "enabled".green() } else { "disabled".red() });
+    println!(
+        "  Algorithm:       {}",
+        config
+            .algorithm
+            .unwrap_or(Algorithm::Standard)
+            .to_string()
+            .yellow()
+    );
+    println!(
+        "  Max Distance:    {}",
+        config.max_distance.unwrap_or(2).to_string().yellow()
+    );
+    println!(
+        "  Prefix Mode:     {}",
+        if config.prefix_mode.unwrap_or(false) {
+            "enabled".green()
+        } else {
+            "disabled".red()
+        }
+    );
+    println!(
+        "  Show Distances:  {}",
+        if config.show_distances.unwrap_or(false) {
+            "enabled".green()
+        } else {
+            "disabled".red()
+        }
+    );
 
     if let Some(Some(limit)) = config.result_limit {
         println!("  Result Limit:    {}", limit.to_string().yellow());
@@ -959,11 +1041,22 @@ fn print_config(config: &PersistentConfig) {
         println!("  Result Limit:    {}", "none".yellow());
     }
 
-    println!("  Auto-sync:       {}",
-        if config.auto_sync.unwrap_or(false) { "enabled".green() } else { "disabled".red() });
+    println!(
+        "  Auto-sync:       {}",
+        if config.auto_sync.unwrap_or(false) {
+            "enabled".green()
+        } else {
+            "disabled".red()
+        }
+    );
 
     println!();
-    println!("  Config file: {}", 
-        super::paths::config_file_path().unwrap().display().to_string().cyan());
+    println!(
+        "  Config file: {}",
+        super::paths::config_file_path()
+            .unwrap()
+            .display()
+            .to_string()
+            .cyan()
+    );
 }
-

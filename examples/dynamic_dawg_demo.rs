@@ -77,7 +77,10 @@ fn main() {
     let static_dawg = DawgDictionary::from_iter(terms.clone());
     println!("   Static DAWG:");
     println!("     Terms: {}", static_dawg.term_count());
-    println!("     Nodes: {} (perfectly minimal)", static_dawg.node_count());
+    println!(
+        "     Nodes: {} (perfectly minimal)",
+        static_dawg.node_count()
+    );
 
     // Dynamic DAWG (after compaction)
     println!("\n   Dynamic DAWG (after compaction):");

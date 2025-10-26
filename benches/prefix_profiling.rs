@@ -22,7 +22,9 @@ fn main() {
     let dict = PathMapDictionary::from_iter(words.iter().map(|s| s.as_str()));
 
     // Simulate realistic workload: many queries with prefix matching and filtering
-    let queries = vec!["test", "get", "set", "value", "user", "data", "calc", "find"];
+    let queries = vec![
+        "test", "get", "set", "value", "user", "data", "calc", "find",
+    ];
 
     // Warm-up
     for _ in 0..10 {
@@ -62,5 +64,8 @@ fn main() {
         }
     }
 
-    println!("Profiling complete: processed {} iterations", 1000 * queries.len() * 3);
+    println!(
+        "Profiling complete: processed {} iterations",
+        1000 * queries.len() * 3
+    );
 }

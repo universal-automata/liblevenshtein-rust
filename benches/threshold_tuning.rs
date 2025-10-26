@@ -3,11 +3,7 @@ use liblevenshtein::prelude::*;
 
 /// Parameterized DAWG for testing different thresholds
 /// We'll manually implement the search with different thresholds
-fn search_with_threshold(
-    nodes: &[DawgNode],
-    term: &str,
-    threshold: usize,
-) -> bool {
+fn search_with_threshold(nodes: &[DawgNode], term: &str, threshold: usize) -> bool {
     let mut node_idx = 0;
 
     for &byte in term.as_bytes() {

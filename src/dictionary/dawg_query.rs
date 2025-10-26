@@ -4,9 +4,9 @@
 //! that works directly with node indices instead of DawgDictionaryNode,
 //! eliminating Arc::clone operations during traversal.
 
-use crate::transducer::{Algorithm, PathNode, State, StatePool};
-use crate::transducer::transition::{initial_state, transition_state_pooled};
 use super::dawg::DawgNode;
+use crate::transducer::transition::{initial_state, transition_state_pooled};
+use crate::transducer::{Algorithm, PathNode, State, StatePool};
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -176,7 +176,7 @@ impl DawgQueryIterator {
     }
 
     /// Queue child intersections for exploration
-    fn queue_children(&mut self, intersection: &Box<DawgIntersection>) {
+    fn queue_children(&mut self, intersection: &DawgIntersection) {
         let node = &self.nodes[intersection.node_idx];
 
         // ✅ Iterate edges using indices - NO Arc clone!
@@ -188,21 +188,19 @@ impl DawgQueryIterator {
                 &self.query,
                 self.max_distance,
                 self.algorithm,
-                false,  // Exact matching (not prefix mode)
+                false, // Exact matching (not prefix mode)
             ) {
                 // Create lightweight PathNode (no Arc clone!)
-                let parent_path = if let Some(current_label) = intersection.label {
-                    Some(Box::new(PathNode::new(
+                let parent_path = intersection.label.map(|current_label| {
+                    Box::new(PathNode::new(
                         current_label,
-                        intersection.parent.clone(),  // Clone PathNode chain (cheap)
-                    )))
-                } else {
-                    None
-                };
+                        intersection.parent.clone(), // Clone PathNode chain (cheap)
+                    ))
+                });
 
                 let child = Box::new(DawgIntersection::with_parent(
                     label,
-                    child_idx,  // ← Index, not DawgDictionaryNode!
+                    child_idx, // ← Index, not DawgDictionaryNode!
                     next_state,
                     parent_path,
                 ));
@@ -307,12 +305,8 @@ mod tests {
     #[test]
     fn test_dawg_query_exact_match() {
         let dawg = DawgDictionary::from_iter(vec!["test"]);
-        let iter = DawgQueryIterator::new(
-            dawg.nodes_arc(),
-            "test".to_string(),
-            0,
-            Algorithm::Standard,
-        );
+        let iter =
+            DawgQueryIterator::new(dawg.nodes_arc(), "test".to_string(), 0, Algorithm::Standard);
 
         let result: Vec<_> = iter.collect();
         assert_eq!(result, vec!["test"]);
@@ -321,12 +315,8 @@ mod tests {
     #[test]
     fn test_dawg_query_with_distance() {
         let dawg = DawgDictionary::from_iter(vec!["test", "best", "rest", "testing"]);
-        let iter = DawgQueryIterator::new(
-            dawg.nodes_arc(),
-            "test".to_string(),
-            1,
-            Algorithm::Standard,
-        );
+        let iter =
+            DawgQueryIterator::new(dawg.nodes_arc(), "test".to_string(), 1, Algorithm::Standard);
 
         let results: Vec<_> = iter.collect();
         assert!(results.contains(&"test".to_string()));
@@ -345,7 +335,11 @@ mod tests {
         );
 
         let candidates: Vec<_> = iter.collect();
-        assert!(candidates.iter().any(|c| c.term == "test" && c.distance == 0));
-        assert!(candidates.iter().any(|c| c.term == "best" && c.distance == 1));
+        assert!(candidates
+            .iter()
+            .any(|c| c.term == "test" && c.distance == 0));
+        assert!(candidates
+            .iter()
+            .any(|c| c.term == "best" && c.distance == 1));
     }
 }

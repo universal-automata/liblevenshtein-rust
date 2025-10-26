@@ -66,9 +66,27 @@ pub fn transition_position(
     prefix_mode: bool,
 ) -> SmallVec<[Position; 4]> {
     match algorithm {
-        Algorithm::Standard => transition_standard(position, characteristic_vector, query_length, max_distance, prefix_mode),
-        Algorithm::Transposition => transition_transposition(position, characteristic_vector, query_length, max_distance, prefix_mode),
-        Algorithm::MergeAndSplit => transition_merge_split(position, characteristic_vector, query_length, max_distance, prefix_mode),
+        Algorithm::Standard => transition_standard(
+            position,
+            characteristic_vector,
+            query_length,
+            max_distance,
+            prefix_mode,
+        ),
+        Algorithm::Transposition => transition_transposition(
+            position,
+            characteristic_vector,
+            query_length,
+            max_distance,
+            prefix_mode,
+        ),
+        Algorithm::MergeAndSplit => transition_merge_split(
+            position,
+            characteristic_vector,
+            query_length,
+            max_distance,
+            prefix_mode,
+        ),
     }
 }
 
@@ -194,7 +212,7 @@ fn epsilon_closure_mut(state: &mut State, query_length: usize, max_distance: usi
 
     // Start with current positions
     for pos in state.positions() {
-        to_process.push(pos.clone());
+        to_process.push(*pos);
     }
 
     let mut processed = 0;
@@ -209,7 +227,7 @@ fn epsilon_closure_mut(state: &mut State, query_length: usize, max_distance: usi
             // Try to insert - State.insert handles deduplication efficiently
             // Only add to to_process if it was actually inserted (new position)
             let len_before = state.len();
-            state.insert(deleted.clone());
+            state.insert(deleted);
             if state.len() > len_before {
                 to_process.push(deleted);
             }
@@ -276,7 +294,14 @@ pub fn transition_state(
         let offset = position.term_index;
         let cv = characteristic_vector(dict_char, query, window_size, offset, &mut cv_buffer);
 
-        let next_positions = transition_position(position, cv, query_length, max_distance, algorithm, prefix_mode);
+        let next_positions = transition_position(
+            position,
+            cv,
+            query_length,
+            max_distance,
+            algorithm,
+            prefix_mode,
+        );
 
         for next_pos in next_positions {
             next_state.insert(next_pos);
@@ -345,7 +370,14 @@ pub fn transition_state_pooled(
         let offset = position.term_index;
         let cv = characteristic_vector(dict_char, query, window_size, offset, &mut cv_buffer);
 
-        let next_positions = transition_position(position, cv, query_length, max_distance, algorithm, prefix_mode);
+        let next_positions = transition_position(
+            position,
+            cv,
+            query_length,
+            max_distance,
+            algorithm,
+            prefix_mode,
+        );
 
         for next_pos in next_positions {
             next_state.insert(next_pos);

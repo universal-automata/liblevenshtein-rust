@@ -1,6 +1,6 @@
 //! Benchmarks for serialization performance optimization.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use liblevenshtein::prelude::*;
 use std::io::Cursor;
 
@@ -52,8 +52,8 @@ fn bench_bincode_deserialize(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
                 let cursor = Cursor::new(black_box(&buffer));
-                let loaded: PathMapDictionary = BincodeSerializer::deserialize(cursor)
-                    .expect("Deserialization failed");
+                let loaded: PathMapDictionary =
+                    BincodeSerializer::deserialize(cursor).expect("Deserialization failed");
                 black_box(loaded);
             });
         });
@@ -94,8 +94,8 @@ fn bench_json_deserialize(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
                 let cursor = Cursor::new(black_box(&buffer));
-                let loaded: PathMapDictionary = JsonSerializer::deserialize(cursor)
-                    .expect("Deserialization failed");
+                let loaded: PathMapDictionary =
+                    JsonSerializer::deserialize(cursor).expect("Deserialization failed");
                 black_box(loaded);
             });
         });
@@ -138,8 +138,8 @@ fn bench_protobuf_v1_deserialize(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
                 let cursor = Cursor::new(black_box(&buffer));
-                let loaded: PathMapDictionary = ProtobufSerializer::deserialize(cursor)
-                    .expect("Deserialization failed");
+                let loaded: PathMapDictionary =
+                    ProtobufSerializer::deserialize(cursor).expect("Deserialization failed");
                 black_box(loaded);
             });
         });
@@ -277,7 +277,8 @@ fn bench_format_comparison_deserialize(c: &mut Criterion) {
         group.bench_function("protobuf_v2", |b| {
             b.iter(|| {
                 let cursor = Cursor::new(black_box(&protobuf_v2_buffer));
-                let loaded: PathMapDictionary = OptimizedProtobufSerializer::deserialize(cursor).unwrap();
+                let loaded: PathMapDictionary =
+                    OptimizedProtobufSerializer::deserialize(cursor).unwrap();
                 black_box(loaded);
             });
         });
@@ -321,8 +322,9 @@ fn bench_gzip_bincode_deserialize(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
                 let cursor = Cursor::new(black_box(&buffer));
-                let loaded: PathMapDictionary = GzipSerializer::<BincodeSerializer>::deserialize(cursor)
-                    .expect("Deserialization failed");
+                let loaded: PathMapDictionary =
+                    GzipSerializer::<BincodeSerializer>::deserialize(cursor)
+                        .expect("Deserialization failed");
                 black_box(loaded);
             });
         });
@@ -365,8 +367,9 @@ fn bench_gzip_json_deserialize(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
                 let cursor = Cursor::new(black_box(&buffer));
-                let loaded: PathMapDictionary = GzipSerializer::<JsonSerializer>::deserialize(cursor)
-                    .expect("Deserialization failed");
+                let loaded: PathMapDictionary =
+                    GzipSerializer::<JsonSerializer>::deserialize(cursor)
+                        .expect("Deserialization failed");
                 black_box(loaded);
             });
         });
@@ -441,13 +444,17 @@ fn bench_file_size_comparison(c: &mut Criterion) {
 
     println!("\n=== File Size Comparison (1000 words) ===");
     println!("Bincode:           {:6} bytes", bincode_plain.len());
-    println!("Bincode+Gzip:      {:6} bytes ({:.1}% of original)",
-             bincode_gzip.len(),
-             100.0 * bincode_gzip.len() as f64 / bincode_plain.len() as f64);
+    println!(
+        "Bincode+Gzip:      {:6} bytes ({:.1}% of original)",
+        bincode_gzip.len(),
+        100.0 * bincode_gzip.len() as f64 / bincode_plain.len() as f64
+    );
     println!("JSON:              {:6} bytes", json_plain.len());
-    println!("JSON+Gzip:         {:6} bytes ({:.1}% of original)",
-             json_gzip.len(),
-             100.0 * json_gzip.len() as f64 / json_plain.len() as f64);
+    println!(
+        "JSON+Gzip:         {:6} bytes ({:.1}% of original)",
+        json_gzip.len(),
+        100.0 * json_gzip.len() as f64 / json_plain.len() as f64
+    );
 
     // Dummy benchmark to trigger output
     group.bench_function("dummy", |b| b.iter(|| 1));

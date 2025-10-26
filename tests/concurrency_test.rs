@@ -42,9 +42,7 @@ fn test_parallel_reads() {
     }
 
     // Collect results
-    let durations: Vec<_> = handles.into_iter()
-        .map(|h| h.join().unwrap())
-        .collect();
+    let durations: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
 
     // Print timing info
     println!("\n=== Parallel Read Test ===");
@@ -63,12 +61,17 @@ fn test_parallel_reads() {
 
     println!("\n  Max duration: {:?}", max);
     println!("  Sum duration: {:?}", sum);
-    println!("  Parallelism ratio: {:.2}x", sum.as_secs_f64() / max.as_secs_f64());
+    println!(
+        "  Parallelism ratio: {:.2}x",
+        sum.as_secs_f64() / max.as_secs_f64()
+    );
 
     // If parallel, ratio should be close to NUM_READERS
     // If serialized, ratio would be close to 1.0
-    assert!(sum.as_secs_f64() / max.as_secs_f64() > 2.0,
-            "Reads appear to be serialized, not parallel!");
+    assert!(
+        sum.as_secs_f64() / max.as_secs_f64() > 2.0,
+        "Reads appear to be serialized, not parallel!"
+    );
 }
 
 #[test]

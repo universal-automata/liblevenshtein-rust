@@ -27,7 +27,10 @@ fn main() {
         "programming",
     ];
 
-    println!("Building dictionary with {} words...", dictionary_words.len());
+    println!(
+        "Building dictionary with {} words...",
+        dictionary_words.len()
+    );
     let dict = PathMapDictionary::from_iter(dictionary_words);
 
     // Create a transducer with Standard algorithm
@@ -37,11 +40,11 @@ fn main() {
 
     // Test words with typos
     let test_queries = vec![
-        ("aple", 1),      // Missing 'p' in "apple"
-        ("applie", 2),    // Extra 'i' in "apple"
-        ("tset", 1),      // Transposed letters in "test"
-        ("tesing", 1),    // Missing 't' in "testing"
-        ("wrld", 2),      // Missing vowels in "world"
+        ("aple", 1),       // Missing 'p' in "apple"
+        ("applie", 2),     // Extra 'i' in "apple"
+        ("tset", 1),       // Transposed letters in "test"
+        ("tesing", 1),     // Missing 't' in "testing"
+        ("wrld", 2),       // Missing vowels in "world"
         ("programing", 1), // Missing 'm' in "programming"
     ];
 

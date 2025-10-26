@@ -127,7 +127,10 @@ mod tests {
         // (5, 2) should NOT subsume (4, 3) - different positions
         let p3 = Position::new(5, 2);
         let p4 = Position::new(4, 3);
-        assert!(!p3.subsumes(&p4), "p3(5,2) should NOT subsume p4(4,3) - different positions");
+        assert!(
+            !p3.subsumes(&p4),
+            "p3(5,2) should NOT subsume p4(4,3) - different positions"
+        );
 
         // (3, 2) should subsume (3, 2) - same position and errors
         let p5 = Position::new(3, 2);

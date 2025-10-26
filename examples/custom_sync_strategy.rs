@@ -3,8 +3,8 @@
 
 use liblevenshtein::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 use liblevenshtein::transducer::{Algorithm, Transducer};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 /// Example of a lock-free, persistent dictionary backend.
 ///
@@ -102,11 +102,14 @@ impl DictionaryNode for PersistentNode {
             let mut new_prefix = prefix.clone();
             new_prefix.push(c);
 
-            (byte, PersistentNode {
-                terms: Arc::clone(&terms),
-                prefix: new_prefix,
-                index: index + 1,
-            })
+            (
+                byte,
+                PersistentNode {
+                    terms: Arc::clone(&terms),
+                    prefix: new_prefix,
+                    index: index + 1,
+                },
+            )
         }))
     }
 }
@@ -115,17 +118,21 @@ fn main() {
     println!("=== Custom Synchronization Strategy Example ===\n");
 
     // Create both types of dictionaries
-    let pathmap_dict = liblevenshtein::prelude::PathMapDictionary::from_iter(
-        vec!["test", "testing", "tested"]
-    );
+    let pathmap_dict =
+        liblevenshtein::prelude::PathMapDictionary::from_iter(vec!["test", "testing", "tested"]);
 
-    let persistent_dict = PersistentDictionary::new(
-        vec!["test".to_string(), "testing".to_string(), "tested".to_string()]
-    );
+    let persistent_dict = PersistentDictionary::new(vec![
+        "test".to_string(),
+        "testing".to_string(),
+        "tested".to_string(),
+    ]);
 
     // Check their sync strategies
     println!("PathMap sync strategy: {:?}", pathmap_dict.sync_strategy());
-    println!("Persistent sync strategy: {:?}\n", persistent_dict.sync_strategy());
+    println!(
+        "Persistent sync strategy: {:?}\n",
+        persistent_dict.sync_strategy()
+    );
 
     // Both work the same from the user's perspective
     let trans1 = Transducer::new(pathmap_dict, Algorithm::Standard);

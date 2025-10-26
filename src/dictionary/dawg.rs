@@ -75,8 +75,7 @@ impl DawgBuilder {
     /// Create a new DAWG builder.
     pub fn new() -> Self {
         // Node 0 is always the root
-        let mut nodes = Vec::new();
-        nodes.push(DawgNode::new(false));
+        let nodes = vec![DawgNode::new(false)];
 
         DawgBuilder {
             nodes,
@@ -93,14 +92,12 @@ impl DawgBuilder {
         let bytes = term.as_bytes();
 
         // Find common prefix with previous term
-        let mut common_prefix_len = 0;
-        for i in 0..std::cmp::min(self.prev_term.len(), bytes.len()) {
-            if self.prev_term[i] == bytes[i] {
-                common_prefix_len += 1;
-            } else {
-                break;
-            }
-        }
+        let common_prefix_len = self
+            .prev_term
+            .iter()
+            .zip(bytes.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
 
         // Minimize the suffix of the previous word from the divergence point
         self.minimize(common_prefix_len);
@@ -205,15 +202,14 @@ impl DawgDictionary {
     ///
     /// For optimal space efficiency, the terms will be collected and
     /// sorted before building the DAWG.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_iter<I, S>(terms: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let mut sorted_terms: Vec<String> = terms
-            .into_iter()
-            .map(|s| s.as_ref().to_string())
-            .collect();
+        let mut sorted_terms: Vec<String> =
+            terms.into_iter().map(|s| s.as_ref().to_string()).collect();
         sorted_terms.sort();
         sorted_terms.dedup();
 
@@ -344,10 +340,7 @@ impl Dictionary for DawgDictionary {
             // Empirical testing shows crossover at 16-20 edges
             let next_idx = if edges.len() < 16 {
                 // Linear search for small edge counts - cache-friendly
-                edges
-                    .iter()
-                    .find(|(l, _)| *l == byte)
-                    .map(|(_, idx)| *idx)
+                edges.iter().find(|(l, _)| *l == byte).map(|(_, idx)| *idx)
             } else {
                 // Binary search for large edge counts
                 edges
@@ -410,20 +403,15 @@ impl DictionaryNode for DawgDictionaryNode {
     fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
         // Optimized: capture self by reference instead of cloning Arc upfront.
         // This reduces Arc clones from N+1 to N (one per edge returned).
-        Box::new(
-            self.nodes[self.node_idx]
-                .edges
-                .iter()
-                .map(|(label, idx)| {
-                    (
-                        *label,
-                        DawgDictionaryNode {
-                            nodes: Arc::clone(&self.nodes),
-                            node_idx: *idx,
-                        },
-                    )
-                }),
-        )
+        Box::new(self.nodes[self.node_idx].edges.iter().map(|(label, idx)| {
+            (
+                *label,
+                DawgDictionaryNode {
+                    nodes: Arc::clone(&self.nodes),
+                    node_idx: *idx,
+                },
+            )
+        }))
     }
 
     fn edge_count(&self) -> Option<usize> {
@@ -493,9 +481,7 @@ mod tests {
     #[test]
     fn test_dawg_suffix_sharing() {
         // Words with common suffix "ing"
-        let dict = DawgDictionary::from_iter(vec![
-            "testing", "running", "walking", "talking",
-        ]);
+        let dict = DawgDictionary::from_iter(vec!["testing", "running", "walking", "talking"]);
 
         // DAWG should have fewer nodes than a trie would
         // (exact count depends on implementation details)
@@ -533,12 +519,8 @@ mod tests {
     #[test]
     fn test_dawg_sorted_vs_unsorted() {
         // Both should work, but sorted is more space-efficient
-        let sorted = DawgDictionary::from_iter(vec![
-            "apple", "banana", "cherry", "date",
-        ]);
-        let unsorted = DawgDictionary::from_iter(vec![
-            "cherry", "apple", "date", "banana",
-        ]);
+        let sorted = DawgDictionary::from_iter(vec!["apple", "banana", "cherry", "date"]);
+        let unsorted = DawgDictionary::from_iter(vec!["cherry", "apple", "date", "banana"]);
 
         assert_eq!(sorted.term_count(), unsorted.term_count());
         // Sorted might have fewer nodes due to better suffix sharing

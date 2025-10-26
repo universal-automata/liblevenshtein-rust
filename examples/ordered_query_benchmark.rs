@@ -29,7 +29,11 @@ fn main() {
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Create query set (sample every 100th word for representative queries)
-    let query_words: Vec<_> = words.iter().step_by(words.len() / 1000).take(1000).collect();
+    let query_words: Vec<_> = words
+        .iter()
+        .step_by(words.len() / 1000)
+        .take(1000)
+        .collect();
 
     println!("=== Benchmark 1: Full Iteration (Distance 2) ===\n");
 
@@ -46,7 +50,10 @@ fn main() {
     println!("Unordered query:");
     println!("  Queries: {}", query_words.len());
     println!("  Time: {:?}", time_unordered);
-    println!("  µs/query: {:.2}", time_unordered.as_micros() as f64 / query_words.len() as f64);
+    println!(
+        "  µs/query: {:.2}",
+        time_unordered.as_micros() as f64 / query_words.len() as f64
+    );
     println!("  Results: {}\n", count_unordered);
 
     // Ordered query - consume all results
@@ -62,12 +69,16 @@ fn main() {
     println!("Ordered query:");
     println!("  Queries: {}", query_words.len());
     println!("  Time: {:?}", time_ordered);
-    println!("  µs/query: {:.2}", time_ordered.as_micros() as f64 / query_words.len() as f64);
+    println!(
+        "  µs/query: {:.2}",
+        time_ordered.as_micros() as f64 / query_words.len() as f64
+    );
     println!("  Results: {}\n", count_ordered);
 
     assert_eq!(count_unordered, count_ordered, "Result count mismatch!");
 
-    let overhead = ((time_ordered.as_nanos() as f64 / time_unordered.as_nanos() as f64) - 1.0) * 100.0;
+    let overhead =
+        ((time_ordered.as_nanos() as f64 / time_unordered.as_nanos() as f64) - 1.0) * 100.0;
     println!("Ordering overhead: {:.2}%\n", overhead);
 
     println!("=== Benchmark 2: Top-K (take 10) ===\n");
@@ -84,7 +95,10 @@ fn main() {
 
     println!("Unordered.take(10):");
     println!("  Time: {:?}", time_unordered_take);
-    println!("  µs/query: {:.2}", time_unordered_take.as_micros() as f64 / 100.0);
+    println!(
+        "  µs/query: {:.2}",
+        time_unordered_take.as_micros() as f64 / 100.0
+    );
     println!("  Results: {}\n", count);
 
     // Ordered top-k (can stop early!)
@@ -99,7 +113,10 @@ fn main() {
 
     println!("Ordered.take(10):");
     println!("  Time: {:?}", time_ordered_take);
-    println!("  µs/query: {:.2}", time_ordered_take.as_micros() as f64 / 100.0);
+    println!(
+        "  µs/query: {:.2}",
+        time_ordered_take.as_micros() as f64 / 100.0
+    );
     println!("  Results: {}\n", count);
 
     if time_ordered_take < time_unordered_take {
@@ -113,7 +130,10 @@ fn main() {
     let start = Instant::now();
     let mut count = 0;
     for word in query_words.iter().take(100) {
-        for _ in transducer.query_ordered(word, 3).take_while(|c| c.distance <= 1) {
+        for _ in transducer
+            .query_ordered(word, 3)
+            .take_while(|c| c.distance <= 1)
+        {
             count += 1;
         }
     }
@@ -121,7 +141,10 @@ fn main() {
 
     println!("Ordered.take_while(distance <= 1):");
     println!("  Time: {:?}", time_ordered_bounded);
-    println!("  µs/query: {:.2}", time_ordered_bounded.as_micros() as f64 / 100.0);
+    println!(
+        "  µs/query: {:.2}",
+        time_ordered_bounded.as_micros() as f64 / 100.0
+    );
     println!("  Results: {}\n", count);
 
     // Unordered equivalent (must filter all results)
@@ -138,11 +161,17 @@ fn main() {
 
     println!("Unordered.query_with_distance(3).filter(d <= 1):");
     println!("  Time: {:?}", time_unordered_filter);
-    println!("  µs/query: {:.2}", time_unordered_filter.as_micros() as f64 / 100.0);
+    println!(
+        "  µs/query: {:.2}",
+        time_unordered_filter.as_micros() as f64 / 100.0
+    );
     println!("  Results: {}\n", count);
 
     let speedup = time_unordered_filter.as_nanos() as f64 / time_ordered_bounded.as_nanos() as f64;
-    println!("✅ Ordered is {:.2}x faster for distance-bounded queries!\n", speedup);
+    println!(
+        "✅ Ordered is {:.2}x faster for distance-bounded queries!\n",
+        speedup
+    );
 
     println!("=== Benchmark 4: Performance by Distance ===\n");
 
@@ -183,7 +212,10 @@ fn main() {
 
     println!("\n=== Summary ===\n");
     println!("Full Iteration:");
-    println!("  Ordered has ~{}% overhead for maintaining order", overhead as i32);
+    println!(
+        "  Ordered has ~{}% overhead for maintaining order",
+        overhead as i32
+    );
     println!("\nEarly Termination (take/take_while):");
     println!("  Ordered can be faster due to smart exploration order");
     println!("\n🎯 Recommendation:");

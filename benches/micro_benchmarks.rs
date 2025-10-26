@@ -3,7 +3,7 @@
 //! These benchmarks isolate specific optimizations to understand
 //! which changes caused regressions and why.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use liblevenshtein::prelude::*;
 use smallvec::SmallVec;
 
@@ -38,15 +38,19 @@ fn bench_smallvec_overhead(c: &mut Criterion) {
         });
 
         // Vec with capacity
-        group.bench_with_input(BenchmarkId::new("vec_with_capacity", size), size, |b, &n| {
-            b.iter(|| {
-                let mut v: Vec<Position> = Vec::with_capacity(n);
-                for i in 0..n {
-                    v.push(Position::new(i, 0));
-                }
-                black_box(v);
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("vec_with_capacity", size),
+            size,
+            |b, &n| {
+                b.iter(|| {
+                    let mut v: Vec<Position> = Vec::with_capacity(n);
+                    for i in 0..n {
+                        v.push(Position::new(i, 0));
+                    }
+                    black_box(v);
+                });
+            },
+        );
     }
 
     group.finish();
@@ -88,7 +92,7 @@ fn bench_characteristic_vector_allocation(c: &mut Criterion) {
 
 /// Benchmark epsilon closure implementations
 fn bench_epsilon_closure(c: &mut Criterion) {
-    use liblevenshtein::transducer::{State, Position};
+    use liblevenshtein::transducer::{Position, State};
 
     let mut group = c.benchmark_group("epsilon_closure");
 
@@ -121,8 +125,10 @@ fn bench_epsilon_closure(c: &mut Criterion) {
                         let position = &to_process[processed];
                         processed += 1;
 
-                        if position.num_errors < max_distance && position.term_index < query_length {
-                            let deleted = Position::new(position.term_index + 1, position.num_errors + 1);
+                        if position.num_errors < max_distance && position.term_index < query_length
+                        {
+                            let deleted =
+                                Position::new(position.term_index + 1, position.num_errors + 1);
                             if !to_process.contains(&deleted) {
                                 result.insert(deleted.clone());
                                 to_process.push(deleted);
@@ -141,44 +147,36 @@ fn bench_epsilon_closure(c: &mut Criterion) {
 
 /// Benchmark state operations with different sizes
 fn bench_state_operations(c: &mut Criterion) {
-    use liblevenshtein::transducer::{State, Position};
+    use liblevenshtein::transducer::{Position, State};
 
     let mut group = c.benchmark_group("state_operations");
 
     for size in [1, 3, 5, 10, 20].iter() {
         // Benchmark insert operation
-        group.bench_with_input(
-            BenchmarkId::new("insert", size),
-            size,
-            |b, &n| {
-                b.iter(|| {
-                    let mut state = State::new();
-                    for i in 0..n {
-                        state.insert(Position::new(i, 0));
-                    }
-                    black_box(state);
-                });
-            },
-        );
-
-        // Benchmark contains check (for subsumption)
-        group.bench_with_input(
-            BenchmarkId::new("contains", size),
-            size,
-            |b, &n| {
+        group.bench_with_input(BenchmarkId::new("insert", size), size, |b, &n| {
+            b.iter(|| {
                 let mut state = State::new();
                 for i in 0..n {
                     state.insert(Position::new(i, 0));
                 }
+                black_box(state);
+            });
+        });
 
-                b.iter(|| {
-                    for i in 0..n {
-                        let pos = Position::new(i, 0);
-                        black_box(state.positions().contains(&pos));
-                    }
-                });
-            },
-        );
+        // Benchmark contains check (for subsumption)
+        group.bench_with_input(BenchmarkId::new("contains", size), size, |b, &n| {
+            let mut state = State::new();
+            for i in 0..n {
+                state.insert(Position::new(i, 0));
+            }
+
+            b.iter(|| {
+                for i in 0..n {
+                    let pos = Position::new(i, 0);
+                    black_box(state.positions().contains(&pos));
+                }
+            });
+        });
     }
 
     group.finish();
@@ -186,8 +184,8 @@ fn bench_state_operations(c: &mut Criterion) {
 
 /// Benchmark transition operations
 fn bench_transition_overhead(c: &mut Criterion) {
+    use liblevenshtein::transducer::transition::{initial_state, transition_state};
     use liblevenshtein::transducer::{Position, State};
-    use liblevenshtein::transducer::transition::{transition_state, initial_state};
 
     let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tested"]);
     let root = dict.root();
@@ -205,13 +203,8 @@ fn bench_transition_overhead(c: &mut Criterion) {
                     let state = initial_state(query.len(), max_dist);
 
                     // Transition through 't'
-                    let state = transition_state(
-                        &state,
-                        b't',
-                        query,
-                        max_dist,
-                        Algorithm::Standard
-                    );
+                    let state =
+                        transition_state(&state, b't', query, max_dist, Algorithm::Standard);
 
                     black_box(state);
                 });
@@ -262,18 +255,14 @@ fn bench_query_with_instrumentation(c: &mut Criterion) {
     let mut group = c.benchmark_group("instrumented_query");
 
     for distance in [1, 2, 3].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(distance),
-            distance,
-            |b, &d| {
-                b.iter(|| {
-                    let results: Vec<_> = transducer
-                        .query(black_box("word0500"), black_box(d))
-                        .collect();
-                    black_box(results);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(distance), distance, |b, &d| {
+            b.iter(|| {
+                let results: Vec<_> = transducer
+                    .query(black_box("word0500"), black_box(d))
+                    .collect();
+                black_box(results);
+            });
+        });
     }
 
     group.finish();

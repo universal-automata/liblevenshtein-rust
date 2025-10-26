@@ -7,8 +7,8 @@ use crate::cli::args::SerializationFormat;
 use crate::transducer::Algorithm;
 use anyhow::{Context, Result};
 use colored::Colorize;
-use std::path::PathBuf;
 use std::io::{self, Write};
+use std::path::PathBuf;
 
 /// REPL command
 #[derive(Debug, Clone)]
@@ -130,7 +130,9 @@ impl Command {
 
     fn parse_query(args: &[&str]) -> Result<Self> {
         if args.is_empty() {
-            return Err(anyhow::anyhow!("Usage: query <term> [distance] [--prefix] [--limit N]"));
+            return Err(anyhow::anyhow!(
+                "Usage: query <term> [distance] [--prefix] [--limit N]"
+            ));
         }
 
         let mut term = args[0].to_string();
@@ -602,7 +604,9 @@ impl Command {
                         path.display().to_string().cyan()
                     );
                     if !Self::confirm(&message)? {
-                        return Ok(CommandResult::Continue("Replace cancelled".yellow().to_string()));
+                        return Ok(CommandResult::Continue(
+                            "Replace cancelled".yellow().to_string(),
+                        ));
                     }
                 }
 
@@ -732,7 +736,10 @@ impl Command {
 
                         // Update the path
                         state.auto_sync_path = Some(new_path.clone());
-                        println!("  Dictionary path updated to {}", new_path.display().to_string().cyan());
+                        println!(
+                            "  Dictionary path updated to {}",
+                            new_path.display().to_string().cyan()
+                        );
                     }
                 }
 
@@ -774,12 +781,19 @@ impl Command {
             Self::Clear => {
                 let count = state.dictionary.len();
                 if count == 0 {
-                    return Ok(CommandResult::Continue("Dictionary is already empty".yellow().to_string()));
+                    return Ok(CommandResult::Continue(
+                        "Dictionary is already empty".yellow().to_string(),
+                    ));
                 }
 
-                let message = format!("Clear {} term(s) from dictionary?", count.to_string().red().bold());
+                let message = format!(
+                    "Clear {} term(s) from dictionary?",
+                    count.to_string().red().bold()
+                );
                 if !Self::confirm(&message)? {
-                    return Ok(CommandResult::Continue("Clear cancelled".yellow().to_string()));
+                    return Ok(CommandResult::Continue(
+                        "Clear cancelled".yellow().to_string(),
+                    ));
                 }
 
                 state.dictionary.clear()?;
@@ -830,10 +844,7 @@ impl Command {
 
             Self::Settings => {
                 let mut output = String::new();
-                output.push_str(&format!(
-                    "{}\n\n",
-                    "Current Settings:".bold().underline()
-                ));
+                output.push_str(&format!("{}\n\n", "Current Settings:".bold().underline()));
 
                 // Dictionary Path - show actual default
                 let dict_path = if let Some(ref path) = state.auto_sync_path {
@@ -843,10 +854,7 @@ impl Command {
                         .map(|p| p.display().to_string())
                         .unwrap_or_else(|_| "(auto)".to_string())
                 };
-                output.push_str(&format!(
-                    "  Dictionary Path:    {}\n",
-                    dict_path.cyan()
-                ));
+                output.push_str(&format!("  Dictionary Path:    {}\n", dict_path.cyan()));
 
                 output.push_str(&format!(
                     "  Backend:            {}\n",
@@ -913,9 +921,9 @@ impl Command {
             }
 
             Self::Config { path } => {
-                use crate::cli::paths::{AppConfig, PersistentConfig};
                 use crate::cli::commands::load_dictionary;
                 use crate::cli::detect::detect_format;
+                use crate::cli::paths::{AppConfig, PersistentConfig};
 
                 if let Some(new_path) = path {
                     // User wants to switch to a new config file
@@ -926,7 +934,10 @@ impl Command {
                     if !new_path.exists() {
                         // Copy current config to new location
                         current_config.copy_to(new_path)?;
-                        println!("  Copied current configuration to {}", new_path.display().to_string().cyan());
+                        println!(
+                            "  Copied current configuration to {}",
+                            new_path.display().to_string().cyan()
+                        );
                     }
 
                     // Switch app config to point to new user config
@@ -938,11 +949,13 @@ impl Command {
 
                     // Apply all settings from config
                     state.backend = new_config.backend.unwrap_or(state.backend);
-                    state.serialization_format = new_config.format.unwrap_or(state.serialization_format);
+                    state.serialization_format =
+                        new_config.format.unwrap_or(state.serialization_format);
                     state.algorithm = new_config.algorithm.unwrap_or(state.algorithm);
                     state.max_distance = new_config.max_distance.unwrap_or(state.max_distance);
                     state.prefix_mode = new_config.prefix_mode.unwrap_or(state.prefix_mode);
-                    state.show_distances = new_config.show_distances.unwrap_or(state.show_distances);
+                    state.show_distances =
+                        new_config.show_distances.unwrap_or(state.show_distances);
                     state.result_limit = new_config.result_limit.unwrap_or(state.result_limit);
                     state.auto_sync = new_config.auto_sync.unwrap_or(state.auto_sync);
 
@@ -957,19 +970,27 @@ impl Command {
                                             state.dictionary = container;
                                             state.backend = detection.format.backend;
                                             state.auto_sync_path = Some(dict_path.clone());
-                                            println!("  Loaded {} term(s) from {}",
+                                            println!(
+                                                "  Loaded {} term(s) from {}",
                                                 count.to_string().green(),
-                                                dict_path.display().to_string().cyan());
+                                                dict_path.display().to_string().cyan()
+                                            );
                                         }
                                         Err(e) => {
-                                            println!("  {}: Could not load dictionary: {}",
-                                                "Warning".yellow(), e);
+                                            println!(
+                                                "  {}: Could not load dictionary: {}",
+                                                "Warning".yellow(),
+                                                e
+                                            );
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    println!("  {}: Could not detect dictionary format: {}",
-                                        "Warning".yellow(), e);
+                                    println!(
+                                        "  {}: Could not detect dictionary format: {}",
+                                        "Warning".yellow(),
+                                        e
+                                    );
                                 }
                             }
                         }
@@ -988,7 +1009,10 @@ impl Command {
                     let app_config = AppConfig::load()?;
                     let msg = format!(
                         "App Config:  {}\nUser Config: {}",
-                        crate::cli::paths::app_config_path()?.display().to_string().cyan(),
+                        crate::cli::paths::app_config_path()?
+                            .display()
+                            .to_string()
+                            .cyan(),
                         app_config.user_config_path.display().to_string().cyan()
                     );
                     Ok(CommandResult::Continue(msg))
@@ -1082,7 +1106,9 @@ impl Command {
 
 For detailed help on a command, type: help <command>
 "#,
-            "liblevenshtein REPL - Interactive Levenshtein Dictionary Explorer".bold().underline(),
+            "liblevenshtein REPL - Interactive Levenshtein Dictionary Explorer"
+                .bold()
+                .underline(),
             "Dictionary Operations:".bold(),
             "File Operations:".bold(),
             "Configuration:".bold(),
@@ -1216,13 +1242,18 @@ For detailed help on a command, type: help <command>
   algo transposition            # Allow swaps
   algorithm merge-and-split     # Most permissive
 "#,
-                "algorithm - Change Levenshtein Algorithm".bold().underline(),
+                "algorithm - Change Levenshtein Algorithm"
+                    .bold()
+                    .underline(),
                 "Usage:".bold(),
                 "Description:".bold(),
                 "Algorithms:".bold(),
                 "Examples:".bold(),
             ),
-            _ => format!("No help available for '{}'. Try 'help' for general help.", topic),
+            _ => format!(
+                "No help available for '{}'. Try 'help' for general help.",
+                topic
+            ),
         }
     }
 
@@ -1234,7 +1265,10 @@ For detailed help on a command, type: help <command>
 
         // Check if it looks like plain text (one term per line)
         // Plain text files should have mostly printable ASCII/UTF-8 and newlines
-        if contents.chars().all(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation()) {
+        if contents
+            .chars()
+            .all(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation())
+        {
             // Parse as plain text
             let terms: Vec<String> = contents
                 .lines()
@@ -1250,11 +1284,11 @@ For detailed help on a command, type: help <command>
 
         // If not plain text or empty, try to load as serialized dictionary and extract terms
         // We'll try using the CLI's detect_format and load_dictionary functions
-        use crate::cli::detect::detect_format;
         use crate::cli::commands::load_dictionary;
+        use crate::cli::detect::detect_format;
 
-        let detection = detect_format(path, None, None)
-            .context("Failed to detect dictionary format")?;
+        let detection =
+            detect_format(path, None, None).context("Failed to detect dictionary format")?;
 
         let container = load_dictionary(path, detection.format)
             .context("Failed to load dictionary from file")?;

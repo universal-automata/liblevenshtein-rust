@@ -5,7 +5,11 @@
 /// Different algorithms support different edit operations and are
 /// suited for different use cases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[derive(Default)]
 pub enum Algorithm {
     /// Standard Levenshtein distance.
     ///
@@ -15,6 +19,7 @@ pub enum Algorithm {
     /// - Substitute: replace one character with another
     ///
     /// This is the classic edit distance metric.
+    #[default]
     Standard,
 
     /// Levenshtein distance with transposition.
@@ -56,11 +61,6 @@ impl Algorithm {
     }
 }
 
-impl Default for Algorithm {
-    fn default() -> Self {
-        Algorithm::Standard
-    }
-}
 
 impl std::fmt::Display for Algorithm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -76,7 +76,10 @@ impl std::str::FromStr for Algorithm {
             "standard" => Ok(Algorithm::Standard),
             "transposition" | "trans" => Ok(Algorithm::Transposition),
             "merge-and-split" | "mergesplit" | "merge" => Ok(Algorithm::MergeAndSplit),
-            _ => Err(format!("Unknown algorithm: {}. Valid options: standard, transposition, merge-and-split", s)),
+            _ => Err(format!(
+                "Unknown algorithm: {}. Valid options: standard, transposition, merge-and-split",
+                s
+            )),
         }
     }
 }

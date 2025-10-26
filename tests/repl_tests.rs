@@ -2,15 +2,20 @@
 
 #[cfg(feature = "cli")]
 mod repl_integration_tests {
-    use liblevenshtein::repl::{Command, ReplState};
     use liblevenshtein::repl::state::DictionaryBackend;
+    use liblevenshtein::repl::{Command, ReplState};
     use liblevenshtein::transducer::Algorithm;
 
     #[test]
     fn test_parse_query_command() {
         let cmd = Command::parse("query test 2").unwrap();
         match cmd {
-            Command::Query { term, distance, prefix, limit } => {
+            Command::Query {
+                term,
+                distance,
+                prefix,
+                limit,
+            } => {
                 assert_eq!(term, "test");
                 assert_eq!(distance, Some(2));
                 assert_eq!(prefix, false);
@@ -24,7 +29,12 @@ mod repl_integration_tests {
     fn test_parse_query_with_flags() {
         let cmd = Command::parse("query test 2 --prefix --limit 10").unwrap();
         match cmd {
-            Command::Query { term, distance, prefix, limit } => {
+            Command::Query {
+                term,
+                distance,
+                prefix,
+                limit,
+            } => {
                 assert_eq!(term, "test");
                 assert_eq!(distance, Some(2));
                 assert_eq!(prefix, true);
@@ -80,15 +90,24 @@ mod repl_integration_tests {
 
     #[test]
     fn test_parse_settings_aliases() {
-        assert!(matches!(Command::parse("settings").unwrap(), Command::Settings));
-        assert!(matches!(Command::parse("options").unwrap(), Command::Settings));
+        assert!(matches!(
+            Command::parse("settings").unwrap(),
+            Command::Settings
+        ));
+        assert!(matches!(
+            Command::parse("options").unwrap(),
+            Command::Settings
+        ));
         assert!(matches!(Command::parse("opts").unwrap(), Command::Settings));
     }
 
     #[test]
     fn test_parse_config_command() {
         // Config without arguments shows current config file
-        assert!(matches!(Command::parse("config").unwrap(), Command::Config { path: None }));
+        assert!(matches!(
+            Command::parse("config").unwrap(),
+            Command::Config { path: None }
+        ));
         // Config with path switches to new config file
         match Command::parse("config /tmp/test.json").unwrap() {
             Command::Config { path: Some(p) } => {
@@ -118,7 +137,10 @@ mod repl_integration_tests {
         // Insert terms
         let cmd = Command::parse("insert test testing tester").unwrap();
         let result = cmd.execute(&mut state).unwrap();
-        assert!(matches!(result, liblevenshtein::repl::CommandResult::Continue(_)));
+        assert!(matches!(
+            result,
+            liblevenshtein::repl::CommandResult::Continue(_)
+        ));
 
         // Verify insertion
         assert_eq!(state.dictionary.len(), 3);

@@ -12,9 +12,8 @@ fn main() {
 
     // Create a sample dictionary of similar words
     let words = vec![
-        "test", "tests", "tested", "testing", "tester",
-        "best", "rest", "nest", "west", "fest", "zest",
-        "taste", "text", "tent", "temp", "team",
+        "test", "tests", "tested", "testing", "tester", "best", "rest", "nest", "west", "fest",
+        "zest", "taste", "text", "tent", "temp", "team",
     ];
 
     let dict = PathMapDictionary::from_iter(words.iter().map(|s| *s));
@@ -30,7 +29,12 @@ fn main() {
     println!("{:-<30}", "");
 
     for (rank, candidate) in transducer.query_ordered("tset", 3).enumerate() {
-        println!("{:<3}  {:<10} {}", rank + 1, candidate.distance, candidate.term);
+        println!(
+            "{:<3}  {:<10} {}",
+            rank + 1,
+            candidate.distance,
+            candidate.term
+        );
     }
 
     println!("\n📊 Notice how results are grouped by distance (0, then 1, then 2, then 3)");
@@ -50,7 +54,10 @@ fn main() {
     println!("=== Example 3: Distance-Bounded Query ===\n");
     println!("Using .take_while(|c| c.distance <= 1) to get only close matches:\n");
 
-    for candidate in transducer.query_ordered("tset", 3).take_while(|c| c.distance <= 1) {
+    for candidate in transducer
+        .query_ordered("tset", 3)
+        .take_while(|c| c.distance <= 1)
+    {
         println!("  {} (distance: {})", candidate.term, candidate.distance);
     }
 
@@ -60,14 +67,16 @@ fn main() {
     println!("=== Example 4: Autocomplete/Spell-Check Use Case ===\n");
     println!("Scenario: User types 'tst' - suggest top 3 corrections:\n");
 
-    let suggestions: Vec<_> = transducer
-        .query_ordered("tst", 2)
-        .take(3)
-        .collect();
+    let suggestions: Vec<_> = transducer.query_ordered("tst", 2).take(3).collect();
 
     println!("Suggestions:");
     for (i, candidate) in suggestions.iter().enumerate() {
-        println!("  {}. {} (distance: {})", i + 1, candidate.term, candidate.distance);
+        println!(
+            "  {}. {} (distance: {})",
+            i + 1,
+            candidate.term,
+            candidate.distance
+        );
     }
 
     println!("\n✨ Perfect for autocomplete - best matches first!\n");
@@ -83,9 +92,7 @@ fn main() {
     println!("  {:?}", ordered);
 
     println!("\nUnordered query (depth-first traversal order):");
-    let unordered: Vec<_> = transducer
-        .query("test", 1)
-        .collect();
+    let unordered: Vec<_> = transducer.query("test", 1).collect();
     println!("  {:?}", unordered);
 
     println!("\n📌 Same results, different order - choose based on your use case!\n");

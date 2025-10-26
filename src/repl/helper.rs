@@ -8,7 +8,7 @@ use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
-use rustyline::{Helper, Context};
+use rustyline::{Context, Helper};
 use std::borrow::Cow;
 
 /// REPL helper
@@ -26,10 +26,26 @@ impl LevenshteinHelper {
             highlighter: CommandHighlighter::new(),
             hinter: HistoryHinter::new(),
             commands: vec![
-                "query", "insert", "delete", "contains",
-                "load", "save", "backend", "algorithm", "distance",
-                "prefix", "show-distances", "limit", "clear", "compact",
-                "dump", "stats", "settings", "help", "exit", "quit",
+                "query",
+                "insert",
+                "delete",
+                "contains",
+                "load",
+                "save",
+                "backend",
+                "algorithm",
+                "distance",
+                "prefix",
+                "show-distances",
+                "limit",
+                "clear",
+                "compact",
+                "dump",
+                "stats",
+                "settings",
+                "help",
+                "exit",
+                "quit",
             ]
             .into_iter()
             .map(String::from)
@@ -126,7 +142,7 @@ impl Completer for LevenshteinHelper {
                 Ok((start, candidates))
             }
             "prefix" | "show-distances" if parts.len() <= 2 => {
-                let options = vec!["on", "off"];
+                let options = ["on", "off"];
                 let prefix = parts.last().map(|s| s.to_lowercase()).unwrap_or_default();
                 let candidates = options
                     .iter()
@@ -175,10 +191,7 @@ impl Highlighter for LevenshteinHelper {
 }
 
 impl Validator for LevenshteinHelper {
-    fn validate(
-        &self,
-        _ctx: &mut ValidationContext,
-    ) -> rustyline::Result<ValidationResult> {
+    fn validate(&self, _ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
         // Always accept input (validation happens during execution)
         Ok(ValidationResult::Valid(None))
     }

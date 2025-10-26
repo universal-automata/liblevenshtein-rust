@@ -5,9 +5,9 @@ mod cli_integration_tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use liblevenshtein::cli::detect::{detect_format, DetectionMethod};
-    use liblevenshtein::cli::paths::{PersistentConfig, file_extension};
     use liblevenshtein::cli::args::SerializationFormat;
+    use liblevenshtein::cli::detect::{detect_format, DetectionMethod};
+    use liblevenshtein::cli::paths::{file_extension, PersistentConfig};
     use liblevenshtein::repl::state::DictionaryBackend;
 
     #[test]
@@ -18,7 +18,10 @@ mod cli_integration_tests {
 
         let detection = detect_format(&dict_path, None, None).unwrap();
         assert_eq!(detection.format.format, SerializationFormat::Text);
-        assert!(matches!(detection.method, DetectionMethod::Extension | DetectionMethod::Content));
+        assert!(matches!(
+            detection.method,
+            DetectionMethod::Extension | DetectionMethod::Content
+        ));
     }
 
     #[test]
@@ -41,7 +44,8 @@ mod cli_integration_tests {
             &dict_path,
             Some(DictionaryBackend::Dawg),
             Some(SerializationFormat::Text),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(detection.format.backend, DictionaryBackend::Dawg);
         assert_eq!(detection.format.format, SerializationFormat::Text);
@@ -50,7 +54,10 @@ mod cli_integration_tests {
     #[test]
     fn test_persistent_config_default() {
         let config = PersistentConfig::default();
-        assert_eq!(config.algorithm, Some(liblevenshtein::transducer::Algorithm::Standard));
+        assert_eq!(
+            config.algorithm,
+            Some(liblevenshtein::transducer::Algorithm::Standard)
+        );
         assert_eq!(config.max_distance, Some(2));
         assert_eq!(config.prefix_mode, Some(false));
         assert_eq!(config.show_distances, Some(false));
@@ -80,7 +87,10 @@ mod cli_integration_tests {
         );
 
         assert_eq!(merged.backend, Some(DictionaryBackend::Dawg));
-        assert_eq!(merged.algorithm, Some(liblevenshtein::transducer::Algorithm::Transposition));
+        assert_eq!(
+            merged.algorithm,
+            Some(liblevenshtein::transducer::Algorithm::Transposition)
+        );
         assert_eq!(merged.max_distance, Some(3));
         assert_eq!(merged.prefix_mode, Some(true));
         assert_eq!(merged.show_distances, Some(false)); // unchanged

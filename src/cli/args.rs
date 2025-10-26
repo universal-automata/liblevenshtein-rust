@@ -1,9 +1,9 @@
 //! CLI argument definitions
 
+use crate::repl::state::DictionaryBackend;
+use crate::transducer::Algorithm;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
-use crate::transducer::Algorithm;
-use crate::repl::state::DictionaryBackend;
 
 #[derive(Parser)]
 #[command(name = "liblevenshtein")]
