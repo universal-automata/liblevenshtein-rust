@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-10-26
+
+### Added
+- **Arch Linux package support** ([1199173](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/1199173))
+  - `.pkg.tar.zst` packages for x86_64 and aarch64 architectures
+  - `packaging/arch/PKGBUILD` with architecture-specific RUSTFLAGS
+  - Automated building and testing in CI using Docker with archlinux:latest
+  - Sanity tests verify installation and basic functionality
+
+- **RPM package support** ([1199173](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/1199173))
+  - `.rpm` packages for RedHat, Fedora, CentOS distributions
+  - RPM metadata in `Cargo.toml` using cargo-generate-rpm
+  - Automated building and testing in Fedora 40 container
+  - Proper library paths for /usr/lib64
+
+### Changed
+- **CI workflow improvements** ([1cd9189](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/1cd9189))
+  - Use explicit CPU features (`-C target-feature=+aes,+sse2` for x86_64, `+aes,+neon` for ARM64)
+  - Replaced `-C target-cpu=native` to ensure gxhash dependency compatibility
+  - Applied to `nightly.yml` and `release.yml` workflows
+
+### Fixed
+- **Code quality improvements** ([0f29a30](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/0f29a30))
+  - Fixed all 15 clippy warnings without suppressing any checks
+  - Redundant pattern matching: `if let Err(_) = ...` → `.is_err()` (2 instances)
+  - Identical if blocks: Simplified `parse_limit` logic
+  - Borrowed box: `&Box<T>` → `&T` (2 instances)
+  - Needless range loops: Use iterator patterns with `enumerate()` (5 instances)
+  - Method naming: Renamed `from_iter` → `from_terms` to avoid `FromIterator` confusion (44 call sites)
+  - Too many arguments: Refactored to use structs (2 functions)
+
+- **Library naming corrections** ([1199173](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/1199173))
+  - Fixed library names to use correct double-lib prefix:
+    - `libliblevenshtein.so` (Linux shared library)
+    - `libliblevenshtein.rlib` (Rust static library)
+    - `libliblevenshtein.dylib` (macOS shared library)
+  - Updated across all packaging files and CI workflows
+
 ### Added
 
 #### Development Infrastructure (2025-10-25)

@@ -1,7 +1,7 @@
 # Maintainer: F1R3FLY.io <noreply@f1r3fly.io>
 # NOTE: This PKGBUILD is for tagged releases
 pkgname=liblevenshtein
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Fast approximate string matching using Levenshtein automata"
 arch=('x86_64' 'aarch64')
