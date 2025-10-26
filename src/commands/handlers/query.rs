@@ -78,10 +78,7 @@ pub fn format_results(results: &[(String, usize)], show_distances: bool) -> Stri
 /// Execute query and return formatted result
 ///
 /// Convenience function that combines execute_query and format_results.
-pub fn query_and_format<D: Dictionary + Clone>(
-    dict: &D,
-    params: &QueryParams,
-) -> CommandResult {
+pub fn query_and_format<D: Dictionary + Clone>(dict: &D, params: &QueryParams) -> CommandResult {
     let results = execute_query(dict, params);
     let output = format_results(&results, params.show_distances);
 
@@ -161,10 +158,7 @@ mod tests {
 
     #[test]
     fn test_format_results_with_distances() {
-        let results = vec![
-            ("apple".to_string(), 0),
-            ("apply".to_string(), 1),
-        ];
+        let results = vec![("apple".to_string(), 0), ("apply".to_string(), 1)];
 
         let output = format_results(&results, true);
         assert!(output.contains("apple (distance: 0)"));

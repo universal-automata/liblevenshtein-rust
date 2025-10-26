@@ -1,10 +1,9 @@
 //! Protobuf serializers for cross-language compatibility.
 
 use crate::dictionary::{Dictionary, DictionaryNode};
-use prost::Message;
 use std::io::{Read, Write};
 
-use super::{extract_terms, DictionaryFromTerms, DictionarySerializer, SerializationError};
+use super::{DictionaryFromTerms, DictionarySerializer, SerializationError};
 
 /// Generated protobuf types
 mod proto {
@@ -412,4 +411,3 @@ impl DictionarySerializer for OptimizedProtobufSerializer {
         Ok(D::from_terms(terms))
     }
 }
-

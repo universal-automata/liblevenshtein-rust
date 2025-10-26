@@ -79,7 +79,7 @@ impl DictionaryContainer {
 
     /// Check if the dictionary is empty
     pub fn is_empty(&self) -> bool {
-        self.len().map_or(false, |len| len == 0)
+        self.len() == Some(0)
     }
 
     /// Check if a term exists in the dictionary
@@ -158,9 +158,7 @@ impl DictionaryFactory {
         match backend {
             DictionaryBackend::PathMap => DictionaryContainer::PathMap(PathMapDictionary::new()),
             DictionaryBackend::Dawg => DictionaryContainer::Dawg(DawgDictionary::new()),
-            DictionaryBackend::DynamicDawg => {
-                DictionaryContainer::DynamicDawg(DynamicDawg::new())
-            }
+            DictionaryBackend::DynamicDawg => DictionaryContainer::DynamicDawg(DynamicDawg::new()),
         }
     }
 
@@ -223,10 +221,8 @@ mod tests {
 
     #[test]
     fn test_factory_dynamic_dawg() {
-        let dict = DictionaryFactory::create(
-            DictionaryBackend::DynamicDawg,
-            vec!["foo", "bar", "baz"],
-        );
+        let dict =
+            DictionaryFactory::create(DictionaryBackend::DynamicDawg, vec!["foo", "bar", "baz"]);
 
         assert_eq!(dict.backend(), DictionaryBackend::DynamicDawg);
         assert_eq!(dict.len(), Some(3));
