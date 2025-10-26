@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Development Infrastructure (2025-10-25)
+- **Git hooks for preventing accidental commits** ([116d617](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/116d617))
+  - Pre-commit hook checks for uncommented `[patch]` sections in Cargo.toml
+  - Prevents committing local development overrides (e.g., local PathMap paths)
+  - Installation script: `./scripts/install-git-hooks.sh`
+  - Clear error messages with fix suggestions
+  - Documentation in `.githooks/README.md`
+
+### Changed
+
+#### Dependency Management (2025-10-25)
+- **PathMap dependency now uses GitHub repository** ([77e6b56](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/77e6b56))
+  - Changed from local path to `git = "https://github.com/Adam-Vandervorst/PathMap.git"`
+  - Added commented `[patch]` section for local development override
+  - Removed PathMap checkout steps from GitHub Actions workflows (automatic fetch)
+  - Created `.cargo/config.toml.local-example` for local dev setup
+  - Updated CONTRIBUTING.md with instructions for both approaches
+  - Benefits: cleaner CI/CD, easier for contributors, works from crates.io
+
+#### Documentation (2025-10-25)
+- **Comprehensive documentation restructuring** ([d9a52d0](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/d9a52d0))
+  - Created `docs/README.md` as central documentation index (177 lines)
+  - Organized documentation into categories (Getting Started, User Guides, Developer Docs, Benchmarks)
+  - Archived 20 historical benchmark files to `docs/archive/benchmarks/`
+  - Updated `FEATURES.md` for v0.2.0 (DynamicDawg, OrderedQueryIterator, compression, protobuf)
+  - Created comprehensive `BUILD.md` (434 lines) with build instructions
+  - Updated `CONTRIBUTING.md` for v0.2.0 features and workflows
+  - All docs now include version headers and last-updated dates
+
+#### CI/CD (2025-10-25)
+- **GitHub Actions workflow badges** ([5c5853a](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/5c5853a))
+  - Added CI, Nightly Tests, Release, License, and Crates.io badges to README
+
+- **Comprehensive GitHub Actions workflows** ([e065043](https://github.com/F1R3FLY-io/liblevenshtein-rust/commit/e065043))
+  - `ci.yml`: Main CI with test matrix (Ubuntu + macOS, stable + nightly Rust)
+  - `release.yml`: Multi-platform builds (Linux x86_64/ARM64, macOS x86_64/ARM64, .deb packages)
+  - `nightly.yml`: Daily validation with code coverage, security audits, benchmark tracking
+  - Total: 647 lines of workflow automation
+
 ## [0.2.0] - 2025-10-25
 
 ### Added
