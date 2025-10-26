@@ -36,7 +36,7 @@ use crate::dictionary::Dictionary;
 /// ```rust,ignore
 /// use liblevenshtein::prelude::*;
 ///
-/// let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
+/// let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
 /// let transducer = Transducer::new(dict, Algorithm::Standard);
 ///
 /// for term in transducer.query("tset", 2) {
@@ -100,7 +100,7 @@ impl<D: Dictionary> Transducer<D> {
     /// ```rust,ignore
     /// use liblevenshtein::prelude::*;
     ///
-    /// let dict = PathMapDictionary::from_iter(vec!["test", "best", "rest"]);
+    /// let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest"]);
     /// let transducer = Transducer::new(dict, Algorithm::Standard);
     ///
     /// // Get first 3 closest matches

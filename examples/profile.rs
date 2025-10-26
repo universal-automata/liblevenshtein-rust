@@ -15,7 +15,7 @@ fn create_dictionary(size: usize) -> PathMapDictionary {
             format!("word{:0width$}", i, width = len - 4)
         })
         .collect();
-    PathMapDictionary::from_iter(words)
+    PathMapDictionary::from_terms(words)
 }
 
 fn main() {
@@ -58,7 +58,7 @@ fn main() {
 
     // 5. Worst case similar words (maximum state expansion)
     println!("Running worst case queries...");
-    let worst_dict = PathMapDictionary::from_iter(vec![
+    let worst_dict = PathMapDictionary::from_terms(vec![
         "aaaa", "aaab", "aaba", "aabb", "abaa", "abab", "abba", "abbb", "baaa", "baab", "baba",
         "babb", "bbaa", "bbab", "bbba", "bbbb",
     ]);

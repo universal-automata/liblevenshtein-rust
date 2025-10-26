@@ -8,7 +8,7 @@ fn main() {
     println!("Batch Operations with Dynamic DAWG\n");
     println!("===================================\n");
 
-    let dawg = DynamicDawg::from_iter(vec!["apple", "application", "apply", "banana", "cherry"]);
+    let dawg = DynamicDawg::from_terms(vec!["apple", "application", "apply", "banana", "cherry"]);
 
     println!("1. Initial state:");
     println!("   Terms: {}", dawg.term_count());

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 fn test_parallel_reads() {
     // Create dictionary with many terms
     let terms: Vec<String> = (0..1000).map(|i| format!("term{}", i)).collect();
-    let dict = PathMapDictionary::from_iter(terms);
+    let dict = PathMapDictionary::from_terms(terms);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     const NUM_READERS: usize = 8;
@@ -76,7 +76,7 @@ fn test_parallel_reads() {
 
 #[test]
 fn test_read_during_write() {
-    let dict = PathMapDictionary::from_iter(vec!["test"]);
+    let dict = PathMapDictionary::from_terms(vec!["test"]);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     let dict_writer = dict.clone();

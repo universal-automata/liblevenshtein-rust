@@ -216,7 +216,7 @@ impl DictionarySerializer for ProtobufSerializer {
 /// ```rust,ignore
 /// use liblevenshtein::prelude::*;
 ///
-/// let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
+/// let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
 ///
 /// // Serialize with optimized format (smaller size)
 /// let mut buf = Vec::new();

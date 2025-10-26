@@ -72,17 +72,18 @@ fn run_repl(
     let config = PersistentConfig::load().unwrap_or_default();
 
     // Merge with CLI options
-    let merged_config = config.merge_with_cli(
-        dict_path.clone(),
-        backend_opt,
-        format_opt,
-        Some(algorithm),
-        Some(max_distance),
-        Some(prefix),
-        Some(show_distances),
-        Some(limit),
-        Some(auto_sync),
-    );
+    let cli_overrides = PersistentConfig {
+        dict_path: dict_path.clone(),
+        backend: backend_opt,
+        format: format_opt,
+        algorithm: Some(algorithm),
+        max_distance: Some(max_distance),
+        prefix_mode: Some(prefix),
+        show_distances: Some(show_distances),
+        result_limit: Some(limit),
+        auto_sync: Some(auto_sync),
+    };
+    let merged_config = config.merge_with_cli(&cli_overrides);
 
     // Save merged config for future use
     let _ = merged_config.save();

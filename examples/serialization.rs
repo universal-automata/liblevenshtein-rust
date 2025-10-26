@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "tested",
         "tester",
     ];
-    let dict = PathMapDictionary::from_iter(terms.clone());
+    let dict = PathMapDictionary::from_terms(terms.clone());
     println!("   Created dictionary with {} terms\n", dict.len().unwrap());
 
     // Serialize to bincode (compact binary format)

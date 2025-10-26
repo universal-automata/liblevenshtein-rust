@@ -187,7 +187,7 @@ fn bench_transition_overhead(c: &mut Criterion) {
     use liblevenshtein::transducer::transition::{initial_state, transition_state};
     use liblevenshtein::transducer::{Position, State};
 
-    let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tested"]);
+    let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
     let root = dict.root();
 
     let mut group = c.benchmark_group("transition_overhead");
@@ -249,7 +249,7 @@ fn bench_inline_impact(c: &mut Criterion) {
 
 /// Benchmark complete query with profiling
 fn bench_query_with_instrumentation(c: &mut Criterion) {
-    let dict = PathMapDictionary::from_iter((0..1000).map(|i| format!("word{:04}", i)));
+    let dict = PathMapDictionary::from_terms((0..1000).map(|i| format!("word{:04}", i)));
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     let mut group = c.benchmark_group("instrumented_query");

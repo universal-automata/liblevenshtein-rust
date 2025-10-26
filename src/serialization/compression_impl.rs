@@ -17,7 +17,7 @@ use super::{DictionaryFromTerms, DictionarySerializer, SerializationError};
 /// use liblevenshtein::serialization::{GzipSerializer, BincodeSerializer};
 /// use std::fs::File;
 ///
-/// let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
+/// let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
 ///
 /// // Serialize with gzip compression
 /// let file = File::create("dict.bin.gz")?;

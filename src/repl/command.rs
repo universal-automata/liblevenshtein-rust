@@ -382,9 +382,7 @@ impl Command {
     }
 
     fn parse_limit(args: &[&str]) -> Result<Self> {
-        let limit = if args.is_empty() {
-            None
-        } else if args[0].to_lowercase() == "none" || args[0] == "0" {
+        let limit = if args.is_empty() || args[0].to_lowercase() == "none" || args[0] == "0" {
             None
         } else {
             Some(args[0].parse().context("Invalid limit value")?)
@@ -772,7 +770,7 @@ impl Command {
                 // Check if we have a dictionary path that would need its extension changed
                 if let Some(ref dict_path) = state.auto_sync_path {
                     // Check if current path matches the new format
-                    if let Err(_) = validate_dict_path(dict_path, *format) {
+                    if validate_dict_path(dict_path, *format).is_err() {
                         let new_path = change_extension(dict_path, *format);
                         let expected_ext = file_extension(*format);
 

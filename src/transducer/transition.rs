@@ -28,9 +28,9 @@ fn characteristic_vector<'a>(
 ) -> &'a [bool] {
     // Most queries use max_distance ≤ 7, so window_size ≤ 8
     let len = window_size.min(8);
-    for i in 0..len {
+    for (i, item) in buffer.iter_mut().enumerate().take(len) {
         let query_idx = offset + i;
-        buffer[i] = query_idx < query.len() && query[query_idx] == dict_char;
+        *item = query_idx < query.len() && query[query_idx] == dict_char;
     }
     &buffer[..len]
 }

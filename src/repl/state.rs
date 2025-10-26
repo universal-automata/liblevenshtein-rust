@@ -155,7 +155,7 @@ impl DictContainer {
 
         let new_dict = match backend {
             DictionaryBackend::PathMap => {
-                let dict = PathMapDictionary::from_iter(terms.iter().map(|s| s.as_str()));
+                let dict = PathMapDictionary::from_terms(terms.iter().map(|s| s.as_str()));
                 Self::PathMap(dict)
             }
             DictionaryBackend::Dawg => {
@@ -297,7 +297,7 @@ impl ReplState {
 
             self.dictionary = match backend {
                 DictionaryBackend::PathMap => {
-                    DictContainer::PathMap(PathMapDictionary::from_iter(terms))
+                    DictContainer::PathMap(PathMapDictionary::from_terms(terms))
                 }
                 DictionaryBackend::Dawg => DictContainer::Dawg(DawgDictionary::from_iter(terms)),
                 DictionaryBackend::DynamicDawg => {

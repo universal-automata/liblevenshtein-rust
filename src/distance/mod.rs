@@ -37,8 +37,8 @@ pub fn standard_distance(source: &str, target: &str) -> usize {
     let mut curr_row = vec![0; n + 1];
 
     // Initialize first row
-    for j in 0..=n {
-        prev_row[j] = j;
+    for (j, item) in prev_row.iter_mut().enumerate().take(n + 1) {
+        *item = j;
     }
 
     // Fill the matrix
@@ -97,8 +97,8 @@ pub fn transposition_distance(source: &str, target: &str) -> usize {
     let mut curr_row = vec![0; n + 1];
 
     // Initialize first row
-    for j in 0..=n {
-        prev_row[j] = j;
+    for (j, item) in prev_row.iter_mut().enumerate().take(n + 1) {
+        *item = j;
     }
 
     // Fill the matrix

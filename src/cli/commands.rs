@@ -38,9 +38,9 @@ pub fn execute(command: Commands) -> Result<()> {
             prefix,
             show_distances,
             limit,
-        } => cmd_query(
-            &term,
-            dict,
+        } => cmd_query(QueryOptions {
+            term: &term,
+            dict_path: dict,
             backend,
             format,
             max_distance,
@@ -48,7 +48,7 @@ pub fn execute(command: Commands) -> Result<()> {
             prefix,
             show_distances,
             limit,
-        ),
+        }),
         Commands::Info { dict } => cmd_info(dict),
         Commands::Convert {
             input,
@@ -106,9 +106,9 @@ pub fn execute(command: Commands) -> Result<()> {
     }
 }
 
-/// Query command
-fn cmd_query(
-    term: &str,
+/// Query command options
+struct QueryOptions<'a> {
+    term: &'a str,
     dict_path: Option<PathBuf>,
     backend: Option<DictionaryBackend>,
     format: Option<SerializationFormat>,
@@ -117,20 +117,24 @@ fn cmd_query(
     prefix: bool,
     show_distances: bool,
     limit: Option<usize>,
-) -> Result<()> {
-    let (path, dict_format) = resolve_dict_path_and_format(dict_path, backend, format)?;
+}
+
+/// Query command
+fn cmd_query(opts: QueryOptions) -> Result<()> {
+    let (path, dict_format) =
+        resolve_dict_path_and_format(opts.dict_path, opts.backend, opts.format)?;
 
     // Load dictionary
     let container = load_dictionary(&path, dict_format)?;
 
     // Create query parameters
     let params = QueryParams {
-        term: term.to_string(),
-        max_distance,
-        algorithm,
-        prefix,
+        term: opts.term.to_string(),
+        max_distance: opts.max_distance,
+        algorithm: opts.algorithm,
+        prefix: opts.prefix,
         show_distances: false, // Not used by execute_query
-        limit,
+        limit: opts.limit,
     };
 
     // Perform query using shared handler
@@ -145,7 +149,7 @@ fn cmd_query(
         println!("{}", "No matches found".yellow());
     } else {
         for (i, (candidate, distance)) in results.iter().enumerate() {
-            if show_distances {
+            if opts.show_distances {
                 println!("   {}. {} (d={})", i + 1, candidate.green(), distance);
             } else {
                 println!("   {}. {}", i + 1, candidate.green());
@@ -639,7 +643,7 @@ where
 /// Create dictionary from terms
 fn create_dict_from_terms(terms: Vec<String>, backend: DictionaryBackend) -> Result<DictContainer> {
     let container = match backend {
-        DictionaryBackend::PathMap => DictContainer::PathMap(PathMapDictionary::from_iter(
+        DictionaryBackend::PathMap => DictContainer::PathMap(PathMapDictionary::from_terms(
             terms.iter().map(|s| s.as_str()),
         )),
         DictionaryBackend::Dawg => {
@@ -822,7 +826,7 @@ fn cmd_settings(
         if let Some(ref dict_path) = config.dict_path {
             use super::paths::{change_extension, file_extension, validate_dict_path};
 
-            if let Err(_) = validate_dict_path(dict_path, format) {
+            if validate_dict_path(dict_path, format).is_err() {
                 let new_path = change_extension(dict_path, format);
                 let expected_ext = file_extension(format);
 

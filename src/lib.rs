@@ -15,7 +15,7 @@
 //! use liblevenshtein::prelude::*;
 //!
 //! let terms = vec!["test", "testing", "tested"];
-//! let dict = PathMapDictionary::from_iter(terms);
+//! let dict = PathMapDictionary::from_terms(terms);
 //! let transducer = Transducer::new(dict, Algorithm::Standard);
 //!
 //! for term in transducer.query("tset", 2) {

@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_intersection_creation() {
-        let dict = PathMapDictionary::from_iter(vec!["test"]);
+        let dict = PathMapDictionary::from_terms(vec!["test"]);
         let root = dict.root();
         let state = State::single(Position::new(0, 0));
 
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_intersection_path_reconstruction() {
-        let dict = PathMapDictionary::from_iter(vec!["test"]);
+        let dict = PathMapDictionary::from_terms(vec!["test"]);
         let root = dict.root();
 
         // Build path: t -> e -> s using PathNode

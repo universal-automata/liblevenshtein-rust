@@ -23,7 +23,7 @@ fn main() {
     // Build dictionary
     println!("Building dictionary...");
     let start = Instant::now();
-    let dict = PathMapDictionary::from_iter(words.iter().map(|s| s.as_str()));
+    let dict = PathMapDictionary::from_terms(words.iter().map(|s| s.as_str()));
     println!("Built in {:?}\n", start.elapsed());
 
     let transducer = Transducer::new(dict, Algorithm::Standard);

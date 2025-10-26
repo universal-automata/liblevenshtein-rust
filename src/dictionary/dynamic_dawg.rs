@@ -70,8 +70,7 @@ impl DawgNode {
 impl DynamicDawg {
     /// Create a new empty dynamic DAWG.
     pub fn new() -> Self {
-        let mut nodes = Vec::new();
-        nodes.push(DawgNode::new(false)); // Root at index 0
+        let nodes = vec![DawgNode::new(false)]; // Root at index 0
 
         DynamicDawg {
             inner: Arc::new(RwLock::new(DynamicDawgInner {
@@ -83,7 +82,7 @@ impl DynamicDawg {
     }
 
     /// Create from an iterator of terms (optimized batch insert).
-    pub fn from_iter<I, S>(terms: I) -> Self
+    pub fn from_terms<I, S>(terms: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -740,7 +739,7 @@ mod tests {
     fn test_dynamic_dawg_with_transducer() {
         use crate::transducer::{Algorithm, Transducer};
 
-        let dawg = DynamicDawg::from_iter(vec!["apple", "application", "apply"]);
+        let dawg = DynamicDawg::from_terms(vec!["apple", "application", "apply"]);
         let transducer = Transducer::new(dawg.clone(), Algorithm::Standard);
 
         let results: Vec<_> = transducer.query("aple", 2).collect();
@@ -782,7 +781,7 @@ mod tests {
 
     #[test]
     fn test_batch_remove_many() {
-        let dawg = DynamicDawg::from_iter(vec!["test", "testing", "tested", "tester"]);
+        let dawg = DynamicDawg::from_terms(vec!["test", "testing", "tested", "tester"]);
 
         let to_remove = vec!["testing", "tester"];
         let removed = dawg.remove_many(to_remove);
@@ -878,7 +877,8 @@ mod tests {
 
     #[test]
     fn test_minimize_after_deletions() {
-        let dawg = DynamicDawg::from_iter(vec!["test", "testing", "tested", "tester", "testimony"]);
+        let dawg =
+            DynamicDawg::from_terms(vec!["test", "testing", "tested", "tester", "testimony"]);
 
         // Remove some terms, creating potential orphaned nodes
         dawg.remove("testing");
@@ -949,7 +949,7 @@ mod tests {
 
     #[test]
     fn test_minimize_idempotent() {
-        let dawg = DynamicDawg::from_iter(vec!["apple", "application", "apply", "apricot"]);
+        let dawg = DynamicDawg::from_terms(vec!["apple", "application", "apply", "apricot"]);
 
         // First minimization
         let _merged1 = dawg.minimize();

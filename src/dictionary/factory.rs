@@ -127,11 +127,11 @@ impl DictionaryFactory {
     {
         match backend {
             DictionaryBackend::PathMap => {
-                DictionaryContainer::PathMap(PathMapDictionary::from_iter(terms))
+                DictionaryContainer::PathMap(PathMapDictionary::from_terms(terms))
             }
             DictionaryBackend::Dawg => DictionaryContainer::Dawg(DawgDictionary::from_iter(terms)),
             DictionaryBackend::DynamicDawg => {
-                DictionaryContainer::DynamicDawg(DynamicDawg::from_iter(terms))
+                DictionaryContainer::DynamicDawg(DynamicDawg::from_terms(terms))
             }
         }
     }

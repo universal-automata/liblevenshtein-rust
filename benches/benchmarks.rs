@@ -12,7 +12,7 @@ fn create_dictionary(size: usize) -> PathMapDictionary {
             format!("word{:0width$}", i, width = len - 4)
         })
         .collect();
-    PathMapDictionary::from_iter(words)
+    PathMapDictionary::from_terms(words)
 }
 
 /// Benchmark: Query performance with different dictionary sizes
@@ -57,7 +57,7 @@ fn bench_query_varying_distance(c: &mut Criterion) {
 
 /// Benchmark: Query performance with different query lengths
 fn bench_query_varying_query_length(c: &mut Criterion) {
-    let dict = PathMapDictionary::from_iter(vec![
+    let dict = PathMapDictionary::from_terms(vec![
         "a",
         "ab",
         "abc",
@@ -110,7 +110,7 @@ fn bench_query_many_results(c: &mut Criterion) {
 
 /// Benchmark: Worst-case queries (maximum state expansion)
 fn bench_query_worst_case(c: &mut Criterion) {
-    let dict = PathMapDictionary::from_iter(vec![
+    let dict = PathMapDictionary::from_terms(vec![
         "aaaa", "aaab", "aaba", "aabb", "abaa", "abab", "abba", "abbb", "baaa", "baab", "baba",
         "babb", "bbaa", "bbab", "bbba", "bbbb",
     ]);
@@ -223,7 +223,7 @@ fn bench_distance_computation(c: &mut Criterion) {
 
 /// Benchmark: Insertion/deletion heavy queries
 fn bench_insertion_deletion_queries(c: &mut Criterion) {
-    let dict = PathMapDictionary::from_iter(vec![
+    let dict = PathMapDictionary::from_terms(vec![
         "apple",
         "application",
         "apply",

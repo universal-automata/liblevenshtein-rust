@@ -11,7 +11,7 @@ fn main() {
     // Create a reasonably sized dictionary
     let words: Vec<String> = (0..5000).map(|i| format!("word{:05}", i)).collect();
 
-    let dict = PathMapDictionary::from_iter(words);
+    let dict = PathMapDictionary::from_terms(words);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     println!("Dictionary created with 5000 words");

@@ -16,7 +16,7 @@ fn create_dictionary(size: usize) -> PathMapDictionary {
             format!("word{:0width$}", i, width = len - 4)
         })
         .collect();
-    PathMapDictionary::from_iter(words)
+    PathMapDictionary::from_terms(words)
 }
 
 /// Benchmark: Bincode serialization performance

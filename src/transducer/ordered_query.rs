@@ -44,7 +44,7 @@ pub struct OrderedCandidate {
 /// ```rust,ignore
 /// use liblevenshtein::prelude::*;
 ///
-/// let dict = PathMapDictionary::from_iter(vec!["test", "best", "rest", "testing"]);
+/// let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest", "testing"]);
 /// let transducer = Transducer::new(dict, Algorithm::Standard);
 ///
 /// // Get first 3 closest matches
@@ -141,7 +141,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
 
     /// Queue child intersections into appropriate distance buckets
     #[inline]
-    fn queue_children(&mut self, intersection: &Box<Intersection<N>>) {
+    fn queue_children(&mut self, intersection: &Intersection<N>) {
         // Edges are iterated in sorted order (lexicographic) thanks to DAWG construction
         for (label, child_node) in intersection.node.edges() {
             if let Some(next_state) = transition_state_pooled(
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_ordered_exact_match() {
-        let dict = PathMapDictionary::from_iter(vec!["test"]);
+        let dict = PathMapDictionary::from_terms(vec!["test"]);
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
@@ -347,7 +347,7 @@ mod tests {
 
     #[test]
     fn test_ordered_distance_first() {
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "test",    // distance 0
             "best",    // distance 1
             "rest",    // distance 1
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_ordered_lexicographic_within_distance() {
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "test", "best", "fest", "nest", "rest", "west", "zest",
         ]);
 
@@ -411,7 +411,7 @@ mod tests {
 
     #[test]
     fn test_ordered_take() {
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "test", "best", "rest", "nest", "testing", "resting",
         ]);
 
@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn test_ordered_take_while() {
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "test", "best", "rest", "nest", "testing", "resting",
         ]);
 
@@ -458,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_ordered_empty_query() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "best"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "best"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "xyz".to_string(), 0, Algorithm::Standard);
@@ -473,7 +473,7 @@ mod tests {
         use crate::transducer::query::QueryIterator;
 
         let dict =
-            PathMapDictionary::from_iter(vec!["test", "best", "rest", "nest", "fest", "testing"]);
+            PathMapDictionary::from_terms(vec!["test", "best", "rest", "nest", "fest", "testing"]);
 
         let ordered =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
@@ -492,7 +492,7 @@ mod tests {
     #[test]
     fn test_filtered_query() {
         let dict =
-            PathMapDictionary::from_iter(vec!["test", "Test", "TEST", "best", "Best", "rest"]);
+            PathMapDictionary::from_terms(vec!["test", "Test", "TEST", "best", "Best", "rest"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn test_filtered_query_with_distance() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "best", "rest", "nest"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "best", "rest", "nest"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
@@ -546,7 +546,7 @@ mod tests {
     #[test]
     fn test_filtered_query_maintains_order() {
         let dict =
-            PathMapDictionary::from_iter(vec!["a", "aa", "aaa", "ab", "abc", "b", "ba", "baa"]);
+            PathMapDictionary::from_terms(vec!["a", "aa", "aaa", "ab", "abc", "b", "ba", "baa"]);
 
         let query = OrderedQueryIterator::new(dict.root(), "a".to_string(), 2, Algorithm::Standard);
 
@@ -571,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_filtered_query_with_take() {
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "test", "testing", "tester", "best", "rest", "nest", "fest",
         ]);
 
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_prefix_exact_match() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tester", "tested"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tester", "tested"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
@@ -622,7 +622,8 @@ mod tests {
 
     #[test]
     fn test_prefix_with_errors() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "best", "resting", "rest"]);
+        let dict =
+            PathMapDictionary::from_terms(vec!["test", "testing", "best", "resting", "rest"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "tes".to_string(), 1, Algorithm::Standard);
@@ -642,7 +643,7 @@ mod tests {
 
     #[test]
     fn test_prefix_ordering() {
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "test", "testing", "tester", "best", "resting", "rest",
         ]);
 
@@ -670,7 +671,7 @@ mod tests {
 
     #[test]
     fn test_prefix_vs_exact() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tester"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tester"]);
 
         // Exact matching
         let exact_query =
@@ -698,7 +699,7 @@ mod tests {
     #[test]
     fn test_prefix_autocomplete_scenario() {
         // Simulating code completion
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "getValue",
             "getVariable",
             "getValue2",
@@ -726,7 +727,7 @@ mod tests {
     #[test]
     fn test_prefix_with_filter() {
         // Combining prefix matching with filtering
-        let dict = PathMapDictionary::from_iter(vec![
+        let dict = PathMapDictionary::from_terms(vec![
             "TestCase",
             "testMethod",
             "testHelper",

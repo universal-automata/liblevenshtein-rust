@@ -33,7 +33,7 @@ impl PathMapDictionary {
     }
 
     /// Create a dictionary from an iterator of terms
-    pub fn from_iter<I, S>(terms: I) -> Self
+    pub fn from_terms<I, S>(terms: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -184,7 +184,7 @@ impl Default for PathMapDictionary {
 #[cfg(feature = "serialization")]
 impl DictionaryFromTerms for PathMapDictionary {
     fn from_terms<I: IntoIterator<Item = String>>(terms: I) -> Self {
-        Self::from_iter(terms)
+        PathMapDictionary::from_terms(terms)
     }
 }
 
@@ -338,13 +338,13 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_creation() {
-        let dict = PathMapDictionary::from_iter(vec!["hello", "world", "test"]);
+        let dict = PathMapDictionary::from_terms(vec!["hello", "world", "test"]);
         assert_eq!(dict.len(), Some(3));
     }
 
     #[test]
     fn test_pathmap_dictionary_contains() {
-        let dict = PathMapDictionary::from_iter(vec!["hello", "world"]);
+        let dict = PathMapDictionary::from_terms(vec!["hello", "world"]);
         assert!(dict.contains("hello"));
         assert!(dict.contains("world"));
         assert!(!dict.contains("goodbye"));
@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_node_traversal() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
         let root = dict.root();
 
         // Navigate: t -> e -> s -> t
@@ -370,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_node_edges() {
-        let dict = PathMapDictionary::from_iter(vec!["ab", "ac", "ad"]);
+        let dict = PathMapDictionary::from_terms(vec!["ab", "ac", "ad"]);
         let root = dict.root();
         let a = root.transition(b'a').expect("should have 'a'");
 
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_insert() {
-        let dict = PathMapDictionary::from_iter(vec!["test"]);
+        let dict = PathMapDictionary::from_terms(vec!["test"]);
         assert_eq!(dict.term_count(), 1);
 
         // Insert new term
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_remove() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tested"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
         assert_eq!(dict.term_count(), 3);
 
         // Remove existing term
@@ -415,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_clear() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
         assert_eq!(dict.term_count(), 2);
 
         dict.clear();
@@ -428,7 +428,7 @@ mod tests {
     fn test_pathmap_dictionary_concurrent_operations() {
         use std::thread;
 
-        let dict = PathMapDictionary::from_iter(vec!["test"]);
+        let dict = PathMapDictionary::from_terms(vec!["test"]);
         let dict_clone = dict.clone();
 
         // Spawn thread that inserts while main thread queries

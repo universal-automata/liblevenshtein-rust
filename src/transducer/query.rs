@@ -81,7 +81,7 @@ impl<N: DictionaryNode> QueryIterator<N> {
     }
 
     /// Queue child intersections for exploration
-    fn queue_children(&mut self, intersection: &Box<Intersection<N>>) {
+    fn queue_children(&mut self, intersection: &Intersection<N>) {
         for (label, child_node) in intersection.node.edges() {
             if let Some(next_state) = transition_state_pooled(
                 &intersection.state,
@@ -175,8 +175,8 @@ impl<N: DictionaryNode> CandidateIterator<N> {
         let mut dp = vec![vec![0; n + 1]; m + 1];
 
         // Initialize first row and column
-        for i in 0..=m {
-            dp[i][0] = i;
+        for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+            row[0] = i;
         }
         for j in 0..=n {
             dp[0][j] = j;
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_query_exact_match() {
-        let dict = PathMapDictionary::from_iter(vec!["test"]);
+        let dict = PathMapDictionary::from_terms(vec!["test"]);
         let query = QueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let result: Vec<_> = query.collect();
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_query_with_distance() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "best", "rest", "testing"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest", "testing"]);
         let query = QueryIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_candidate_iterator() {
-        let dict = PathMapDictionary::from_iter(vec!["test", "best"]);
+        let dict = PathMapDictionary::from_terms(vec!["test", "best"]);
         let query = CandidateIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
 
         let candidates: Vec<_> = query.collect();
@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_empty_query() {
-        let dict = PathMapDictionary::from_iter(vec!["test"]);
+        let dict = PathMapDictionary::from_terms(vec!["test"]);
         let query = QueryIterator::new(dict.root(), "".to_string(), 0, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();

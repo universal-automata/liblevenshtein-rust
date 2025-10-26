@@ -251,28 +251,22 @@ impl PersistentConfig {
     }
 
     /// Merge with command-line options (CLI options take precedence)
-    pub fn merge_with_cli(
-        &self,
-        dict_path: Option<PathBuf>,
-        backend: Option<DictionaryBackend>,
-        format: Option<SerializationFormat>,
-        algorithm: Option<crate::transducer::Algorithm>,
-        max_distance: Option<usize>,
-        prefix_mode: Option<bool>,
-        show_distances: Option<bool>,
-        result_limit: Option<Option<usize>>,
-        auto_sync: Option<bool>,
-    ) -> Self {
+    ///
+    /// This method accepts a partial config where CLI options override the stored config.
+    pub fn merge_with_cli(&self, cli_overrides: &Self) -> Self {
         Self {
-            dict_path: dict_path.or_else(|| self.dict_path.clone()),
-            backend: backend.or(self.backend),
-            format: format.or(self.format),
-            algorithm: algorithm.or(self.algorithm),
-            max_distance: max_distance.or(self.max_distance),
-            prefix_mode: prefix_mode.or(self.prefix_mode),
-            show_distances: show_distances.or(self.show_distances),
-            result_limit: result_limit.or(self.result_limit),
-            auto_sync: auto_sync.or(self.auto_sync),
+            dict_path: cli_overrides
+                .dict_path
+                .clone()
+                .or_else(|| self.dict_path.clone()),
+            backend: cli_overrides.backend.or(self.backend),
+            format: cli_overrides.format.or(self.format),
+            algorithm: cli_overrides.algorithm.or(self.algorithm),
+            max_distance: cli_overrides.max_distance.or(self.max_distance),
+            prefix_mode: cli_overrides.prefix_mode.or(self.prefix_mode),
+            show_distances: cli_overrides.show_distances.or(self.show_distances),
+            result_limit: cli_overrides.result_limit.or(self.result_limit),
+            auto_sync: cli_overrides.auto_sync.or(self.auto_sync),
         }
     }
 }

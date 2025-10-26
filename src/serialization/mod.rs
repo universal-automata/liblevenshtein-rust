@@ -11,7 +11,7 @@
 //! use std::fs::File;
 //!
 //! // Create and populate dictionary
-//! let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
+//! let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
 //!
 //! // Serialize to file
 //! let file = File::create("dict.bin")?;
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_bincode_roundtrip() {
-        let dict = PathMapDictionary::from_iter(vec!["hello", "world", "test"]);
+        let dict = PathMapDictionary::from_terms(vec!["hello", "world", "test"]);
         let mut buffer = Vec::new();
 
         BincodeSerializer::serialize(&dict, &mut buffer).unwrap();
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_json_roundtrip() {
-        let dict = PathMapDictionary::from_iter(vec!["alpha", "beta", "gamma"]);
+        let dict = PathMapDictionary::from_terms(vec!["alpha", "beta", "gamma"]);
         let mut buffer = Vec::new();
 
         JsonSerializer::serialize(&dict, &mut buffer).unwrap();
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_extract_terms() {
-        let dict = PathMapDictionary::from_iter(vec!["apple", "apply", "application"]);
+        let dict = PathMapDictionary::from_terms(vec!["apple", "apply", "application"]);
         let terms = extract_terms(&dict);
 
         assert_eq!(terms.len(), 3);

@@ -31,7 +31,7 @@ fn main() {
         "Building dictionary with {} words...",
         dictionary_words.len()
     );
-    let dict = PathMapDictionary::from_iter(dictionary_words);
+    let dict = PathMapDictionary::from_terms(dictionary_words);
 
     // Create a transducer with Standard algorithm
     let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -81,7 +81,7 @@ fn main() {
     println!("\n=== Algorithm Comparison ===\n");
 
     let test_word = "tset";
-    let dict2 = PathMapDictionary::from_iter(vec!["test", "set", "reset"]);
+    let dict2 = PathMapDictionary::from_terms(vec!["test", "set", "reset"]);
 
     println!("Query: '{}' with distance 1", test_word);
 

@@ -119,7 +119,7 @@ fn main() {
 
     // Create both types of dictionaries
     let pathmap_dict =
-        liblevenshtein::prelude::PathMapDictionary::from_iter(vec!["test", "testing", "tested"]);
+        liblevenshtein::prelude::PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
 
     let persistent_dict = PersistentDictionary::new(vec![
         "test".to_string(),

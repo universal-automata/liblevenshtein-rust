@@ -74,17 +74,18 @@ mod cli_integration_tests {
     #[test]
     fn test_config_merge() {
         let base_config = PersistentConfig::default();
-        let merged = base_config.merge_with_cli(
-            None,
-            Some(DictionaryBackend::Dawg),
-            None,
-            Some(liblevenshtein::transducer::Algorithm::Transposition),
-            Some(3),
-            Some(true),
-            None,
-            None,
-            None,
-        );
+        let cli_overrides = PersistentConfig {
+            dict_path: None,
+            backend: Some(DictionaryBackend::Dawg),
+            format: None,
+            algorithm: Some(liblevenshtein::transducer::Algorithm::Transposition),
+            max_distance: Some(3),
+            prefix_mode: Some(true),
+            show_distances: None,
+            result_limit: None,
+            auto_sync: None,
+        };
+        let merged = base_config.merge_with_cli(&cli_overrides);
 
         assert_eq!(merged.backend, Some(DictionaryBackend::Dawg));
         assert_eq!(

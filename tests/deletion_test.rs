@@ -4,7 +4,7 @@ use liblevenshtein::prelude::*;
 
 #[test]
 fn test_aple_to_apple() {
-    let dict = PathMapDictionary::from_iter(vec!["apple"]);
+    let dict = PathMapDictionary::from_terms(vec!["apple"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     let results: Vec<_> = transducer.query("aple", 1).collect();
@@ -26,7 +26,7 @@ fn test_aple_to_apple() {
 
 #[test]
 fn test_apple_to_aple() {
-    let dict = PathMapDictionary::from_iter(vec!["aple"]);
+    let dict = PathMapDictionary::from_terms(vec!["aple"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     let results: Vec<_> = transducer.query("apple", 1).collect();
@@ -49,7 +49,7 @@ fn test_apple_to_aple() {
 #[test]
 fn test_deletion_operations() {
     // Test various deletion scenarios
-    let dict = PathMapDictionary::from_iter(vec!["test", "testing", "apple", "world"]);
+    let dict = PathMapDictionary::from_terms(vec!["test", "testing", "apple", "world"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Query has extra character (deletion from query)
