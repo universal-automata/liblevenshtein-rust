@@ -4,18 +4,29 @@ This document provides a detailed implementation plan for the remaining architec
 
 ## Overview
 
-The goal is to eliminate code duplication between CLI and REPL, and split large modules into maintainable pieces.
+The goal is to eliminate code duplication between CLI and REPL by extracting shared command logic, which will naturally reduce the size of both modules.
 
 ## Current State
 
-- `src/cli/commands.rs`: 1061 lines - CLI command handlers
-- `src/repl/command.rs`: 1371 lines - REPL command parser + handlers
+- `src/cli/commands.rs`: 1061 lines - CLI command handlers (mostly duplicated logic)
+- `src/repl/command.rs`: 1371 lines - REPL command parser + handlers (mostly duplicated logic)
 - `src/serialization/mod.rs`: 1080 lines - All serialization formats in one file
+- **Duplication**: ~800 lines of similar query/modify/IO logic between CLI and REPL
 
-## Phase 1: Extract Shared Command Logic (Priority 1)
+## Target State
+
+After refactoring:
+- `src/commands/`: 950 lines - Shared command handlers (eliminates duplication)
+- `src/cli/`: 200 lines - Thin wrapper dispatching to shared handlers
+- `src/repl/`: 750 lines - Enum + parser + thin executor using shared handlers
+- `src/serialization/`: ~650 lines - Split across format-specific files
+
+**Net savings**: ~530 lines + eliminated duplication + improved testability
+
+## Phase 1: Extract and Split Shared Command Module (Priority 1)
 
 ### Goal
-Create a shared command execution layer that both CLI and REPL can use.
+Create a shared command execution layer with all handler logic that both CLI and REPL can use. This is the main refactoring task - once complete, CLI and REPL naturally become thin wrappers.
 
 ### Implementation Steps
 
@@ -207,29 +218,26 @@ impl Command {
 3. Verify no regressions in functionality
 4. Add integration tests for shared commands
 
-## Phase 2: Split REPL Command Module (Priority 2)
+## Phase 2: Refactor REPL to Use Shared Commands (Priority 2)
 
 ### Goal
-Break down `src/repl/command.rs` (1371 lines) into focused modules.
+Update REPL to use shared command handlers from Phase 1. This naturally reduces REPL from 1371 lines to ~750 lines.
 
 ### Target Structure
 
 ```
 src/repl/
 ├── mod.rs
-├── command.rs       (~100 lines: Command enum + CommandResult)
+├── command.rs       (~150 lines: Command enum + CommandResult)
 ├── parser.rs        (~400 lines: Parse user input into Command)
+├── executor.rs      (~200 lines: Map Command to shared handlers)
 ├── state.rs         (existing)
 ├── helper.rs        (existing)
-├── highlighter.rs   (existing)
-└── handlers/
-    ├── mod.rs
-    ├── query.rs     (~100 lines)
-    ├── modify.rs    (~150 lines)
-    ├── io.rs        (~150 lines)
-    ├── config.rs    (~100 lines)
-    └── info.rs      (~50 lines)
+└── highlighter.rs   (existing)
 ```
+
+### Key Insight
+Most of the 1371 lines are handlers - these move to `src/commands/` in Phase 1. What remains is just the REPL-specific parsing and thin execution wrappers.
 
 ### Implementation Steps
 
@@ -362,32 +370,28 @@ mod tests {
 - `protobuf.rs` - Both ProtobufSerializer and OptimizedProtobufSerializer
 - `compression.rs` - GzipSerializer wrapper
 
-## Phase 4: Split CLI Commands (Priority 4)
+## Phase 4: Refactor CLI to Use Shared Commands (Priority 4)
 
 ### Goal
-Modularize `src/cli/commands.rs` using shared command logic from Phase 1.
+Update CLI to use shared command handlers from Phase 1. This reduces CLI from 1061 lines to ~200 lines of dispatch logic.
 
 ### Target Structure
 
 ```
 src/cli/
 ├── mod.rs
-├── args.rs         (existing - clap definitions)
-├── commands.rs     (~100 lines: dispatch only)
+├── args.rs         (~250 lines: clap definitions - unchanged)
+├── commands.rs     (~200 lines: dispatch to shared handlers)
 ├── detect.rs       (existing)
-├── paths.rs        (existing)
-└── handlers/
-    ├── mod.rs
-    ├── query.rs
-    ├── info.rs
-    ├── convert.rs
-    ├── modify.rs
-    └── config.rs
+└── paths.rs        (existing)
 ```
+
+### Key Insight
+No need for separate handler files - the logic is in `src/commands/`. CLI just needs to parse args and call shared handlers.
 
 ### Implementation
 
-Most CLI handlers will delegate to shared commands from Phase 1, so they become thin wrappers:
+CLI becomes a thin facade over shared commands:
 
 ```rust
 // src/cli/handlers/query.rs
@@ -441,12 +445,14 @@ If a phase causes issues:
 
 ## Timeline Estimate
 
-- Phase 1 (Shared commands): 4-6 hours
-- Phase 2 (Split REPL): 2-3 hours
+- Phase 1 (Extract & split shared commands): 6-8 hours ← Main work
+- Phase 2 (Refactor REPL wrapper): 1-2 hours ← Quick update
 - Phase 3 (Split serialization): 2-3 hours
-- Phase 4 (Split CLI): 1-2 hours
+- Phase 4 (Refactor CLI wrapper): 1 hour ← Quick update
 
-**Total**: ~10-15 hours of focused work
+**Total**: ~10-14 hours of focused work
+
+**Note**: Phase 1 is the bulk of the work. Once it's done, Phases 2 and 4 are straightforward refactorings that mostly involve deleting code and adding delegation calls.
 
 ## Questions to Consider
 
