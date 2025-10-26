@@ -94,10 +94,12 @@ impl<N: DictionaryNode> QueryIterator<N> {
             ) {
                 // ✅ Create lightweight PathNode (no Arc clone!)
                 // Only stores label and parent chain - dictionary node not needed in parent
-                let parent_path = intersection.label.map(|current_label| Box::new(super::intersection::PathNode::new(
+                let parent_path = intersection.label.map(|current_label| {
+                    Box::new(super::intersection::PathNode::new(
                         current_label,
                         intersection.parent.clone(), // Clone PathNode chain (cheap)
-                    )));
+                    ))
+                });
 
                 let child = Box::new(Intersection::with_parent(
                     label,

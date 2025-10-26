@@ -524,15 +524,14 @@ fn load_text_dict(path: &Path, backend: DictionaryBackend) -> Result<DictContain
     let terms: Vec<String> = reader
         .lines()
         .filter_map(|line| {
-            line.ok()
-                .and_then(|l| {
-                    let trimmed = l.trim();
-                    if trimmed.is_empty() || trimmed.starts_with('#') {
-                        None
-                    } else {
-                        Some(trimmed.to_string())
-                    }
-                })
+            line.ok().and_then(|l| {
+                let trimmed = l.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
+            })
         })
         .collect();
 

@@ -157,10 +157,9 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
                 if let Some(min_dist) = next_state.min_distance() {
                     if min_dist <= self.max_distance {
                         // Create lightweight PathNode for parent chain
-                        let parent_path = intersection.label.map(|current_label| Box::new(PathNode::new(
-                                current_label,
-                                intersection.parent.clone(),
-                            )));
+                        let parent_path = intersection.label.map(|current_label| {
+                            Box::new(PathNode::new(current_label, intersection.parent.clone()))
+                        });
 
                         let child = Box::new(Intersection::with_parent(
                             label,
