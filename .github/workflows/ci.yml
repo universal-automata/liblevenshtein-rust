@@ -163,16 +163,7 @@ jobs:
       run: |
         # Lint workspace code
         # --no-deps: Don't lint dependencies (avoids failing on upstream warnings)
-        # Allow certain pedantic/style lints that don't affect correctness
-        # Note: Using -W instead of -D to allow missing-docs warnings from lib.rs
-        cargo clippy --all-features --target x86_64-unknown-linux-gnu --no-deps -- \
-          -W clippy::all \
-          -A clippy::needless-range-loop \
-          -A clippy::vec-init-then-push \
-          -A clippy::should-implement-trait \
-          -A clippy::borrowed-box \
-          -A clippy::manual-map \
-          -A clippy::too-many-arguments
+        cargo clippy --no-deps -- -D warnings
 
   benchmarks:
     name: Benchmarks
