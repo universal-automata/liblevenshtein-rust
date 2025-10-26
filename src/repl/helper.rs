@@ -21,6 +21,7 @@ pub struct LevenshteinHelper {
 }
 
 impl LevenshteinHelper {
+    /// Create a new helper instance
     pub fn new() -> Self {
         Self {
             highlighter: CommandHighlighter::new(),

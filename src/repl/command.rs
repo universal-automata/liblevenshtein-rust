@@ -15,60 +15,120 @@ use std::path::PathBuf;
 pub enum Command {
     /// Query the dictionary: query <term> [distance] [--prefix] [--limit N]
     Query {
+        /// Query term
         term: String,
+        /// Maximum edit distance
         distance: Option<usize>,
+        /// Enable prefix matching
         prefix: bool,
+        /// Result limit
         limit: Option<usize>,
     },
     /// Insert term(s): insert <term> [term2] [term3] ...
-    Insert { terms: Vec<String> },
+    Insert {
+        /// Terms to insert
+        terms: Vec<String>,
+    },
     /// Delete term(s): delete <term> [term2] [term3] ...
-    Delete { terms: Vec<String> },
+    Delete {
+        /// Terms to delete
+        terms: Vec<String>,
+    },
     /// Check if term exists: contains <term>
-    Contains { term: String },
+    Contains {
+        /// Term to check
+        term: String,
+    },
     /// Load dictionary from file: load <path> [backend]
     Load {
+        /// Path to dictionary file
         path: PathBuf,
+        /// Backend type (auto-detected if not specified)
         backend: Option<DictionaryBackend>,
     },
     /// Save dictionary to file: save <path>
-    Save { path: PathBuf },
+    Save {
+        /// Path to save to
+        path: PathBuf,
+    },
     /// Insert terms from file: insert-from <path>
-    InsertFrom { path: PathBuf },
+    InsertFrom {
+        /// Path to file containing terms
+        path: PathBuf,
+    },
     /// Remove terms from file: remove-from <path>
-    RemoveFrom { path: PathBuf },
+    RemoveFrom {
+        /// Path to file containing terms to remove
+        path: PathBuf,
+    },
     /// Replace all terms with those from file: replace-with <path>
-    ReplaceWith { path: PathBuf },
+    ReplaceWith {
+        /// Path to file containing replacement terms
+        path: PathBuf,
+    },
     /// Change backend: backend <type>
-    Backend { backend: DictionaryBackend },
+    Backend {
+        /// Backend type
+        backend: DictionaryBackend,
+    },
     /// Change algorithm: algorithm <type>
-    Algorithm { algorithm: Algorithm },
+    Algorithm {
+        /// Algorithm type
+        algorithm: Algorithm,
+    },
     /// Set max distance: distance <n>
-    Distance { distance: usize },
+    Distance {
+        /// Maximum edit distance
+        distance: usize,
+    },
     /// Toggle prefix mode: prefix [on|off]
-    PrefixMode { enable: Option<bool> },
+    PrefixMode {
+        /// Enable or disable prefix mode
+        enable: Option<bool>,
+    },
     /// Toggle distance display: show-distances [on|off]
-    ShowDistances { enable: Option<bool> },
+    ShowDistances {
+        /// Enable or disable distance display
+        enable: Option<bool>,
+    },
     /// Set result limit: limit <n>
-    Limit { limit: Option<usize> },
+    Limit {
+        /// Result limit
+        limit: Option<usize>,
+    },
     /// Change serialization format: format <type>
-    Format { format: SerializationFormat },
+    Format {
+        /// Serialization format
+        format: SerializationFormat,
+    },
     /// Toggle auto-sync: auto-sync [on|off]
-    AutoSync { enable: Option<bool> },
+    AutoSync {
+        /// Enable or disable auto-sync
+        enable: Option<bool>,
+    },
     /// Clear dictionary: clear
     Clear,
     /// Compact/minimize dictionary: compact
     Compact,
     /// Dump all terms: dump [limit]
-    Dump { limit: Option<usize> },
+    Dump {
+        /// Limit number of terms to dump
+        limit: Option<usize>,
+    },
     /// Show statistics: stats | info
     Stats,
     /// Show settings: settings
     Settings,
     /// Manage config file: config [path]
-    Config { path: Option<PathBuf> },
+    Config {
+        /// Path to config file
+        path: Option<PathBuf>,
+    },
     /// Show help: help [command]
-    Help { topic: Option<String> },
+    Help {
+        /// Help topic
+        topic: Option<String>,
+    },
     /// Exit REPL: exit | quit
     Exit,
 }

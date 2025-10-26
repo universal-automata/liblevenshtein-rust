@@ -24,6 +24,7 @@ pub struct FormatDetection {
     pub method: DetectionMethod,
 }
 
+/// Method used to detect dictionary format
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DetectionMethod {
     /// Exact detection via magic bytes or header

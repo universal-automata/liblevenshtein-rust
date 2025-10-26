@@ -9,6 +9,7 @@ pub struct CommandHighlighter {
 }
 
 impl CommandHighlighter {
+    /// Create a new command highlighter
     pub fn new() -> Self {
         Self {
             commands: vec![

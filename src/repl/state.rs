@@ -79,8 +79,11 @@ impl std::str::FromStr for DictionaryBackend {
 
 /// Unified dictionary container
 pub enum DictContainer {
+    /// PathMap-based trie dictionary
     PathMap(PathMapDictionary),
+    /// Static DAWG dictionary
     Dawg(DawgDictionary),
+    /// Dynamic DAWG dictionary
     DynamicDawg(DynamicDawg),
 }
 
@@ -428,8 +431,11 @@ impl Default for ReplState {
 /// Dictionary statistics
 #[derive(Debug)]
 pub struct DictStats {
+    /// Dictionary backend type
     pub backend: DictionaryBackend,
+    /// Number of terms in the dictionary
     pub term_count: usize,
+    /// Number of nodes (if available)
     pub node_count: Option<usize>,
 }
 

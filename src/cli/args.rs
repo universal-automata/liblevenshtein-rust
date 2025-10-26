@@ -5,6 +5,7 @@ use crate::transducer::Algorithm;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+/// Command-line interface for liblevenshtein
 #[derive(Parser)]
 #[command(name = "liblevenshtein")]
 #[command(about = "Fast fuzzy string matching with Levenshtein automata")]
@@ -14,10 +15,12 @@ pub struct Cli {
     #[arg(short = 'c', long, global = true)]
     pub config: Option<PathBuf>,
 
+    /// The subcommand to execute
     #[command(subcommand)]
     pub command: Commands,
 }
 
+/// Available CLI commands
 #[derive(Subcommand)]
 pub enum Commands {
     /// Launch interactive REPL
@@ -233,6 +236,7 @@ pub enum Commands {
     },
 }
 
+/// Serialization format for dictionary storage
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum SerializationFormat {
     /// Plain text (one term per line)
