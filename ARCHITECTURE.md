@@ -74,17 +74,17 @@ src/
 │   ├── gzip.rs                 # Gzip compression wrapper (feature: compression)
 │   └── proto.rs                # Generated protobuf code
 │
-├── cli/                        # Command-line interface (feature: cli)
-│   ├── mod.rs                  # CLI module root
-│   ├── args.rs                 # Clap argument parsing
-│   ├── commands.rs             # Command execution
-│   ├── detect.rs               # Format auto-detection
-│   └── paths.rs                # Path utilities, persistent config
+├── cli/                        # Shared CLI/REPL infrastructure (feature: cli)
+│   ├── mod.rs                  # CLI module root, public exports
+│   ├── args.rs                 # Clap argument parsing (CLI-specific)
+│   ├── commands.rs             # Shared command execution (load, save, query)
+│   ├── detect.rs               # Format auto-detection (shared)
+│   └── paths.rs                # Path utilities, persistent config (shared)
 │
 └── repl/                       # Interactive REPL (feature: cli)
     ├── mod.rs                  # REPL module root
-    ├── state.rs                # REPL state management
-    ├── command.rs              # Command parsing and execution
+    ├── state.rs                # REPL state management (uses cli::commands)
+    ├── command.rs              # REPL command parsing and execution
     ├── helper.rs               # Rustyline integration
     └── highlighter.rs          # Syntax highlighting
 ```
@@ -260,6 +260,65 @@ pub trait DictionarySerializer {
 - Magic bytes (exact)
 - File extension (heuristic)
 - Content analysis (fallback)
+
+### 6. CLI/REPL Architecture
+
+**Design:** Shared infrastructure with separate interfaces
+
+```
+┌─────────────────────────────────────┐
+│         User Interface              │
+├──────────────────┬──────────────────┤
+│   CLI (Clap)     │   REPL (Rustyline)│
+│   - args.rs      │   - command.rs   │
+│   - One-shot     │   - Interactive  │
+└──────────────────┴──────────────────┘
+           ↓                ↓
+┌─────────────────────────────────────┐
+│      Shared Infrastructure          │
+│   (src/cli/)                        │
+│   - commands.rs                     │
+│     • load_dictionary()             │
+│     • save_dictionary()             │
+│     • query operations              │
+│   - detect.rs                       │
+│     • detect_format()               │
+│   - paths.rs                        │
+│     • config management             │
+│     • path validation               │
+└─────────────────────────────────────┘
+           ↓
+┌─────────────────────────────────────┐
+│      Core Library                   │
+│   - Dictionary                      │
+│   - Transducer                      │
+│   - Serialization                   │
+└─────────────────────────────────────┘
+```
+
+**Shared Components:**
+- `cli::commands::load_dictionary()` - Used by both CLI and REPL
+- `cli::commands::save_dictionary()` - Used by both CLI and REPL
+- `cli::detect::detect_format()` - Format auto-detection
+- `cli::paths::PersistentConfig` - Configuration management
+- `cli::args::SerializationFormat` - Format enum
+
+**CLI-Specific:**
+- `cli::args` - Clap command-line parsing (struct-based)
+- One-shot execution model
+
+**REPL-Specific:**
+- `repl::command` - Text-based command parsing
+- `repl::state` - Persistent REPL session state
+- `repl::helper` - Rustyline integration (completion, history)
+- `repl::highlighter` - Syntax highlighting
+- Interactive session model
+
+**Benefits:**
+- Code reuse between CLI and REPL
+- Consistent behavior (same load/save logic)
+- Single source of truth for format detection
+- Easier maintenance (fix once, works in both)
 
 ---
 
