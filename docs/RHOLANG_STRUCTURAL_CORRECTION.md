@@ -407,12 +407,67 @@ pub enum TokenKind {
 
 ## Level 2: Syntactic Correction
 
+### Overview
+
+**Level 2** focuses on **parse errors** and **grammar violations** detected by Tree-sitter. Unlike lexical errors (typos), syntactic errors involve invalid combinations of valid tokens that violate the language grammar.
+
+**Key Capabilities:**
+- Detect ERROR nodes from Tree-sitter parsing
+- Analyze parse error context (parent, siblings, expected tokens)
+- Apply pattern-based correction strategies
+- Suggest insertions, deletions, or replacements
+- Handle missing keywords, operators, and delimiters
+- Recover from incomplete constructs
+
+### Tree-Sitter Error Recovery
+
+**Tree-sitter's error handling** produces two types of error indicators:
+
+1. **ERROR nodes** - Unexpected tokens that violate grammar rules
+2. **MISSING nodes** - Expected tokens that are absent
+
+**Example Parse Tree with Errors:**
+```
+source_file [0, 27]
+  new [0, 26]
+    name_list [4, 8]
+      var: "x" [4, 5]
+      var: "y" [7, 8]
+    ERROR [9, 26]           ← Parser couldn't continue
+      block [9, 26]
+        ...
+```
+
+**Error Recovery Strategies:**
+
+1. **Panic Mode Recovery**
+   - Skip tokens until synchronization point (e.g., `;`, `}`, next statement)
+   - Continue parsing from synchronized position
+   - Used for severe syntax errors
+
+2. **Phrase-Level Recovery**
+   - Insert expected token (e.g., missing `in` keyword)
+   - Delete unexpected token
+   - Replace with expected token
+   - Continue parsing immediately
+
+3. **Error Productions**
+   - Grammar includes special error rules
+   - Captures common error patterns
+   - Provides structured error information
+
+**Reference:**
+- **Aho et al. (2006)** - *Compilers: Principles, Techniques, and Tools*, Chapter 4: Syntax Analysis
+  - Error recovery strategies for parsers
+
+---
+
 ### Grammar-Based Error Detection
 
 **Leverage Tree-sitter's error nodes:**
 
 ```rust
-use tree_sitter::{Parser, Language, Node};
+use tree_sitter::{Parser, Language, Node, TreeCursor};
 
 pub struct RholangSyntaxCorrector {
     parser: Parser,
@@ -420,98 +475,811 @@ pub struct RholangSyntaxCorrector {
 }
 
 impl RholangSyntaxCorrector {
+    pub fn new() -> Result<Self> {
+        let mut parser = Parser::new();
+        let language = unsafe { tree_sitter_rholang() };
+        parser.set_language(language)?;
+
+        let grammar_patterns = Self::load_patterns();
+
+        Ok(Self {
+            parser,
+            grammar_patterns,
+        })
+    }
+
     pub fn analyze(&self, source: &str) -> Vec<SyntaxError> {
-        let mut parser = self.parser.clone();
-        let tree = parser.parse(source, None).unwrap();
+        let tree = match self.parser.parse(source, None) {
+            Some(tree) => tree,
+            None => return vec![SyntaxError::parse_failed()],
+        };
 
         let mut errors = Vec::new();
         let mut cursor = tree.walk();
 
-        // Traverse AST looking for ERROR nodes
+        Self::traverse_for_errors(&mut cursor, source, &mut errors, &self.grammar_patterns);
+
+        errors
+    }
+
+    fn traverse_for_errors(
+        cursor: &mut TreeCursor,
+        source: &str,
+        errors: &mut Vec<SyntaxError>,
+        patterns: &[GrammarPattern],
+    ) {
         loop {
             let node = cursor.node();
 
+            // Check for ERROR nodes
             if node.kind() == "ERROR" {
-                errors.push(self.diagnose_error(node, source));
+                errors.push(Self::diagnose_error(node, source, patterns));
             }
 
+            // Check for MISSING nodes
+            if node.is_missing() {
+                errors.push(Self::diagnose_missing(node, source));
+            }
+
+            // Recurse into children
             if !cursor.goto_first_child() {
                 while !cursor.goto_next_sibling() {
                     if !cursor.goto_parent() {
-                        return errors;
+                        return;
                     }
                 }
             }
         }
     }
 
-    fn diagnose_error(&self, error_node: Node, source: &str) -> SyntaxError {
-        // Analyze surrounding context
+    fn diagnose_error(
+        error_node: Node,
+        source: &str,
+        patterns: &[GrammarPattern],
+    ) -> SyntaxError {
+        // Extract context
         let parent = error_node.parent();
         let prev_sibling = error_node.prev_sibling();
         let next_sibling = error_node.next_sibling();
 
-        // Pattern match against known error scenarios
-        for pattern in &self.grammar_patterns {
-            if pattern.matches(error_node, parent, source) {
-                return pattern.generate_correction(error_node, source);
+        let context = ErrorContext {
+            node: error_node,
+            parent,
+            prev_sibling,
+            next_sibling,
+            source,
+        };
+
+        // Try pattern matching
+        for pattern in patterns {
+            if pattern.matches(&context) {
+                return pattern.generate_correction(&context);
             }
         }
 
-        // Generic error
+        // Fallback: generic error
+        Self::generic_error(error_node, source)
+    }
+
+    fn diagnose_missing(node: Node, source: &str) -> SyntaxError {
+        SyntaxError {
+            span: (node.start_byte(), node.end_byte()),
+            kind: SyntaxErrorKind::MissingToken {
+                expected: node.kind().to_string(),
+            },
+            suggestions: vec![Suggestion {
+                message: format!("Missing '{}'", node.kind()),
+                fix: Fix::Insert {
+                    position: node.start_byte(),
+                    text: Self::suggest_token_text(node.kind()),
+                },
+                confidence: 0.85,
+            }],
+        }
+    }
+
+    fn generic_error(error_node: Node, source: &str) -> SyntaxError {
+        let error_text = &source[error_node.start_byte()..error_node.end_byte()];
+
         SyntaxError {
             span: (error_node.start_byte(), error_node.end_byte()),
-            kind: SyntaxErrorKind::Unknown,
+            kind: SyntaxErrorKind::UnexpectedToken {
+                found: error_text.to_string(),
+            },
             suggestions: vec![],
         }
+    }
+
+    fn suggest_token_text(kind: &str) -> String {
+        match kind {
+            "in" => " in ".to_string(),
+            "=>" => " => ".to_string(),
+            "=" => " = ".to_string(),
+            "{" => " { ".to_string(),
+            "}" => " }".to_string(),
+            "(" => "(".to_string(),
+            ")" => ")".to_string(),
+            _ => format!(" {} ", kind),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ErrorContext<'a> {
+    pub node: Node<'a>,
+    pub parent: Option<Node<'a>>,
+    pub prev_sibling: Option<Node<'a>>,
+    pub next_sibling: Option<Node<'a>>,
+    pub source: &'a str,
+}
+
+impl<'a> ErrorContext<'a> {
+    pub fn error_text(&self) -> &'a str {
+        &self.source[self.node.start_byte()..self.node.end_byte()]
+    }
+
+    pub fn parent_kind(&self) -> Option<&str> {
+        self.parent.map(|p| p.kind())
+    }
+
+    pub fn prev_text(&self) -> Option<&'a str> {
+        self.prev_sibling.map(|n| {
+            &self.source[n.start_byte()..n.end_byte()]
+        })
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct GrammarPattern {
     pub name: &'static str,
-    pub matcher: Box<dyn Fn(Node, Option<Node>, &str) -> bool>,
-    pub corrector: Box<dyn Fn(Node, &str) -> Vec<Suggestion>>,
+    pub description: &'static str,
+    pub matcher: fn(&ErrorContext) -> bool,
+    pub corrector: fn(&ErrorContext) -> SyntaxError,
 }
 
-// Example patterns
-fn missing_in_keyword_pattern() -> GrammarPattern {
-    GrammarPattern {
-        name: "missing_in_after_new",
-        matcher: Box::new(|node, parent, _source| {
-            parent.map_or(false, |p| p.kind() == "new")
-                && node.kind() == "ERROR"
-        }),
-        corrector: Box::new(|node, source| {
-            vec![Suggestion {
-                message: "Missing 'in' keyword after 'new' declaration".to_string(),
-                fix: Fix::Insert {
-                    position: node.start_byte(),
-                    text: "in ".to_string(),
-                },
-                confidence: 0.95,
-            }]
-        }),
+impl GrammarPattern {
+    pub fn matches(&self, context: &ErrorContext) -> bool {
+        (self.matcher)(context)
+    }
+
+    pub fn generate_correction(&self, context: &ErrorContext) -> SyntaxError {
+        (self.corrector)(context)
     }
 }
+```
 
-fn missing_arrow_in_match_pattern() -> GrammarPattern {
+---
+
+### Comprehensive Pattern Library
+
+**20+ Common Rholang Parse Error Patterns:**
+
+#### Pattern 1: Missing `in` after `new`
+
+```rust
+fn missing_in_after_new() -> GrammarPattern {
     GrammarPattern {
-        name: "missing_arrow_in_match_case",
-        matcher: Box::new(|node, parent, source| {
-            parent.map_or(false, |p| p.kind() == "case")
-                && !source[node.start_byte()..node.end_byte()].contains("=>")
-        }),
-        corrector: Box::new(|node, _source| {
-            vec![Suggestion {
-                message: "Missing '=>' in match case".to_string(),
-                fix: Fix::Insert {
-                    position: node.end_byte(),
-                    text: " => ".to_string(),
+        name: "missing_in_after_new",
+        description: "new x, y { ... } should be new x, y in { ... }",
+        matcher: |ctx| {
+            ctx.parent_kind() == Some("new") && ctx.node.kind() == "ERROR"
+        },
+        corrector: |ctx| {
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::MissingKeyword {
+                    keyword: "in".to_string(),
+                    after: "new declaration".to_string(),
                 },
-                confidence: 0.90,
-            }]
-        }),
+                suggestions: vec![Suggestion {
+                    message: "Insert 'in' keyword after channel names".to_string(),
+                    fix: Fix::Insert {
+                        position: ctx.node.start_byte(),
+                        text: "in ".to_string(),
+                    },
+                    confidence: 0.95,
+                    explanation: Some(
+                        "Syntax: new <channels> in { <body> }".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 2: Missing `=>` in match case
+
+```rust
+fn missing_arrow_in_match() -> GrammarPattern {
+    GrammarPattern {
+        name: "missing_arrow_in_match",
+        description: "Match case missing => operator",
+        matcher: |ctx| {
+            ctx.parent_kind() == Some("case")
+                && ctx.node.kind() == "ERROR"
+                && !ctx.error_text().contains("=>")
+        },
+        corrector: |ctx| {
+            let insert_pos = if let Some(prev) = ctx.prev_sibling {
+                prev.end_byte()
+            } else {
+                ctx.node.start_byte()
+            };
+
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::MissingOperator {
+                    operator: "=>".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Insert '=>' between pattern and body".to_string(),
+                    fix: Fix::Insert {
+                        position: insert_pos,
+                        text: " => ".to_string(),
+                    },
+                    confidence: 0.92,
+                    explanation: Some(
+                        "Match case syntax: pattern => body".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 3: Missing `=` after contract signature
+
+```rust
+fn missing_equals_in_contract() -> GrammarPattern {
+    GrammarPattern {
+        name: "missing_equals_in_contract",
+        description: "contract Name(...) { ... } should be contract Name(...) = { ... }",
+        matcher: |ctx| {
+            ctx.parent_kind() == Some("contract")
+                && ctx.node.kind() == "ERROR"
+                && ctx.prev_sibling.map_or(false, |p| p.kind() == ")")
+        },
+        corrector: |ctx| {
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::MissingOperator {
+                    operator: "=".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Insert '=' between signature and body".to_string(),
+                    fix: Fix::Insert {
+                        position: ctx.node.start_byte(),
+                        text: " = ".to_string(),
+                    },
+                    confidence: 0.93,
+                    explanation: Some(
+                        "Contract syntax: contract Name(params) = body".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 4: Missing `<-` in for-comprehension binding
+
+```rust
+fn missing_arrow_in_for_binding() -> GrammarPattern {
+    GrammarPattern {
+        name: "missing_arrow_in_for_binding",
+        description: "for(x chan) should be for(x <- chan)",
+        matcher: |ctx| {
+            ctx.parent_kind() == Some("input") || ctx.parent_kind() == Some("for")
+        },
+        corrector: |ctx| {
+            // Check if we have pattern: for(x channel)
+            let needs_arrow = ctx.prev_sibling.map_or(false, |p| {
+                p.kind() == "var" && !ctx.error_text().contains("<-")
+            });
+
+            if needs_arrow {
+                SyntaxError {
+                    span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                    kind: SyntaxErrorKind::MissingOperator {
+                        operator: "<-".to_string(),
+                    },
+                    suggestions: vec![Suggestion {
+                        message: "Insert '<-' between variable and channel".to_string(),
+                        fix: Fix::Insert {
+                            position: ctx.prev_sibling.unwrap().end_byte(),
+                            text: " <- ".to_string(),
+                        },
+                        confidence: 0.90,
+                        explanation: Some(
+                            "For-comprehension syntax: for(var <- channel) { body }".to_string()
+                        ),
+                    }],
+                }
+            } else {
+                SyntaxError::generic(ctx)
+            }
+        },
+    }
+}
+```
+
+#### Pattern 5: Missing body after contract signature
+
+```rust
+fn missing_contract_body() -> GrammarPattern {
+    GrammarPattern {
+        name: "missing_contract_body",
+        description: "Contract declaration without body",
+        matcher: |ctx| {
+            ctx.node.kind() == "contract"
+                && ctx.node.child_by_field_name("proc").is_none()
+        },
+        corrector: |ctx| {
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::IncompleteConstruct {
+                    construct: "contract".to_string(),
+                    missing: "body".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Add contract body after '='".to_string(),
+                    fix: Fix::Insert {
+                        position: ctx.node.end_byte(),
+                        text: " { Nil }".to_string(),
+                    },
+                    confidence: 0.70,
+                    explanation: Some(
+                        "Contracts must have a body: contract Name(args) = { process }".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 6: Missing `with` in match expression
+
+```rust
+fn missing_with_in_match() -> GrammarPattern {
+    GrammarPattern {
+        name: "missing_with_in_match",
+        description: "match expr { ... } should be match expr with { ... }",
+        matcher: |ctx| {
+            ctx.parent_kind() == Some("match")
+                && ctx.node.kind() == "ERROR"
+                && ctx.prev_sibling.map_or(false, |p| p.kind() != "with")
+        },
+        corrector: |ctx| {
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::MissingKeyword {
+                    keyword: "with".to_string(),
+                    after: "match expression".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Insert 'with' before match cases".to_string(),
+                    fix: Fix::Insert {
+                        position: ctx.node.start_byte(),
+                        text: "with ".to_string(),
+                    },
+                    confidence: 0.94,
+                    explanation: Some(
+                        "Match syntax: match expr with { case1 => body1 ... }".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 7: Missing channel name in send operation
+
+```rust
+fn missing_channel_in_send() -> GrammarPattern {
+    GrammarPattern {
+        name: "missing_channel_in_send",
+        description: "!(value) should be channel!(value)",
+        matcher: |ctx| {
+            ctx.node.kind() == "ERROR"
+                && ctx.error_text().starts_with('!')
+                && ctx.prev_sibling.map_or(true, |p| {
+                    !matches!(p.kind(), "var" | "name")
+                })
+        },
+        corrector: |ctx| {
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::MissingOperand {
+                    operator: "!".to_string(),
+                    missing: "channel".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Send operation requires a channel name".to_string(),
+                    fix: Fix::Insert {
+                        position: ctx.node.start_byte(),
+                        text: "channel".to_string(),
+                    },
+                    confidence: 0.60,
+                    explanation: Some(
+                        "Send syntax: channelName!(value)".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 8: Unterminated string literal
+
+```rust
+fn unterminated_string() -> GrammarPattern {
+    GrammarPattern {
+        name: "unterminated_string",
+        description: "String missing closing quote",
+        matcher: |ctx| {
+            ctx.node.kind() == "ERROR"
+                && ctx.error_text().starts_with('"')
+                && !ctx.error_text()[1..].contains('"')
+        },
+        corrector: |ctx| {
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::UnterminatedLiteral {
+                    literal_type: "string".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Add closing quote".to_string(),
+                    fix: Fix::Insert {
+                        position: ctx.node.end_byte(),
+                        text: "\"".to_string(),
+                    },
+                    confidence: 0.95,
+                    explanation: Some(
+                        "Strings must be enclosed in double quotes".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 9: Missing semicolon in for-comprehension (multiple bindings)
+
+```rust
+fn missing_semicolon_in_for() -> GrammarPattern {
+    GrammarPattern {
+        name: "missing_semicolon_in_for",
+        description: "for(x <- ch y <- ch2) should use semicolon",
+        matcher: |ctx| {
+            ctx.parent_kind() == Some("input")
+                && ctx.node.kind() == "ERROR"
+                && ctx.error_text().contains("<-")
+                && ctx.prev_sibling.map_or(false, |p| p.kind() == "bind")
+        },
+        corrector: |ctx| {
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::MissingDelimiter {
+                    delimiter: ";".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Separate bindings with semicolon".to_string(),
+                    fix: Fix::Insert {
+                        position: ctx.prev_sibling.unwrap().end_byte(),
+                        text: "; ".to_string(),
+                    },
+                    confidence: 0.91,
+                    explanation: Some(
+                        "Multiple bindings: for(x <- ch1; y <- ch2) { body }".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+#### Pattern 10: Wrong operator (`:=` instead of `<-`)
+
+```rust
+fn wrong_assignment_operator() -> GrammarPattern {
+    GrammarPattern {
+        name: "wrong_assignment_operator",
+        description: "for(x := ch) should use <- not :=",
+        matcher: |ctx| {
+            ctx.parent_kind() == Some("input")
+                && ctx.error_text().contains(":=")
+        },
+        corrector: |ctx| {
+            let text = ctx.error_text();
+            let new_text = text.replace(":=", "<-");
+
+            SyntaxError {
+                span: (ctx.node.start_byte(), ctx.node.end_byte()),
+                kind: SyntaxErrorKind::WrongOperator {
+                    found: ":=".to_string(),
+                    expected: "<-".to_string(),
+                },
+                suggestions: vec![Suggestion {
+                    message: "Use '<-' for channel binding, not ':='".to_string(),
+                    fix: Fix::Replace {
+                        start: ctx.node.start_byte(),
+                        end: ctx.node.end_byte(),
+                        text: new_text,
+                    },
+                    confidence: 0.89,
+                    explanation: Some(
+                        "Rholang uses <- for channel receive, not :=".to_string()
+                    ),
+                }],
+            }
+        },
+    }
+}
+```
+
+### Additional Patterns (11-20)
+
+```rust
+impl RholangSyntaxCorrector {
+    fn load_patterns() -> Vec<GrammarPattern> {
+        vec![
+            missing_in_after_new(),
+            missing_arrow_in_match(),
+            missing_equals_in_contract(),
+            missing_arrow_in_for_binding(),
+            missing_contract_body(),
+            missing_with_in_match(),
+            missing_channel_in_send(),
+            unterminated_string(),
+            missing_semicolon_in_for(),
+            wrong_assignment_operator(),
+
+            // Additional patterns:
+            missing_pipe_in_parallel(),          // x!(1) y!(2) → x!(1) | y!(2)
+            extra_comma_in_list(),               // [1, 2, 3,] → [1, 2, 3]
+            missing_exclamation_in_send(),       // channel(value) → channel!(value)
+            wrong_brace_type(),                  // contract C() = [ ... ] → { ... }
+            missing_expression_in_if(),          // if { ... } → if (condition) { ... }
+            missing_else_body(),                 // if (x) { ... } else → add body
+            duplicate_operators(),               // x !! y → x ! y
+            invalid_operator_combination(),      // x =! y → x != y
+            missing_pattern_in_match_case(),     // => { body } → pattern => { body }
+            unmatched_quote_unquote(),           // @*x → validation check
+        ]
+    }
+}
+```
+
+---
+
+### Error Type Taxonomy
+
+```rust
+#[derive(Clone, Debug)]
+pub enum SyntaxErrorKind {
+    /// Unexpected token that violates grammar
+    UnexpectedToken {
+        found: String,
+    },
+
+    /// Expected token is missing
+    MissingToken {
+        expected: String,
+    },
+
+    /// Missing keyword at specific location
+    MissingKeyword {
+        keyword: String,
+        after: String,
+    },
+
+    /// Missing operator
+    MissingOperator {
+        operator: String,
+    },
+
+    /// Missing operand for operator
+    MissingOperand {
+        operator: String,
+        missing: String,  // "left" or "right" or "channel"
+    },
+
+    /// Wrong operator used
+    WrongOperator {
+        found: String,
+        expected: String,
+    },
+
+    /// Missing delimiter (semicolon, comma, etc.)
+    MissingDelimiter {
+        delimiter: String,
+    },
+
+    /// Incomplete construct (e.g., contract without body)
+    IncompleteConstruct {
+        construct: String,
+        missing: String,
+    },
+
+    /// Unterminated literal (string, etc.)
+    UnterminatedLiteral {
+        literal_type: String,
+    },
+
+    /// Invalid operator combination
+    InvalidOperatorSequence {
+        sequence: String,
+        suggestion: String,
+    },
+
+    /// Generic parse error
+    Unknown,
+}
+
+#[derive(Clone, Debug)]
+pub struct SyntaxError {
+    pub span: (usize, usize),
+    pub kind: SyntaxErrorKind,
+    pub suggestions: Vec<Suggestion>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Suggestion {
+    pub message: String,
+    pub fix: Fix,
+    pub confidence: f64,
+    pub explanation: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub enum Fix {
+    Insert {
+        position: usize,
+        text: String,
+    },
+    Delete {
+        start: usize,
+        end: usize,
+    },
+    Replace {
+        start: usize,
+        end: usize,
+        text: String,
+    },
+}
+```
+
+---
+
+### Advanced Error Diagnosis Algorithm
+
+**Multi-pass analysis for complex errors:**
+
+```rust
+impl RholangSyntaxCorrector {
+    /// Perform multi-pass analysis for better error detection
+    pub fn analyze_multi_pass(&self, source: &str) -> Vec<SyntaxError> {
+        let mut all_errors = Vec::new();
+
+        // Pass 1: Direct ERROR node detection
+        let tree = self.parser.parse(source, None).unwrap();
+        let mut errors_pass1 = self.find_error_nodes(&tree, source);
+        all_errors.append(&mut errors_pass1);
+
+        // Pass 2: Structural validation (even if no ERROR nodes)
+        let mut errors_pass2 = self.validate_structure(&tree, source);
+        all_errors.append(&mut errors_pass2);
+
+        // Pass 3: Consistency checks
+        let mut errors_pass3 = self.check_consistency(&tree, source);
+        all_errors.append(&mut errors_pass3);
+
+        // Deduplicate and rank
+        self.deduplicate_errors(&mut all_errors);
+        self.rank_by_confidence(&mut all_errors);
+
+        all_errors
+    }
+
+    fn validate_structure(&self, tree: &Tree, source: &str) -> Vec<SyntaxError> {
+        let mut errors = Vec::new();
+        let mut cursor = tree.walk();
+
+        fn visit(cursor: &mut TreeCursor, source: &str, errors: &mut Vec<SyntaxError>) {
+            let node = cursor.node();
+
+            match node.kind() {
+                "contract" => {
+                    // Must have name, params, and body
+                    if node.child_by_field_name("name").is_none() {
+                        errors.push(SyntaxError::missing_contract_name(node));
+                    }
+                    if node.child_by_field_name("proc").is_none() {
+                        errors.push(SyntaxError::missing_contract_body(node));
+                    }
+                }
+                "match" => {
+                    // Must have expression and cases
+                    if node.child_by_field_name("cases").is_none() {
+                        errors.push(SyntaxError::missing_match_cases(node));
+                    }
+                }
+                "input" | "for" => {
+                    // Must have at least one binding
+                    if node.named_child_count() == 0 {
+                        errors.push(SyntaxError::empty_for_comprehension(node));
+                    }
+                }
+                "send" => {
+                    // Must have channel and value
+                    if node.child_by_field_name("chan").is_none() {
+                        errors.push(SyntaxError::send_without_channel(node));
+                    }
+                }
+                _ => {}
+            }
+
+            if cursor.goto_first_child() {
+                loop {
+                    visit(cursor, source, errors);
+                    if !cursor.goto_next_sibling() {
+                        break;
+                    }
+                }
+                cursor.goto_parent();
+            }
+        }
+
+        visit(&mut cursor, source, &mut errors);
+        errors
+    }
+
+    fn check_consistency(&self, tree: &Tree, source: &str) -> Vec<SyntaxError> {
+        let mut errors = Vec::new();
+
+        // Check for mismatched quote/unquote
+        let quotes = self.count_nodes_by_kind(tree, "quote");
+        let unquotes = self.count_nodes_by_kind(tree, "eval");
+
+        if quotes != unquotes {
+            errors.push(SyntaxError::unbalanced_quote_unquote(quotes, unquotes));
+        }
+
+        // Check for operators without operands
+        // (Implementation depends on grammar specifics)
+
+        errors
+    }
+
+    fn deduplicate_errors(&self, errors: &mut Vec<SyntaxError>) {
+        // Remove duplicate errors at same position
+        errors.sort_by_key(|e| e.span.0);
+        errors.dedup_by(|a, b| {
+            a.span == b.span &&
+            std::mem::discriminant(&a.kind) == std::mem::discriminant(&b.kind)
+        });
+    }
+
+    fn rank_by_confidence(&self, errors: &mut Vec<SyntaxError>) {
+        errors.sort_by(|a, b| {
+            let conf_a = a.suggestions.iter()
+                .map(|s| s.confidence)
+                .max_by(|x, y| x.partial_cmp(y).unwrap())
+                .unwrap_or(0.0);
+            let conf_b = b.suggestions.iter()
+                .map(|s| s.confidence)
+                .max_by(|x, y| x.partial_cmp(y).unwrap())
+                .unwrap_or(0.0);
+            conf_b.partial_cmp(&conf_a).unwrap()
+        });
     }
 }
 ```
@@ -2053,7 +2821,7 @@ This design proposes a **comprehensive, multi-level error correction system** fo
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Last Updated:** 2025-10-26
 **Author:** Claude (AI Assistant)
-**Status:** Design Proposal with Complete Theoretical Foundation
+**Status:** Design Proposal with Complete Theoretical Foundation and Comprehensive Parse Error Coverage
