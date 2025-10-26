@@ -5,7 +5,7 @@
 //! 2. Compares performance characteristics
 //! 3. Validates optimization effectiveness on real data
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::collections::HashMap;
 use std::fs;
 

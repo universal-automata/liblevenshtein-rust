@@ -5,10 +5,10 @@ mod cli_integration_tests {
     use std::fs;
     use tempfile::TempDir;
 
-    use levenshtein::cli::detect::{detect_format, DetectionMethod};
-    use levenshtein::cli::paths::{PersistentConfig, file_extension};
-    use levenshtein::cli::args::SerializationFormat;
-    use levenshtein::repl::state::DictionaryBackend;
+    use liblevenshtein::cli::detect::{detect_format, DetectionMethod};
+    use liblevenshtein::cli::paths::{PersistentConfig, file_extension};
+    use liblevenshtein::cli::args::SerializationFormat;
+    use liblevenshtein::repl::state::DictionaryBackend;
 
     #[test]
     fn test_detect_text_format() {
@@ -50,7 +50,7 @@ mod cli_integration_tests {
     #[test]
     fn test_persistent_config_default() {
         let config = PersistentConfig::default();
-        assert_eq!(config.algorithm, Some(levenshtein::transducer::Algorithm::Standard));
+        assert_eq!(config.algorithm, Some(liblevenshtein::transducer::Algorithm::Standard));
         assert_eq!(config.max_distance, Some(2));
         assert_eq!(config.prefix_mode, Some(false));
         assert_eq!(config.show_distances, Some(false));
@@ -71,7 +71,7 @@ mod cli_integration_tests {
             None,
             Some(DictionaryBackend::Dawg),
             None,
-            Some(levenshtein::transducer::Algorithm::Transposition),
+            Some(liblevenshtein::transducer::Algorithm::Transposition),
             Some(3),
             Some(true),
             None,
@@ -80,7 +80,7 @@ mod cli_integration_tests {
         );
 
         assert_eq!(merged.backend, Some(DictionaryBackend::Dawg));
-        assert_eq!(merged.algorithm, Some(levenshtein::transducer::Algorithm::Transposition));
+        assert_eq!(merged.algorithm, Some(liblevenshtein::transducer::Algorithm::Transposition));
         assert_eq!(merged.max_distance, Some(3));
         assert_eq!(merged.prefix_mode, Some(true));
         assert_eq!(merged.show_distances, Some(false)); // unchanged

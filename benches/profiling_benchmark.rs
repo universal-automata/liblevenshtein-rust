@@ -1,7 +1,7 @@
 /// Profiling benchmark for realistic workload
 /// This benchmark is designed to exercise hot paths for profiling and PGO
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 

@@ -1,11 +1,11 @@
 //! Benchmarks for serialization performance optimization.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::io::Cursor;
 
 #[cfg(feature = "compression")]
-use levenshtein::serialization::GzipSerializer;
+use liblevenshtein::serialization::GzipSerializer;
 
 /// Create a dictionary of the specified size with varied word lengths
 fn create_dictionary(size: usize) -> PathMapDictionary {

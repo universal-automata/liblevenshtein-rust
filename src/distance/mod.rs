@@ -12,7 +12,7 @@
 /// # Example
 ///
 /// ```rust
-/// use levenshtein::distance::standard_distance;
+/// use liblevenshtein::distance::standard_distance;
 ///
 /// assert_eq!(standard_distance("kitten", "sitting"), 3);
 /// assert_eq!(standard_distance("test", "test"), 0);
@@ -72,7 +72,7 @@ pub fn standard_distance(source: &str, target: &str) -> usize {
 /// # Example
 ///
 /// ```rust
-/// use levenshtein::distance::transposition_distance;
+/// use liblevenshtein::distance::transposition_distance;
 ///
 /// assert_eq!(transposition_distance("ab", "ba"), 1); // One transposition
 /// assert_eq!(transposition_distance("test", "tset"), 1); // One transposition

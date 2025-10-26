@@ -42,7 +42,7 @@ pub struct OrderedCandidate {
 /// # Example
 ///
 /// ```rust,ignore
-/// use levenshtein::prelude::*;
+/// use liblevenshtein::prelude::*;
 ///
 /// let dict = PathMapDictionary::from_iter(vec!["test", "best", "rest", "testing"]);
 /// let transducer = Transducer::new(dict, Algorithm::Standard);

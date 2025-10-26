@@ -1,7 +1,7 @@
 //! Detailed trace test for debugging insertion issues
 
-use levenshtein::prelude::*;
-use levenshtein::transducer::transition::{transition_state, initial_state};
+use liblevenshtein::prelude::*;
+use liblevenshtein::transducer::transition::{transition_state, initial_state};
 
 #[test]
 fn trace_aple_to_apple() {

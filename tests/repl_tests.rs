@@ -2,9 +2,9 @@
 
 #[cfg(feature = "cli")]
 mod repl_integration_tests {
-    use levenshtein::repl::{Command, ReplState};
-    use levenshtein::repl::state::DictionaryBackend;
-    use levenshtein::transducer::Algorithm;
+    use liblevenshtein::repl::{Command, ReplState};
+    use liblevenshtein::repl::state::DictionaryBackend;
+    use liblevenshtein::transducer::Algorithm;
 
     #[test]
     fn test_parse_query_command() {
@@ -118,7 +118,7 @@ mod repl_integration_tests {
         // Insert terms
         let cmd = Command::parse("insert test testing tester").unwrap();
         let result = cmd.execute(&mut state).unwrap();
-        assert!(matches!(result, levenshtein::repl::CommandResult::Continue(_)));
+        assert!(matches!(result, liblevenshtein::repl::CommandResult::Continue(_)));
 
         // Verify insertion
         assert_eq!(state.dictionary.len(), 3);

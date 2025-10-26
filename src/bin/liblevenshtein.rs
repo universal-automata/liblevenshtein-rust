@@ -6,10 +6,10 @@ use clap::Parser;
 use colored::Colorize;
 use std::process;
 
-use levenshtein::cli::{Cli, Commands};
-use levenshtein::cli::commands;
-use levenshtein::cli::paths::PersistentConfig;
-use levenshtein::repl::{Command, CommandResult, LevenshteinHelper, ReplConfig, ReplState};
+use liblevenshtein::cli::{Cli, Commands};
+use liblevenshtein::cli::commands;
+use liblevenshtein::cli::paths::PersistentConfig;
+use liblevenshtein::repl::{Command, CommandResult, LevenshteinHelper, ReplConfig, ReplState};
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor};
 
@@ -56,17 +56,17 @@ fn main() {
 #[allow(clippy::too_many_arguments)]
 fn run_repl(
     dict_path: Option<std::path::PathBuf>,
-    backend_opt: Option<levenshtein::repl::state::DictionaryBackend>,
-    format_opt: Option<levenshtein::cli::args::SerializationFormat>,
-    algorithm: levenshtein::transducer::Algorithm,
+    backend_opt: Option<liblevenshtein::repl::state::DictionaryBackend>,
+    format_opt: Option<liblevenshtein::cli::args::SerializationFormat>,
+    algorithm: liblevenshtein::transducer::Algorithm,
     max_distance: usize,
     prefix: bool,
     show_distances: bool,
     limit: Option<usize>,
     auto_sync: bool,
 ) -> anyhow::Result<()> {
-    use levenshtein::cli::detect::detect_format;
-    use levenshtein::cli::paths::default_dict_path;
+    use liblevenshtein::cli::detect::detect_format;
+    use liblevenshtein::cli::paths::default_dict_path;
 
     // Load persistent config
     let config = PersistentConfig::load().unwrap_or_default();
@@ -109,7 +109,7 @@ fn run_repl(
     } else {
         // Use default path if it exists
         let backend = merged_config.backend.unwrap_or(state.backend);
-        let format = merged_config.format.unwrap_or(levenshtein::cli::args::SerializationFormat::Text);
+        let format = merged_config.format.unwrap_or(liblevenshtein::cli::args::SerializationFormat::Text);
         default_dict_path(backend, format).ok()
     };
 
@@ -124,7 +124,7 @@ fn run_repl(
                         detection.format.format.to_string().green()
                     );
 
-                    match levenshtein::cli::commands::load_dictionary(path, detection.format) {
+                    match liblevenshtein::cli::commands::load_dictionary(path, detection.format) {
                         Ok(container) => {
                             let count = container.len();
                             state.dictionary = container;
@@ -204,7 +204,7 @@ fn run_repl(
 
                             // Auto-sync if enabled
                             if auto_sync {
-                                if let Some(ref path) = dict_path {
+                                if let Some(ref _path) = dict_path {
                                     // TODO: Implement auto-save
                                 }
                             }

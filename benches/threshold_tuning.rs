@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 /// Parameterized DAWG for testing different thresholds
 /// We'll manually implement the search with different thresholds

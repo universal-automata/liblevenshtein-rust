@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example dawg_demo
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 fn main() {
     println!("DAWG Dictionary Demonstration\n");

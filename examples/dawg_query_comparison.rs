@@ -1,6 +1,6 @@
 //! Benchmark comparing generic QueryIterator vs optimized DawgQueryIterator
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::fs;
 use std::time::Instant;
 

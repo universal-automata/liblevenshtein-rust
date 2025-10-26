@@ -2,7 +2,7 @@
 //!
 //! This example runs a representative mix of operations for profiling purposes.
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::hint::black_box;
 
 fn main() {

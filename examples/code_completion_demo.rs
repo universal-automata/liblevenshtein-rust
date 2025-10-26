@@ -5,7 +5,7 @@
 //! - Filtering for context-aware suggestions (by type, scope, visibility)
 //! - Typo tolerance with low edit distances (1-2)
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 /// Represents different types of code identifiers
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

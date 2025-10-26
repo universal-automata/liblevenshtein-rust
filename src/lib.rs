@@ -12,7 +12,7 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use levenshtein::prelude::*;
+//! use liblevenshtein::prelude::*;
 //!
 //! let terms = vec!["test", "testing", "tested"];
 //! let dict = PathMapDictionary::from_iter(terms);

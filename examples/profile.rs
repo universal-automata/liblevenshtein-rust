@@ -6,7 +6,7 @@
 //! - Small dictionary queries (+8% regression)
 //! - Epsilon closure O(n²) behavior
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 fn create_dictionary(size: usize) -> PathMapDictionary {
     let words: Vec<String> = (0..size)

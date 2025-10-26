@@ -4,7 +4,7 @@
 //! while it's being used for queries, demonstrating the thread-safe
 //! mutation capabilities.
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 fn main() {
     println!("=== Dynamic Dictionary Example ===\n");

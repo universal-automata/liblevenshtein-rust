@@ -1,5 +1,5 @@
-use levenshtein::transducer::transition::{initial_state, transition_state};
-use levenshtein::transducer::Algorithm;
+use liblevenshtein::transducer::transition::{initial_state, transition_state};
+use liblevenshtein::transducer::Algorithm;
 
 #[test]
 fn test_transition_debug() {

@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 // Load real dictionary for realistic benchmarks
 fn load_dictionary() -> Vec<String> {

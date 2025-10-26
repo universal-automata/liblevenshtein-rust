@@ -8,7 +8,7 @@
 //!
 //! Run with: cargo run --example dynamic_dawg_demo
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 fn main() {
     println!("Dynamic DAWG Demonstration\n");

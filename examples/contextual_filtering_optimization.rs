@@ -4,7 +4,7 @@
 //! containing only contextually relevant terms, dramatically reducing
 //! search space.
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::collections::HashSet;
 use std::time::Instant;
 

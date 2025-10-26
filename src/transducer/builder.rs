@@ -11,7 +11,7 @@ use crate::transducer::{Transducer, Algorithm};
 /// # Example
 ///
 /// ```rust,ignore
-/// use levenshtein::prelude::*;
+/// use liblevenshtein::prelude::*;
 ///
 /// let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
 /// let transducer = TransducerBuilder::new()

@@ -1,5 +1,5 @@
-use levenshtein::prelude::*;
-use levenshtein::dictionary::Dictionary;
+use liblevenshtein::prelude::*;
+use liblevenshtein::dictionary::Dictionary;
 
 #[test]
 fn test_basic_dictionary_ops() {

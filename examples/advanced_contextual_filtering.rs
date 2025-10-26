@@ -4,7 +4,7 @@
 //! dictionary entries are "active" for the current context. This allows
 //! instant context switching with zero overhead.
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::collections::HashMap;
 use std::time::Instant;
 

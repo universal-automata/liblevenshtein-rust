@@ -1,6 +1,6 @@
 //! Test to verify true concurrent read parallelism
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant};

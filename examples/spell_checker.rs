@@ -3,7 +3,7 @@
 //! This example demonstrates how to use liblevenshtein for approximate
 //! string matching, useful for spell checking and fuzzy search.
 
-use levenshtein::prelude::*;
+use liblevenshtein::prelude::*;
 
 fn main() {
     // Create a dictionary of valid words

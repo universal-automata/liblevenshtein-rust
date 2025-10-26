@@ -38,7 +38,7 @@ tempfile = "3.8"
 prost-build = { version = "0.12", optional = true }
 
 [lib]
-name = "levenshtein"
+name = "liblevenshtein"
 path = "src/lib.rs"
 # Support both static (rlib) and dynamic (cdylib) library builds
 crate-type = ["rlib", "cdylib"]

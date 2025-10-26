@@ -6,8 +6,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use levenshtein::prelude::*;
-//! use levenshtein::serialization::{BincodeSerializer, DictionarySerializer};
+//! use liblevenshtein::prelude::*;
+//! use liblevenshtein::serialization::{BincodeSerializer, DictionarySerializer};
 //! use std::fs::File;
 //!
 //! // Create and populate dictionary
@@ -422,7 +422,7 @@ impl DictionarySerializer for ProtobufSerializer {
 /// # Example
 ///
 /// ```rust,ignore
-/// use levenshtein::prelude::*;
+/// use liblevenshtein::prelude::*;
 ///
 /// let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
 ///
@@ -620,8 +620,8 @@ impl DictionarySerializer for OptimizedProtobufSerializer {
 /// # Example
 ///
 /// ```rust,ignore
-/// use levenshtein::prelude::*;
-/// use levenshtein::serialization::{GzipSerializer, BincodeSerializer};
+/// use liblevenshtein::prelude::*;
+/// use liblevenshtein::serialization::{GzipSerializer, BincodeSerializer};
 /// use std::fs::File;
 ///
 /// let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
