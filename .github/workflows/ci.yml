@@ -74,39 +74,51 @@ jobs:
           ${{ runner.os }}-${{ matrix.rust }}-cargo-build-target-
 
     - name: Build library
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Building liblevenshtein"
-        RUSTFLAGS="-C target-cpu=native" cargo build --all-features --verbose
+        cargo build --all-features --verbose
         echo "::endgroup::"
 
     - name: Build CLI
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Building CLI"
-        RUSTFLAGS="-C target-cpu=native" cargo build --bin liblevenshtein --features cli,compression,protobuf --verbose
+        cargo build --bin liblevenshtein --features cli,compression,protobuf --verbose
         echo "::endgroup::"
 
     - name: Run unit tests
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running unit tests"
-        RUSTFLAGS="-C target-cpu=native" cargo test --lib --all-features --verbose
+        cargo test --lib --all-features --verbose
         echo "::endgroup::"
 
     - name: Run integration tests
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running integration tests"
-        RUSTFLAGS="-C target-cpu=native" cargo test --test '*' --all-features --verbose -- --nocapture
+        cargo test --test '*' --all-features --verbose -- --nocapture
         echo "::endgroup::"
 
     - name: Run doc tests
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running documentation tests"
-        RUSTFLAGS="-C target-cpu=native" cargo test --doc --all-features --verbose
+        cargo test --doc --all-features --verbose
         echo "::endgroup::"
 
     - name: Build examples
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Building examples"
-        RUSTFLAGS="-C target-cpu=native" cargo build --examples --all-features --verbose
+        cargo build --examples --all-features --verbose
         echo "::endgroup::"
 
     - name: Upload test artifacts on failure
@@ -145,12 +157,14 @@ jobs:
       run: cargo fmt -- --check
 
     - name: Run clippy
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         # Lint workspace code
         # --no-deps: Don't lint dependencies (avoids failing on upstream warnings)
         # Allow certain pedantic/style lints that don't affect correctness
         # Note: Using -W instead of -D to allow missing-docs warnings from lib.rs
-        RUSTFLAGS="-C target-cpu=native" cargo clippy --all-features --no-deps -- \
+        cargo clippy --all-features --no-deps -- \
           -W clippy::all \
           -A clippy::needless-range-loop \
           -A clippy::vec-init-then-push \
@@ -182,9 +196,11 @@ jobs:
         RUSTFLAGS: "-C target-cpu=native"
 
     - name: Run benchmarks
+      env:
+        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running benchmarks"
-        RUSTFLAGS="-C target-cpu=native" cargo bench --all-features --no-fail-fast -- --output-format bencher | tee output.txt
+        cargo bench --all-features --no-fail-fast -- --output-format bencher | tee output.txt
         echo "::endgroup::"
 
     - name: Upload benchmark results
