@@ -1288,124 +1288,487 @@ impl RholangSyntaxCorrector {
 
 ## Level 3: Structural Correction
 
-### Bracket/Brace Matching
+### Overview
 
-**Automaton-based delimiter matching:**
+**Level 3** handles **structural errors** involving delimiter matching, nesting, and block structure. This includes all forms of paired delimiters:
+
+**Paired Delimiters:**
+1. **Braces:** `{` `}` - Blocks, match bodies, contracts
+2. **Parentheses:** `(` `)` - Expressions, function arguments, for-bindings
+3. **Brackets:** `[` `]` - Collections, arrays
+4. **Double Quotes:** `"` - String literals
+5. **Single Quotes:** `'` - (if applicable in Rholang grammar)
+
+**Key Capabilities:**
+- Detect missing closing delimiters
+- Detect extra/misplaced closing delimiters
+- Handle mismatched delimiter types (e.g., `{` closed with `]`)
+- Context-aware position suggestions for insertions
+- String literal tracking with escape sequence handling
+- Nested delimiter validation
+
+---
+
+### Comprehensive Delimiter Matching
+
+**Enhanced automaton with quote tracking:**
 
 ```rust
+use std::collections::VecDeque;
+
 pub struct DelimiterMatcher {
     stack: Vec<Delimiter>,
+    in_string: bool,
+    in_comment: bool,
+    string_start: Option<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Delimiter {
-    Brace { open_pos: usize, close_pos: Option<usize> },
-    Paren { open_pos: usize, close_pos: Option<usize> },
-    Bracket { open_pos: usize, close_pos: Option<usize> },
+    Brace {
+        open_pos: usize,
+        line: usize,
+        col: usize,
+        context: DelimiterContext,
+    },
+    Paren {
+        open_pos: usize,
+        line: usize,
+        col: usize,
+        context: DelimiterContext,
+    },
+    Bracket {
+        open_pos: usize,
+        line: usize,
+        col: usize,
+        context: DelimiterContext,
+    },
+    Quote {
+        open_pos: usize,
+        line: usize,
+        col: usize,
+        quote_type: QuoteType,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum QuoteType {
+    Double,   // "..."
+    Single,   // '...'
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum DelimiterContext {
+    ContractBody,
+    MatchExpression,
+    ForComprehension,
+    FunctionArgs,
+    Collection,
+    BlockExpression,
+    Unknown,
 }
 
 impl DelimiterMatcher {
+    pub fn new() -> Self {
+        Self {
+            stack: Vec::new(),
+            in_string: false,
+            in_comment: false,
+            string_start: None,
+        }
+    }
+
+    /// Comprehensive delimiter analysis with context tracking
     pub fn analyze(&mut self, source: &str) -> Vec<StructuralError> {
         let mut errors = Vec::new();
-        let mut pos = 0;
+        let mut chars = source.char_indices().peekable();
+        let mut line = 1;
+        let mut col = 1;
 
-        for ch in source.chars() {
+        while let Some((pos, ch)) = chars.next() {
+            // Handle comments (skip delimiter matching inside)
+            if !self.in_string && ch == '/' {
+                if let Some(&(_, '/')) = chars.peek() {
+                    // Line comment: skip until newline
+                    chars.next(); // consume second /
+                    while let Some(&(_, c)) = chars.peek() {
+                        chars.next();
+                        if c == '\n' {
+                            line += 1;
+                            col = 1;
+                            break;
+                        }
+                    }
+                    continue;
+                } else if let Some(&(_, '*')) = chars.peek() {
+                    // Block comment: skip until */
+                    chars.next(); // consume *
+                    self.in_comment = true;
+                    while let Some((_, c)) = chars.next() {
+                        if c == '*' {
+                            if let Some(&(_, '/')) = chars.peek() {
+                                chars.next();
+                                self.in_comment = false;
+                                break;
+                            }
+                        }
+                        if c == '\n' {
+                            line += 1;
+                            col = 1;
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            if self.in_comment {
+                if ch == '\n' {
+                    line += 1;
+                    col = 1;
+                }
+                continue;
+            }
+
+            // Handle string literals
+            if ch == '"' {
+                if self.in_string {
+                    // Check if escaped
+                    if !Self::is_escaped(source, pos) {
+                        // Closing quote
+                        self.in_string = false;
+                        self.string_start = None;
+                    }
+                } else {
+                    // Opening quote
+                    self.in_string = true;
+                    self.string_start = Some(pos);
+                }
+                col += 1;
+                continue;
+            }
+
+            if self.in_string {
+                if ch == '\n' {
+                    line += 1;
+                    col = 1;
+                } else {
+                    col += 1;
+                }
+                continue;
+            }
+
+            // Handle structural delimiters
             match ch {
-                '{' => self.stack.push(Delimiter::Brace {
-                    open_pos: pos,
-                    close_pos: None,
-                }),
+                '{' => {
+                    let context = self.infer_context(source, pos);
+                    self.stack.push(Delimiter::Brace {
+                        open_pos: pos,
+                        line,
+                        col,
+                        context,
+                    });
+                }
                 '}' => {
-                    if let Some(Delimiter::Brace { open_pos, .. }) = self.stack.pop() {
-                        // Matched
-                    } else {
-                        errors.push(StructuralError::UnmatchedClosing {
-                            delimiter: '}',
-                            position: pos,
-                        });
+                    match self.stack.pop() {
+                        Some(Delimiter::Brace { open_pos, line: open_line, col: open_col, context }) => {
+                            // Matched correctly
+                        }
+                        Some(other) => {
+                            // Mismatched type
+                            errors.push(StructuralError::MismatchedDelimiter {
+                                expected: Self::closing_char(&other),
+                                found: '}',
+                                opening_pos: Self::delimiter_pos(&other),
+                                closing_pos: pos,
+                            });
+                            // Push back the mismatched opener
+                            self.stack.push(other);
+                        }
+                        None => {
+                            // Extra closing brace
+                            errors.push(StructuralError::UnmatchedClosing {
+                                delimiter: '}',
+                                position: pos,
+                                line,
+                                col,
+                            });
+                        }
                     }
                 }
-                '(' => self.stack.push(Delimiter::Paren {
-                    open_pos: pos,
-                    close_pos: None,
-                }),
+                '(' => {
+                    let context = self.infer_context(source, pos);
+                    self.stack.push(Delimiter::Paren {
+                        open_pos: pos,
+                        line,
+                        col,
+                        context,
+                    });
+                }
                 ')' => {
-                    if let Some(Delimiter::Paren { open_pos, .. }) = self.stack.pop() {
-                        // Matched
-                    } else {
-                        errors.push(StructuralError::UnmatchedClosing {
-                            delimiter: ')',
-                            position: pos,
-                        });
+                    match self.stack.pop() {
+                        Some(Delimiter::Paren { open_pos, line: open_line, col: open_col, context }) => {
+                            // Matched correctly
+                        }
+                        Some(other) => {
+                            errors.push(StructuralError::MismatchedDelimiter {
+                                expected: Self::closing_char(&other),
+                                found: ')',
+                                opening_pos: Self::delimiter_pos(&other),
+                                closing_pos: pos,
+                            });
+                            self.stack.push(other);
+                        }
+                        None => {
+                            errors.push(StructuralError::UnmatchedClosing {
+                                delimiter: ')',
+                                position: pos,
+                                line,
+                                col,
+                            });
+                        }
                     }
                 }
-                '[' => self.stack.push(Delimiter::Bracket {
-                    open_pos: pos,
-                    close_pos: None,
-                }),
+                '[' => {
+                    let context = self.infer_context(source, pos);
+                    self.stack.push(Delimiter::Bracket {
+                        open_pos: pos,
+                        line,
+                        col,
+                        context,
+                    });
+                }
                 ']' => {
-                    if let Some(Delimiter::Bracket { open_pos, .. }) = self.stack.pop() {
-                        // Matched
-                    } else {
-                        errors.push(StructuralError::UnmatchedClosing {
-                            delimiter: ']',
-                            position: pos,
-                        });
+                    match self.stack.pop() {
+                        Some(Delimiter::Bracket { open_pos, line: open_line, col: open_col, context }) => {
+                            // Matched correctly
+                        }
+                        Some(other) => {
+                            errors.push(StructuralError::MismatchedDelimiter {
+                                expected: Self::closing_char(&other),
+                                found: ']',
+                                opening_pos: Self::delimiter_pos(&other),
+                                closing_pos: pos,
+                            });
+                            self.stack.push(other);
+                        }
+                        None => {
+                            errors.push(StructuralError::UnmatchedClosing {
+                                delimiter: ']',
+                                position: pos,
+                                line,
+                                col,
+                            });
+                        }
                     }
+                }
+                '\n' => {
+                    line += 1;
+                    col = 1;
+                    continue;
                 }
                 _ => {}
             }
-            pos += ch.len_utf8();
+
+            col += 1;
+        }
+
+        // Check for unterminated string
+        if self.in_string {
+            if let Some(start_pos) = self.string_start {
+                errors.push(StructuralError::UnterminatedString {
+                    start_pos,
+                    suggested_close: source.len(),
+                });
+            }
         }
 
         // Check for unclosed delimiters
-        for delimiter in &self.stack {
-            match delimiter {
-                Delimiter::Brace { open_pos, .. } => {
-                    errors.push(StructuralError::UnclosedDelimiter {
-                        delimiter: '{',
-                        open_position: *open_pos,
-                        suggested_close: self.suggest_close_position(source, *open_pos),
-                    });
+        while let Some(delimiter) = self.stack.pop() {
+            let (char_type, open_pos, line, col, context) = match delimiter {
+                Delimiter::Brace { open_pos, line, col, context } => ('{', open_pos, line, col, Some(context)),
+                Delimiter::Paren { open_pos, line, col, context } => ('(', open_pos, line, col, Some(context)),
+                Delimiter::Bracket { open_pos, line, col, context } => ('[', open_pos, line, col, Some(context)),
+                Delimiter::Quote { open_pos, line, col, quote_type } => {
+                    (if quote_type == QuoteType::Double { '"' } else { '\'' }, open_pos, line, col, None)
                 }
-                Delimiter::Paren { open_pos, .. } => {
-                    errors.push(StructuralError::UnclosedDelimiter {
-                        delimiter: '(',
-                        open_position: *open_pos,
-                        suggested_close: self.suggest_close_position(source, *open_pos),
-                    });
-                }
-                Delimiter::Bracket { open_pos, .. } => {
-                    errors.push(StructuralError::UnclosedDelimiter {
-                        delimiter: '[',
-                        open_position: *open_pos,
-                        suggested_close: self.suggest_close_position(source, *open_pos),
-                    });
-                }
-            }
+            };
+
+            let suggested_close = self.suggest_close_position(source, open_pos, context);
+
+            errors.push(StructuralError::UnclosedDelimiter {
+                delimiter: char_type,
+                open_position: open_pos,
+                open_line: line,
+                open_col: col,
+                suggested_close,
+                context: context.clone(),
+            });
         }
 
         errors
     }
 
-    fn suggest_close_position(&self, source: &str, open_pos: usize) -> usize {
-        // Heuristic: Find end of logical block
-        // 1. Same indentation level as opening
-        // 2. Or end of file
-        // 3. Or before next same-level delimiter
+    /// Check if a character at position is escaped
+    fn is_escaped(source: &str, pos: usize) -> bool {
+        if pos == 0 {
+            return false;
+        }
 
+        let mut backslash_count = 0;
+        let mut check_pos = pos;
+
+        while check_pos > 0 {
+            check_pos -= 1;
+            if source.as_bytes()[check_pos] == b'\\' {
+                backslash_count += 1;
+            } else {
+                break;
+            }
+        }
+
+        // Odd number of backslashes means the quote is escaped
+        backslash_count % 2 == 1
+    }
+
+    /// Infer delimiter context from surrounding code
+    fn infer_context(&self, source: &str, pos: usize) -> DelimiterContext {
+        // Look back to find keywords
+        let prefix = &source[..pos];
+        let words: Vec<&str> = prefix
+            .split(|c: char| c.is_whitespace() || "(){}[]".contains(c))
+            .collect();
+
+        if let Some(&last_word) = words.iter().rev().find(|w| !w.is_empty()) {
+            match last_word {
+                "contract" => DelimiterContext::ContractBody,
+                "match" | "with" => DelimiterContext::MatchExpression,
+                "for" => DelimiterContext::ForComprehension,
+                _ => {
+                    // Check if we're after a function name (identifier followed by '(')
+                    if prefix.ends_with('(') {
+                        DelimiterContext::FunctionArgs
+                    } else if prefix.ends_with('[') {
+                        DelimiterContext::Collection
+                    } else {
+                        DelimiterContext::BlockExpression
+                    }
+                }
+            }
+        } else {
+            DelimiterContext::Unknown
+        }
+    }
+
+    fn closing_char(delimiter: &Delimiter) -> char {
+        match delimiter {
+            Delimiter::Brace { .. } => '}',
+            Delimiter::Paren { .. } => ')',
+            Delimiter::Bracket { .. } => ']',
+            Delimiter::Quote { quote_type, .. } => {
+                if *quote_type == QuoteType::Double { '"' } else { '\'' }
+            }
+        }
+    }
+
+    fn delimiter_pos(delimiter: &Delimiter) -> usize {
+        match delimiter {
+            Delimiter::Brace { open_pos, .. } => *open_pos,
+            Delimiter::Paren { open_pos, .. } => *open_pos,
+            Delimiter::Bracket { open_pos, .. } => *open_pos,
+            Delimiter::Quote { open_pos, .. } => *open_pos,
+        }
+    }
+
+    fn suggest_close_position(
+        &self,
+        source: &str,
+        open_pos: usize,
+        context: Option<DelimiterContext>
+    ) -> usize {
+        // Context-aware position suggestion
+        match context {
+            Some(DelimiterContext::ContractBody) => {
+                // Close after contract body (typically longer)
+                self.find_end_of_block(source, open_pos, 2)
+            }
+            Some(DelimiterContext::ForComprehension) => {
+                // Close after for body (typically shorter)
+                self.find_end_of_block(source, open_pos, 1)
+            }
+            Some(DelimiterContext::FunctionArgs) => {
+                // Close after argument list (same line usually)
+                self.find_end_of_line(source, open_pos)
+            }
+            Some(DelimiterContext::Collection) => {
+                // Close after collection elements
+                self.find_end_of_expression(source, open_pos)
+            }
+            _ => {
+                // Generic: find by indentation
+                self.find_end_by_indentation(source, open_pos)
+            }
+        }
+    }
+
+    fn find_end_of_block(&self, source: &str, open_pos: usize, min_lines: usize) -> usize {
         let lines: Vec<&str> = source[open_pos..].lines().collect();
+        if lines.is_empty() {
+            return source.len();
+        }
+
+        let open_indent = Self::count_leading_whitespace(lines[0]);
+
+        for (i, line) in lines.iter().enumerate().skip(min_lines) {
+            let indent = Self::count_leading_whitespace(line);
+            if indent <= open_indent && !line.trim().is_empty() {
+                return open_pos + lines[..i].join("\n").len();
+            }
+        }
+
+        source.len()
+    }
+
+    fn find_end_of_line(&self, source: &str, open_pos: usize) -> usize {
+        source[open_pos..]
+            .find('\n')
+            .map(|pos| open_pos + pos)
+            .unwrap_or(source.len())
+    }
+
+    fn find_end_of_expression(&self, source: &str, open_pos: usize) -> usize {
+        // Find next delimiter or semicolon at same nesting level
+        let mut depth = 1;
+        for (i, ch) in source[open_pos..].char_indices() {
+            match ch {
+                '[' | '(' | '{' => depth += 1,
+                ']' | ')' | '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return open_pos + i;
+                    }
+                }
+                ';' | '\n' if depth == 1 => return open_pos + i,
+                _ => {}
+            }
+        }
+        source.len()
+    }
+
+    fn find_end_by_indentation(&self, source: &str, open_pos: usize) -> usize {
+        let lines: Vec<&str> = source[open_pos..].lines().collect();
+        if lines.is_empty() {
+            return source.len();
+        }
+
         let open_indent = Self::count_leading_whitespace(lines[0]);
 
         for (i, line) in lines.iter().enumerate().skip(1) {
             let indent = Self::count_leading_whitespace(line);
             if indent <= open_indent && !line.trim().is_empty() {
-                // Found line at same or less indentation
                 return open_pos + lines[..i].join("\n").len();
             }
         }
 
-        // Default: end of file
         source.len()
     }
 
@@ -1414,6 +1777,474 @@ impl DelimiterMatcher {
     }
 }
 ```
+
+---
+
+### Structural Error Types
+
+**Comprehensive error taxonomy for delimiters:**
+
+```rust
+#[derive(Clone, Debug)]
+pub enum StructuralError {
+    /// Unclosed delimiter (missing closing delimiter)
+    UnclosedDelimiter {
+        delimiter: char,
+        open_position: usize,
+        open_line: usize,
+        open_col: usize,
+        suggested_close: usize,
+        context: Option<DelimiterContext>,
+    },
+
+    /// Unmatched closing delimiter (extra closing without opening)
+    UnmatchedClosing {
+        delimiter: char,
+        position: usize,
+        line: usize,
+        col: usize,
+    },
+
+    /// Mismatched delimiter type (opened with '{', closed with ']')
+    MismatchedDelimiter {
+        expected: char,
+        found: char,
+        opening_pos: usize,
+        closing_pos: usize,
+    },
+
+    /// Unterminated string literal
+    UnterminatedString {
+        start_pos: usize,
+        suggested_close: usize,
+    },
+
+    /// Wrong delimiter for context (e.g., '[...]' used for contract body instead of '{...}')
+    WrongDelimiterForContext {
+        found: char,
+        expected: char,
+        context: DelimiterContext,
+        position: usize,
+    },
+
+    /// Misplaced delimiter (closing appears in wrong scope)
+    MisplacedDelimiter {
+        delimiter: char,
+        position: usize,
+        expected_scope: String,
+        actual_scope: String,
+    },
+}
+
+impl StructuralError {
+    pub fn to_correction(&self, source: &str) -> StructuralCorrection {
+        match self {
+            StructuralError::UnclosedDelimiter {
+                delimiter,
+                open_position,
+                suggested_close,
+                context,
+                ..
+            } => {
+                let closing_char = match delimiter {
+                    '{' => '}',
+                    '(' => ')',
+                    '[' => ']',
+                    '"' => '"',
+                    '\'' => '\'',
+                    _ => panic!("Unknown delimiter: {}", delimiter),
+                };
+
+                StructuralCorrection {
+                    message: format!(
+                        "Unclosed '{}' at position {} (line {}, col {})",
+                        delimiter, open_position,
+                        self.line(), self.col()
+                    ),
+                    fix: Fix::Insert {
+                        position: *suggested_close,
+                        text: format!("{}", closing_char),
+                    },
+                    confidence: 0.88,
+                    explanation: Some(format!(
+                        "Add '{}' to close {:?} block",
+                        closing_char,
+                        context.as_ref().unwrap_or(&DelimiterContext::Unknown)
+                    )),
+                }
+            }
+
+            StructuralError::UnmatchedClosing {
+                delimiter,
+                position,
+                line,
+                col,
+            } => {
+                StructuralCorrection {
+                    message: format!(
+                        "Unmatched '{}' at position {} (line {}, col {})",
+                        delimiter, position, line, col
+                    ),
+                    fix: Fix::Delete {
+                        start: *position,
+                        end: position + 1,
+                    },
+                    confidence: 0.75,
+                    explanation: Some(format!(
+                        "Remove extra '{}' that has no matching opening delimiter",
+                        delimiter
+                    )),
+                }
+            }
+
+            StructuralError::MismatchedDelimiter {
+                expected,
+                found,
+                opening_pos,
+                closing_pos,
+            } => {
+                StructuralCorrection {
+                    message: format!(
+                        "Mismatched delimiters: opened with '{}' at {}, closed with '{}' at {}",
+                        Self::opening_char(*expected), opening_pos, found, closing_pos
+                    ),
+                    fix: Fix::Replace {
+                        start: *closing_pos,
+                        end: closing_pos + 1,
+                        text: expected.to_string(),
+                    },
+                    confidence: 0.92,
+                    explanation: Some(format!(
+                        "Replace '{}' with '{}' to match opening delimiter",
+                        found, expected
+                    )),
+                }
+            }
+
+            StructuralError::UnterminatedString {
+                start_pos,
+                suggested_close,
+            } => {
+                StructuralCorrection {
+                    message: format!("Unterminated string starting at position {}", start_pos),
+                    fix: Fix::Insert {
+                        position: *suggested_close,
+                        text: "\"".to_string(),
+                    },
+                    confidence: 0.95,
+                    explanation: Some(
+                        "Add closing quote to terminate string literal".to_string()
+                    ),
+                }
+            }
+
+            StructuralError::WrongDelimiterForContext {
+                found,
+                expected,
+                context,
+                position,
+            } => {
+                StructuralCorrection {
+                    message: format!(
+                        "Wrong delimiter '{}' for {:?} context (expected '{}')",
+                        found, context, expected
+                    ),
+                    fix: Fix::Replace {
+                        start: *position,
+                        end: position + 1,
+                        text: expected.to_string(),
+                    },
+                    confidence: 0.85,
+                    explanation: Some(format!(
+                        "{:?} requires '{}' delimiters, not '{}'",
+                        context, expected, found
+                    )),
+                }
+            }
+
+            StructuralError::MisplacedDelimiter {
+                delimiter,
+                position,
+                expected_scope,
+                actual_scope,
+            } => {
+                StructuralCorrection {
+                    message: format!(
+                        "Delimiter '{}' appears in wrong scope: found in {}, expected in {}",
+                        delimiter, actual_scope, expected_scope
+                    ),
+                    fix: Fix::Delete {
+                        start: *position,
+                        end: position + 1,
+                    },
+                    confidence: 0.70,
+                    explanation: Some(
+                        "Remove misplaced delimiter or move to correct scope".to_string()
+                    ),
+                }
+            }
+        }
+    }
+
+    fn opening_char(closing: char) -> char {
+        match closing {
+            '}' => '{',
+            ')' => '(',
+            ']' => '[',
+            '"' => '"',
+            '\'' => '\'',
+            _ => closing,
+        }
+    }
+
+    fn line(&self) -> usize {
+        match self {
+            StructuralError::UnclosedDelimiter { open_line, .. } => *open_line,
+            StructuralError::UnmatchedClosing { line, .. } => *line,
+            _ => 0,
+        }
+    }
+
+    fn col(&self) -> usize {
+        match self {
+            StructuralError::UnclosedDelimiter { open_col, .. } => *open_col,
+            StructuralError::UnmatchedClosing { col, .. } => *col,
+            _ => 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StructuralCorrection {
+    pub message: String,
+    pub fix: Fix,
+    pub confidence: f64,
+    pub explanation: Option<String>,
+}
+```
+
+---
+
+### Delimiter Correction Examples
+
+#### Example 1: Missing Closing Brace in Contract
+
+**Input:**
+```rholang
+contract Cell(get, set) = {
+  for(x <- get) {
+    x!(42)
+  }
+  // Missing closing }
+```
+
+**Analysis:**
+```
+Delimiter stack at EOF:
+  - '{' at position 27 (contract body, line 1, col 28)
+
+Error: UnclosedDelimiter { delimiter: '{', open_position: 27, ... }
+```
+
+**Correction:**
+```rholang
+contract Cell(get, set) = {
+  for(x <- get) {
+    x!(42)
+  }
+}  // <- Added closing brace
+```
+
+**Confidence:** 0.88
+
+#### Example 2: Unterminated String Literal
+
+**Input:**
+```rholang
+stdout!("Hello, world)
+```
+
+**Analysis:**
+```
+String opened at position 8 ('"')
+No closing quote found before EOF
+
+Error: UnterminatedString { start_pos: 8, suggested_close: 22 }
+```
+
+**Correction:**
+```rholang
+stdout!("Hello, world")
+//                   ^ Added closing quote
+```
+
+**Confidence:** 0.95
+
+#### Example 3: Mismatched Delimiter Type
+
+**Input:**
+```rholang
+contract Cell(get, set) = {
+  for(x <- get] {  // Opened with '(', closed with ']'
+    x!(42)
+  }
+}
+```
+
+**Analysis:**
+```
+'(' opened at position 30
+']' found at position 39
+
+Error: MismatchedDelimiter {
+  expected: ')',
+  found: ']',
+  opening_pos: 30,
+  closing_pos: 39
+}
+```
+
+**Correction:**
+```rholang
+contract Cell(get, set) = {
+  for(x <- get) {  // Changed ']' to ')'
+    x!(42)
+  }
+}
+```
+
+**Confidence:** 0.92
+
+#### Example 4: Extra Closing Delimiter
+
+**Input:**
+```rholang
+contract Cell() = { Nil }}  // Extra '}'
+```
+
+**Analysis:**
+```
+First '}' closes '{' correctly
+Second '}' has no matching opener
+
+Error: UnmatchedClosing {
+  delimiter: '}',
+  position: 27,
+  line: 1,
+  col: 28
+}
+```
+
+**Correction:**
+```rholang
+contract Cell() = { Nil }  // Removed extra '}'
+```
+
+**Confidence:** 0.75
+
+#### Example 5: String with Escaped Quote
+
+**Input (correct):**
+```rholang
+stdout!("She said \"Hello\"")
+```
+
+**Analysis:**
+```
+'"' at position 8 (opening)
+'\"' at position 17 (escaped, not closing)
+'\"' at position 23 (escaped, not closing)
+'"' at position 24 (closing, not escaped)
+
+Result: No errors (correctly balanced)
+```
+
+#### Example 6: Nested Delimiters
+
+**Input:**
+```rholang
+match x with {
+  case [1, (2, 3] => { Nil }  // '[' closed with ']', but '(' not closed
+}
+```
+
+**Analysis:**
+```
+Stack after line 2:
+  - '(' at position 18 (unclosed)
+
+Error: UnclosedDelimiter {
+  delimiter: '(',
+  open_position: 18,
+  suggested_close: 23
+}
+```
+
+**Correction:**
+```rholang
+match x with {
+  case [1, (2, 3)] => { Nil }  // Added ')' before ']'
+}
+```
+
+**Confidence:** 0.88
+
+#### Example 7: Wrong Delimiter for Context
+
+**Input:**
+```rholang
+contract Cell() = [ Nil ]  // Using '[...]' instead of '{...}'
+```
+
+**Analysis:**
+```
+Context: ContractBody expects '{...}'
+Found: '[...]'
+
+Error: WrongDelimiterForContext {
+  found: '[',
+  expected: '{',
+  context: DelimiterContext::ContractBody,
+  position: 18
+}
+```
+
+**Correction:**
+```rholang
+contract Cell() = { Nil }  // Changed '[' to '{'
+```
+
+**Confidence:** 0.85
+
+#### Example 8: Multi-Line Unterminated String
+
+**Input:**
+```rholang
+stdout!("This is a very long
+         string that spans multiple
+         lines but forgot the closing quote
+```
+
+**Analysis:**
+```
+'"' at position 8 (opening)
+No closing '"' before EOF (assuming multiline strings allowed)
+
+Error: UnterminatedString {
+  start_pos: 8,
+  suggested_close: [end of line 3]
+}
+```
+
+**Correction:**
+```rholang
+stdout!("This is a very long
+         string that spans multiple
+         lines but forgot the closing quote")
+//                                         ^ Added here
+```
+
+**Confidence:** 0.95
 
 ### Block Structure Validation
 
@@ -2821,7 +3652,7 @@ This design proposes a **comprehensive, multi-level error correction system** fo
 
 ---
 
-**Document Version:** 1.2
+**Document Version:** 1.3
 **Last Updated:** 2025-10-26
 **Author:** Claude (AI Assistant)
-**Status:** Design Proposal with Complete Theoretical Foundation and Comprehensive Parse Error Coverage
+**Status:** Design Proposal with Complete Theoretical Foundation, Comprehensive Parse/Syntax Error Coverage, and Full Delimiter Matching
