@@ -3,11 +3,13 @@
 //! Manages the dictionary backend, algorithm selection, and query parameters.
 
 use crate::cli::args::SerializationFormat;
+use crate::commands::core::QueryParams;
+use crate::commands::handlers::query::execute_query;
 use crate::dictionary::dawg::DawgDictionary;
 use crate::dictionary::dynamic_dawg::DynamicDawg;
 use crate::dictionary::pathmap::PathMapDictionary;
 use crate::dictionary::{Dictionary, DictionaryNode};
-use crate::transducer::{Algorithm, Transducer};
+use crate::transducer::Algorithm;
 use anyhow::Result;
 use std::path::Path;
 
@@ -349,59 +351,20 @@ impl ReplState {
 
     /// Query the dictionary
     pub fn query(&self, term: &str) -> Vec<(String, usize)> {
-        let mut results: Vec<_> = match &self.dictionary {
-            DictContainer::PathMap(d) => {
-                let transducer = Transducer::new(d.clone(), self.algorithm);
-                if self.prefix_mode {
-                    transducer
-                        .query_ordered(term, self.max_distance)
-                        .prefix()
-                        .map(|c| (c.term, c.distance))
-                        .collect()
-                } else {
-                    transducer
-                        .query_ordered(term, self.max_distance)
-                        .map(|c| (c.term, c.distance))
-                        .collect()
-                }
-            }
-            DictContainer::Dawg(d) => {
-                let transducer = Transducer::new(d.clone(), self.algorithm);
-                if self.prefix_mode {
-                    transducer
-                        .query_ordered(term, self.max_distance)
-                        .prefix()
-                        .map(|c| (c.term, c.distance))
-                        .collect()
-                } else {
-                    transducer
-                        .query_ordered(term, self.max_distance)
-                        .map(|c| (c.term, c.distance))
-                        .collect()
-                }
-            }
-            DictContainer::DynamicDawg(d) => {
-                let transducer = Transducer::new(d.clone(), self.algorithm);
-                if self.prefix_mode {
-                    transducer
-                        .query_ordered(term, self.max_distance)
-                        .prefix()
-                        .map(|c| (c.term, c.distance))
-                        .collect()
-                } else {
-                    transducer
-                        .query_ordered(term, self.max_distance)
-                        .map(|c| (c.term, c.distance))
-                        .collect()
-                }
-            }
+        let params = QueryParams {
+            term: term.to_string(),
+            max_distance: self.max_distance,
+            algorithm: self.algorithm,
+            prefix: self.prefix_mode,
+            show_distances: false, // Not used by execute_query
+            limit: self.result_limit,
         };
 
-        if let Some(limit) = self.result_limit {
-            results.truncate(limit);
+        match &self.dictionary {
+            DictContainer::PathMap(d) => execute_query(d, &params),
+            DictContainer::Dawg(d) => execute_query(d, &params),
+            DictContainer::DynamicDawg(d) => execute_query(d, &params),
         }
-
-        results
     }
 
     /// Get dictionary statistics
