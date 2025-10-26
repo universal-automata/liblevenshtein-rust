@@ -13,11 +13,23 @@ This library provides efficient fuzzy string matching against large dictionaries
   - `Standard`: insert, delete, substitute operations
   - `Transposition`: adds character transposition (swap adjacent chars)
   - `MergeAndSplit`: adds merge and split operations
-- **Pluggable dictionary backends**:
-  - PathMap (default) - high-performance trie with structural sharing
+- **Multiple dictionary backends**:
+  - **PathMap** (default) - high-performance trie with structural sharing
+  - **DAWG** - Directed Acyclic Word Graph for space-efficient storage
+  - **DynamicDawg** - DAWG with online insert/delete/minimize operations
   - Extensible trait-based design for custom backends
+- **Ordered results**: `OrderedQueryIterator` returns results sorted by distance first, then lexicographically
+- **Filtering and prefix matching**: Filter results with custom predicates, enable prefix mode for code completion
+- **Serialization support** (optional `serialization` feature):
+  - Bincode (binary), JSON, Protobuf formats
+  - **Gzip compression** (optional `compression` feature) - 85% file size reduction
+  - Save and load dictionaries to/from disk
+- **Full-featured CLI tool** (optional `cli` feature):
+  - Interactive REPL for exploration
+  - Query, insert, delete, convert operations
+  - Support for all serialization formats including compressed variants
 - **Runtime dictionary updates**:
-  - Thread-safe insert, remove, and clear operations
+  - Thread-safe insert, remove, and clear operations (PathMap, DynamicDawg)
   - Queries automatically see updates via `RwLock`-based interior mutability
   - Concurrent queries during modifications
 - **Lazy evaluation** - results generated on-demand
@@ -89,6 +101,101 @@ dict.clear();
 - Active `Transducer` instances automatically see updates
 
 See [`examples/dynamic_dictionary.rs`](examples/dynamic_dictionary.rs) for a complete demonstration.
+
+### Ordered Results
+
+Get results sorted by edit distance first, then alphabetically:
+
+```rust
+use liblevenshtein::prelude::*;
+
+let dict = PathMapDictionary::from_iter(vec!["apple", "apply", "ape", "app"]);
+let transducer = Transducer::new(dict, Algorithm::Standard);
+
+// Results ordered by distance, then alphabetically
+for candidate in transducer.query_ordered("aple", 1) {
+    println!("{}: {}", candidate.term, candidate.distance);
+}
+// Output:
+//   ape: 1
+//   apple: 1
+//   apply: 1
+```
+
+### Filtering and Prefix Matching
+
+Filter results and enable prefix matching for code completion:
+
+```rust
+use liblevenshtein::prelude::*;
+
+let dict = PathMapDictionary::from_iter(vec![
+    "getValue", "getVariable", "setValue", "setVariable"
+]);
+let transducer = Transducer::new(dict, Algorithm::Standard);
+
+// Prefix matching with filtering
+for candidate in transducer
+    .query_ordered("getVal", 1)
+    .prefix()  // Match terms starting with query ± edits
+    .filter(|c| c.term.starts_with("get"))  // Only getter methods
+{
+    println!("{}: {}", candidate.term, candidate.distance);
+}
+// Output:
+//   getValue: 0
+//   getVariable: 1
+```
+
+See [`examples/code_completion_demo.rs`](examples/code_completion_demo.rs) and [`examples/contextual_filtering_optimization.rs`](examples/contextual_filtering_optimization.rs) for more examples.
+
+### Serialization and Compression
+
+Save and load dictionaries with optional compression:
+
+```rust
+use liblevenshtein::prelude::*;
+use liblevenshtein::serialization::{BincodeSerializer, GzipSerializer};
+use std::fs::File;
+
+let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tested"]);
+
+// Save with compression (85% file size reduction)
+let file = File::create("dict.bin.gz")?;
+GzipSerializer::<BincodeSerializer>::serialize(&dict, file)?;
+
+// Load compressed dictionary
+let file = File::open("dict.bin.gz")?;
+let dict: PathMapDictionary = GzipSerializer::<BincodeSerializer>::deserialize(file)?;
+```
+
+Requires `serialization` and `compression` features:
+
+```toml
+[dependencies]
+liblevenshtein = { version = "0.1", features = ["serialization", "compression"] }
+```
+
+### CLI Tool
+
+The library includes a full-featured command-line tool:
+
+```bash
+# Install with CLI support
+cargo install liblevenshtein --features cli,compression,protobuf
+
+# Query a dictionary
+liblevenshtein query "test" --dict /usr/share/dict/words -m 2 -s
+
+# Convert between formats with compression
+liblevenshtein convert words.txt words.bin.gz \
+  --to-format bincode-gz --to-backend path-map
+
+# Launch interactive REPL
+liblevenshtein repl --dict words.bin.gz --format bincode-gz
+```
+
+See [`BUILD.md`](BUILD.md) for more CLI usage examples.
 
 ## Theoretical Background
 
