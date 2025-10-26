@@ -317,7 +317,7 @@ jobs:
           pkgrel=1
           pkgdesc="Fast approximate string matching using Levenshtein automata"
           arch=('__ARCH__')
-          url="https://github.com/F1R3FLY-io/liblevenshtein-rust"
+          url="https://github.com/universal-automata/liblevenshtein-rust"
           license=('Apache')
           depends=('gcc-libs')
           source=()
@@ -454,6 +454,6 @@ jobs:
           draft: false
           prerelease: false
           body: |
-            See [CHANGELOG.md](https://github.com/F1R3FLY-io/liblevenshtein-rust/blob/master/CHANGELOG.md) for details.
+            See [CHANGELOG.md](https://github.com/universal-automata/liblevenshtein-rust/blob/master/CHANGELOG.md) for details.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

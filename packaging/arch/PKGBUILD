@@ -5,11 +5,11 @@ pkgver=0.3.0
 pkgrel=1
 pkgdesc="Fast approximate string matching using Levenshtein automata"
 arch=('x86_64' 'aarch64')
-url="https://github.com/F1R3FLY-io/liblevenshtein-rust"
+url="https://github.com/universal-automata/liblevenshtein-rust"
 license=('Apache')
 depends=('gcc-libs')
 makedepends=('rust' 'cargo' 'protobuf')
-source=("liblevenshtein::git+https://github.com/F1R3FLY-io/liblevenshtein-rust.git#tag=v${pkgver}")
+source=("liblevenshtein::git+https://github.com/universal-automata/liblevenshtein-rust.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 
 build() {

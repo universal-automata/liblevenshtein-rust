@@ -61,7 +61,7 @@ All required metadata is already present in `Cargo.toml`:
 - ✓ `authors` = ["Dylon Edwards <dylon.devo@gmail.com>"]
 - ✓ `license` = "Apache-2.0"
 - ✓ `description` = "Levenshtein/Universal Automata for approximate string matching using various dictionary backends"
-- ✓ `repository` = "https://github.com/F1R3FLY-io/liblevenshtein-rust"
+- ✓ `repository` = "https://github.com/universal-automata/liblevenshtein-rust"
 - ✓ `readme` = "README.md"
 - ✓ `keywords` = ["levenshtein", "edit-distance", "spell-checking", "fuzzy-search", "automata"] (5/5 max)
 - ✓ `categories` = ["algorithms", "data-structures", "text-processing"] (3/5 max)
@@ -71,7 +71,7 @@ All required metadata is already present in `Cargo.toml`:
 Consider adding these fields to `Cargo.toml`:
 
 ```toml
-homepage = "https://github.com/F1R3FLY-io/liblevenshtein-rust"
+homepage = "https://github.com/universal-automata/liblevenshtein-rust"
 documentation = "https://docs.rs/liblevenshtein"
 ```
 

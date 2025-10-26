@@ -1,8 +1,8 @@
 # liblevenshtein-rust
 
-[![CI](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/ci.yml)
-[![Nightly Tests](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/nightly.yml/badge.svg)](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/nightly.yml)
-[![Release](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/release.yml/badge.svg)](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/release.yml)
+[![CI](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/ci.yml)
+[![Nightly Tests](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/nightly.yml/badge.svg)](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/nightly.yml)
+[![Release](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/release.yml/badge.svg)](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A Rust port of [liblevenshtein](https://github.com/universal-automata/liblevenshtein-cpp) for fast approximate string matching using Levenshtein automata (Universal Levenshtein Automata).
@@ -59,19 +59,19 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-liblevenshtein = { git = "https://github.com/F1R3FLY-io/liblevenshtein-rust", tag = "v0.3.0" }
+liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", tag = "v0.3.0" }
 ```
 
 Or install the CLI tool:
 
 ```bash
-cargo install --git https://github.com/F1R3FLY-io/liblevenshtein-rust --tag v0.3.0 \
+cargo install --git https://github.com/universal-automata/liblevenshtein-rust --tag v0.3.0 \
   --features cli,compression,protobuf liblevenshtein
 ```
 
 ### Pre-built Packages
 
-Download pre-built packages from the [GitHub Releases](https://github.com/F1R3FLY-io/liblevenshtein-rust/releases) page:
+Download pre-built packages from the [GitHub Releases](https://github.com/universal-automata/liblevenshtein-rust/releases) page:
 
 - **Debian/Ubuntu**: `.deb` packages
 - **Fedora/RHEL/CentOS**: `.rpm` packages
@@ -221,7 +221,7 @@ Requires `serialization` and `compression` features:
 
 ```toml
 [dependencies]
-liblevenshtein = { git = "https://github.com/F1R3FLY-io/liblevenshtein-rust", tag = "v0.3.0", features = ["serialization", "compression"] }
+liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", tag = "v0.3.0", features = ["serialization", "compression"] }
 ```
 
 ### CLI Tool
@@ -230,7 +230,7 @@ The library includes a full-featured command-line tool with interactive REPL:
 
 ```bash
 # Install with CLI support (from GitHub)
-cargo install --git https://github.com/F1R3FLY-io/liblevenshtein-rust --tag v0.3.0 \
+cargo install --git https://github.com/universal-automata/liblevenshtein-rust --tag v0.3.0 \
   --features cli,compression,protobuf liblevenshtein
 
 # Or download pre-built binaries from GitHub Releases
@@ -287,5 +287,5 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for detai
 
 - [Original C++ implementation](https://github.com/universal-automata/liblevenshtein-cpp)
 - [PathMap backend](https://github.com/Adam-Vandervorst/PathMap)
-- [GitHub Repository](https://github.com/F1R3FLY-io/liblevenshtein-rust)
-- [Release Page](https://github.com/F1R3FLY-io/liblevenshtein-rust/releases)
+- [GitHub Repository](https://github.com/universal-automata/liblevenshtein-rust)
+- [Release Page](https://github.com/universal-automata/liblevenshtein-rust/releases)

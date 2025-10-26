@@ -168,7 +168,7 @@ Found an issue or want to improve documentation?
 
 1. Check [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines
 2. Submit a pull request
-3. Report issues on [GitHub](https://github.com/F1R3FLY-io/liblevenshtein-rust/issues)
+3. Report issues on [GitHub](https://github.com/universal-automata/liblevenshtein-rust/issues)
 
 ---
 
