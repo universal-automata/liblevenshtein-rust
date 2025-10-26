@@ -464,7 +464,9 @@ fn resolve_dict_path_and_format(
     };
 
     // Detect or use specified format
-    let detection = detect_format(&path, backend.or(config.backend), format.or(config.format))?;
+    // Only pass explicitly user-provided backend/format to detect_format for validation.
+    // Config values are used as fallback when detection fails, not as constraints.
+    let detection = detect_format(&path, backend, format)?;
 
     Ok((path, detection.format))
 }
