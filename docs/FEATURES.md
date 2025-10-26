@@ -1,5 +1,8 @@
 # Feature Documentation
 
+**Version**: 0.2.0
+**Last Updated**: 2025-10-25
+
 This document describes all features available in liblevenshtein-rust.
 
 ## Core Features
@@ -28,6 +31,20 @@ use liblevenshtein::prelude::*;
 
 let dict = DawgDictionary::from_iter(vec!["testing", "walking", "talking"]);
 println!("Terms: {}, Nodes: {}", dict.term_count(), dict.node_count());
+```
+
+#### DynamicDawg Dictionary
+- **Type**: DAWG with online insert/delete/minimize operations
+- **Best for**: Dictionaries needing both space efficiency and runtime updates
+- **Thread-safe**: Uses RwLock for concurrent access
+- **Space efficiency**: Maintains DAWG properties through incremental minimization
+- **Usage**:
+```rust
+use liblevenshtein::prelude::*;
+
+let dict = DynamicDawgDictionary::from_iter(vec!["test", "testing"]);
+dict.insert("tester");  // Online insertion with minimization
+dict.remove("test");    // Online deletion
 ```
 
 ### 2. Levenshtein Algorithms
@@ -63,6 +80,53 @@ let transducer = TransducerBuilder::new()
 - Helpful error messages
 - Order-independent method calls
 
+### 4. Query Iterators
+
+#### Standard Query Iterator
+- Returns results in discovery order
+- Lazy evaluation, no collection overhead
+```rust
+for term in transducer.query("test", 2) {
+    println!("{}", term);
+}
+
+for candidate in transducer.query_with_distance("test", 2) {
+    println!("{}: {}", candidate.term, candidate.distance);
+}
+```
+
+#### Ordered Query Iterator (v0.2.0)
+- **Distance-first ordering**: Results sorted by edit distance, then lexicographically
+- **Perfect for code completion**: Most relevant results first
+- **Usage**:
+```rust
+for candidate in transducer.query_ordered("aple", 1) {
+    println!("{}: {}", candidate.term, candidate.distance);
+}
+// Output:
+//   ape: 1
+//   apple: 1
+//   apply: 1
+```
+
+#### Filtering and Prefix Matching (v0.2.0)
+- **Custom filters**: Apply arbitrary predicates to results
+- **Prefix mode**: Match only terms starting with query ± edits
+- **Optimized**: Bitmap masking for efficient context filtering
+- **Usage**:
+```rust
+// Prefix matching for code completion
+for candidate in transducer
+    .query_ordered("getVal", 1)
+    .prefix()  // Only terms starting with "getVal" ± 1 edit
+    .filter(|c| c.term.starts_with("get"))
+{
+    println!("{}: {}", candidate.term, candidate.distance);
+}
+```
+
+See [CODE_COMPLETION_GUIDE.md](CODE_COMPLETION_GUIDE.md) for detailed examples.
+
 ## Optional Features
 
 ### Dictionary Serialization
@@ -72,6 +136,12 @@ Enable with: `features = ["serialization"]`
 **Supported formats**:
 - **Bincode**: Fast, compact binary format
 - **JSON**: Human-readable, for debugging
+- **Protobuf** (optional `protobuf` feature): Cross-language compatibility
+
+**Compression support** (v0.2.0, optional `compression` feature):
+- **Gzip compression**: 85% file size reduction
+- **Compressed formats**: bincode-gz, json-gz, protobuf-gz
+- **Generic wrapper**: `GzipSerializer<S>` works with any serializer
 
 **Usage**:
 ```rust
@@ -79,50 +149,94 @@ use liblevenshtein::prelude::*;
 use liblevenshtein::serialization::*;
 use std::fs::File;
 
-// Save dictionary
+// Save dictionary with compression (v0.2.0)
 let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
-let file = File::create("dict.bin")?;
-BincodeSerializer::serialize(&dict, file)?;
+let file = File::create("dict.bin.gz")?;
+GzipSerializer::<BincodeSerializer>::serialize(&dict, file)?;
 
-// Load dictionary
-let file = File::open("dict.bin")?;
-let loaded: PathMapDictionary = BincodeSerializer::deserialize(file)?;
+// Load compressed dictionary
+let file = File::open("dict.bin.gz")?;
+let loaded: PathMapDictionary = GzipSerializer::<BincodeSerializer>::deserialize(file)?;
+
+// Protobuf format (cross-language)
+#[cfg(feature = "protobuf")]
+{
+    let file = File::create("dict.pb.gz")?;
+    GzipSerializer::<ProtobufSerializer>::serialize(&dict, file)?;
+}
 ```
 
 **Benefits**:
-- Fast startup with pre-built dictionaries
-- Share dictionaries across systems
-- Reduce memory usage with binary formats
+- **Fast startup** with pre-built dictionaries
+- **Share dictionaries** across systems and languages
+- **Reduce file size** by 85% with compression
+- **Production-ready**: Validated with 470k+ word dictionaries
 
 ### CLI Tool
 
 Enable with: `features = ["cli"]`
 
-Build: `cargo build --bin liblevenshtein-cli --features cli --release`
+Build: `cargo build --bin liblevenshtein --features cli,compression,protobuf --release`
 
 **Commands**:
 
 1. **Query**: Search for fuzzy matches
 ```bash
-liblevenshtein-cli query \\
+liblevenshtein query "aple" \\
     --dict words.txt \\
-    --term "aple" \\
-    --distance 2 \\
+    -m 2 \\
     --algorithm transposition \\
-    --with-distance
+    -s  # Show distances
 ```
 
-2. **Info**: Show dictionary statistics
+2. **Convert**: Between formats and backends (v0.2.0)
 ```bash
-liblevenshtein-cli info \\
-    --dict words.txt \\
-    --dict-type dawg
+# Convert to compressed format
+liblevenshtein convert words.txt words.bin.gz \\
+    --to-format bincode-gz \\
+    --to-backend path-map
+
+# Convert between backends
+liblevenshtein convert dict.bin dict-dawg.bin \\
+    --from-backend path-map \\
+    --to-backend dawg
 ```
 
-**Options**:
-- `--dict-type`: Choose `pathmap` or `dawg`
-- `--algorithm`: Choose `standard`, `transposition`, or `merge-and-split`
-- `--with-distance`: Include edit distances in output
+3. **Insert/Delete**: Runtime dictionary updates (v0.2.0)
+```bash
+# Insert terms
+liblevenshtein insert "newterm" --dict dict.bin
+
+# Delete terms
+liblevenshtein delete "oldterm" --dict dict.bin
+```
+
+4. **REPL**: Interactive exploration (v0.2.0)
+```bash
+liblevenshtein repl --dict words.bin.gz --format bincode-gz
+```
+
+5. **Info**: Show dictionary statistics
+```bash
+liblevenshtein info --dict words.txt --backend path-map
+```
+
+**Format Support** (v0.2.0):
+- Text (`--format text` or `.txt`)
+- Bincode (`--format bincode` or `.bin`)
+- JSON (`--format json` or `.json`)
+- Protobuf (`--format protobuf` or `.pb`)
+- **Compressed**: `bincode-gz`, `json-gz`, `protobuf-gz` (.bin.gz, .json.gz, .pb.gz)
+
+**Backend Options**:
+- `path-map`: Default trie-based dictionary
+- `dawg`: Space-efficient DAWG
+- `dynamic-dawg`: DAWG with runtime updates
+
+**Algorithm Options**:
+- `standard`: Insert, delete, substitute
+- `transposition`: + character swaps
+- `merge-and-split`: + merge/split operations
 
 ## Examples
 
@@ -131,6 +245,10 @@ All examples can be run with `cargo run --example <name>`:
 1. **serialization**: Dictionary save/load demo
 2. **dawg_demo**: DAWG vs PathMap comparison
 3. **builder_demo**: TransducerBuilder usage
+4. **code_completion_demo** (v0.2.0): IDE-style autocomplete with filtering
+5. **advanced_contextual_filtering** (v0.2.0): Bitmap masking for context switching
+6. **contextual_filtering_optimization** (v0.2.0): Performance comparison of filtering strategies
+7. **dynamic_dictionary**: Runtime dictionary updates with thread safety
 
 ## Performance
 
@@ -210,8 +328,16 @@ All dictionary implementations are thread-safe:
 [features]
 default = []
 serialization = ["serde", "bincode", "serde_json"]
-cli = ["clap", "anyhow"]
+compression = ["flate2"]  # v0.2.0
+protobuf = ["prost", "prost-build"]  # v0.2.0
+cli = ["clap", "anyhow", "serialization"]
 ```
+
+**Feature combinations**:
+- `serialization`: Basic save/load support (bincode, JSON)
+- `serialization,compression`: Add gzip compression
+- `serialization,protobuf`: Add cross-language Protobuf support
+- `cli,compression,protobuf`: Full CLI with all formats
 
 ## Future Enhancements
 

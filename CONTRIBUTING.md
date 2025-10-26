@@ -1,5 +1,8 @@
 # Contributing to liblevenshtein-rust
 
+**Version**: 0.2.0
+**Last Updated**: 2025-10-25
+
 Thank you for your interest in contributing to liblevenshtein-rust!
 
 ## Development Setup
@@ -8,46 +11,72 @@ Thank you for your interest in contributing to liblevenshtein-rust!
 
 - Rust 1.70 or later
 - Git
+- Protocol Buffers compiler (optional, for `protobuf` feature)
+  - Linux: `sudo apt-get install protobuf-compiler`
+  - macOS: `brew install protobuf`
+  - Windows: Download from [protobuf releases](https://github.com/protocolbuffers/protobuf/releases)
 
 ### Building
 
-The project requires CPU features (AES, SSE2) due to PathMap dependencies:
+The project requires the PathMap dependency:
 
 ```bash
-export RUSTFLAGS="-C target-cpu=native"
-cargo build
+# Clone PathMap (sibling directory)
+cd ..
+git clone https://github.com/F1R3FLY-io/PathMap.git
+cd liblevenshtein-rust
+
+# Build with CPU-specific optimizations
+RUSTFLAGS="-C target-cpu=native" cargo build --all-features
 ```
 
-Or use the provided script:
-
-```bash
-./scripts/build.sh  # If added
-```
+See [BUILD.md](BUILD.md) for comprehensive build instructions.
 
 ### Running Tests
 
 ```bash
-RUSTFLAGS="-C target-cpu=native" cargo test
+# Run all tests
+RUSTFLAGS="-C target-cpu=native" cargo test --all-features
+
+# Run tests for specific features
+RUSTFLAGS="-C target-cpu=native" cargo test --features compression,protobuf
 ```
 
-### Running Examples
+### Running Examples (v0.2.0)
 
 ```bash
-RUSTFLAGS="-C target-cpu=native" cargo run --example spell_checker
+# Code completion demo
+RUSTFLAGS="-C target-cpu=native" cargo run --example code_completion_demo
+
+# DAWG comparison
+RUSTFLAGS="-C target-cpu=native" cargo run --example dawg_demo
+
+# Contextual filtering
+RUSTFLAGS="-C target-cpu=native" cargo run --example advanced_contextual_filtering
+
+# Dynamic dictionary updates
+cargo run --example dynamic_dictionary
 ```
 
 ### Benchmarks
 
 ```bash
+# Run all benchmarks
 RUSTFLAGS="-C target-cpu=native" cargo bench
+
+# Run specific benchmark suite
+RUSTFLAGS="-C target-cpu=native" cargo bench --bench serialization_benchmarks --features compression,protobuf
+RUSTFLAGS="-C target-cpu=native" cargo bench --bench filtering_prefix_benchmarks
 ```
 
 ## Code Style
 
 - Follow Rust standard formatting (`cargo fmt`)
-- Ensure clippy passes (`cargo clippy`)
+- Ensure clippy passes (`cargo clippy --all-features`)
 - Add documentation for public APIs
 - Include tests for new functionality
+- Write clear commit messages following conventional commits format
+- Update CHANGELOG.md for user-facing changes
 
 ## Pull Request Process
 
@@ -61,30 +90,38 @@ RUSTFLAGS="-C target-cpu=native" cargo bench
 8. Push to the branch (`git push origin feature/amazing-feature`)
 9. Open a Pull Request
 
-## Areas for Contribution
+## Areas for Contribution (v0.2.0)
 
-See [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md) for planned features.
+See [docs/FUTURE_ENHANCEMENTS.md](docs/FUTURE_ENHANCEMENTS.md) for detailed planned features.
 
 ### High Priority
 
-- Complete Transposition algorithm implementation
-- Add priority queue for ordered results
-- Improve test coverage
-- Performance optimizations
+- Additional algorithm variants (e.g., Damerau-Levenshtein with bounded deletions)
+- Further performance optimizations (SIMD, parallel queries)
+- Improve test coverage for edge cases
+- FFI bindings for C/C++ integration
 
 ### Medium Priority
 
-- Alternative dictionary backends
-- Serialization support
-- Extended examples
-- Benchmarking suite
+- Additional serialization formats (MessagePack, CBOR)
+- Dictionary builder optimizations
+- Extended CLI features (batch processing, watch mode)
+- More comprehensive benchmarking suite
 
 ### Documentation
 
 - API documentation improvements
-- Usage tutorials
-- Performance guides
-- Algorithm comparisons
+- Usage tutorials and cookbooks
+- Performance tuning guides
+- Algorithm comparison studies
+- Integration examples for common frameworks
+
+### Examples
+
+- Web service integration (Actix, Axum)
+- IDE plugin demonstration
+- Real-time search applications
+- Multi-language dictionary support
 
 ## Questions?
 
