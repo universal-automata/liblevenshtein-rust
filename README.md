@@ -1,5 +1,11 @@
 # liblevenshtein-rust
 
+[![CI](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/ci.yml)
+[![Nightly Tests](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/nightly.yml/badge.svg)](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/nightly.yml)
+[![Release](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/release.yml/badge.svg)](https://github.com/F1R3FLY-io/liblevenshtein-rust/actions/workflows/release.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Crates.io](https://img.shields.io/crates/v/liblevenshtein.svg)](https://crates.io/crates/liblevenshtein)
+
 A Rust port of [liblevenshtein](https://github.com/universal-automata/liblevenshtein-cpp) for fast approximate string matching using Levenshtein automata (Universal Levenshtein Automata).
 
 ## Overview
