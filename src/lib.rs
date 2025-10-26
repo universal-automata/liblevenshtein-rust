@@ -26,6 +26,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 
+pub mod commands;
 pub mod dictionary;
 pub mod distance;
 pub mod transducer;
