@@ -1,660 +1,567 @@
-# liblevenshtein-rust Architecture Guide
+# liblevenshtein-rust Architecture
 
-This document outlines the current architecture and provides detailed plans for recommended improvements.
+**Version:** 0.3.0
+**Last Updated:** 2025-10-26
 
-## Current Architecture
-
-### Module Organization
-
-```
-src/
-├── lib.rs                    # Public API and prelude
-├── dictionary/               # Dictionary backends
-│   ├── mod.rs               # Dictionary traits
-│   ├── dawg.rs              # Static DAWG (529 lines)
-│   ├── dynamic_dawg.rs      # Mutable DAWG (1031 lines)
-│   ├── dawg_query.rs        # Optimized DAWG queries (345 lines)
-│   └── pathmap.rs           # PathMap wrapper (451 lines)
-├── transducer/              # Levenshtein automata
-│   ├── mod.rs               # Transducer main struct
-│   ├── algorithm.rs         # Algorithm types
-│   ├── state.rs             # Automaton state (293 lines)
-│   ├── transition.rs        # State transitions (485 lines)
-│   ├── query.rs             # Unordered queries (254 lines)
-│   ├── ordered_query.rs     # Ordered queries (754 lines)
-│   ├── intersection.rs      # Dictionary-automaton intersection
-│   ├── pool.rs              # State pooling (294 lines)
-│   ├── position.rs          # Position in automaton
-│   └── builder.rs           # Transducer builder (231 lines)
-├── serialization/           # Dictionary persistence
-│   └── mod.rs               # All formats (1080 lines) ⚠️
-├── cli/                     # Command-line interface
-│   ├── mod.rs
-│   ├── args.rs              # Clap definitions (285 lines)
-│   ├── commands.rs          # Command handlers (1061 lines) ⚠️
-│   ├── detect.rs            # Format detection (261 lines)
-│   └── paths.rs             # Path utilities (300 lines)
-├── repl/                    # Interactive REPL
-│   ├── mod.rs
-│   ├── command.rs           # Commands + parsing + execution (1371 lines) ⚠️
-│   ├── state.rs             # REPL state (455 lines)
-│   ├── helper.rs            # Rustyline integration
-│   └── highlighter.rs       # Syntax highlighting
-└── distance/                # Distance calculations
-    └── mod.rs
-
-⚠️ = Files that need splitting
-```
-
-## Recommended Improvements
-
-### 1. Split REPL Command Module ⭐ HIGH PRIORITY
-
-**Problem:** `src/repl/command.rs` (1371 lines) contains command types, parsing, and ALL execution logic.
-
-**Solution:**
-
-```
-src/repl/
-├── mod.rs
-├── state.rs
-├── helper.rs
-├── highlighter.rs
-└── command/
-    ├── mod.rs               # Command enum + CommandResult
-    ├── parser.rs            # Command::parse() and parse_* methods
-    ├── executor.rs          # Command::execute() dispatch
-    └── handlers/
-        ├── mod.rs
-        ├── query.rs         # Query command implementation
-        ├── dictionary.rs    # Insert, Delete, Contains, Load, Save
-        ├── file_ops.rs      # InsertFrom, RemoveFrom, ReplaceWith
-        ├── config.rs        # Backend, Algorithm, Distance, Prefix, etc.
-        └── utility.rs       # Help, Stats, Dump, Settings, Config
-```
-
-**Implementation Steps:**
-
-1. **Create `command/mod.rs`:**
-```rust
-//! REPL command definitions and execution
-
-mod parser;
-mod executor;
-mod handlers;
-
-pub use self::executor::CommandResult;
-
-/// REPL command
-#[derive(Debug, Clone)]
-pub enum Command {
-    Query { term: String, distance: Option<usize>, prefix: bool, limit: Option<usize> },
-    Insert { terms: Vec<String> },
-    // ... other variants
-}
-
-impl Command {
-    /// Parse command from input string
-    pub fn parse(input: &str) -> anyhow::Result<Self> {
-        parser::parse(input)
-    }
-
-    /// Execute command against REPL state
-    pub fn execute(&self, state: &mut super::ReplState) -> anyhow::Result<CommandResult> {
-        executor::execute(self, state)
-    }
-}
-```
-
-2. **Create `command/parser.rs`:**
-```rust
-use super::Command;
-use anyhow::Result;
-
-pub fn parse(input: &str) -> Result<Command> {
-    let input = input.trim();
-    if input.is_empty() {
-        return Err(anyhow::anyhow!("Empty command"));
-    }
-
-    let parts: Vec<&str> = input.split_whitespace().collect();
-    let cmd = parts[0].to_lowercase();
-
-    match cmd.as_str() {
-        "query" | "q" => parse_query(&parts[1..]),
-        "insert" | "add" => parse_insert(&parts[1..]),
-        // ... dispatch to parse_* functions
-        _ => Err(anyhow::anyhow!("Unknown command: '{}'", cmd)),
-    }
-}
-
-fn parse_query(args: &[&str]) -> Result<Command> {
-    // Move parse logic here
-}
-
-fn parse_insert(args: &[&str]) -> Result<Command> {
-    // Move parse logic here
-}
-// ... other parse_* functions
-```
-
-3. **Create `command/executor.rs`:**
-```rust
-use super::Command;
-use crate::repl::ReplState;
-use anyhow::Result;
-
-pub enum CommandResult {
-    Continue(String),
-    Exit,
-    Silent,
-}
-
-pub fn execute(command: &Command, state: &mut ReplState) -> Result<CommandResult> {
-    match command {
-        Command::Query { .. } => handlers::query::execute(command, state),
-        Command::Insert { .. } => handlers::dictionary::execute_insert(command, state),
-        // ... dispatch to handlers
-    }
-}
-```
-
-4. **Create `command/handlers/query.rs`:**
-```rust
-use crate::repl::command::{Command, CommandResult};
-use crate::repl::ReplState;
-use anyhow::Result;
-
-pub fn execute(command: &Command, state: &mut ReplState) -> Result<CommandResult> {
-    let Command::Query { term, distance, prefix, limit } = command else {
-        unreachable!()
-    };
-
-    // Move query execution logic here
-    let results = state.query(term);
-    let output = format_results(&results, state.show_distances);
-    Ok(CommandResult::Continue(output))
-}
-
-fn format_results(results: &[String], show_distances: bool) -> String {
-    // Move formatting logic here
-}
-```
-
-**Benefits:**
-- Each handler is 50-100 lines (easy to understand)
-- Independent testing per handler
-- Clear separation of parsing vs execution
-- Easy to add new commands
+This document describes the architecture and design principles of liblevenshtein-rust.
 
 ---
 
-### 2. Extract Serialization Formats ⭐ HIGH PRIORITY
+## Table of Contents
 
-**Problem:** `src/serialization/mod.rs` (1080 lines) contains all format implementations.
+- [Overview](#overview)
+- [Module Organization](#module-organization)
+- [Core Components](#core-components)
+- [Design Principles](#design-principles)
+- [Performance Architecture](#performance-architecture)
+- [Thread Safety](#thread-safety)
+- [Future Directions](#future-directions)
 
-**Solution:**
+---
+
+## Overview
+
+liblevenshtein-rust is a high-performance library for approximate string matching using Levenshtein automata. The architecture is designed around three core pillars:
+
+1. **Pluggable Dictionary Backends** - Multiple trie implementations (PathMap, DAWG, DynamicDawg)
+2. **Efficient Automata** - Optimized state machines for Levenshtein distance computation
+3. **Flexible Serialization** - Multiple formats with optional compression
+
+### Key Characteristics
+
+- **Type-safe** - Extensive use of Rust's type system for correctness
+- **Zero-cost abstractions** - Trait-based design with no runtime overhead
+- **Memory-efficient** - Structural sharing via Arc, object pooling, stack allocation
+- **Concurrent-safe** - RwLock-based interior mutability for shared dictionaries
+- **Feature-gated** - Modular compilation with optional features
+
+---
+
+## Module Organization
 
 ```
-src/serialization/
-├── mod.rs                   # Traits, common types, and re-exports
-├── formats/
-│   ├── mod.rs
-│   ├── bincode.rs           # BincodeSerializer
-│   ├── json.rs              # JsonSerializer
-│   ├── protobuf.rs          # ProtobufSerializer + OptimizedProtobufSerializer
-│   └── text.rs              # Plain text format
-├── compression/
-│   ├── mod.rs
-│   └── gzip.rs              # GzipSerializer wrapper
-└── proto/
-    └── mod.rs               # Generated protobuf code
+src/
+├── lib.rs                      # Public API, prelude, feature gates
+│
+├── dictionary/                 # Dictionary backends (trait-based)
+│   ├── mod.rs                  # Dictionary trait, DictionaryNode trait
+│   ├── factory.rs              # Unified factory for creating dictionaries
+│   ├── pathmap.rs              # PathMap backend (default, thread-safe)
+│   ├── dawg.rs                 # Static DAWG (space-efficient, read-only)
+│   ├── dynamic_dawg.rs         # Mutable DAWG (insert/delete/minimize)
+│   └── dawg_query.rs           # Index-based DAWG query iterator
+│
+├── transducer/                 # Levenshtein automata
+│   ├── mod.rs                  # Transducer struct, public API
+│   ├── algorithm.rs            # Algorithm enum (Standard, Transposition, MergeAndSplit)
+│   ├── state.rs                # Automaton state representation
+│   ├── state_pool.rs           # Object pool for state reuse (major optimization)
+│   ├── transition.rs           # State transition logic
+│   ├── position.rs             # Position in automaton
+│   ├── intersection.rs         # Dictionary-automaton intersection
+│   ├── query.rs                # Unordered query iterator
+│   ├── ordered_query.rs        # Distance-first, lexicographic query iterator
+│   └── builder_api.rs          # Fluent builder pattern (experimental)
+│
+├── distance/                   # Distance calculations
+│   └── mod.rs                  # Levenshtein, Transposition distance functions
+│
+├── serialization/              # Dictionary persistence (feature: serialization)
+│   ├── mod.rs                  # Traits, format implementations
+│   ├── bincode_impl.rs         # Bincode format
+│   ├── json_impl.rs            # JSON format
+│   ├── protobuf_impl.rs        # Protobuf format (feature: protobuf)
+│   ├── gzip.rs                 # Gzip compression wrapper (feature: compression)
+│   └── proto.rs                # Generated protobuf code
+│
+├── cli/                        # Command-line interface (feature: cli)
+│   ├── mod.rs                  # CLI module root
+│   ├── args.rs                 # Clap argument parsing
+│   ├── commands.rs             # Command execution
+│   ├── detect.rs               # Format auto-detection
+│   └── paths.rs                # Path utilities, persistent config
+│
+└── repl/                       # Interactive REPL (feature: cli)
+    ├── mod.rs                  # REPL module root
+    ├── state.rs                # REPL state management
+    ├── command.rs              # Command parsing and execution
+    ├── helper.rs               # Rustyline integration
+    └── highlighter.rs          # Syntax highlighting
 ```
 
-**Implementation:**
+---
 
-1. **Update `mod.rs`:**
+## Core Components
+
+### 1. Dictionary Abstraction
+
+**Trait:** `Dictionary`
+
 ```rust
-//! Dictionary serialization support
+pub trait Dictionary: Send + Sync {
+    type Node: DictionaryNode;
 
-mod formats;
-#[cfg(feature = "compression")]
-mod compression;
+    fn root(&self) -> Self::Node;
+    fn len(&self) -> Option<usize>;
+    fn sync_strategy(&self) -> SyncStrategy;
+}
+```
 
-pub use formats::bincode::BincodeSerializer;
-pub use formats::json::JsonSerializer;
-pub use formats::text::TextSerializer;
+**Purpose:** Provides a unified interface for different trie implementations.
 
-#[cfg(feature = "protobuf")]
-pub use formats::protobuf::{ProtobufSerializer, OptimizedProtobufSerializer};
+**Implementations:**
+- **PathMapDictionary** - High-performance trie with structural sharing (default)
+  - Uses `Arc<RwLock<PathMap>>` for thread-safe mutations
+  - Excellent query performance
+  - Lazy edge iteration (15-50% faster)
 
-#[cfg(feature = "compression")]
-pub use compression::gzip::GzipSerializer;
+- **DawgDictionary** - Static DAWG (Directed Acyclic Word Graph)
+  - Space-efficient via node sharing
+  - Read-only after construction
+  - Best for static dictionaries
 
-// Traits stay here
+- **DynamicDawg** - Mutable DAWG
+  - Online insert/delete operations
+  - Minimize operation for compaction
+  - Reference-counted nodes (Arc)
+
+**Dictionary Factory Pattern:**
+
+```rust
+pub enum DictContainer {
+    PathMap(PathMapDictionary),
+    Dawg(DawgDictionary),
+    DynamicDawg(DynamicDawg),
+}
+
+impl DictContainer {
+    pub fn from_backend(backend: DictionaryBackend, terms: Vec<String>) -> Self {
+        match backend {
+            DictionaryBackend::PathMap => Self::PathMap(PathMapDictionary::from_terms(terms)),
+            DictionaryBackend::Dawg => Self::Dawg(DawgDictionary::from_terms(terms)),
+            DictionaryBackend::DynamicDawg => Self::DynamicDawg(DynamicDawg::from_terms(terms)),
+        }
+    }
+}
+```
+
+### 2. Transducer (Levenshtein Automaton)
+
+**Struct:** `Transducer<D: Dictionary>`
+
+```rust
+pub struct Transducer<D: Dictionary> {
+    dictionary: D,
+    algorithm: Algorithm,
+}
+```
+
+**Purpose:** Coordinates dictionary traversal with Levenshtein automaton.
+
+**Key Methods:**
+- `query(term, max_distance)` - Unordered results
+- `query_ordered(term, max_distance)` - Distance-first, then lexicographic
+- `query_with_distance(term, max_distance)` - Include edit distances
+
+**Query Iterator Architecture:**
+
+```
+User Query
+    ↓
+Transducer::query()
+    ↓
+QueryIterator
+    ↓
+┌─────────────────┬──────────────────┐
+│  Dictionary     │   Automaton      │
+│  Traversal      │   State Machine  │
+└─────────────────┴──────────────────┘
+    ↓                      ↓
+ Trie Edges          State Transitions
+    ↓                      ↓
+        Intersection
+             ↓
+         Results
+```
+
+### 3. Ordered Query Iterator
+
+**Problem:** Results from basic query are unordered (depth-first traversal)
+
+**Solution:** Heap-based priority queue for ordered results
+
+```rust
+pub struct OrderedQueryIterator<N: DictionaryNode> {
+    heap: BinaryHeap<Reverse<Intersection<N>>>,
+    seen: HashSet<Vec<u8>>,
+    max_distance: usize,
+}
+```
+
+**Ordering:** Primary by distance (ascending), secondary by term (lexicographic)
+
+**Optimizations:**
+- Deduplication via `HashSet`
+- Prefix mode support
+- Custom predicate filtering
+
+### 4. State Pool (Object Pool Pattern)
+
+**Problem:** Repeated allocation/deallocation of State objects in hot paths
+
+**Solution:** `StatePool` - reuse State instances
+
+```rust
+pub struct StatePool {
+    pool: RefCell<Vec<State>>,
+}
+
+pub struct PooledState<'pool> {
+    state: Option<State>,
+    pool: &'pool StatePool,
+}
+
+impl Drop for PooledState<'_> {
+    fn drop(&mut self) {
+        if let Some(state) = self.state.take() {
+            self.pool.pool.borrow_mut().push(state);
+        }
+    }
+}
+```
+
+**Impact:** Exceptional performance gains (see `docs/PERFORMANCE.md`)
+
+### 5. Serialization System
+
+**Trait-based design:**
+
+```rust
 pub trait DictionarySerializer {
-    fn serialize<D, W>(&self, dictionary: &D, writer: W) -> Result<(), SerializationError>
+    fn serialize<D, W>(&self, dictionary: &D, writer: W) -> Result<()>
     where
         D: Dictionary,
         W: Write;
 
-    fn deserialize<D, R>(&self, reader: R) -> Result<D, SerializationError>
+    fn deserialize<D, R>(&self, reader: R) -> Result<D>
     where
         D: DictionaryFromTerms,
         R: Read;
 }
-
-pub trait DictionaryFromTerms: Sized {
-    fn from_terms<I: IntoIterator<Item = String>>(terms: I) -> Self;
-}
 ```
 
-2. **Create `formats/bincode.rs`:**
-```rust
-use super::super::{DictionaryFromTerms, DictionarySerializer, SerializationError};
-use crate::dictionary::Dictionary;
-use std::io::{Read, Write};
+**Implementations:**
+- `BincodeSerializer` - Binary format (fast, compact)
+- `JsonSerializer` - JSON format (human-readable)
+- `ProtobufSerializer` - Protocol Buffers (cross-language)
+- `GzipSerializer<S>` - Wrapper for compression (85% size reduction)
 
-pub struct BincodeSerializer;
-
-impl DictionarySerializer for BincodeSerializer {
-    fn serialize<D, W>(&self, dictionary: &D, writer: W) -> Result<(), SerializationError>
-    where
-        D: Dictionary,
-        W: Write,
-    {
-        // Move bincode serialization logic here
-    }
-
-    fn deserialize<D, R>(&self, reader: R) -> Result<D, SerializationError>
-    where
-        D: DictionaryFromTerms,
-        R: Read,
-    {
-        // Move bincode deserialization logic here
-    }
-}
-```
-
-**Benefits:**
-- Feature gates are cleaner
-- Each format is self-contained
-- Easy to add new formats
-- Reduces compilation time when features disabled
+**Format Auto-Detection:**
+- Magic bytes (exact)
+- File extension (heuristic)
+- Content analysis (fallback)
 
 ---
 
-### 3. Implement Query Builder Pattern ⭐ MEDIUM PRIORITY
+## Design Principles
 
-**Problem:** Current API `transducer.query("test", 2)` is not self-documenting.
+### 1. Trait-Based Polymorphism
 
-**Solution:** Add fluent builder API (already implemented in `builder_api.rs`)
+**Philosophy:** Use traits for abstraction, concrete types for performance
 
-**Integration:**
-
-1. **Add to `transducer/mod.rs`:**
 ```rust
-mod builder_api;
-pub use builder_api::QueryBuilder;
+// Abstraction via traits
+pub trait Dictionary { ... }
 
-impl<D: Dictionary> Transducer<D> {
-    /// Create a fluent query builder
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let results: Vec<_> = transducer
-    ///     .query_builder("test")
-    ///     .max_distance(2)
-    ///     .prefix_mode(true)
-    ///     .execute()
-    ///     .collect();
-    /// ```
-    pub fn query_builder(&self, term: impl Into<String>) -> QueryBuilder<D> {
-        QueryBuilder::new(&self.dictionary, term, 2, self.algorithm)
-    }
-}
-```
-
-2. **Update prelude:**
-```rust
-pub mod prelude {
-    // ... existing exports
-    pub use crate::transducer::QueryBuilder;
-}
+// Concrete implementations optimized for specific use cases
+pub struct PathMapDictionary { ... }
+pub struct DawgDictionary { ... }
 ```
 
 **Benefits:**
-- Self-documenting API
-- Type-safe configuration
-- Backwards compatible (existing `query()` still works)
-- Better IDE autocomplete
-
----
-
-### 4. Add Dedicated Error Types 🔧 MEDIUM PRIORITY
-
-**Problem:** Using `anyhow::Error` everywhere loses type information.
-
-**Solution:**
-
-1. **Add `thiserror` dependency:**
-```toml
-[dependencies]
-thiserror = "1.0"
-```
-
-2. **Create `src/error.rs`:**
-```rust
-//! Error types for liblevenshtein
-
-use std::io;
-
-/// Main library error type
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Dictionary error: {0}")]
-    Dictionary(#[from] DictionaryError),
-
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] SerializationError),
-
-    #[error("Query error: {0}")]
-    Query(String),
-
-    #[error("Invalid algorithm: {0}")]
-    InvalidAlgorithm(String),
-
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
-
-    #[error("{0}")]
-    Other(String),
-}
-
-/// Dictionary-specific errors
-#[derive(Debug, thiserror::Error)]
-pub enum DictionaryError {
-    #[error("Term not found: {0}")]
-    NotFound(String),
-
-    #[error("Operation {operation} not supported by {backend} backend")]
-    UnsupportedOperation {
-        backend: String,
-        operation: String,
-    },
-
-    #[error("Invalid dictionary format: {0}")]
-    InvalidFormat(String),
-
-    #[error("Dictionary is read-only")]
-    ReadOnly,
-}
-
-/// Serialization-specific errors
-#[derive(Debug, thiserror::Error)]
-pub enum SerializationError {
-    #[error("Unsupported format: {0}")]
-    UnsupportedFormat(String),
-
-    #[error("Serialization failed: {0}")]
-    SerializationFailed(String),
-
-    #[error("Deserialization failed: {0}")]
-    DeserializationFailed(String),
-
-    #[error("Compression error: {0}")]
-    Compression(String),
-
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-```
-
-3. **Update `src/lib.rs`:**
-```rust
-pub mod error;
-pub use error::{Error, Result};
-```
-
-4. **Gradually migrate from `anyhow::Error` to `crate::Error`**
-
-**Benefits:**
-- Type-safe error handling
-- Better error messages
-- Easier error recovery
-- Self-documenting error cases
-
----
-
-### 5. Split CLI Commands ⭐ MEDIUM PRIORITY
-
-**Problem:** `src/cli/commands.rs` (1061 lines) contains all command handlers.
-
-**Solution:**
-
-```
-src/cli/
-├── mod.rs
-├── args.rs
-├── detect.rs
-├── paths.rs
-└── commands/
-    ├── mod.rs               # Re-exports and dispatch
-    ├── query.rs             # Query command
-    ├── info.rs              # Info command
-    ├── convert.rs           # Convert command
-    ├── dictionary.rs        # Insert, Delete, Clear
-    ├── minimize.rs          # Minimize command
-    └── settings.rs          # Settings, Config commands
-```
-
-**Implementation:**
-
-1. **Create `commands/mod.rs`:**
-```rust
-mod query;
-mod info;
-mod convert;
-mod dictionary;
-mod minimize;
-mod settings;
-
-use crate::cli::args::Commands;
-use anyhow::Result;
-
-pub fn execute(command: &Commands) -> Result<()> {
-    match command {
-        Commands::Query { .. } => query::execute(command),
-        Commands::Info { .. } => info::execute(command),
-        Commands::Convert { .. } => convert::execute(command),
-        Commands::Insert { .. } => dictionary::execute_insert(command),
-        Commands::Delete { .. } => dictionary::execute_delete(command),
-        // ... etc
-    }
-}
-```
-
-2. **Create individual handler files following REPL pattern**
-
----
-
-### 6. Add Dictionary Factory 🔧 LOW PRIORITY
-
-**Problem:** Dictionary creation is scattered across codebase.
-
-**Solution:**
-
-1. **Create `src/dictionary/factory.rs`:**
-```rust
-//! Dictionary factory for creating dictionary instances
-
-use super::{DawgDictionary, DictionaryBackend, DynamicDawg};
-use crate::dictionary::pathmap::PathMapDictionary;
-use crate::error::{DictionaryError, Result};
-use std::path::Path;
-
-pub struct DictionaryFactory;
-
-impl DictionaryFactory {
-    /// Create a new dictionary with the specified backend
-    pub fn create<I>(backend: DictionaryBackend, terms: I) -> Result<Box<dyn Dictionary>>
-    where
-        I: IntoIterator<Item = String>,
-    {
-        match backend {
-            DictionaryBackend::PathMap => {
-                Ok(Box::new(PathMapDictionary::from_iter(terms)))
-            }
-            DictionaryBackend::Dawg => {
-                Ok(Box::new(DawgDictionary::from_iter(terms)))
-            }
-            DictionaryBackend::DynamicDawg => {
-                Ok(Box::new(DynamicDawg::from_iter(terms)))
-            }
-        }
-    }
-
-    /// Load a dictionary from a file, auto-detecting format and backend
-    pub fn load(
-        path: &Path,
-        backend: Option<DictionaryBackend>,
-        format: Option<SerializationFormat>,
-    ) -> Result<Box<dyn Dictionary>> {
-        // Auto-detection and loading logic
-        let detected = if format.is_none() || backend.is_none() {
-            detect_format(path)?
-        } else {
-            DictFormat {
-                backend: backend.unwrap(),
-                format: format.unwrap(),
-            }
-        };
-
-        // Load using appropriate serializer
-        // ... implementation
-    }
-
-    /// Save a dictionary to a file
-    pub fn save(
-        dictionary: &dyn Dictionary,
-        path: &Path,
-        format: SerializationFormat,
-    ) -> Result<()> {
-        // Save using appropriate serializer
-        // ... implementation
-    }
-}
-```
-
-2. **Update dictionary mod.rs:**
-```rust
-mod factory;
-pub use factory::DictionaryFactory;
-```
-
-**Benefits:**
-- Centralized creation logic
-- Consistent error handling
+- Zero-cost abstraction
 - Easy to add new backends
-- Simplifies CLI/REPL code
+- Type-safe API
+
+### 2. Interior Mutability with RwLock
+
+**Pattern:** Shared ownership + interior mutability
+
+```rust
+pub struct PathMapDictionary {
+    map: Arc<RwLock<PathMap<()>>>,
+    term_count: Arc<RwLock<usize>>,
+}
+```
+
+**Benefits:**
+- Thread-safe concurrent queries
+- Modifications don't invalidate existing references
+- `Clone` is cheap (Arc increment)
+
+**Trade-offs:**
+- Lock acquisition overhead
+- Potential lock contention
+
+### 3. Arc Path Sharing
+
+**Optimization:** Share paths via Arc instead of cloning
+
+```rust
+pub struct PathMapNode {
+    map: Arc<RwLock<PathMap<()>>>,
+    path: Arc<Vec<u8>>,  // Shared, not cloned
+}
+```
+
+**Before:**
+```rust
+let mut new_path = self.path.clone();  // Deep copy
+new_path.push(label);
+```
+
+**After:**
+```rust
+let new_path = {
+    let mut path = Vec::with_capacity(self.path.len() + 1);
+    path.extend_from_slice(&self.path);
+    path.push(label);
+    Arc::new(path)  // Cheap reference counting
+};
+```
+
+### 4. SmallVec for Stack Allocation
+
+**Pattern:** Stack-allocate small collections
+
+```rust
+use smallvec::SmallVec;
+
+// Stack-allocated for ≤8 elements, heap for larger
+type EdgeList = SmallVec<[(u8, Node); 8]>;
+```
+
+**Benefits:**
+- Reduced heap allocations
+- Better cache locality
+- Zero overhead for small cases
+
+### 5. Lazy Evaluation
+
+**Pattern:** Generate results on-demand via iterators
+
+```rust
+pub fn query<'a>(
+    &'a self,
+    term: &'a str,
+    max_distance: usize,
+) -> impl Iterator<Item = String> + 'a {
+    QueryIterator::new(...)
+}
+```
+
+**Benefits:**
+- Memory-efficient (no intermediate collections)
+- Early termination support
+- Composable with adapters (`.filter()`, `.take()`, etc.)
+
+### 6. Feature Gates
+
+**Pattern:** Modular compilation with cargo features
+
+```toml
+[features]
+default = []
+serialization = ["serde", "bincode", "serde_json"]
+protobuf = ["prost", "bytes", "prost-build", "serialization"]
+compression = ["flate2", "serialization"]
+cli = ["clap", "anyhow", "rustyline", "colored", "dirs"]
+```
+
+**Benefits:**
+- Minimal dependencies for library-only use
+- Faster compilation
+- Smaller binary size
 
 ---
 
-## Migration Guide
+## Performance Architecture
 
-### Phase 1: Foundation (Week 1)
-1. Add error types (`error.rs`)
-2. Add Query Builder (`builder_api.rs` - already done!)
-3. Add Dictionary Factory (`dictionary/factory.rs`)
+### Optimization Stack
 
-### Phase 2: REPL Split (Week 2)
-1. Create `repl/command/` directory structure
-2. Move Command enum to `mod.rs`
-3. Extract parser to `parser.rs`
-4. Extract executor to `executor.rs`
-5. Create handler modules
-6. Run tests after each step
+```
+┌─────────────────────────────────────┐
+│  Application Level                  │
+│  - Lazy evaluation                  │
+│  - Early termination                │
+└─────────────────────────────────────┘
+           ↓
+┌─────────────────────────────────────┐
+│  Algorithm Level                    │
+│  - Ordered heap-based iteration     │
+│  - Prefix mode optimization         │
+│  - Filter predicate evaluation      │
+└─────────────────────────────────────┘
+           ↓
+┌─────────────────────────────────────┐
+│  Data Structure Level               │
+│  - Arc path sharing                 │
+│  - SmallVec stack allocation        │
+│  - Lazy edge iteration              │
+└─────────────────────────────────────┘
+           ↓
+┌─────────────────────────────────────┐
+│  Memory Management Level            │
+│  - StatePool object reuse           │
+│  - Reference counting (Arc)         │
+│  - Interior mutability (RwLock)     │
+└─────────────────────────────────────┘
+           ↓
+┌─────────────────────────────────────┐
+│  Compiler Level                     │
+│  - Aggressive inlining (#[inline])  │
+│  - Target-specific features         │
+│  - LTO (Link-Time Optimization)     │
+└─────────────────────────────────────┘
+```
 
-### Phase 3: Serialization Split (Week 3)
-1. Create `serialization/formats/` directory
-2. Extract each format to its own file
-3. Update feature gates
-4. Test each format independently
+### Hot Paths
 
-### Phase 4: CLI Split (Week 4)
-1. Create `cli/commands/` directory
-2. Extract each command handler
-3. Follow REPL pattern
-4. Update tests
+**Identified via profiling (flamegraphs):**
 
-### Phase 5: Polish (Week 5)
-1. Update all documentation
-2. Add migration guide for users
-3. Update examples to use new APIs
-4. Performance testing
+1. **State transitions** - `transition.rs`
+   - Inlined transition functions
+   - Optimized epsilon closure
 
-## Testing Strategy
+2. **Dictionary traversal** - `pathmap.rs`, `dawg_query.rs`
+   - Lazy edge iteration
+   - Index-based queries for DAWG
 
-- **Unit tests:** Each handler module has its own tests
-- **Integration tests:** Test command parsing and execution together
-- **Backwards compatibility:** Keep old APIs working with `#[deprecated]`
-- **Property tests:** Use `quickcheck` for query invariants
+3. **Result collection** - `ordered_query.rs`
+   - Heap-based priority queue
+   - Efficient deduplication
 
-## Performance Considerations
+### Benchmarking
 
-- **No performance regression:** All changes are structural, not algorithmic
-- **Compilation time:** Modular structure may improve incremental compilation
-- **Binary size:** No change expected (same code, different organization)
+**Tools:**
+- Criterion.rs - Statistical benchmarking
+- Flamegraph - CPU profiling
+- cargo-llvm-cov - Code coverage
 
-## Backwards Compatibility
+**Key Metrics:**
+- Query throughput (queries/second)
+- Result latency (ms to first result)
+- Memory usage (bytes per term)
+- Serialization speed (MB/s)
 
-- Keep existing public APIs with `#[deprecated]` for 1-2 versions
-- Provide migration examples
-- Use semantic versioning: 0.2.0 → 0.3.0 (minor breaking changes)
+See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for detailed performance analysis.
 
-## Future Enhancements
+---
 
-### Async Support (v0.4.0)
+## Thread Safety
+
+### Concurrent Access Patterns
+
+**Scenario 1: Multiple Readers**
 ```rust
-pub trait AsyncDictionary {
-    async fn query(&self, term: &str, distance: usize)
-        -> impl Stream<Item = String>;
+// Multiple threads can query simultaneously
+let dict = PathMapDictionary::from_terms(terms);
+let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
+
+thread::spawn(move || {
+    for result in transducer.query("test", 2) {
+        println!("{}", result);
+    }
+});
+
+// Another thread queries in parallel
+for result in transducer.query("hello", 1) {
+    println!("{}", result);
 }
 ```
 
-### Metrics/Telemetry (v0.5.0)
+**Scenario 2: Concurrent Modification**
 ```rust
-pub trait QueryMetrics {
-    fn record_query(
-        &self,
-        term: &str,
-        distance: usize,
-        result_count: usize,
-        duration: Duration,
-    );
+let dict = PathMapDictionary::from_terms(terms);
+let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
+
+// Background thread modifies dictionary
+thread::spawn(move || {
+    dict.insert("new_term");
+});
+
+// Main thread queries (sees updates after write lock released)
+for result in transducer.query("new", 1) {
+    println!("{}", result);
 }
 ```
 
-### Plugin System (v0.6.0)
-- Custom dictionary backends
-- Custom serialization formats
-- Custom distance metrics
+### SyncStrategy Enum
+
+```rust
+pub enum SyncStrategy {
+    Persistent,    // Immutable, always safe (Dawg)
+    InternalSync,  // Internal synchronization (future: lock-free structures)
+    ExternalSync,  // Requires RwLock (PathMap, DynamicDawg)
+}
+```
+
+**Purpose:** Communicates thread-safety requirements to library users
+
+---
+
+## Future Directions
+
+### Planned Enhancements
+
+1. **SIMD Optimizations** (v0.4.0)
+   - Vectorize distance calculations
+   - Parallel edge traversal
+   - Target: 2-3x speedup for large queries
+
+2. **Async Support** (v0.5.0)
+   - `async fn query()` returning `Stream<Item = String>`
+   - Non-blocking I/O for serialization
+   - Tokio/async-std compatibility
+
+3. **Custom Allocators** (v0.6.0)
+   - Arena allocators for query sessions
+   - Reduce fragmentation
+   - Predictable memory usage
+
+4. **GPU Acceleration** (Research)
+   - Large-scale parallel queries
+   - CUDA/OpenCL backends
+   - Target: 10-100x for very large dictionaries
+
+### Potential Refactorings
+
+1. **Error Types** - Replace `anyhow::Error` with `thiserror` types
+2. **Modular Serialization** - Split `serialization/mod.rs` into `formats/`
+3. **Query Builder** - Promote `builder_api.rs` to stable API
+4. **Plugin System** - Dynamic loading of dictionary backends
+
+See [`docs/FUTURE_ENHANCEMENTS.md`](docs/FUTURE_ENHANCEMENTS.md) for details.
+
+---
+
+## References
+
+- **Performance:** [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md)
+- **Features:** [`docs/FEATURES.md`](docs/FEATURES.md)
+- **Contributing:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- **Build Guide:** [`BUILD.md`](BUILD.md)
 
 ---
 
 ## Summary
 
-This architecture guide provides a clear roadmap for improving the codebase structure while maintaining quality and backwards compatibility. Each improvement is independent and can be implemented incrementally.
+liblevenshtein-rust achieves high performance through:
 
-**Priority Order:**
-1. ⭐ Split REPL commands (immediate maintainability win)
-2. ⭐ Extract serialization formats (cleaner feature gates)
-3. 🔧 Query Builder (better DX - already implemented!)
-4. 🔧 Error types (better error handling)
-5. 🔧 Split CLI commands (consistency)
-6. 🔧 Dictionary Factory (convenience)
+1. **Efficient data structures** - Tries with structural sharing
+2. **Smart memory management** - Object pooling, Arc sharing, stack allocation
+3. **Zero-cost abstractions** - Trait-based design with no runtime overhead
+4. **Profiling-driven optimization** - Targeted improvements to hot paths
+5. **Concurrent-safe design** - RwLock-based interior mutability
 
-All improvements maintain backwards compatibility and follow Rust best practices.
+The architecture is designed to be **extensible** (easy to add backends, formats, algorithms) while maintaining **performance** (zero-cost abstractions, profiling-guided optimizations) and **safety** (Rust's type system, thread-safety guarantees).
