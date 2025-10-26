@@ -263,7 +263,7 @@ impl DawgDictionary {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use liblevenshtein::prelude::*;
+    /// use levenshtein::prelude::*;
     ///
     /// let dawg = DawgDictionary::from_iter(vec!["test", "testing"]);
     ///

@@ -131,6 +131,48 @@ impl PathMapDictionary {
     pub fn term_count(&self) -> usize {
         *self.term_count.read().unwrap()
     }
+
+    /// Serialize to PathMap's native .paths format
+    ///
+    /// # Thread Safety
+    ///
+    /// This method acquires a read lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lock is poisoned.
+    pub fn serialize_paths<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        use pathmap::paths_serialization::serialize_paths;
+        let map = self.map.read().unwrap();
+        serialize_paths(map.read_zipper(), writer)?;
+        Ok(())
+    }
+
+    /// Deserialize from PathMap's native .paths format
+    ///
+    /// Creates a new dictionary from the serialized data.
+    pub fn deserialize_paths<R: std::io::Read>(reader: R) -> std::io::Result<Self> {
+        use pathmap::paths_serialization::deserialize_paths;
+        use pathmap::zipper::ZipperIteration;
+
+        let mut map = PathMap::new();
+        deserialize_paths(map.write_zipper(), reader, ())?;
+
+        // Count terms to populate term_count
+        let count = {
+            let mut rz = map.read_zipper();
+            let mut count = 0;
+            while rz.to_next_val() {
+                count += 1;
+            }
+            count
+        };
+
+        Ok(Self {
+            map: Arc::new(RwLock::new(map)),
+            term_count: Arc::new(RwLock::new(count)),
+        })
+    }
 }
 
 impl Default for PathMapDictionary {

@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo run --example batch_operations
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 
 fn main() {
     println!("Batch Operations with Dynamic DAWG\n");

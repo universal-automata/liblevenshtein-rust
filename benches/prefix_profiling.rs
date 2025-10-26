@@ -1,7 +1,7 @@
 // Profiling-optimized benchmark for flame graph generation
 // Run with: cargo flamegraph --bench prefix_profiling
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 
 fn load_dictionary() -> Vec<String> {
     std::fs::read_to_string("/usr/share/dict/words")

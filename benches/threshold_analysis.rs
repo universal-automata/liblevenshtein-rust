@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 
 /// Analyze the distribution of edge counts in DAWG nodes
 fn analyze_edge_distribution(dict: &DawgDictionary) -> EdgeDistribution {

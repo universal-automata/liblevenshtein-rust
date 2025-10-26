@@ -5,7 +5,7 @@
 //! 2. Distance-bounded queries (take_while distance <= threshold)
 //! 3. Ranked autocomplete/spell-check suggestions
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 
 fn main() {
     println!("=== OrderedQueryIterator Demonstration ===\n");

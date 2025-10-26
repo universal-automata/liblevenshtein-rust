@@ -1,6 +1,6 @@
 //! Debug ordered query to understand the discrepancy
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 use std::fs;
 
 fn main() {

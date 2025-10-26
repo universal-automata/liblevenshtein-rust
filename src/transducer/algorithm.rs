@@ -5,6 +5,7 @@
 /// Different algorithms support different edit operations and are
 /// suited for different use cases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub enum Algorithm {
     /// Standard Levenshtein distance.
     ///
@@ -58,5 +59,24 @@ impl Algorithm {
 impl Default for Algorithm {
     fn default() -> Self {
         Algorithm::Standard
+    }
+}
+
+impl std::fmt::Display for Algorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+impl std::str::FromStr for Algorithm {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "standard" => Ok(Algorithm::Standard),
+            "transposition" | "trans" => Ok(Algorithm::Transposition),
+            "merge-and-split" | "mergesplit" | "merge" => Ok(Algorithm::MergeAndSplit),
+            _ => Err(format!("Unknown algorithm: {}. Valid options: standard, transposition, merge-and-split", s)),
+        }
     }
 }

@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use liblevenshtein::dictionary::{
+use levenshtein::dictionary::{
     dawg::DawgDictionary, dynamic_dawg::DynamicDawg, Dictionary, DictionaryNode,
 };
 use std::collections::HashSet;

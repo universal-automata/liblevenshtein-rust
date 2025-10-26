@@ -94,7 +94,7 @@ pub struct DawgCandidate {
 /// # Example
 ///
 /// ```rust,ignore
-/// use liblevenshtein::prelude::*;
+/// use levenshtein::prelude::*;
 ///
 /// let dawg = DawgDictionary::from_iter(vec!["test", "testing"]);
 /// let iter = dawg.query_optimized("tset", 2, Algorithm::Standard);

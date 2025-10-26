@@ -1,8 +1,8 @@
 //! Example showing how custom dictionary backends can specify
 //! their synchronization strategy.
 
-use liblevenshtein::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
-use liblevenshtein::transducer::{Algorithm, Transducer};
+use levenshtein::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
+use levenshtein::transducer::{Algorithm, Transducer};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -115,7 +115,7 @@ fn main() {
     println!("=== Custom Synchronization Strategy Example ===\n");
 
     // Create both types of dictionaries
-    let pathmap_dict = liblevenshtein::prelude::PathMapDictionary::from_iter(
+    let pathmap_dict = levenshtein::prelude::PathMapDictionary::from_iter(
         vec!["test", "testing", "tested"]
     );
 

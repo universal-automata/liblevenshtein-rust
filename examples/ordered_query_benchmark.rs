@@ -1,6 +1,6 @@
 //! Benchmark comparing OrderedQueryIterator vs unordered QueryIterator
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 use std::fs;
 use std::time::Instant;
 

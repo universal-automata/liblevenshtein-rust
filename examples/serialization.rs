@@ -8,7 +8,7 @@
 //!
 //! Run with: cargo run --example serialization --features serialization
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

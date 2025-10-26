@@ -32,7 +32,7 @@ use crate::dictionary::Dictionary;
 /// # Example
 ///
 /// ```rust,ignore
-/// use liblevenshtein::prelude::*;
+/// use levenshtein::prelude::*;
 ///
 /// let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
 /// let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -92,7 +92,7 @@ impl<D: Dictionary> Transducer<D> {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use liblevenshtein::prelude::*;
+    /// use levenshtein::prelude::*;
     ///
     /// let dict = PathMapDictionary::from_iter(vec!["test", "best", "rest"]);
     /// let transducer = Transducer::new(dict, Algorithm::Standard);

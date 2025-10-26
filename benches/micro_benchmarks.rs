@@ -4,12 +4,12 @@
 //! which changes caused regressions and why.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 use smallvec::SmallVec;
 
 /// Benchmark SmallVec vs Vec for position storage
 fn bench_smallvec_overhead(c: &mut Criterion) {
-    use liblevenshtein::transducer::Position;
+    use levenshtein::transducer::Position;
 
     let mut group = c.benchmark_group("smallvec_vs_vec");
 
@@ -88,7 +88,7 @@ fn bench_characteristic_vector_allocation(c: &mut Criterion) {
 
 /// Benchmark epsilon closure implementations
 fn bench_epsilon_closure(c: &mut Criterion) {
-    use liblevenshtein::transducer::{State, Position};
+    use levenshtein::transducer::{State, Position};
 
     let mut group = c.benchmark_group("epsilon_closure");
 
@@ -141,7 +141,7 @@ fn bench_epsilon_closure(c: &mut Criterion) {
 
 /// Benchmark state operations with different sizes
 fn bench_state_operations(c: &mut Criterion) {
-    use liblevenshtein::transducer::{State, Position};
+    use levenshtein::transducer::{State, Position};
 
     let mut group = c.benchmark_group("state_operations");
 
@@ -186,8 +186,8 @@ fn bench_state_operations(c: &mut Criterion) {
 
 /// Benchmark transition operations
 fn bench_transition_overhead(c: &mut Criterion) {
-    use liblevenshtein::transducer::{Position, State};
-    use liblevenshtein::transducer::transition::{transition_state, initial_state};
+    use levenshtein::transducer::{Position, State};
+    use levenshtein::transducer::transition::{transition_state, initial_state};
 
     let dict = PathMapDictionary::from_iter(vec!["test", "testing", "tested"]);
     let root = dict.root();
@@ -224,7 +224,7 @@ fn bench_transition_overhead(c: &mut Criterion) {
 
 /// Benchmark inline vs non-inline impact
 fn bench_inline_impact(c: &mut Criterion) {
-    use liblevenshtein::transducer::Position;
+    use levenshtein::transducer::Position;
 
     let mut group = c.benchmark_group("inline_impact");
 

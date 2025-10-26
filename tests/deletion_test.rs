@@ -1,6 +1,6 @@
 //! Test for deletion bug fix
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 
 #[test]
 fn test_aple_to_apple() {

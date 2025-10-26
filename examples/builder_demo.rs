@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example builder_demo
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 
 fn main() {
     println!("TransducerBuilder Demonstration\n");
