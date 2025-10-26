@@ -1,176 +1,175 @@
 # Documentation Index
 
-Comprehensive documentation for liblevenshtein-rust v0.2.0.
+Comprehensive documentation for liblevenshtein-rust v0.3.0.
+
+**Last Updated:** 2025-10-26
+
+---
 
 ## 📚 Getting Started
 
-- **[Main README](../README.md)** - Project overview, installation, and quick start
-- **[BUILD.md](../BUILD.md)** - Building from source and development setup
-- **[CHANGELOG.md](../CHANGELOG.md)** - Version history and release notes (v0.2.0)
-- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contributing guidelines
+Start here if you're new to liblevenshtein-rust:
 
-## 🎯 User Guides
+- **[Main README](../README.md)** - Project overview, installation, and quick start examples
+- **[BUILD.md](../BUILD.md)** - Building from source, development setup, and CLI usage
+- **[CHANGELOG.md](../CHANGELOG.md)** - Version history and release notes (v0.3.0)
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contributing guidelines and development workflow
+
+---
+
+## 📖 User Guides
 
 ### Core Features
-- **[Features Overview](FEATURES.md)** - Complete feature list and capabilities
-- **[Code Completion Guide](CODE_COMPLETION_GUIDE.md)** - IDE-style autocomplete with filtering and prefix matching
-- **[Code Completion Performance](CODE_COMPLETION_PERFORMANCE.md)** - Optimization strategies for filtering
 
-### Dictionary Backends
-- **[DAWG Backend](DYNAMIC_DAWG.md)** - Directed Acyclic Word Graph implementation with online modifications
-- **[DAWG Comparison](DAWG_COMPARISON.md)** - DAWG vs PathMap performance analysis
-- **[PathMap Thread Safety](PATHMAP_THREAD_SAFETY.md)** - Concurrent access patterns and thread safety
+- **[Features Overview](FEATURES.md)** - Complete feature list and capabilities (v0.2.0)
+  - Levenshtein algorithms (Standard, Transposition, MergeAndSplit)
+  - Dictionary backends (PathMap, DAWG, DynamicDawg)
+  - Serialization formats (Bincode, JSON, Protobuf, compressed variants)
+  - CLI tool and interactive REPL
 
-### Serialization & Storage
-- **[Protobuf Serialization](PROTOBUF_SERIALIZATION.md)** - Protocol Buffers format support
-- **Compression** - See v0.2.0 features in [CHANGELOG](../CHANGELOG.md)
-  - Gzip compression (85% file size reduction)
-  - Compressed format variants: bincode-gz, json-gz, protobuf-gz
+- **[Code Completion Guide](CODE_COMPLETION_GUIDE.md)** - IDE-style autocomplete implementation
+  - Filtering with custom predicates
+  - Prefix matching for code completion
+  - Performance optimization strategies
+  - Real-world integration examples
 
-## 🔧 Developer Documentation
+### Advanced Topics
 
-### Performance & Optimization
+- **[DAWG Backend](DYNAMIC_DAWG.md)** - Directed Acyclic Word Graph implementation
+  - Online insert/delete/minimize operations
+  - Space-efficient storage
+  - When to use DAWG vs PathMap
 
-**Start Here:**
-- **[Optimization Summary](OPTIMIZATION_SUMMARY.md)** - **⭐ RECOMMENDED** - Complete optimization overview
-  - 40-60% performance improvements
-  - Profiling-guided approach
-  - Key takeaways and lessons learned
+- **[Thread Safety](PATHMAP_THREAD_SAFETY.md)** - Concurrent access patterns
+  - RwLock-based interior mutability
+  - Safe concurrent queries during modifications
+  - Multi-threaded usage examples
 
-**Detailed Reports:**
-- **[optimization/](optimization/)** - Phase-by-phase optimization journey
-  - [Optimization README](optimization/README.md) - Detailed overview
-  - [Phase 4: SmallVec Investigation](optimization/PHASE4_SMALLVEC_INVESTIGATION.md)
-  - [Phase 5: StatePool Results](optimization/PHASE5_STATEPOOL_RESULTS.md) - Exceptional results
-  - [Phase 6: Arc Path Results](optimization/PHASE6_ARC_PATH_RESULTS.md) - Highly successful
-  - [Profiling Comparison](optimization/PROFILING_COMPARISON.md)
+- **[Protobuf Serialization](PROTOBUF_SERIALIZATION.md)** - Protocol Buffers format
+  - Schema definitions
+  - Cross-language compatibility
+  - Compression support
 
-**Additional Performance Docs:**
-- [ARC Optimization Results](ARC_OPTIMIZATION_RESULTS.md)
-- [DAWG Optimization Results](DAWG_OPTIMIZATION_RESULTS.md)
-- [PathNode Optimization Results](PATHNODE_OPTIMIZATION_RESULTS.md)
-- [Threshold Tuning Results](THRESHOLD_TUNING_RESULTS.md)
-- [PGO Impact Analysis](PGO_IMPACT_ANALYSIS.md)
+---
 
-### Architecture & Implementation
-- **[Contextual Filtering Optimization](CONTEXTUAL_FILTERING_OPTIMIZATION.md)** - Bitmap masking strategies
-- **[Index-Based Query](INDEX_BASED_QUERY_RESULTS.md)** - Memory-efficient DAWG queries
-- **[Query ARC Analysis](QUERY_ARC_ANALYSIS.md)** - Arc usage patterns in queries
+## ⚡ Performance
+
+- **[Performance Optimizations](PERFORMANCE.md)** - **⭐ RECOMMENDED**
+  - 40-60% overall performance improvements
+  - Key optimizations: Arc path sharing, StatePool, SmallVec, lazy iteration
+  - Benchmarking methodology and tools
+  - Performance tips for users and contributors
+
+### Archived Performance Documentation
+
+Detailed historical analysis in [`archive/performance/`](archive/performance/):
+- Optimization phase reports (Phases 2-6)
+- DAWG, serialization, and filtering optimizations
+- Comparisons with Java implementation
+- Real-world validation results
+
+---
+
+## 🔧 Development
+
+- **[Publishing Guide](PUBLISHING.md)** - Requirements for publishing to crates.io
+  - Current blockers (PathMap dependency)
+  - Publication checklist and steps
+  - Troubleshooting common issues
+
 - **[Future Enhancements](FUTURE_ENHANCEMENTS.md)** - Roadmap and planned features
+  - SIMD operations
+  - Parallel queries
+  - Additional algorithm support
 
-## 📊 Benchmarks & Validation
+---
 
-- **[Real World Validation](REAL_WORLD_VALIDATION.md)** - Tests with system dictionaries
-- **[Java Comparison](JAVA_COMPARISON.md)** - Performance vs original Java implementation
-- **[Serialization Optimization Results](SERIALIZATION_OPTIMIZATION_RESULTS.md)** - Compression benchmarks
-
-### Archived Data
-Historical benchmark results in [`archive/benchmarks/`](archive/benchmarks/):
-- PGO build logs
-- DAWG benchmarks (baseline, adaptive, optimized)
-- Serialization benchmarks
-- Profiling results
-- 20+ benchmark result files
-
-## 🗂️ Documentation Organization
+## 📂 Documentation Structure
 
 ```
 docs/
-├── README.md (this file)          # Main documentation index
+├── README.md (this file)          # Documentation index
 │
 ├── User Guides
-│   ├── FEATURES.md                 # Feature overview
+│   ├── FEATURES.md                 # Feature overview (v0.2.0)
 │   ├── CODE_COMPLETION_GUIDE.md    # Code completion tutorial
-│   ├── CODE_COMPLETION_PERFORMANCE.md
 │   ├── DYNAMIC_DAWG.md             # DAWG backend guide
-│   ├── PROTOBUF_SERIALIZATION.md
-│   └── PATHMAP_THREAD_SAFETY.md
+│   ├── PATHMAP_THREAD_SAFETY.md    # Thread safety patterns
+│   └── PROTOBUF_SERIALIZATION.md   # Protobuf format guide
 │
-├── Performance & Optimization
-│   ├── OPTIMIZATION_SUMMARY.md     # ⭐ Start here
-│   ├── ARC_OPTIMIZATION_RESULTS.md
-│   ├── DAWG_OPTIMIZATION_RESULTS.md
-│   ├── PATHNODE_OPTIMIZATION_RESULTS.md
-│   ├── THRESHOLD_TUNING_RESULTS.md
-│   ├── PGO_IMPACT_ANALYSIS.md
-│   └── SERIALIZATION_OPTIMIZATION_RESULTS.md
+├── Performance & Development
+│   ├── PERFORMANCE.md              # ⭐ Performance overview
+│   ├── PUBLISHING.md               # crates.io publication guide
+│   └── FUTURE_ENHANCEMENTS.md      # Roadmap
 │
-├── Architecture & Analysis
-│   ├── CONTEXTUAL_FILTERING_OPTIMIZATION.md
-│   ├── INDEX_BASED_QUERY_RESULTS.md
-│   ├── QUERY_ARC_ANALYSIS.md
-│   ├── DAWG_COMPARISON.md
-│   └── JAVA_COMPARISON.md
-│
-├── Validation & Benchmarks
-│   ├── REAL_WORLD_VALIDATION.md
-│   └── archive/benchmarks/        # Historical data
-│
-├── optimization/                   # Detailed phase reports
-│   ├── README.md
-│   ├── PHASE4_SMALLVEC_INVESTIGATION.md
-│   ├── PHASE5_STATEPOOL_RESULTS.md
-│   ├── PHASE6_ARC_PATH_RESULTS.md
-│   ├── PROFILING_COMPARISON.md
-│   ├── benchmarks/
-│   └── profiling/
-│
-└── FUTURE_ENHANCEMENTS.md          # Roadmap
+└── archive/                        # Historical documentation
+    ├── benchmarks/                 # Historical benchmark results
+    ├── performance/                # Detailed optimization reports
+    └── optimization/               # Phase-by-phase optimization journey
 ```
+
+---
 
 ## 🔍 Quick Reference
 
 ### For New Users
-1. Start: [Main README](../README.md)
-2. Features: [FEATURES.md](FEATURES.md)
-3. Code completion: [CODE_COMPLETION_GUIDE.md](CODE_COMPLETION_GUIDE.md)
-4. Changelog: [CHANGELOG.md](../CHANGELOG.md)
+
+1. **[Main README](../README.md)** - Start here for installation and basic usage
+2. **[FEATURES.md](FEATURES.md)** - Explore available features
+3. **[CODE_COMPLETION_GUIDE.md](CODE_COMPLETION_GUIDE.md)** - Advanced usage for IDE integration
+4. **[BUILD.md](../BUILD.md)** - CLI tool usage and build instructions
 
 ### For Contributors
-1. Contributing: [CONTRIBUTING.md](../CONTRIBUTING.md)
-2. Build setup: [BUILD.md](../BUILD.md)
-3. Performance: [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md)
-4. Future work: [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)
 
-### For Performance Analysts
-1. **Overview**: [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md)
-2. **Detailed**: [optimization/README.md](optimization/README.md)
-3. **Specific areas**:
-   - DAWG: [DAWG_OPTIMIZATION_RESULTS.md](DAWG_OPTIMIZATION_RESULTS.md)
-   - Serialization: [SERIALIZATION_OPTIMIZATION_RESULTS.md](SERIALIZATION_OPTIMIZATION_RESULTS.md)
-   - Code completion: [CODE_COMPLETION_PERFORMANCE.md](CODE_COMPLETION_PERFORMANCE.md)
+1. **[CONTRIBUTING.md](../CONTRIBUTING.md)** - How to contribute
+2. **[BUILD.md](../BUILD.md)** - Development setup
+3. **[PERFORMANCE.md](PERFORMANCE.md)** - Performance optimization guidelines
+4. **[FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)** - Future work
+
+### For Performance Analysis
+
+1. **[PERFORMANCE.md](PERFORMANCE.md)** - Start here for performance overview
+2. **[archive/performance/OPTIMIZATION_SUMMARY.md](archive/performance/OPTIMIZATION_SUMMARY.md)** - Detailed optimization history
+3. **[archive/performance/](archive/performance/)** - Specific optimization reports
 
 ### For Integration/IDE Developers
-1. [CODE_COMPLETION_GUIDE.md](CODE_COMPLETION_GUIDE.md) - Complete integration guide
-2. [CODE_COMPLETION_PERFORMANCE.md](CODE_COMPLETION_PERFORMANCE.md) - Performance tips
-3. [CONTEXTUAL_FILTERING_OPTIMIZATION.md](CONTEXTUAL_FILTERING_OPTIMIZATION.md) - Optimization strategies
-4. [PATHMAP_THREAD_SAFETY.md](PATHMAP_THREAD_SAFETY.md) - Concurrency patterns
 
-## 📈 Recent Updates (v0.2.0)
+1. **[CODE_COMPLETION_GUIDE.md](CODE_COMPLETION_GUIDE.md)** - Complete integration guide
+2. **[PERFORMANCE.md](PERFORMANCE.md)** - Performance tips
+3. **[PATHMAP_THREAD_SAFETY.md](PATHMAP_THREAD_SAFETY.md)** - Concurrency patterns
+4. **[FEATURES.md](FEATURES.md)** - Available features and APIs
 
-- ✅ Compression support (85% file size reduction)
-- ✅ CLI integration with compressed formats
-- ✅ OrderedQueryIterator for sorted results
-- ✅ Filtering and prefix matching optimizations
-- ✅ Comprehensive GitHub Actions CI/CD
-- ✅ Multi-platform release builds
+---
 
-See [CHANGELOG.md](../CHANGELOG.md) for complete v0.2.0 details.
+## 📈 What's New in v0.3.0
+
+- ✅ **Package Support**: Debian (.deb), RPM (.rpm), and Arch Linux (.pkg.tar.zst) packages
+- ✅ **CI Improvements**: Explicit CPU features for better platform compatibility
+- ✅ **Code Quality**: Fixed all clippy warnings without suppressing checks
+- ✅ **Bug Fixes**: Fixed CLI format auto-detection for text dictionaries
+- ✅ **Documentation**: Reorganized and updated for v0.3.0
+
+See [CHANGELOG.md](../CHANGELOG.md) for complete v0.3.0 details.
+
+---
 
 ## 📝 Document Status
 
-- **Version**: 0.2.0
-- **Last Updated**: 2025-10-25
+- **Version**: 0.3.0
+- **Last Updated**: 2025-10-26
 - **Status**: Active development
 - Documentation continuously updated with new features and improvements
+
+---
 
 ## 🤝 Contributing to Documentation
 
 Found an issue or want to improve documentation?
-1. Check [CONTRIBUTING.md](../CONTRIBUTING.md)
+
+1. Check [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines
 2. Submit a pull request
-3. Report issues on GitHub
+3. Report issues on [GitHub](https://github.com/F1R3FLY-io/liblevenshtein-rust/issues)
 
 ---
 
-**Navigation**: [← Back to Main README](../README.md) | [Features →](FEATURES.md) | [Optimization Summary →](OPTIMIZATION_SUMMARY.md)
+**Navigation**: [← Back to Main README](../README.md) | [Features →](FEATURES.md) | [Performance →](PERFORMANCE.md)
