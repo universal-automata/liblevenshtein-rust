@@ -7,6 +7,20 @@ Thank you for your interest in contributing to liblevenshtein-rust!
 
 ## Development Setup
 
+### Install Git Hooks (Recommended)
+
+After cloning the repository, install the git hooks to prevent common mistakes:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+This installs hooks that:
+- Prevent accidentally committing local development overrides (e.g., uncommented `[patch]` sections)
+- Ensure Cargo.toml uses git dependencies instead of local paths
+
+See [.githooks/README.md](.githooks/README.md) for more details.
+
 ### Prerequisites
 
 - Rust 1.70 or later

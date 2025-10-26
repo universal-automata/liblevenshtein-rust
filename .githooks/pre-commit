@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# Pre-commit hook to prevent accidentally committing local development overrides
+#
+# This hook checks for:
+# - Uncommented [patch] sections in Cargo.toml
+# - Local path dependencies that should use git sources
+#
+# To bypass this hook (not recommended), use: git commit --no-verify
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+# Check if Cargo.toml is being committed
+if git diff --cached --name-only | grep -q "^Cargo.toml$"; then
+    echo "Checking Cargo.toml for local development overrides..."
+
+    # Get the staged version of Cargo.toml
+    STAGED_CONTENT=$(git diff --cached --diff-filter=AM Cargo.toml)
+
+    # Check for uncommented [patch] sections
+    if echo "$STAGED_CONTENT" | grep -E "^\+\[patch\." > /dev/null; then
+        echo -e "${RED}ERROR: Uncommented [patch] override detected in Cargo.toml${NC}"
+        echo ""
+        echo "Found an uncommented [patch] section that would override dependencies."
+        echo "This is likely a local development override that shouldn't be committed."
+        echo ""
+        echo -e "${YELLOW}Detected changes:${NC}"
+        echo "$STAGED_CONTENT" | grep -A 2 -E "^\+\[patch\."
+        echo ""
+        echo "Please comment out the [patch] section before committing:"
+        echo "  # [patch.'https://github.com/Adam-Vandervorst/PathMap.git']"
+        echo "  # pathmap = { path = \"../PathMap\" }"
+        echo ""
+        echo "To bypass this check (not recommended):"
+        echo "  git commit --no-verify"
+        exit 1
+    fi
+
+    # Check for local path dependencies on PathMap
+    if echo "$STAGED_CONTENT" | grep -E '^\+.*pathmap.*path.*=.*"\.\.' > /dev/null; then
+        echo -e "${RED}ERROR: Local path dependency detected for PathMap${NC}"
+        echo ""
+        echo "Found a local path dependency that should use the git repository."
+        echo ""
+        echo -e "${YELLOW}Detected changes:${NC}"
+        echo "$STAGED_CONTENT" | grep -E '^\+.*pathmap.*path'
+        echo ""
+        echo "PathMap should use the git repository:"
+        echo '  pathmap = { git = "https://github.com/Adam-Vandervorst/PathMap.git", branch = "master" }'
+        echo ""
+        echo "For local development, use the [patch] section instead (commented out by default)."
+        echo ""
+        echo "To bypass this check (not recommended):"
+        echo "  git commit --no-verify"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✓ Cargo.toml looks good - no local development overrides detected${NC}"
+fi
+
+# All checks passed
+exit 0
