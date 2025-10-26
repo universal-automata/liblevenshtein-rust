@@ -10,7 +10,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  RUSTFLAGS: "-C target-cpu=native"
+  # Note: RUSTFLAGS is configured in .cargo/config.toml instead of here
+  # to avoid conflicts with the setup-rust-toolchain action
 
 jobs:
   test:
@@ -46,8 +47,7 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
         components: rustfmt, clippy
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
+        # RUSTFLAGS configured in .cargo/config.toml
 
     - name: Cache cargo registry
       uses: actions/cache@v4
@@ -74,48 +74,36 @@ jobs:
           ${{ runner.os }}-${{ matrix.rust }}-cargo-build-target-
 
     - name: Build library
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Building liblevenshtein"
         cargo build --all-features --verbose
         echo "::endgroup::"
 
     - name: Build CLI
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Building CLI"
         cargo build --bin liblevenshtein --features cli,compression,protobuf --verbose
         echo "::endgroup::"
 
     - name: Run unit tests
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running unit tests"
         cargo test --lib --all-features --verbose
         echo "::endgroup::"
 
     - name: Run integration tests
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running integration tests"
         cargo test --test '*' --all-features --verbose -- --nocapture
         echo "::endgroup::"
 
     - name: Run doc tests
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running documentation tests"
         cargo test --doc --all-features --verbose
         echo "::endgroup::"
 
     - name: Build examples
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Building examples"
         cargo build --examples --all-features --verbose
@@ -150,15 +138,11 @@ jobs:
       with:
         toolchain: stable
         components: rustfmt, clippy
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
 
     - name: Check formatting
       run: cargo fmt -- --check
 
     - name: Run clippy
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         # Lint workspace code
         # --no-deps: Don't lint dependencies (avoids failing on upstream warnings)
@@ -192,12 +176,8 @@ jobs:
       with:
         toolchain: nightly
         components: rustfmt, clippy
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
 
     - name: Run benchmarks
-      env:
-        RUSTFLAGS: "-C target-cpu=native"
       run: |
         echo "::group::Running benchmarks"
         cargo bench --all-features --no-fail-fast -- --output-format bencher | tee output.txt
