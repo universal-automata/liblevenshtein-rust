@@ -1,0 +1,245 @@
+name: Release Builds and Packaging
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-matrix:
+    name: Build ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            rustflags: "-C target-cpu=native"
+            artifact_name: liblevenshtein-linux-x86_64
+            use_cross: false
+
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            rustflags: "-C target-cpu=native"
+            artifact_name: liblevenshtein-linux-arm64
+            use_cross: false
+
+          - name: macOS x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+            rustflags: "-C target-cpu=native"
+            artifact_name: liblevenshtein-macos-x86_64
+            use_cross: false
+
+          - name: macOS ARM64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            rustflags: "-C target-cpu=native"
+            artifact_name: liblevenshtein-macos-arm64
+            use_cross: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Checkout PathMap dependency (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd ../
+          git clone --depth=1 --branch master https://github.com/F1R3FLY-io/PathMap.git PathMap
+
+      - name: Install protobuf compiler (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install protobuf compiler (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.platform.target }}
+
+      - name: Build liblevenshtein CLI
+        env:
+          RUSTFLAGS: ${{ matrix.platform.rustflags }}
+        run: cargo build --release --bin liblevenshtein --features cli,compression,protobuf --target ${{ matrix.platform.target }} --verbose
+
+      - name: Build liblevenshtein library
+        env:
+          RUSTFLAGS: ${{ matrix.platform.rustflags }}
+        run: cargo build --release --lib --all-features --target ${{ matrix.platform.target }} --verbose
+
+      - name: Prepare binaries (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          # Copy CLI binary
+          cp target/${{ matrix.platform.target }}/release/liblevenshtein dist/
+
+          # Copy library files
+          cp target/${{ matrix.platform.target }}/release/liblevenshtein.rlib dist/
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            cp target/${{ matrix.platform.target }}/release/liblevenshtein.so dist/
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            cp target/${{ matrix.platform.target }}/release/liblevenshtein.dylib dist/
+          fi
+
+          chmod +x dist/liblevenshtein
+
+      - name: Create tarball (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          tar czf ../${{ matrix.platform.artifact_name }}.tar.gz *
+          cd ..
+
+      - name: Create zip archive
+        run: |
+          cd dist
+          7z a ../${{ matrix.platform.artifact_name }}.zip *
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.artifact_name }}
+          path: |
+            ${{ matrix.platform.artifact_name }}.tar.gz
+            ${{ matrix.platform.artifact_name }}.zip
+          retention-days: 30
+
+  package-deb:
+    name: Create .deb package
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Linux x86_64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: liblevenshtein-linux-x86_64
+
+      - name: Extract binaries
+        run: |
+          tar xzf liblevenshtein-linux-x86_64.tar.gz
+          mkdir -p target/release
+          mv liblevenshtein target/release/
+          mv liblevenshtein.so target/release/ 2>/dev/null || true
+          mv liblevenshtein.rlib target/release/
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Create .deb package metadata
+        run: |
+          cat >> Cargo.toml <<'EOF'
+
+[package.metadata.deb]
+maintainer = "Dylon Edwards <dylon.devo@gmail.com>"
+copyright = "2025, F1R3FLY.io <noreply@f1r3fly.io>"
+license-file = ["LICENSE", "0"]
+extended-description = """
+Fast approximate string matching using Levenshtein automata.
+Supports multiple dictionary backends, serialization formats,
+and includes a full-featured CLI tool with compression support.
+"""
+depends = "$auto"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/liblevenshtein", "usr/bin/", "755"],
+    ["target/release/liblevenshtein.so", "usr/lib/", "644"],
+    ["target/release/liblevenshtein.rlib", "usr/lib/", "644"],
+    ["README.md", "usr/share/doc/liblevenshtein/", "644"],
+    ["CHANGELOG.md", "usr/share/doc/liblevenshtein/", "644"],
+]
+EOF
+
+      - name: Create .deb package
+        run: cargo deb --no-build --no-strip
+
+      - name: Upload .deb package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: target/debian/*.deb
+          retention-days: 30
+
+  test-deb-package:
+    name: Sanity Check - Debian Package
+    needs: package-deb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download .deb package
+        uses: actions/download-artifact@v4
+        with:
+          name: debian-package
+
+      - name: Install package
+        run: |
+          sudo dpkg -i *.deb || true
+          sudo apt-get install -f -y
+
+      - name: Verify installation
+        run: |
+          which liblevenshtein
+          liblevenshtein --version || liblevenshtein --help
+
+      - name: Check shared libraries
+        run: |
+          ldd $(which liblevenshtein)
+          ls -lh /usr/lib/liblevenshtein.so || true
+          ls -lh /usr/lib/liblevenshtein.rlib
+
+      - name: Test basic functionality
+        run: |
+          echo -e "test\ntesting\ntested\ntester" > /tmp/test-dict.txt
+          liblevenshtein query "tset" --dict /tmp/test-dict.txt -m 2
+          echo "Basic query test passed!"
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-matrix, package-deb, test-deb-package]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            liblevenshtein-linux-*/*.tar.gz
+            liblevenshtein-linux-*/*.zip
+            liblevenshtein-macos-*/*.tar.gz
+            liblevenshtein-macos-*/*.zip
+            debian-package/*.deb
+          draft: false
+          prerelease: false
+          body: |
+            See [CHANGELOG.md](https://github.com/F1R3FLY-io/liblevenshtein-rust/blob/master/CHANGELOG.md) for details.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
