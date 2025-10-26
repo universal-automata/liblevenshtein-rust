@@ -4,11 +4,12 @@
 //! containing only contextually relevant terms, dramatically reducing
 //! search space.
 
-use liblevenshtein::prelude::*;
+use levenshtein::prelude::*;
 use std::collections::HashSet;
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 enum IdentifierType {
     Variable,
     Function,

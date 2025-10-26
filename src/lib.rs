@@ -12,7 +12,7 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use liblevenshtein::prelude::*;
+//! use levenshtein::prelude::*;
 //!
 //! let terms = vec!["test", "testing", "tested"];
 //! let dict = PathMapDictionary::from_iter(terms);
@@ -33,6 +33,14 @@ pub mod distance;
 #[cfg(feature = "serialization")]
 pub mod serialization;
 
+/// Interactive REPL for exploring Levenshtein dictionaries
+#[cfg(feature = "cli")]
+pub mod repl;
+
+/// CLI interface and utilities
+#[cfg(feature = "cli")]
+pub mod cli;
+
 /// Common imports for convenient usage
 pub mod prelude {
     pub use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
@@ -49,4 +57,7 @@ pub mod prelude {
 
     #[cfg(feature = "protobuf")]
     pub use crate::serialization::{ProtobufSerializer, OptimizedProtobufSerializer};
+
+    #[cfg(feature = "compression")]
+    pub use crate::serialization::GzipSerializer;
 }

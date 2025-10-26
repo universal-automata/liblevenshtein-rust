@@ -4,8 +4,8 @@
 //! dictionary entries are "active" for the current context. This allows
 //! instant context switching with zero overhead.
 
-use liblevenshtein::prelude::*;
-use std::collections::{HashMap, HashSet};
+use levenshtein::prelude::*;
+use std::collections::HashMap;
 use std::time::Instant;
 
 /// Context-aware dictionary wrapper with bitmap masking
