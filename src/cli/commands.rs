@@ -10,7 +10,7 @@ use crate::commands::handlers::query::execute_query;
 use crate::dictionary::dawg::DawgDictionary;
 use crate::dictionary::dynamic_dawg::DynamicDawg;
 use crate::dictionary::pathmap::PathMapDictionary;
-use crate::dictionary::Dictionary;
+use crate::dictionary::{Dictionary, DictionaryNode};
 use crate::repl::state::{DictContainer, DictionaryBackend};
 use crate::transducer::Algorithm;
 

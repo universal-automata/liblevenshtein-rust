@@ -2,14 +2,14 @@
 
 use crate::dictionary::{Dictionary, DictionaryNode};
 use prost::Message;
-use std::collections::HashMap;
 use std::io::{Read, Write};
 
 use super::{extract_terms, DictionaryFromTerms, DictionarySerializer, SerializationError};
 
 /// Generated protobuf types
-pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/liblevenshtein.rs"));
+mod proto {
+    #![allow(dead_code)]
+    include!(concat!(env!("OUT_DIR"), "/liblevenshtein.proto.rs"));
 }
 
 #[cfg(feature = "protobuf")]

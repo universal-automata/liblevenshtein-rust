@@ -26,24 +26,24 @@ use crate::dictionary::{Dictionary, DictionaryNode};
 use std::io::{Read, Write};
 
 // Serializer implementations
-mod bincode;
-mod json;
+mod bincode_impl;
+mod json_impl;
 
 #[cfg(feature = "protobuf")]
-pub mod protobuf;
+pub mod protobuf_impl;
 
 #[cfg(feature = "compression")]
-mod compression;
+mod compression_impl;
 
 // Re-exports
-pub use self::bincode::BincodeSerializer;
-pub use self::json::JsonSerializer;
+pub use self::bincode_impl::BincodeSerializer;
+pub use self::json_impl::JsonSerializer;
 
 #[cfg(feature = "protobuf")]
-pub use self::protobuf::{OptimizedProtobufSerializer, ProtobufSerializer};
+pub use self::protobuf_impl::{OptimizedProtobufSerializer, ProtobufSerializer};
 
 #[cfg(feature = "compression")]
-pub use self::compression::GzipSerializer;
+pub use self::compression_impl::GzipSerializer;
 
 /// Trait for serializing and deserializing dictionaries.
 pub trait DictionarySerializer {
@@ -156,12 +156,6 @@ pub fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::dictionary::pathmap::PathMapDictionary;
-
-    impl DictionaryFromTerms for PathMapDictionary {
-        fn from_terms<I: IntoIterator<Item = String>>(terms: I) -> Self {
-            Self::from_iter(terms.into_iter().map(|s| s.as_str()))
-        }
-    }
 
     #[test]
     fn test_bincode_roundtrip() {
