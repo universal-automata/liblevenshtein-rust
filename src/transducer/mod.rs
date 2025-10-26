@@ -5,6 +5,7 @@
 
 mod algorithm;
 pub mod builder;
+mod builder_api;
 mod intersection;
 mod ordered_query;
 mod pool;
@@ -15,6 +16,7 @@ pub mod transition;
 
 pub use algorithm::Algorithm;
 pub use builder::{BuilderError, TransducerBuilder};
+pub use builder_api::QueryBuilder;
 pub use intersection::{Intersection, PathNode};
 pub use ordered_query::{OrderedCandidate, OrderedQueryIterator};
 pub use pool::StatePool;
@@ -130,5 +132,38 @@ impl<D: Dictionary> Transducer<D> {
     /// Get a reference to the underlying dictionary
     pub fn dictionary(&self) -> &D {
         &self.dictionary
+    }
+
+    /// Create a fluent query builder
+    ///
+    /// Provides a more ergonomic, self-documenting API for querying.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::prelude::*;
+    ///
+    /// let dict = DawgDictionary::from_iter(vec!["test", "testing"]);
+    /// let transducer = Transducer::new(dict, Algorithm::Standard);
+    ///
+    /// // Fluent API
+    /// let results: Vec<_> = transducer
+    ///     .query_builder("tset")
+    ///     .max_distance(2)
+    ///     .prefix_mode(true)
+    ///     .limit(10)
+    ///     .collect();
+    ///
+    /// // Ordered results
+    /// let top_matches: Vec<_> = transducer
+    ///     .query_builder("test")
+    ///     .max_distance(2)
+    ///     .ordered()
+    ///     .take(5)
+    ///     .map(|c| c.term)
+    ///     .collect();
+    /// ```
+    pub fn query_builder(&self, term: impl Into<String>) -> QueryBuilder<'_, D> {
+        QueryBuilder::new(&self.dictionary, term, 2, self.algorithm)
     }
 }

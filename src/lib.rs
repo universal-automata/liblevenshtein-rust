@@ -47,7 +47,7 @@ pub mod prelude {
     pub use crate::dictionary::dynamic_dawg::DynamicDawg;
     pub use crate::dictionary::pathmap::PathMapDictionary;
     pub use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
-    pub use crate::transducer::{Algorithm, Candidate, Transducer, TransducerBuilder};
+    pub use crate::transducer::{Algorithm, Candidate, QueryBuilder, Transducer, TransducerBuilder};
 
     #[cfg(feature = "serialization")]
     pub use crate::serialization::{
