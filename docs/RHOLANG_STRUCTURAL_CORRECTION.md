@@ -2246,6 +2246,939 @@ stdout!("This is a very long
 
 **Confidence:** 0.95
 
+---
+
+### Delimiter Correction Framework
+
+**Comprehensive strategies for correcting missing, misplaced, and superfluous delimiters:**
+
+#### Strategy 1: Missing Closing Delimiters
+
+**Problem:** Unclosed delimiter detected at EOF or before incompatible delimiter.
+
+**Detection:**
+```rust
+pub struct MissingClosingDetector;
+
+impl MissingClosingDetector {
+    pub fn detect_and_correct(
+        &self,
+        errors: &[StructuralError],
+        source: &str,
+    ) -> Vec<DelimiterCorrection> {
+        let mut corrections = Vec::new();
+
+        for error in errors {
+            if let StructuralError::UnclosedDelimiter {
+                delimiter,
+                open_position,
+                suggested_close,
+                context,
+                ..
+            } = error
+            {
+                let correction = self.correct_unclosed(
+                    *delimiter,
+                    *open_position,
+                    *suggested_close,
+                    context.as_ref(),
+                    source,
+                );
+                corrections.push(correction);
+            }
+        }
+
+        corrections
+    }
+
+    fn correct_unclosed(
+        &self,
+        delimiter: char,
+        open_pos: usize,
+        suggested_close: usize,
+        context: Option<&DelimiterContext>,
+        source: &str,
+    ) -> DelimiterCorrection {
+        let closing_char = match delimiter {
+            '{' => '}',
+            '(' => ')',
+            '[' => ']',
+            '"' => '"',
+            '\'' => '\'',
+            _ => delimiter,
+        };
+
+        // Refine position based on context
+        let refined_position = self.refine_insertion_point(
+            suggested_close,
+            closing_char,
+            context,
+            source,
+        );
+
+        // Determine indentation
+        let indent = self.compute_closing_indent(open_pos, source);
+
+        DelimiterCorrection {
+            error_type: DelimiterErrorType::MissingClosing,
+            fix: Fix::Insert {
+                position: refined_position,
+                text: format!("{}{}", indent, closing_char),
+            },
+            confidence: self.compute_confidence(context, open_pos, refined_position, source),
+            explanation: format!(
+                "Insert '{}' to close {} opened at position {}",
+                closing_char,
+                context.map(|c| format!("{:?}", c)).unwrap_or_else(|| "block".to_string()),
+                open_pos
+            ),
+            alternative_fixes: self.generate_alternatives(
+                delimiter,
+                open_pos,
+                refined_position,
+                source,
+            ),
+        }
+    }
+
+    fn refine_insertion_point(
+        &self,
+        suggested: usize,
+        closing_char: char,
+        context: Option<&DelimiterContext>,
+        source: &str,
+    ) -> usize {
+        // Look for natural break points near suggestion
+        let search_window = 100; // characters
+        let start = suggested.saturating_sub(search_window / 2);
+        let end = (suggested + search_window / 2).min(source.len());
+
+        let window = &source[start..end];
+
+        // Find best insertion point
+        let relative_pos = match context {
+            Some(DelimiterContext::ContractBody) | Some(DelimiterContext::BlockExpression) => {
+                // Prefer end of last complete statement
+                self.find_statement_end(window)
+            }
+            Some(DelimiterContext::FunctionArgs) => {
+                // Prefer after last argument
+                self.find_arg_list_end(window)
+            }
+            Some(DelimiterContext::Collection) => {
+                // Prefer after last element
+                self.find_collection_end(window)
+            }
+            _ => {
+                // Generic: after last non-whitespace
+                self.find_last_non_whitespace(window)
+            }
+        };
+
+        start + relative_pos
+    }
+
+    fn find_statement_end(&self, window: &str) -> usize {
+        // Look for newline after complete expression
+        window
+            .rfind(|c: char| c == '\n' || c == ';')
+            .unwrap_or(window.len())
+    }
+
+    fn find_arg_list_end(&self, window: &str) -> usize {
+        // Look for last comma or identifier
+        window
+            .rfind(|c: char| c == ',' || c.is_alphanumeric())
+            .map(|pos| pos + 1)
+            .unwrap_or(window.len())
+    }
+
+    fn find_collection_end(&self, window: &str) -> usize {
+        // Similar to arg list
+        self.find_arg_list_end(window)
+    }
+
+    fn find_last_non_whitespace(&self, window: &str) -> usize {
+        window
+            .rfind(|c: char| !c.is_whitespace())
+            .map(|pos| pos + 1)
+            .unwrap_or(window.len())
+    }
+
+    fn compute_closing_indent(&self, open_pos: usize, source: &str) -> String {
+        // Extract line containing opening delimiter
+        let line_start = source[..open_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line = &source[line_start..open_pos];
+
+        // Count leading whitespace
+        let indent_count = line.chars().take_while(|c| c.is_whitespace()).count();
+
+        // Return newline + same indentation
+        format!("\n{}", " ".repeat(indent_count))
+    }
+
+    fn compute_confidence(
+        &self,
+        context: Option<&DelimiterContext>,
+        open_pos: usize,
+        close_pos: usize,
+        source: &str,
+    ) -> f64 {
+        let mut confidence = 0.85; // base
+
+        // Increase confidence if context is known
+        if context.is_some() {
+            confidence += 0.05;
+        }
+
+        // Increase if distance is reasonable
+        let distance = close_pos - open_pos;
+        if distance < 1000 {
+            confidence += 0.05;
+        } else if distance > 5000 {
+            confidence -= 0.10;
+        }
+
+        // Decrease if many nested delimiters in between
+        let nesting_depth = self.count_nesting_depth(&source[open_pos..close_pos]);
+        if nesting_depth > 5 {
+            confidence -= 0.05 * (nesting_depth - 5) as f64;
+        }
+
+        confidence.max(0.5).min(0.98)
+    }
+
+    fn count_nesting_depth(&self, text: &str) -> usize {
+        let mut max_depth = 0;
+        let mut current_depth = 0;
+
+        for ch in text.chars() {
+            match ch {
+                '{' | '(' | '[' => {
+                    current_depth += 1;
+                    max_depth = max_depth.max(current_depth);
+                }
+                '}' | ')' | ']' => {
+                    current_depth = current_depth.saturating_sub(1);
+                }
+                _ => {}
+            }
+        }
+
+        max_depth
+    }
+
+    fn generate_alternatives(
+        &self,
+        delimiter: char,
+        open_pos: usize,
+        primary_close_pos: usize,
+        source: &str,
+    ) -> Vec<AlternativeFix> {
+        let mut alternatives = Vec::new();
+
+        // Alternative 1: Delete opening delimiter instead
+        alternatives.push(AlternativeFix {
+            description: format!("Remove opening '{}'", delimiter),
+            fix: Fix::Delete {
+                start: open_pos,
+                end: open_pos + 1,
+            },
+            confidence: 0.60,
+            rationale: "Opening delimiter might be unnecessary".to_string(),
+        });
+
+        // Alternative 2: Close immediately after opening
+        let immediate_close = self.find_next_non_whitespace(open_pos + 1, source);
+        if immediate_close < primary_close_pos {
+            alternatives.push(AlternativeFix {
+                description: format!("Close {} immediately", delimiter),
+                fix: Fix::Insert {
+                    position: immediate_close,
+                    text: match delimiter {
+                        '{' => "}",
+                        '(' => ")",
+                        '[' => "]",
+                        '"' => "\"",
+                        _ => "",
+                    }
+                    .to_string(),
+                },
+                confidence: 0.50,
+                rationale: "Block might be empty".to_string(),
+            });
+        }
+
+        alternatives
+    }
+
+    fn find_next_non_whitespace(&self, start: usize, source: &str) -> usize {
+        source[start..]
+            .find(|c: char| !c.is_whitespace())
+            .map(|pos| start + pos)
+            .unwrap_or(source.len())
+    }
+}
+```
+
+#### Strategy 2: Superfluous Closing Delimiters
+
+**Problem:** Extra closing delimiter with no matching opening.
+
+**Detection and Correction:**
+```rust
+pub struct SuperfluousClosingCorrector;
+
+impl SuperfluousClosingCorrector {
+    pub fn correct(&self, error: &StructuralError, source: &str) -> DelimiterCorrection {
+        if let StructuralError::UnmatchedClosing {
+            delimiter,
+            position,
+            line,
+            col,
+        } = error
+        {
+            // Analyze context to determine if deletion or replacement is better
+            let context_analysis = self.analyze_context(*position, source);
+
+            match context_analysis {
+                ClosingContext::Superfluous => {
+                    // Simply delete
+                    DelimiterCorrection {
+                        error_type: DelimiterErrorType::SuperfluousClosing,
+                        fix: Fix::Delete {
+                            start: *position,
+                            end: position + 1,
+                        },
+                        confidence: 0.80,
+                        explanation: format!(
+                            "Remove extra '{}' at line {}, col {} (no matching opening)",
+                            delimiter, line, col
+                        ),
+                        alternative_fixes: vec![
+                            AlternativeFix {
+                                description: "Add matching opening delimiter".to_string(),
+                                fix: self.suggest_opening_insertion(*delimiter, *position, source),
+                                confidence: 0.45,
+                                rationale: "Opening delimiter might be missing instead".to_string(),
+                            },
+                        ],
+                    }
+                }
+                ClosingContext::LikelyTypo => {
+                    // Might be wrong delimiter type
+                    self.suggest_delimiter_replacement(*delimiter, *position, source)
+                }
+                ClosingContext::MissingOpening => {
+                    // Suggest adding opening
+                    let opening_pos = self.find_likely_opening_position(*delimiter, *position, source);
+                    DelimiterCorrection {
+                        error_type: DelimiterErrorType::MissingOpening,
+                        fix: Fix::Insert {
+                            position: opening_pos,
+                            text: Self::opening_char(*delimiter).to_string(),
+                        },
+                        confidence: 0.65,
+                        explanation: format!(
+                            "Insert opening '{}' before position {}",
+                            Self::opening_char(*delimiter),
+                            position
+                        ),
+                        alternative_fixes: vec![
+                            AlternativeFix {
+                                description: format!("Delete closing '{}'", delimiter),
+                                fix: Fix::Delete {
+                                    start: *position,
+                                    end: position + 1,
+                                },
+                                confidence: 0.70,
+                                rationale: "Closing might be unnecessary".to_string(),
+                            },
+                        ],
+                    }
+                }
+            }
+        } else {
+            panic!("Wrong error type for SuperfluousClosingCorrector");
+        }
+    }
+
+    fn analyze_context(&self, position: usize, source: &str) -> ClosingContext {
+        // Look backward for likely opening position
+        let lookback = 200;
+        let start = position.saturating_sub(lookback);
+        let window = &source[start..position];
+
+        // Count delimiters in window
+        let mut brace_depth = 0;
+        let mut paren_depth = 0;
+        let mut bracket_depth = 0;
+
+        for ch in window.chars() {
+            match ch {
+                '{' => brace_depth += 1,
+                '}' => brace_depth -= 1,
+                '(' => paren_depth += 1,
+                ')' => paren_depth -= 1,
+                '[' => bracket_depth += 1,
+                ']' => bracket_depth -= 1,
+                _ => {}
+            }
+        }
+
+        // Analyze closing delimiter
+        let closing = source.chars().nth(position).unwrap();
+        let expected_depth = match closing {
+            '}' => brace_depth,
+            ')' => paren_depth,
+            ']' => bracket_depth,
+            _ => 0,
+        };
+
+        if expected_depth < 0 {
+            ClosingContext::Superfluous
+        } else if expected_depth > 0 {
+            ClosingContext::MissingOpening
+        } else {
+            // Depth is balanced, might be typo
+            ClosingContext::LikelyTypo
+        }
+    }
+
+    fn suggest_delimiter_replacement(
+        &self,
+        found: char,
+        position: usize,
+        source: &str,
+    ) -> DelimiterCorrection {
+        // Find what delimiter is actually needed
+        let expected = self.find_expected_delimiter(position, source);
+
+        DelimiterCorrection {
+            error_type: DelimiterErrorType::WrongDelimiterType,
+            fix: Fix::Replace {
+                start: position,
+                end: position + 1,
+                text: expected.to_string(),
+            },
+            confidence: 0.75,
+            explanation: format!(
+                "Replace '{}' with '{}' (likely typo)",
+                found, expected
+            ),
+            alternative_fixes: vec![],
+        }
+    }
+
+    fn find_expected_delimiter(&self, position: usize, source: &str) -> char {
+        // Look backward for unclosed opening
+        let mut stack = Vec::new();
+
+        for (i, ch) in source[..position].char_indices().rev() {
+            match ch {
+                '{' | '(' | '[' => {
+                    if let Some(top) = stack.pop() {
+                        // Check if matches
+                        if !Self::delimiters_match(ch, top) {
+                            stack.push(top);
+                            stack.push(ch);
+                        }
+                    } else {
+                        // Found unclosed opening
+                        return Self::closing_for_opening(ch);
+                    }
+                }
+                '}' | ')' | ']' => {
+                    stack.push(ch);
+                }
+                _ => {}
+            }
+        }
+
+        // Default: assume brace
+        '}'
+    }
+
+    fn find_likely_opening_position(&self, closing: char, close_pos: usize, source: &str) -> usize {
+        // Look for start of logical block
+        let opening = Self::opening_char(closing);
+        let lookback = 500;
+        let start = close_pos.saturating_sub(lookback);
+
+        // Find keywords that typically precede this delimiter
+        let keywords = match opening {
+            '{' => vec!["contract", "match", "if", "else", "for"],
+            '(' => vec!["for", "if"],
+            '[' => vec![], // Collections typically start inline
+            _ => vec![],
+        };
+
+        for keyword in keywords {
+            if let Some(pos) = source[start..close_pos].rfind(keyword) {
+                // Position after keyword
+                let keyword_end = start + pos + keyword.len();
+                // Skip whitespace
+                return source[keyword_end..close_pos]
+                    .find(|c: char| !c.is_whitespace())
+                    .map(|p| keyword_end + p)
+                    .unwrap_or(keyword_end);
+            }
+        }
+
+        // Fallback: start of line
+        source[start..close_pos]
+            .rfind('\n')
+            .map(|p| start + p + 1)
+            .unwrap_or(start)
+    }
+
+    fn opening_char(closing: char) -> char {
+        match closing {
+            '}' => '{',
+            ')' => '(',
+            ']' => '[',
+            '"' => '"',
+            '\'' => '\'',
+            _ => closing,
+        }
+    }
+
+    fn closing_for_opening(opening: char) -> char {
+        match opening {
+            '{' => '}',
+            '(' => ')',
+            '[' => ']',
+            '"' => '"',
+            '\'' => '\'',
+            _ => opening,
+        }
+    }
+
+    fn delimiters_match(opening: char, closing: char) -> bool {
+        matches!(
+            (opening, closing),
+            ('{', '}') | ('(', ')') | ('[', ']') | ('"', '"') | ('\'', '\'')
+        )
+    }
+
+    fn suggest_opening_insertion(&self, closing: char, close_pos: usize, source: &str) -> Fix {
+        let opening_pos = self.find_likely_opening_position(closing, close_pos, source);
+        Fix::Insert {
+            position: opening_pos,
+            text: Self::opening_char(closing).to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum ClosingContext {
+    Superfluous,      // Definitely extra
+    LikelyTypo,       // Probably wrong delimiter type
+    MissingOpening,   // Opening delimiter is missing
+}
+```
+
+#### Strategy 3: Misplaced Delimiters
+
+**Problem:** Delimiter appears in wrong scope or position.
+
+**Detection and Correction:**
+```rust
+pub struct MisplacedDelimiterCorrector;
+
+impl MisplacedDelimiterCorrector {
+    pub fn correct(
+        &self,
+        error: &StructuralError,
+        source: &str,
+        tree: &Tree,
+    ) -> DelimiterCorrection {
+        if let StructuralError::MismatchedDelimiter {
+            expected,
+            found,
+            opening_pos,
+            closing_pos,
+        } = error
+        {
+            // Determine if this is a simple typo or structural issue
+            let analysis = self.analyze_mismatch(
+                *expected,
+                *found,
+                *opening_pos,
+                *closing_pos,
+                source,
+                tree,
+            );
+
+            match analysis {
+                MismatchType::SimpleTypo => {
+                    // Just replace the wrong delimiter
+                    DelimiterCorrection {
+                        error_type: DelimiterErrorType::MismatchedPair,
+                        fix: Fix::Replace {
+                            start: *closing_pos,
+                            end: closing_pos + 1,
+                            text: expected.to_string(),
+                        },
+                        confidence: 0.92,
+                        explanation: format!(
+                            "Replace '{}' with '{}' to match opening at position {}",
+                            found, expected, opening_pos
+                        ),
+                        alternative_fixes: vec![
+                            AlternativeFix {
+                                description: "Replace opening delimiter instead".to_string(),
+                                fix: Fix::Replace {
+                                    start: *opening_pos,
+                                    end: opening_pos + 1,
+                                    text: Self::opening_for_closing(*found).to_string(),
+                                },
+                                confidence: 0.70,
+                                rationale: "Opening might be wrong instead".to_string(),
+                            },
+                        ],
+                    }
+                }
+                MismatchType::NestedConfusion(correct_close_pos) => {
+                    // Need to reorder delimiters
+                    DelimiterCorrection {
+                        error_type: DelimiterErrorType::MismatchedPair,
+                        fix: Fix::MultiStep(vec![
+                            Fix::Replace {
+                                start: *closing_pos,
+                                end: closing_pos + 1,
+                                text: expected.to_string(),
+                            },
+                            Fix::Insert {
+                                position: correct_close_pos,
+                                text: found.to_string(),
+                            },
+                        ]),
+                        confidence: 0.75,
+                        explanation: format!(
+                            "Reorder delimiters: change '{}' to '{}' and insert '{}' at correct position",
+                            found, expected, found
+                        ),
+                        alternative_fixes: vec![],
+                    }
+                }
+                MismatchType::StructuralError => {
+                    // More complex fix needed
+                    self.suggest_structural_fix(*expected, *found, *opening_pos, *closing_pos, source)
+                }
+            }
+        } else {
+            panic!("Wrong error type for MisplacedDelimiterCorrector");
+        }
+    }
+
+    fn analyze_mismatch(
+        &self,
+        expected: char,
+        found: char,
+        open_pos: usize,
+        close_pos: usize,
+        source: &str,
+        tree: &Tree,
+    ) -> MismatchType {
+        // Check if there's another delimiter of the expected type nearby
+        let search_range = 50;
+        let start = close_pos.saturating_sub(search_range);
+        let end = (close_pos + search_range).min(source.len());
+
+        if let Some(correct_pos) = source[start..end].find(expected) {
+            // Found expected delimiter nearby - likely nested confusion
+            MismatchType::NestedConfusion(start + correct_pos)
+        } else {
+            // Check AST structure
+            if self.is_simple_typo(open_pos, close_pos, tree) {
+                MismatchType::SimpleTypo
+            } else {
+                MismatchType::StructuralError
+            }
+        }
+    }
+
+    fn is_simple_typo(&self, open_pos: usize, close_pos: usize, tree: &Tree) -> bool {
+        // Use Tree-sitter to check if fixing would create valid AST
+        let root = tree.root_node();
+
+        // Find nodes at these positions
+        let open_node = root.descendant_for_byte_range(open_pos, open_pos + 1);
+        let close_node = root.descendant_for_byte_range(close_pos, close_pos + 1);
+
+        // If both are in ERROR nodes, likely structural
+        // If only one is in ERROR, likely typo
+        match (open_node, close_node) {
+            (Some(on), Some(cn)) => {
+                !(on.kind() == "ERROR" && cn.kind() == "ERROR")
+            }
+            _ => true, // Assume typo if can't determine
+        }
+    }
+
+    fn suggest_structural_fix(
+        &self,
+        expected: char,
+        found: char,
+        open_pos: usize,
+        close_pos: usize,
+        source: &str,
+    ) -> DelimiterCorrection {
+        // Analyze what structure is actually needed
+        DelimiterCorrection {
+            error_type: DelimiterErrorType::StructuralMismatch,
+            fix: Fix::Replace {
+                start: close_pos,
+                end: close_pos + 1,
+                text: expected.to_string(),
+            },
+            confidence: 0.65,
+            explanation: format!(
+                "Replace '{}' with '{}' (structural fix may need manual review)",
+                found, expected
+            ),
+            alternative_fixes: vec![
+                AlternativeFix {
+                    description: "Remove both delimiters".to_string(),
+                    fix: Fix::MultiStep(vec![
+                        Fix::Delete {
+                            start: open_pos,
+                            end: open_pos + 1,
+                        },
+                        Fix::Delete {
+                            start: close_pos,
+                            end: close_pos + 1,
+                        },
+                    ]),
+                    confidence: 0.55,
+                    rationale: "Block structure might be unnecessary".to_string(),
+                },
+            ],
+        }
+    }
+
+    fn opening_for_closing(closing: char) -> char {
+        match closing {
+            '}' => '{',
+            ')' => '(',
+            ']' => '[',
+            '"' => '"',
+            '\'' => '\'',
+            _ => closing,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum MismatchType {
+    SimpleTypo,                     // Just wrong character
+    NestedConfusion(usize),         // Correct delimiter exists at position
+    StructuralError,                // Deeper structural issue
+}
+```
+
+#### Strategy 4: Multi-Step Corrections
+
+**Complex corrections requiring multiple fixes:**
+
+```rust
+#[derive(Clone, Debug)]
+pub enum Fix {
+    Insert {
+        position: usize,
+        text: String,
+    },
+    Delete {
+        start: usize,
+        end: usize,
+    },
+    Replace {
+        start: usize,
+        end: usize,
+        text: String,
+    },
+    MultiStep(Vec<Fix>),  // Multiple fixes in sequence
+}
+
+pub struct MultiStepCorrector;
+
+impl MultiStepCorrector {
+    pub fn apply_fixes(&self, source: &str, fixes: &[Fix]) -> Result<String, String> {
+        // Sort fixes by position (reverse order for safe application)
+        let mut sorted_fixes: Vec<(usize, &Fix)> = fixes
+            .iter()
+            .map(|fix| (self.fix_position(fix), fix))
+            .collect();
+        sorted_fixes.sort_by(|a, b| b.0.cmp(&a.0)); // Reverse order
+
+        let mut result = source.to_string();
+
+        for (_, fix) in sorted_fixes {
+            result = self.apply_single_fix(&result, fix)?;
+        }
+
+        Ok(result)
+    }
+
+    fn apply_single_fix(&self, source: &str, fix: &Fix) -> Result<String, String> {
+        match fix {
+            Fix::Insert { position, text } => {
+                let mut result = String::with_capacity(source.len() + text.len());
+                result.push_str(&source[..*position]);
+                result.push_str(text);
+                result.push_str(&source[*position..]);
+                Ok(result)
+            }
+            Fix::Delete { start, end } => {
+                let mut result = String::with_capacity(source.len());
+                result.push_str(&source[..*start]);
+                result.push_str(&source[*end..]);
+                Ok(result)
+            }
+            Fix::Replace { start, end, text } => {
+                let mut result = String::with_capacity(source.len() + text.len());
+                result.push_str(&source[..*start]);
+                result.push_str(text);
+                result.push_str(&source[*end..]);
+                Ok(result)
+            }
+            Fix::MultiStep(fixes) => {
+                self.apply_fixes(source, fixes)
+            }
+        }
+    }
+
+    fn fix_position(&self, fix: &Fix) -> usize {
+        match fix {
+            Fix::Insert { position, .. } => *position,
+            Fix::Delete { start, .. } => *start,
+            Fix::Replace { start, .. } => *start,
+            Fix::MultiStep(fixes) => {
+                fixes.iter().map(|f| self.fix_position(f)).min().unwrap_or(0)
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DelimiterCorrection {
+    pub error_type: DelimiterErrorType,
+    pub fix: Fix,
+    pub confidence: f64,
+    pub explanation: String,
+    pub alternative_fixes: Vec<AlternativeFix>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AlternativeFix {
+    pub description: String,
+    pub fix: Fix,
+    pub confidence: f64,
+    pub rationale: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum DelimiterErrorType {
+    MissingClosing,
+    SuperfluousClosing,
+    MissingOpening,
+    MismatchedPair,
+    WrongDelimiterType,
+    StructuralMismatch,
+}
+```
+
+---
+
+### Integrated Correction Pipeline
+
+**Complete workflow for delimiter correction:**
+
+```rust
+pub struct DelimiterCorrectionPipeline {
+    missing_detector: MissingClosingDetector,
+    superfluous_corrector: SuperfluousClosingCorrector,
+    misplaced_corrector: MisplacedDelimiterCorrector,
+    multi_step: MultiStepCorrector,
+}
+
+impl DelimiterCorrectionPipeline {
+    pub fn correct_all_delimiters(
+        &self,
+        source: &str,
+        tree: &Tree,
+    ) -> Result<CorrectionResult, String> {
+        // Step 1: Analyze delimiters
+        let mut matcher = DelimiterMatcher::new();
+        let errors = matcher.analyze(source);
+
+        if errors.is_empty() {
+            return Ok(CorrectionResult {
+                corrected_source: source.to_string(),
+                corrections: vec![],
+                confidence: 1.0,
+            });
+        }
+
+        // Step 2: Categorize errors
+        let mut corrections = Vec::new();
+
+        for error in &errors {
+            let correction = match error {
+                StructuralError::UnclosedDelimiter { .. } => {
+                    self.missing_detector.detect_and_correct(&[error.clone()], source)
+                        .into_iter()
+                        .next()
+                        .unwrap()
+                }
+                StructuralError::UnmatchedClosing { .. } => {
+                    self.superfluous_corrector.correct(error, source)
+                }
+                StructuralError::MismatchedDelimiter { .. } => {
+                    self.misplaced_corrector.correct(error, source, tree)
+                }
+                StructuralError::UnterminatedString { .. } => {
+                    error.to_correction(source)
+                }
+                _ => continue,
+            };
+
+            corrections.push(correction);
+        }
+
+        // Step 3: Rank by confidence
+        corrections.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+
+        // Step 4: Apply fixes
+        let fixes: Vec<Fix> = corrections.iter().map(|c| c.fix.clone()).collect();
+        let corrected_source = self.multi_step.apply_fixes(source, &fixes)?;
+
+        // Step 5: Compute overall confidence
+        let overall_confidence = if corrections.is_empty() {
+            1.0
+        } else {
+            corrections.iter().map(|c| c.confidence).sum::<f64>() / corrections.len() as f64
+        };
+
+        Ok(CorrectionResult {
+            corrected_source,
+            corrections,
+            confidence: overall_confidence,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct CorrectionResult {
+    pub corrected_source: String,
+    pub corrections: Vec<DelimiterCorrection>,
+    pub confidence: f64,
+}
+```
+
+---
+
 ### Block Structure Validation
 
 **Ensure contracts, match, for, etc. have proper bodies:**
@@ -3652,7 +4585,7 @@ This design proposes a **comprehensive, multi-level error correction system** fo
 
 ---
 
-**Document Version:** 1.3
+**Document Version:** 1.4
 **Last Updated:** 2025-10-26
 **Author:** Claude (AI Assistant)
-**Status:** Design Proposal with Complete Theoretical Foundation, Comprehensive Parse/Syntax Error Coverage, and Full Delimiter Matching
+**Status:** Design Proposal with Complete Theoretical Foundation, Comprehensive Parse/Syntax Error Coverage, Full Delimiter Matching, and Correction Strategies
