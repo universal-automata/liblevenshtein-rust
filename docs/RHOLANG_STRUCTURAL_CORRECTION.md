@@ -255,16 +255,226 @@ For transducers T₁: Σ* → Δ* and T₂: Δ* → Γ*, the composition T₂ �
 (T₂ ∘ T₁)(x) = {(z, w₁ ⊗ w₂) | ∃y: (y,w₁) ∈ T₁(x) ∧ (z,w₂) ∈ T₂(y)}
 ```
 
-**Composition Algorithm (Mohri et al. 2002):**
-State space of T₂ ∘ T₁ is Q₁ × Q₂ with transitions:
+**Intuition:** Composition chains transducers by feeding the output of T₁ as input to T₂:
 ```
-((q₁,q₂), a:c, w₁ ⊗ w₂, (q₁',q₂'))
-  whenever (q₁, a:b, w₁, q₁') ∈ T₁ and (q₂, b:c, w₂, q₂') ∈ T₂
+Input x → [T₁] → Intermediate y → [T₂] → Output z
+          weight w₁              weight w₂
+
+Combined: Input x → [T₂ ∘ T₁] → Output z, weight w₁ ⊗ w₂
+```
+
+**Why Arbitrary Composition is Possible:**
+
+The key insight is that **WFST composition is closed** - composing two WFSTs produces another WFST with the same algebraic properties. This closure property enables arbitrary composition depth.
+
+**Mathematical Foundation for Arbitrary Composition:**
+
+1. **Type Compatibility** - Algebraic Matching
+   ```
+   T₁: Σ* → Δ* over semiring K₁
+   T₂: Δ* → Γ* over semiring K₂
+
+   Requirement: T₁'s output alphabet = T₂'s input alphabet (Δ* = Δ*)
+                Semirings must be compatible: K₁ = K₂ or convertible
+
+   Result: T₂ ∘ T₁: Σ* → Γ* over semiring K
+   ```
+
+2. **Closure Property** - Composition Produces WFST
+   ```
+   If T₁ and T₂ are WFSTs, then T₂ ∘ T₁ is also a WFST
+
+   Proof sketch:
+   - States: Q = Q₁ × Q₂ (Cartesian product, finite if Q₁, Q₂ finite)
+   - Transitions: Constructed by matching T₁'s outputs with T₂'s inputs
+   - Weights: Combined via semiring operation ⊗
+   - Result is a valid WFST by construction
+   ```
+
+3. **Associativity** - Composition Order Doesn't Matter
+   ```
+   (T₃ ∘ T₂) ∘ T₁ = T₃ ∘ (T₂ ∘ T₁)
+
+   This allows arbitrary nesting depth:
+   T_n ∘ ... ∘ T₃ ∘ T₂ ∘ T₁ is well-defined
+   ```
+
+**Composition Algorithm (Mohri et al. 2002):**
+
+**Input:** T₁ = (Q₁, Σ, Δ, δ₁, λ₁, q₁⁰, F₁, ρ₁) and T₂ = (Q₂, Δ, Γ, δ₂, λ₂, q₂⁰, F₂, ρ₂)
+
+**Output:** T = T₂ ∘ T₁ = (Q, Σ, Γ, δ, λ, q⁰, F, ρ)
+
+**Construction:**
+```
+1. Initial state: q⁰ = (q₁⁰, q₂⁰)
+
+2. States: Q ⊆ Q₁ × Q₂ (computed on-demand during traversal)
+
+3. Transitions: For each pair (q₁, q₂) ∈ Q:
+
+   For each transition (q₁, a:b, w₁, q₁') in T₁:
+     For each transition (q₂, b:c, w₂, q₂') in T₂:
+       Add transition: ((q₁,q₂), a:c, w₁ ⊗ w₂, (q₁',q₂'))
+
+   Note: b must match! (T₁'s output = T₂'s input)
+
+4. Final states: F = F₁ × F₂
+   Final weights: ρ((q₁,q₂)) = ρ₁(q₁) ⊗ ρ₂(q₂)
+```
+
+**Example: Composing Character → Token → Syntax:**
+
+```
+T₁ (Lexical): Characters → Tokens
+  "contrac" → "contract" (weight: 1 edit)
+
+T₂ (Syntactic): Tokens → Corrected Tokens
+  [contract, x, {] → [contract, x, in, {] (weight: 1 insertion)
+
+Composed: T₂ ∘ T₁
+  "contrac x { ..." → "contract x in { ..." (weight: 1+1 = 2)
+```
+
+**State Space Construction:**
+
+```
+T₁ states: {q₁⁰, q₁¹, q₁²}  (processing "contrac")
+T₂ states: {q₂⁰, q₂¹, q₂²}  (processing tokens)
+
+Composed states: Q₁ × Q₂
+  (q₁⁰, q₂⁰) - initial: reading chars, processing tokens
+  (q₁¹, q₂⁰) - mid-word, token not complete
+  (q₁², q₂¹) - word complete, token processing started
+  ...
+```
+
+**Why This Enables Arbitrary Composition:**
+
+1. **Modularity** - Each transducer is self-contained
+   ```
+   T_lexical: Focus on character-level errors
+   T_syntactic: Focus on token-level errors
+   T_structural: Focus on delimiter errors
+   T_semantic: Focus on meaning-level errors
+
+   Each can be developed, tested, and optimized independently
+   ```
+
+2. **Composability** - Output/Input types match automatically
+   ```
+   T_lexical:    Char*   → Token*
+   T_syntactic:  Token*  → Token*     ← Output of T_lexical = Input of T_syntactic
+   T_structural: Token*  → Token*     ← Compatible!
+   T_semantic:   Token*  → Token*
+
+   Full pipeline: Char* → Token* via T_semantic ∘ T_structural ∘ T_syntactic ∘ T_lexical
+   ```
+
+3. **Weight Accumulation** - Confidence scores compose via semiring
+   ```
+   Tropical semiring (ℝ₊, min, +):
+     w_total = w₁ + w₂ + w₃ + w₄  (sum of edit distances)
+
+   Probability semiring ([0,1], +, ×):
+     w_total = w₁ × w₂ × w₃ × w₄  (product of probabilities)
+
+   Log semiring (ℝ, ⊕_log, +):
+     w_total = w₁ + w₂ + w₃ + w₄  (sum of log probabilities)
+   ```
+
+**Practical Implications:**
+
+1. **Add New Correction Levels Trivially**
+   ```rust
+   // Original 3-level pipeline
+   let pipeline = T_structural ∘ T_syntactic ∘ T_lexical;
+
+   // Add semantic level - just compose!
+   let enhanced = T_semantic ∘ pipeline;
+
+   // Add preprocessing - compose on the left!
+   let full = enhanced ∘ T_normalize;
+   ```
+
+2. **Reorder Levels Easily**
+   ```rust
+   // Standard order
+   let standard = T_sem ∘ T_str ∘ T_syn ∘ T_lex;
+
+   // Alternative: Fix structure before syntax
+   let alternative = T_sem ∘ T_syn ∘ T_str ∘ T_lex;
+
+   // Both valid due to associativity!
+   ```
+
+3. **Test Each Level Independently**
+   ```rust
+   // Test lexical alone
+   assert_eq!(T_lexical.transduce("contrac"), ("contract", 1));
+
+   // Test syntactic alone
+   assert_eq!(T_syntactic.transduce([contract, x, {]),
+              ([contract, x, in, {], 1));
+
+   // Test composition
+   assert_eq!((T_syntactic ∘ T_lexical).transduce("contrac x {"),
+              ("contract x in {", 2));
+   ```
+
+**Complexity Analysis:**
+
+**Theoretical:** O(|T₁| × |T₂|) states in worst case
+- If T₁ has n₁ states and T₂ has n₂ states
+- Composed transducer has up to n₁ × n₂ states
+
+**Practical:** Much smaller due to reachability
+- Only states reachable from initial state are created
+- On-the-fly construction avoids exploring unreachable states
+- Typical: O(k × |T₁| × |T₂|) where k << 1
+
+**Optimization: Epsilon Removal**
+```
+Transducers may have ε-transitions (no input/output consumed)
+These complicate composition and increase state space
+
+Solution: Remove ε-transitions before composition
+- ε-free composition: O(E₁ × E₂) where E is number of transitions
+- Significantly faster in practice
+```
+
+**Key Theorem (Closure under Composition):**
+
+```
+Theorem: The class of weighted finite-state transducers is closed under composition.
+
+Proof:
+1. Given WFSTs T₁ and T₂ with compatible alphabets
+2. Construct T = T₂ ∘ T₁ using algorithm above
+3. T has finite states Q ⊆ Q₁ × Q₂ (finite × finite = finite)
+4. T has well-defined transitions by construction
+5. T has valid semiring weights (closed under ⊗)
+6. Therefore T is a WFST ∎
+
+Corollary: Arbitrary finite composition T_n ∘ ... ∘ T₁ is well-defined by induction.
+```
+
+**Application to Multi-Level Correction:**
+
+```
+T_total = T_semantic ∘ T_structural ∘ T_syntactic ∘ T_lexical
+
+Step-by-step construction:
+1. T₁₂ = T_syntactic ∘ T_lexical       (2 levels)
+2. T₁₂₃ = T_structural ∘ T₁₂           (3 levels)
+3. T_total = T_semantic ∘ T₁₂₃         (4 levels)
+
+Each intermediate result is a valid WFST that can be composed further!
 ```
 
 **Complexity:** O(|T₁| × |T₂|) in practice with epsilon removal
 
-**Application:** Hierarchical composition of correction levels
+**Application:** Hierarchical composition of correction levels - can compose arbitrarily many correction stages by repeatedly applying composition operation
 
 **Reference:** Mohri et al. (2002) - DOI: 10.1006/csla.2001.0184
 
