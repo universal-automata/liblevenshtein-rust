@@ -1,6 +1,6 @@
 # Rholang Structural Error Correction via Hierarchical Automata Composition
 
-**Version:** 1.6 (Final Review)
+**Version:** 1.8 (Integrated Grammar-Aware Automata)
 **Date:** 2025-10-26
 **Status:** Complete Design Specification with Unified Theory-to-Implementation Mapping
 **Related Documents:**
@@ -18,11 +18,12 @@ This document presents a **comprehensive, theoretically-grounded hierarchical er
 
 1. **Weighted Finite-State Transducers (WFST)** - Hierarchical composition for multi-level correction
 2. **Universal Levenshtein Automata** - Efficient lexical error correction with edit distance bounds
-3. **Tree-sitter GLR Parser** - Robust parsing with automatic error recovery
-4. **Process Calculus Theory** - ρ-calculus semantics for concurrent program validation
-5. **Dyck Languages** - Formal framework for delimiter matching and correction
-6. **N-gram Language Models** - Statistical modeling of code patterns with Kneser-Ney smoothing
-7. **Dataflow Analysis** - Semantic validation via control flow graphs and reaching definitions
+3. **Grammar-Aware Levenshtein Automata** - Token-level syntactic correction constrained by grammar transitions
+4. **Tree-sitter GLR Parser** - Robust parsing with automatic error recovery
+5. **Process Calculus Theory** - ρ-calculus semantics for concurrent program validation
+6. **Dyck Languages** - Formal framework for delimiter matching and correction
+7. **N-gram Language Models** - Statistical modeling of code patterns with Kneser-Ney smoothing
+8. **Dataflow Analysis** - Semantic validation via control flow graphs and reaching definitions
 
 ### Unified Correction Pipeline
 
@@ -37,7 +38,7 @@ Input Source Code
        ↓ Composition ⊗
 ┌──────────────────────────────────────────────────────┐
 │ Level 2: Syntactic (WFST₂)                          │
-│   Tree-sitter ERROR nodes → grammar-based fixes      │
+│   Grammar-aware token automaton → syntax fixes       │
 │   Confidence: 0.75-0.95                              │
 └──────────────────────────────────────────────────────┘
        ↓ Composition ⊗
@@ -765,7 +766,145 @@ impl ProcessValidator {
 - **Dataflow analysis** - Implements reaching definitions (§4.2)
 - **CFG construction** - Enables control flow validation (§4.1)
 
-#### 7.6 N-gram Models → Syntactic Pattern Validation
+#### 7.6 Grammar-Aware Automata → Token Sequence Correction
+
+**Mathematical Foundation:**
+- Grammar-Aware Levenshtein Transducer (GALT): (Q, Σ_tok, G, δ, λ, q₀, F, n)
+- States: Q = (position, edit_distance, grammar_state)
+- Constrained transitions: G.allows(grammar_state, token_type)
+- Accepts: {σ | edit_distance(τ, σ) ≤ n ∧ G ⊢ σ}
+
+**Implementation Mapping:**
+```rust
+// Grammar-aware Levenshtein automaton operating over tokens
+pub struct SyntaxAwareCorrector {
+    language: Language,  // Tree-sitter grammar
+
+    // Cache: (node_type, child_index) → valid_token_types
+    transition_map: HashMap<(String, usize), Vec<String>>,
+}
+
+impl SyntaxAwareCorrector {
+    // Correct token sequence using grammar constraints
+    pub fn correct_token_sequence(
+        &self,
+        tokens: &[Token],        // Token sequence (not characters!)
+        max_distance: usize,
+    ) -> Vec<TokenSequenceCandidate> {
+        // States: (token_index, edit_distance, grammar_state)
+        let mut states = vec![(0, 0, GrammarState::initial())];
+
+        while let Some((tok_idx, edit_dist, gram_state)) = states.pop() {
+            let current_token = &tokens[tok_idx];
+
+            // Transition 1: MATCH (grammar-valid)
+            if self.is_valid_transition(&gram_state, &current_token.kind) {
+                states.push((tok_idx + 1, edit_dist, gram_state.advance(&current_token.kind)));
+                //                                    ↑ Grammar state advances
+            }
+
+            // Transition 2: SUBSTITUTION (replace with grammar-valid token)
+            if edit_dist < max_distance {
+                for expected in &gram_state.expected {  // ← Grammar constraint!
+                    if expected != &current_token.kind {
+                        states.push((tok_idx + 1, edit_dist + 1, gram_state.advance(expected)));
+                        // Record: substitute current with expected
+                    }
+                }
+            }
+
+            // Transition 3: INSERTION (insert grammar-valid token)
+            if edit_dist < max_distance {
+                for expected in &gram_state.expected {  // ← Grammar constraint!
+                    states.push((tok_idx, edit_dist + 1, gram_state.advance(expected)));
+                    //           ↑ Don't advance token index - inserting before current
+                }
+            }
+
+            // Transition 4: DELETION (skip invalid token)
+            if edit_dist < max_distance {
+                states.push((tok_idx + 1, edit_dist + 1, gram_state.clone()));
+            }
+        }
+
+        // Return all grammar-valid corrections within edit distance
+        candidates
+    }
+
+    // Check if token type is valid in current grammar state
+    fn is_valid_transition(&self, grammar_state: &GrammarState, token_type: &str) -> bool {
+        // Lookup from Tree-sitter grammar
+        if grammar_state.expected.iter().any(|e| e == token_type) {
+            return true;
+        }
+
+        // Check cached transition map
+        if let Some(parent) = &grammar_state.parent_type {
+            if let Some(valid) = self.transition_map.get(&(parent.clone(), child_idx)) {
+                return valid.iter().any(|t| t == token_type);
+            }
+        }
+
+        false
+    }
+}
+
+/// Grammar state tracking valid next tokens
+pub struct GrammarState {
+    node_type: String,             // Current parse tree position
+    parent_type: Option<String>,   // Context
+    expected: Vec<String>,          // Valid next token types (from grammar!)
+    is_optional: bool,
+}
+
+impl GrammarState {
+    fn advance(&self, token_kind: &str) -> Self {
+        GrammarState {
+            node_type: token_kind.to_string(),
+            parent_type: Some(self.node_type.clone()),
+            expected: self.compute_next_expected(token_kind),  // From grammar!
+            is_optional: false,
+        }
+    }
+
+    fn compute_next_expected(&self, token_kind: &str) -> Vec<String> {
+        // Example: Rholang grammar transitions
+        match (self.node_type.as_str(), token_kind) {
+            ("new_expression", "new") => vec!["name_list".to_string()],
+            ("new_expression", "name_list") => vec!["in".to_string()],  // KEY!
+            ("new_expression", "in") => vec!["block".to_string()],
+            _ => vec![],
+        }
+    }
+}
+```
+
+**Theory Usage:**
+- **Grammar constraints** - Every transition validated via `G.allows()`
+- **Token-level edit distance** - Operates on token sequences, not characters
+- **Optimal corrections** - Finds all grammar-valid fixes within edit bound
+- **Automatic pattern discovery** - Grammar IS the specification
+
+**Concrete Example:**
+```rust
+// Input: new x, y { ... }
+// Tokens: [new, name_list, {, ...]
+//                         ↑ Grammar expects "in" here!
+
+let corrector = SyntaxAwareCorrector::new(tree_sitter_rholang());
+let fixes = corrector.correct_token_sequence(&tokens, max_distance=2);
+
+// Output candidate:
+// Tokens: [new, name_list, in, {, ...]  (inserted "in", distance=1)
+//                          ^^^ Grammar-constrained insertion
+// Confidence: 100% (grammar-valid + common pattern)
+```
+
+**Key Advantage over Character-Level Levenshtein:**
+- Character-level: "new x, y {" → suggests character edits
+- Token-level: [new, name_list, {] → knows "in" token required by grammar
+
+#### 7.7 N-gram Models → Syntactic Pattern Validation
 
 **Mathematical Foundation:**
 - N-gram probability: P(wᵢ | wᵢ₋ₙ₊₁,...,wᵢ₋₁) (§5.1)
@@ -850,7 +989,7 @@ impl CodeNgramModel {
 - **Perplexity metric** - Quantifies model confidence (lower = better)
 - **Backoff model** - Recursive probability computation (§5.2)
 
-#### 7.7 Complete System Integration
+#### 7.8 Complete System Integration
 
 **Mathematical Foundation:**
 - Unified framework: T_total = T_semantic ∘ T_structural ∘ T_syntactic ∘ T_lexical (§6.1)
@@ -861,7 +1000,7 @@ impl CodeNgramModel {
 // Complete correction pipeline implementing §6.1 formalization
 pub struct RholangCorrector {
     lexical: RholangLexicalCorrector,      // T_lexical (§7.1)
-    syntactic: SyntacticPatternMatcher,    // T_syntactic (§7.6)
+    syntactic: SyntaxAwareCorrector,       // T_syntactic (§7.6) - Grammar-aware!
     structural: DelimiterMatcher,          // T_structural (§7.4)
     semantic: ProcessValidator,            // T_semantic (§7.5)
 }
@@ -905,7 +1044,7 @@ pub struct CorrectionPipeline {
 - **Optimality** - Minimal total cost by Theorem 6.2
 - **Complete formalization** - Implementation directly mirrors §6.1 mathematics
 
-#### 7.8 Summary: Theory ↔ Code Correspondence
+#### 7.9 Summary: Theory ↔ Code Correspondence
 
 | Mathematical Concept | Implementation | Location |
 |---------------------|----------------|----------|
@@ -918,10 +1057,13 @@ pub struct CorrectionPipeline {
 | ρ-Calculus (§3.2) | `ProcessValidator` | §7.5, Level 4 |
 | CFG (§4.1) | `ControlFlowGraph` | §7.5, Level 4 |
 | Dataflow Analysis (§4.2) | `ReachingDefs` lattice | §7.5, Level 4 |
-| N-gram Model (§5.1) | `CodeNgramModel` | §7.6, Level 2 |
-| Kneser-Ney Smoothing (§5.2) | `probability()` method | §7.6, Level 2 |
-| Unified Framework (§6.1) | `RholangCorrector` | §7.7, Complete System |
-| Optimality Theorem (§6.2) | `CorrectionPipeline::finalize()` | §7.7, Complete System |
+| **Grammar-Aware Levenshtein (§2.1 ext)** | **`SyntaxAwareCorrector`** | **§7.6, Level 2** |
+| **Grammar Constraints** | **`GrammarState::expected`** | **§7.6, Level 2** |
+| **Token-Level Transitions** | **`correct_token_sequence()`** | **§7.6, Level 2** |
+| N-gram Model (§5.1) | `CodeNgramModel` | §7.7, Level 2 |
+| Kneser-Ney Smoothing (§5.2) | `probability()` method | §7.7, Level 2 |
+| Unified Framework (§6.1) | `RholangCorrector` | §7.8, Complete System |
+| Optimality Theorem (§6.2) | `CorrectionPipeline::finalize()` | §7.8, Complete System |
 
 **Key Insight:**
 Every theoretical construct in §1-6 has a direct implementation counterpart in §7, demonstrating the **unified, theoretically-grounded approach** throughout the design.
