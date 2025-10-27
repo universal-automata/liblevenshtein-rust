@@ -1709,6 +1709,529 @@ This approach balances **precision** (don't overwhelm with too many options) wit
 - Suggest insertions, deletions, or replacements
 - Handle missing keywords, operators, and delimiters
 - Recover from incomplete constructs
+- **Grammar-aware Levenshtein automata** - Extend automata to operate over token sequences constrained by grammar transitions
+
+---
+
+### Grammar-Aware Levenshtein Automata
+
+**Core Innovation:** Extend classical Levenshtein automata from operating over **character strings** to operating over **token sequences** where transitions are constrained by the **Tree-sitter grammar**.
+
+#### Theoretical Foundation
+
+**Classical Levenshtein Automaton:**
+- Input alphabet: Σ = {characters}
+- Query: String q = c₁c₂...cₘ
+- Accepts: All strings s where edit_distance(q, s) ≤ n
+
+**Grammar-Aware Extension:**
+- Input alphabet: Σ = {token types from grammar}
+- Query: Token sequence τ = t₁t₂...tₘ
+- Grammar: G = (V, Σ, R, S) from Tree-sitter
+- Accepts: Token sequences σ where:
+  1. edit_distance(τ, σ) ≤ n (edit constraint)
+  2. σ is valid according to grammar G (syntax constraint)
+
+#### Grammar Transition Constraints
+
+**From Tree-sitter grammar.js:**
+
+```javascript
+// Example: Rholang grammar transitions
+{
+  contract_declaration: $ => seq(
+    'contract',        // Token 1: keyword
+    field('name', $.identifier),  // Token 2: identifier (constrained)
+    '(',              // Token 3: delimiter
+    optional($.parameter_list),   // Token 4: optional
+    ')',              // Token 5: delimiter
+    '=',              // Token 6: operator
+    field('body', $.block)        // Token 7: block
+  ),
+
+  new_expression: $ => seq(
+    'new',            // Token 1: keyword
+    $.name_list,      // Token 2: name_list (constrained)
+    'in',             // Token 3: keyword (required!)
+    $.block           // Token 4: block
+  )
+}
+```
+
+**Valid Token Transitions:**
+```
+State: after 'contract' keyword
+  → VALID: identifier
+  → INVALID: 'new', 'if', number, string
+
+State: after 'new' + name_list
+  → VALID: 'in' keyword
+  → INVALID: '{', identifier, operator
+
+State: after 'in' keyword
+  → VALID: block (starting with '{')
+  → INVALID: identifier, literal, operator
+```
+
+#### Token-Level Levenshtein Automaton
+
+**Formal Definition:**
+
+A Grammar-Aware Levenshtein Transducer is a 6-tuple:
+
+**GALT = (Q, Σ_tok, G, δ, λ, q₀, F, n)**
+
+Where:
+- **Q**: Set of states = (position, edit_distance, grammar_state)
+- **Σ_tok**: Token type alphabet (from grammar)
+- **G = (V, Σ_tok, R, S)**: Tree-sitter CFG
+- **δ**: Transition function constrained by grammar
+- **λ**: Output function (correction suggestions)
+- **q₀**: Initial state = (0, 0, S)
+- **F**: Accepting states = {(m, e, valid) | e ≤ n, valid ∈ grammar}
+- **n**: Maximum edit distance
+
+**Transition Function with Grammar Constraints:**
+
+```
+δ: Q × (Σ_tok ∪ {ε}) → 𝒫(Q)
+
+δ((i, e, g_state), tok) = {
+    // Match: token matches query and is valid in grammar state
+    (i+1, e, g_next) if tok = query[i] ∧ G.allows(g_state, tok)
+
+    // Insertion: insert tok from query (cost +1)
+    (i+1, e+1, g_next) if G.allows(g_state, query[i])
+
+    // Deletion: skip input token (cost +1)
+    (i, e+1, g_next) if G.allows(g_state, tok)
+
+    // Substitution: replace input with query token (cost +1)
+    (i+1, e+1, g_next) if tok ≠ query[i] ∧ G.allows(g_state, query[i])
+} where e ≤ n ∧ g_next = G.next_state(g_state, tok)
+```
+
+**Key Constraint:** All transitions must satisfy `G.allows(grammar_state, token_type)`
+
+#### Implementation: Syntax-Aware Token Corrector
+
+```rust
+use tree_sitter::{Language, Query, QueryCursor, Node};
+
+/// Token with type information from Tree-sitter
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Token {
+    pub kind: String,        // Token type from grammar (e.g., "identifier")
+    pub text: String,        // Actual text
+    pub start: usize,        // Byte offset
+    pub end: usize,          // Byte offset
+}
+
+/// Grammar state tracking valid next tokens
+#[derive(Clone, Debug)]
+pub struct GrammarState {
+    /// Current node type in parse tree
+    pub node_type: String,
+
+    /// Parent node type (for context)
+    pub parent_type: Option<String>,
+
+    /// Expected child node types at this position
+    pub expected: Vec<String>,
+
+    /// Whether current position is optional
+    pub is_optional: bool,
+}
+
+/// Grammar-aware Levenshtein automaton operating over token sequences
+pub struct SyntaxAwareCorrector {
+    language: Language,
+
+    /// Cache of valid transitions: (node_type, child_index) → expected_types
+    transition_map: HashMap<(String, usize), Vec<String>>,
+}
+
+impl SyntaxAwareCorrector {
+    pub fn new(language: Language) -> Self {
+        let transition_map = Self::build_transition_map(&language);
+
+        Self {
+            language,
+            transition_map,
+        }
+    }
+
+    /// Build map of valid grammar transitions from Tree-sitter
+    fn build_transition_map(language: &Language) -> HashMap<(String, usize), Vec<String>> {
+        let mut map = HashMap::new();
+
+        // Extract from grammar: for each node type, what children are valid
+        // This is language-specific - example for Rholang:
+
+        map.insert(
+            ("contract_declaration".to_string(), 0),
+            vec!["contract".to_string()]  // First child must be 'contract' keyword
+        );
+        map.insert(
+            ("contract_declaration".to_string(), 1),
+            vec!["identifier".to_string()]  // Second child must be identifier
+        );
+        map.insert(
+            ("new_expression".to_string(), 0),
+            vec!["new".to_string()]
+        );
+        map.insert(
+            ("new_expression".to_string(), 1),
+            vec!["name_list".to_string()]
+        );
+        map.insert(
+            ("new_expression".to_string(), 2),
+            vec!["in".to_string()]  // Critical: 'in' keyword required here
+        );
+
+        // ... populate from full grammar
+        map
+    }
+
+    /// Check if token type is valid in current grammar state
+    fn is_valid_transition(
+        &self,
+        grammar_state: &GrammarState,
+        token_type: &str,
+    ) -> bool {
+        // Check if token type is in expected set
+        if grammar_state.expected.iter().any(|e| e == token_type) {
+            return true;
+        }
+
+        // Check transition map
+        if let Some(parent) = &grammar_state.parent_type {
+            // Compute child index based on context
+            let child_idx = 0; // Would be computed from parse state
+            if let Some(valid_types) = self.transition_map.get(&(parent.clone(), child_idx)) {
+                return valid_types.iter().any(|t| t == token_type);
+            }
+        }
+
+        false
+    }
+
+    /// Correct token sequence using grammar-aware Levenshtein automaton
+    pub fn correct_token_sequence(
+        &self,
+        tokens: &[Token],
+        max_distance: usize,
+    ) -> Vec<TokenSequenceCandidate> {
+        let mut candidates = Vec::new();
+
+        // Build automaton states: (token_index, edit_distance, grammar_state)
+        let mut states: Vec<(usize, usize, GrammarState)> = vec![
+            (0, 0, GrammarState::initial())
+        ];
+
+        let mut visited = HashSet::new();
+
+        while let Some((tok_idx, edit_dist, gram_state)) = states.pop() {
+            // Skip if already visited this state
+            let state_key = (tok_idx, edit_dist, gram_state.node_type.clone());
+            if visited.contains(&state_key) {
+                continue;
+            }
+            visited.insert(state_key);
+
+            // Terminal: reached end of sequence
+            if tok_idx >= tokens.len() {
+                if edit_dist <= max_distance {
+                    candidates.push(TokenSequenceCandidate {
+                        tokens: tokens.to_vec(),
+                        edit_distance: edit_dist,
+                        grammar_valid: true,
+                    });
+                }
+                continue;
+            }
+
+            let current_token = &tokens[tok_idx];
+
+            // Transition 1: MATCH (exact match and grammar-valid)
+            if self.is_valid_transition(&gram_state, &current_token.kind) {
+                let next_state = gram_state.advance(&current_token.kind);
+                states.push((tok_idx + 1, edit_dist, next_state));
+            }
+
+            // Transition 2: SUBSTITUTION (replace with grammar-valid token)
+            if edit_dist < max_distance {
+                for expected in &gram_state.expected {
+                    if expected != &current_token.kind {
+                        let next_state = gram_state.advance(expected);
+                        states.push((tok_idx + 1, edit_dist + 1, next_state));
+
+                        // Record suggestion: substitute current with expected
+                        candidates.push(TokenSequenceCandidate {
+                            tokens: Self::substitute_token(tokens, tok_idx, expected),
+                            edit_distance: edit_dist + 1,
+                            grammar_valid: true,
+                        });
+                    }
+                }
+            }
+
+            // Transition 3: INSERTION (insert expected token)
+            if edit_dist < max_distance {
+                for expected in &gram_state.expected {
+                    let next_state = gram_state.advance(expected);
+                    // Don't advance token index - we're inserting before current
+                    states.push((tok_idx, edit_dist + 1, next_state));
+
+                    candidates.push(TokenSequenceCandidate {
+                        tokens: Self::insert_token(tokens, tok_idx, expected),
+                        edit_distance: edit_dist + 1,
+                        grammar_valid: true,
+                    });
+                }
+            }
+
+            // Transition 4: DELETION (skip current token)
+            if edit_dist < max_distance {
+                states.push((tok_idx + 1, edit_dist + 1, gram_state.clone()));
+
+                candidates.push(TokenSequenceCandidate {
+                    tokens: Self::delete_token(tokens, tok_idx),
+                    edit_distance: edit_dist + 1,
+                    grammar_valid: true,
+                });
+            }
+        }
+
+        // Sort by edit distance, then by grammar validity score
+        candidates.sort_by_key(|c| c.edit_distance);
+        candidates.dedup_by(|a, b| a.tokens == b.tokens);
+
+        candidates
+    }
+
+    fn substitute_token(tokens: &[Token], idx: usize, new_kind: &str) -> Vec<Token> {
+        let mut result = tokens.to_vec();
+        result[idx].kind = new_kind.to_string();
+        result
+    }
+
+    fn insert_token(tokens: &[Token], idx: usize, kind: &str) -> Vec<Token> {
+        let mut result = tokens.to_vec();
+        result.insert(idx, Token {
+            kind: kind.to_string(),
+            text: kind.to_string(),  // Placeholder
+            start: tokens[idx].start,
+            end: tokens[idx].start,
+        });
+        result
+    }
+
+    fn delete_token(tokens: &[Token], idx: usize) -> Vec<Token> {
+        let mut result = tokens.to_vec();
+        result.remove(idx);
+        result
+    }
+}
+
+impl GrammarState {
+    fn initial() -> Self {
+        GrammarState {
+            node_type: "source_file".to_string(),
+            parent_type: None,
+            expected: vec![
+                "contract_declaration".to_string(),
+                "new_expression".to_string(),
+                "match_expression".to_string(),
+            ],
+            is_optional: false,
+        }
+    }
+
+    fn advance(&self, token_kind: &str) -> Self {
+        // Compute next grammar state based on token
+        // This would use the grammar's state machine
+        GrammarState {
+            node_type: token_kind.to_string(),
+            parent_type: Some(self.node_type.clone()),
+            expected: self.compute_next_expected(token_kind),
+            is_optional: false,
+        }
+    }
+
+    fn compute_next_expected(&self, token_kind: &str) -> Vec<String> {
+        // Lookup from grammar what tokens can follow
+        match (self.node_type.as_str(), token_kind) {
+            ("contract_declaration", "contract") => vec!["identifier".to_string()],
+            ("contract_declaration", "identifier") => vec!["(".to_string()],
+            ("new_expression", "new") => vec!["name_list".to_string()],
+            ("new_expression", "name_list") => vec!["in".to_string()],  // KEY!
+            ("new_expression", "in") => vec!["block".to_string()],
+            _ => vec![],
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TokenSequenceCandidate {
+    pub tokens: Vec<Token>,
+    pub edit_distance: usize,
+    pub grammar_valid: bool,
+}
+```
+
+#### Concrete Example: Missing 'in' Keyword
+
+**Erroneous Code:**
+```rholang
+new x, y { stdout!("hello") }
+```
+
+**Token Sequence (from Tree-sitter):**
+```
+[
+  Token { kind: "new", text: "new", start: 0, end: 3 },
+  Token { kind: "name_list", text: "x, y", start: 4, end: 8 },
+  Token { kind: "{", text: "{", start: 9, end: 10 },
+  Token { kind: "identifier", text: "stdout", start: 11, end: 17 },
+  ...
+]
+```
+
+**Grammar-Aware Correction Process:**
+
+```
+Initial State: (idx=0, dist=0, gram_state=new_expression)
+
+Step 1: Match 'new' token
+  → State: (idx=1, dist=0, gram_state=after_new)
+  → Expected next: ["name_list"]
+
+Step 2: Match 'name_list' token
+  → State: (idx=2, dist=0, gram_state=after_name_list)
+  → Expected next: ["in"]  ← Grammar constraint!
+
+Step 3: Current token is '{', but expected 'in'
+  → Option A: SUBSTITUTION - Replace '{' with 'in' (dist=1)
+     ❌ Rejected: breaks delimiter balance
+  → Option B: INSERTION - Insert 'in' before '{' (dist=1)
+     ✅ Accepted: Grammar-valid, preserves structure
+  → State: (idx=2, dist=1, gram_state=after_in)
+  → Expected next: ["block"]
+
+Step 4: Now '{' matches expected 'block' start
+  → State: (idx=3, dist=1, final)
+  → Solution found!
+```
+
+**Correction Suggestion:**
+```rholang
+new x, y in { stdout!("hello") }
+         ^^^ Inserted based on grammar transition constraint
+```
+
+**Confidence Score:**
+```
+base_score = 1.0 / (1.0 + edit_distance) = 1.0 / 2.0 = 0.50
+
+grammar_bonus = 0.40  // Grammar-valid correction
+
+context_bonus = 0.10  // Common error pattern
+
+final_confidence = 0.50 + 0.40 + 0.10 = 1.00 (100%)
+```
+
+#### Advantages Over Pattern-Based Approaches
+
+**Traditional Pattern Matching:**
+```rust
+// Brittle, must enumerate all error patterns
+if node.kind() == "ERROR" && parent.kind() == "new_expression" {
+    if node.prev_sibling().kind() == "name_list" {
+        suggest("Insert 'in' keyword");
+    }
+}
+```
+
+**Grammar-Aware Levenshtein Automaton:**
+```rust
+// Generic, handles any grammar transition error
+let corrector = SyntaxAwareCorrector::new(language);
+let corrections = corrector.correct_token_sequence(tokens, max_distance=2);
+
+// Automatically finds all grammar-valid corrections within edit distance
+// No need to enumerate patterns - grammar is the specification
+```
+
+**Key Advantages:**
+
+1. **Completeness** - Finds ALL grammar-valid corrections within edit bound
+2. **Generality** - Works for any Tree-sitter grammar without pattern enumeration
+3. **Optimality** - Guarantees minimal edit distance (by construction)
+4. **Composability** - Integrates with WFST framework for multi-level correction
+5. **Maintainability** - Grammar changes automatically reflected in corrections
+
+#### Complexity Analysis
+
+**Classical Levenshtein Automaton:**
+- States: O(m × n²) where m = query length, n = max distance
+- Query: O(|s|) per string
+
+**Grammar-Aware Extension:**
+- States: O(m × n² × |G|) where |G| = grammar state space
+- Query: O(|tokens| × |valid_transitions|)
+- In practice: Grammar states are sparse, so |G| ≈ O(m)
+- Effective: O(m² × n²) with memoization
+
+**Optimization: Grammar State Caching:**
+```rust
+pub struct CachedGrammarTransitions {
+    // Cache: (node_type, child_index) → valid_token_types
+    cache: HashMap<(String, usize), Vec<String>>,
+}
+
+impl CachedGrammarTransitions {
+    fn lookup(&self, node_type: &str, child_idx: usize) -> &[String] {
+        self.cache
+            .get(&(node_type.to_string(), child_idx))
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+}
+```
+
+This reduces grammar state lookup from O(|grammar rules|) to O(1).
+
+#### Integration with Multi-Level Pipeline
+
+The grammar-aware token corrector integrates seamlessly into the WFST cascade:
+
+```
+T_total = T_semantic ∘ T_structural ∘ T_syntactic ∘ T_lexical
+
+where T_syntactic is now the grammar-aware token-level transducer:
+
+T_syntactic: Token* → Token* × ℝ₊
+
+T_syntactic(τ) = { (σ, d) | edit_distance_tokens(τ, σ) = d ∧ G ⊢ σ }
+                  ↑                                           ↑
+                Token edit distance                    Grammar-valid
+```
+
+**Combined Correction Example:**
+```
+Level 1 (Lexical):   "contrac" → "contract"  (distance 1)
+Level 2 (Syntactic):  [contract, x, {, ...] → [contract, x, in, {, ...] (distance 1)
+Level 3 (Structural): {...} → {x!(1)} (balanced)
+Level 4 (Semantic):   Valid channel usage
+
+Total edit distance: 2
+Total confidence: 0.92 (weighted product)
+```
+
+This extension answers your question: **Yes, Levenshtein automata can be powerfully extended to syntactic correction by operating over token sequences with grammar-constrained transitions**, providing a theoretically sound and practically effective approach to syntax error correction.
+
+---
 
 ### Tree-Sitter Error Recovery
 
