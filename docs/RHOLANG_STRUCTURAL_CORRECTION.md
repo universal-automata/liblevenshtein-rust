@@ -1292,6 +1292,410 @@ pub enum TokenKind {
 
 ---
 
+### Multi-Candidate Ranking and Selection
+
+**Design Principle:** The system returns **all viable correction candidates** within tolerance criteria, ranked from most to least likely, rather than selecting a single "best" correction. This allows users/tools to choose based on context and enables interactive correction workflows.
+
+#### Candidate Filtering and Ranking Strategy
+
+```rust
+/// Configuration for candidate selection
+#[derive(Clone, Debug)]
+pub struct CandidateConfig {
+    /// Maximum edit distance to consider
+    pub max_distance: usize,
+
+    /// Minimum confidence threshold (0.0 to 1.0)
+    pub min_confidence: f64,
+
+    /// Maximum number of candidates to return
+    pub max_candidates: Option<usize>,
+
+    /// Confidence tolerance: include candidates within this range of top score
+    /// Example: tolerance = 0.15 means include all candidates with
+    /// confidence >= (best_confidence - 0.15)
+    pub confidence_tolerance: f64,
+
+    /// Whether to group candidates by category
+    pub group_by_category: bool,
+}
+
+impl Default for CandidateConfig {
+    fn default() -> Self {
+        Self {
+            max_distance: 2,           // Up to 2 edits
+            min_confidence: 0.3,       // At least 30% confidence
+            max_candidates: Some(10),  // Top 10 by default
+            confidence_tolerance: 0.2, // Within 20% of best
+            group_by_category: true,   // Group keywords, identifiers, etc.
+        }
+    }
+}
+
+/// Enhanced candidate selection with tolerance-based filtering
+impl RholangLexicalCorrector {
+    pub fn correct_token_ranked(
+        &self,
+        token: &str,
+        context: &TokenContext,
+        config: &CandidateConfig,
+    ) -> RankedCandidates {
+        // Step 1: Gather all candidates from all dictionaries
+        let mut all_candidates = Vec::new();
+
+        // Keywords (stricter: distance ≤ 1)
+        for candidate in self.keywords.query_weighted(token, 1.min(config.max_distance)) {
+            all_candidates.push(LexicalCandidate {
+                suggestion: candidate.output,
+                edit_distance: candidate.weight.0 as usize,
+                category: CandidateCategory::Keyword,
+                confidence: self.compute_confidence(&candidate, context),
+            });
+        }
+
+        // Standard library (moderate: distance ≤ 2)
+        for candidate in self.stdlib.query_weighted(token, 2.min(config.max_distance)) {
+            all_candidates.push(LexicalCandidate {
+                suggestion: candidate.output,
+                edit_distance: candidate.weight.0 as usize,
+                category: CandidateCategory::StdLib,
+                confidence: self.compute_confidence(&candidate, context),
+            });
+        }
+
+        // Corpus identifiers (lenient: distance ≤ max_distance)
+        for candidate in self.corpus_identifiers.query_weighted(token, config.max_distance) {
+            all_candidates.push(LexicalCandidate {
+                suggestion: candidate.output,
+                edit_distance: candidate.weight.0 as usize,
+                category: CandidateCategory::Identifier,
+                confidence: self.compute_confidence(&candidate, context),
+            });
+        }
+
+        // Step 2: Apply filtering criteria
+        all_candidates.retain(|c| c.confidence >= config.min_confidence);
+
+        // Step 3: Sort by confidence (descending)
+        all_candidates.sort_by(|a, b| {
+            b.confidence.partial_cmp(&a.confidence)
+                .unwrap()
+                .then(a.edit_distance.cmp(&b.edit_distance))  // Tie-break by distance
+                .then(a.suggestion.cmp(&b.suggestion))         // Then alphabetically
+        });
+
+        // Step 4: Apply tolerance-based filtering
+        let filtered = if let Some(best) = all_candidates.first() {
+            let threshold = best.confidence - config.confidence_tolerance;
+            all_candidates.into_iter()
+                .take_while(|c| c.confidence >= threshold)
+                .collect::<Vec<_>>()
+        } else {
+            all_candidates
+        };
+
+        // Step 5: Apply max_candidates limit if specified
+        let limited = if let Some(max) = config.max_candidates {
+            filtered.into_iter().take(max).collect()
+        } else {
+            filtered
+        };
+
+        // Step 6: Group by category if requested
+        if config.group_by_category {
+            RankedCandidates::grouped(limited)
+        } else {
+            RankedCandidates::flat(limited)
+        }
+    }
+}
+
+/// Result structure for ranked candidates
+#[derive(Clone, Debug)]
+pub enum RankedCandidates {
+    /// Flat list sorted by confidence
+    Flat {
+        candidates: Vec<LexicalCandidate>,
+        metadata: RankingMetadata,
+    },
+
+    /// Grouped by category with per-category ranking
+    Grouped {
+        keywords: Vec<LexicalCandidate>,
+        stdlib: Vec<LexicalCandidate>,
+        identifiers: Vec<LexicalCandidate>,
+        metadata: RankingMetadata,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub struct RankingMetadata {
+    /// Original token being corrected
+    pub original: String,
+
+    /// Total candidates considered before filtering
+    pub total_considered: usize,
+
+    /// Candidates after confidence threshold
+    pub after_min_confidence: usize,
+
+    /// Candidates after tolerance filtering
+    pub after_tolerance: usize,
+
+    /// Final count returned
+    pub final_count: usize,
+
+    /// Best confidence score found
+    pub best_confidence: Option<f64>,
+
+    /// Worst confidence score in results
+    pub worst_confidence: Option<f64>,
+}
+
+impl RankedCandidates {
+    pub fn flat(candidates: Vec<LexicalCandidate>) -> Self {
+        let metadata = RankingMetadata {
+            original: String::new(),
+            total_considered: candidates.len(),
+            after_min_confidence: candidates.len(),
+            after_tolerance: candidates.len(),
+            final_count: candidates.len(),
+            best_confidence: candidates.first().map(|c| c.confidence),
+            worst_confidence: candidates.last().map(|c| c.confidence),
+        };
+
+        RankedCandidates::Flat { candidates, metadata }
+    }
+
+    pub fn grouped(candidates: Vec<LexicalCandidate>) -> Self {
+        let mut keywords = Vec::new();
+        let mut stdlib = Vec::new();
+        let mut identifiers = Vec::new();
+
+        for candidate in candidates {
+            match candidate.category {
+                CandidateCategory::Keyword => keywords.push(candidate),
+                CandidateCategory::StdLib => stdlib.push(candidate),
+                CandidateCategory::Identifier => identifiers.push(candidate),
+            }
+        }
+
+        let total = keywords.len() + stdlib.len() + identifiers.len();
+        let metadata = RankingMetadata {
+            original: String::new(),
+            total_considered: total,
+            after_min_confidence: total,
+            after_tolerance: total,
+            final_count: total,
+            best_confidence: keywords.first()
+                .or(stdlib.first())
+                .or(identifiers.first())
+                .map(|c| c.confidence),
+            worst_confidence: identifiers.last()
+                .or(stdlib.last())
+                .or(keywords.last())
+                .map(|c| c.confidence),
+        };
+
+        RankedCandidates::Grouped {
+            keywords,
+            stdlib,
+            identifiers,
+            metadata,
+        }
+    }
+
+    /// Get all candidates as a flat list
+    pub fn all_candidates(&self) -> Vec<&LexicalCandidate> {
+        match self {
+            RankedCandidates::Flat { candidates, .. } => {
+                candidates.iter().collect()
+            }
+            RankedCandidates::Grouped { keywords, stdlib, identifiers, .. } => {
+                keywords.iter()
+                    .chain(stdlib.iter())
+                    .chain(identifiers.iter())
+                    .collect()
+            }
+        }
+    }
+
+    /// Get the top candidate (most confident)
+    pub fn top(&self) -> Option<&LexicalCandidate> {
+        self.all_candidates().into_iter().next()
+    }
+
+    /// Get top N candidates
+    pub fn top_n(&self, n: usize) -> Vec<&LexicalCandidate> {
+        self.all_candidates().into_iter().take(n).collect()
+    }
+}
+```
+
+#### Example Usage: Interactive Correction
+
+```rust
+// Example: VSCode extension showing multiple suggestions
+fn show_correction_menu(token: &str, context: &TokenContext) {
+    let config = CandidateConfig {
+        max_distance: 2,
+        min_confidence: 0.4,
+        max_candidates: Some(5),
+        confidence_tolerance: 0.15,  // Show candidates within 15% of best
+        group_by_category: true,
+    };
+
+    let corrector = RholangLexicalCorrector::new(corpus_path)?;
+    let ranked = corrector.correct_token_ranked(token, context, &config);
+
+    match ranked {
+        RankedCandidates::Grouped { keywords, stdlib, identifiers, metadata } => {
+            println!("Corrections for '{}' (found {} candidates):", token, metadata.final_count);
+
+            if !keywords.is_empty() {
+                println!("\n  Keywords:");
+                for (i, c) in keywords.iter().enumerate() {
+                    println!("    {}. {} (confidence: {:.1}%, distance: {})",
+                        i + 1, c.suggestion, c.confidence * 100.0, c.edit_distance);
+                }
+            }
+
+            if !stdlib.is_empty() {
+                println!("\n  Standard Library:");
+                for (i, c) in stdlib.iter().enumerate() {
+                    println!("    {}. {} (confidence: {:.1}%, distance: {})",
+                        i + 1, c.suggestion, c.confidence * 100.0, c.edit_distance);
+                }
+            }
+
+            if !identifiers.is_empty() {
+                println!("\n  Identifiers (from your code):");
+                for (i, c) in identifiers.iter().enumerate() {
+                    println!("    {}. {} (confidence: {:.1}%, distance: {})",
+                        i + 1, c.suggestion, c.confidence * 100.0, c.edit_distance);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+```
+
+**Example Output:**
+```
+Corrections for 'contrac' (found 4 candidates):
+
+  Keywords:
+    1. contract (confidence: 95.0%, distance: 1)
+
+  Standard Library:
+    2. stdout (confidence: 82.0%, distance: 2)
+
+  Identifiers (from your code):
+    3. contactAddress (confidence: 80.0%, distance: 2)
+    4. contractState (confidence: 78.0%, distance: 2)
+```
+
+#### Multi-Level Candidate Aggregation
+
+For complete correction pipelines, candidates are aggregated across all levels:
+
+```rust
+/// Aggregate candidates from all correction levels
+#[derive(Clone, Debug)]
+pub struct MultiLevelCandidates {
+    /// Original erroneous source
+    pub original: String,
+
+    /// Lexical correction candidates
+    pub lexical: Vec<LexicalCandidate>,
+
+    /// Syntactic correction candidates
+    pub syntactic: Vec<SyntaxError>,  // Each contains Vec<Suggestion>
+
+    /// Structural correction candidates
+    pub structural: Vec<StructuralError>,  // Each contains Vec<Suggestion>
+
+    /// Semantic linting suggestions
+    pub semantic: Vec<SemanticError>,  // Each contains Vec<Suggestion>
+
+    /// Combined ranking across all levels
+    pub combined_ranking: Vec<CombinedCandidate>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CombinedCandidate {
+    /// The corrected source code
+    pub corrected_source: String,
+
+    /// Overall confidence (weighted combination of levels)
+    pub confidence: f64,
+
+    /// Breakdown by level
+    pub level_scores: LevelScores,
+
+    /// Which corrections were applied
+    pub applied_fixes: Vec<AppliedFix>,
+}
+
+#[derive(Clone, Debug)]
+pub struct LevelScores {
+    pub lexical: f64,
+    pub syntactic: f64,
+    pub structural: f64,
+    pub semantic: f64,
+}
+
+impl MultiLevelCandidates {
+    /// Get top N combined candidates across all levels
+    pub fn top_combined(&self, n: usize) -> Vec<&CombinedCandidate> {
+        let mut sorted = self.combined_ranking.iter().collect::<Vec<_>>();
+        sorted.sort_by(|a, b| {
+            b.confidence.partial_cmp(&a.confidence).unwrap()
+        });
+        sorted.into_iter().take(n).collect()
+    }
+
+    /// Filter by minimum confidence across all levels
+    pub fn filter_by_min_scores(&self, min_scores: &LevelScores) -> Vec<&CombinedCandidate> {
+        self.combined_ranking.iter()
+            .filter(|c| {
+                c.level_scores.lexical >= min_scores.lexical &&
+                c.level_scores.syntactic >= min_scores.syntactic &&
+                c.level_scores.structural >= min_scores.structural &&
+                c.level_scores.semantic >= min_scores.semantic
+            })
+            .collect()
+    }
+}
+```
+
+#### Tolerance-Based Selection Rationale
+
+**Why tolerance-based filtering is superior to top-1 selection:**
+
+1. **Ambiguity Handling** - When multiple corrections have similar confidence (e.g., 0.85 vs 0.83), presenting both allows user/tool to decide based on additional context
+
+2. **Category Diversity** - A keyword might score 0.90, but an identifier from user's codebase at 0.85 could be more contextually appropriate
+
+3. **Interactive Workflows** - IDEs can show quick-fix menu with all viable options
+
+4. **Batch Correction** - Automated tools can apply high-confidence fixes (>0.9) automatically while flagging medium-confidence ones (0.5-0.9) for review
+
+5. **Learning from Feedback** - User selections from ranked lists improve confidence scoring models over time
+
+**Confidence Tolerance Examples:**
+
+| Best Score | Tolerance | Threshold | Candidates Shown |
+|------------|-----------|-----------|------------------|
+| 0.95 | 0.15 | 0.80 | All candidates ≥ 80% confidence |
+| 0.70 | 0.20 | 0.50 | All candidates ≥ 50% confidence |
+| 0.50 | 0.10 | 0.40 | All candidates ≥ 40% confidence |
+
+This approach balances **precision** (don't overwhelm with too many options) with **recall** (don't miss viable corrections just outside the top spot).
+
+---
+
 ## Level 2: Syntactic Correction
 
 ### Overview
