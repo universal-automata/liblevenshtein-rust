@@ -119,7 +119,7 @@ fn main() {
 
     // Create both types of dictionaries
     let pathmap_dict =
-        liblevenshtein::prelude::PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
+        liblevenshtein::prelude::DoubleArrayTrie::from_terms(vec!["test", "testing", "tested"]);
 
     let persistent_dict = PersistentDictionary::new(vec![
         "test".to_string(),
@@ -138,7 +138,7 @@ fn main() {
     let trans1 = Transducer::new(pathmap_dict, Algorithm::Standard);
     let trans2 = Transducer::new(persistent_dict, Algorithm::Standard);
 
-    println!("Query 'test' with PathMapDictionary:");
+    println!("Query 'test' with DoubleArrayTrie:");
     for term in trans1.query("test", 0) {
         println!("  - {}", term);
     }
@@ -150,7 +150,7 @@ fn main() {
 
     println!("\n=== Performance Implications ===");
     println!();
-    println!("PathMapDictionary (ExternalSync):");
+    println!("DoubleArrayTrie (ExternalSync):");
     println!("  - Uses RwLock for synchronization");
     println!("  - Multiple concurrent reads: ✓");
     println!("  - Lock overhead: minimal");

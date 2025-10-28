@@ -68,7 +68,7 @@ fn main() {
 
     // Missing dictionary
     println!("   Attempting to build without dictionary...");
-    let result: Result<Transducer<PathMapDictionary>, _> = TransducerBuilder::new()
+    let result: Result<Transducer<DoubleArrayTrie>, _> = TransducerBuilder::new()
         .algorithm(Algorithm::Standard)
         .build();
 

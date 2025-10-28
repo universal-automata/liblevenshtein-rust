@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 fn test_parallel_reads() {
     // Create dictionary with many terms
     let terms: Vec<String> = (0..1000).map(|i| format!("term{}", i)).collect();
-    let dict = PathMapDictionary::from_terms(terms);
+    let dict = DoubleArrayTrie::from_terms(terms);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     const NUM_READERS: usize = 8;
@@ -76,7 +76,7 @@ fn test_parallel_reads() {
 
 #[test]
 fn test_read_during_write() {
-    let dict = PathMapDictionary::from_terms(vec!["test"]);
+    let dict = DynamicDawg::from_terms(vec!["test"]);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     let dict_writer = dict.clone();
@@ -106,7 +106,7 @@ fn test_read_during_write() {
 
     println!("\n=== Read During Write Test ===");
     println!("  Queries completed while writes happening: {}", queries);
-    println!("  Final term count: {}", dict.term_count());
+    println!("  Final term count: {}", dict.len().unwrap_or(0));
 
     // Reader should have completed many queries despite concurrent writes
     assert!(queries > 40, "Reader was blocked too much by writes");

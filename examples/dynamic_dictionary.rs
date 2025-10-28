@@ -2,15 +2,17 @@
 //!
 //! This example shows how to insert and remove terms from the dictionary
 //! while it's being used for queries, demonstrating the thread-safe
-//! mutation capabilities.
+//! mutation capabilities using DynamicDawg.
+//!
+//! Run with: cargo run --example dynamic_dictionary
 
 use liblevenshtein::prelude::*;
 
 fn main() {
     println!("=== Dynamic Dictionary Example ===\n");
 
-    // Start with a small dictionary
-    let dict = PathMapDictionary::from_terms(vec!["cat", "dog", "bird"]);
+    // Start with a small dictionary (using DynamicDawg for runtime updates)
+    let dict = DynamicDawg::from_terms(vec!["cat", "dog", "bird"]);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     println!("Initial dictionary: cat, dog, bird");
@@ -70,7 +72,7 @@ fn main() {
     use std::thread;
     use std::time::Duration;
 
-    let dict2 = PathMapDictionary::from_terms(vec!["test"]);
+    let dict2 = DynamicDawg::from_terms(vec!["test"]);
     let transducer2 = Transducer::new(dict2.clone(), Algorithm::Standard);
 
     // Clone for thread
@@ -104,12 +106,6 @@ fn main() {
         println!("    - {}", term);
     }
 
-    // Clear demonstration
-    println!("\n=== Clear Dictionary ===\n");
-    println!("Clearing dictionary...");
-    dict2.clear();
-    println!("Term count after clear: {}", dict2.term_count());
-
-    let results: Vec<_> = transducer2.query("test", 0).collect();
-    println!("Query 'test' after clear: {} matches", results.len());
+    println!("\nDynamic dictionary example complete!");
+    println!("Final dictionary has {} terms", dict2.term_count());
 }

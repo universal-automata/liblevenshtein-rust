@@ -81,7 +81,7 @@ fn main() {
     println!("\n=== Algorithm Comparison ===\n");
 
     let test_word = "tset";
-    let dict2 = PathMapDictionary::from_terms(vec!["test", "set", "reset"]);
+    let dict2 = DoubleArrayTrie::from_terms(vec!["test", "set", "reset"]);
 
     println!("Query: '{}' with distance 1", test_word);
 

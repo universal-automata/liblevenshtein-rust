@@ -21,7 +21,7 @@ fn main() {
     ];
 
     println!("1. Creating PathMap dictionary...");
-    let pathmap_dict = PathMapDictionary::from_terms(terms.clone());
+    let pathmap_dict = DoubleArrayTrie::from_terms(terms.clone());
     println!("   PathMap: {} terms", pathmap_dict.len().unwrap());
 
     println!("\n2. Creating DAWG dictionary...");

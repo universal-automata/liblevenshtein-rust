@@ -3,7 +3,7 @@ use liblevenshtein::prelude::*;
 
 #[test]
 fn test_basic_dictionary_ops() {
-    let dict = PathMapDictionary::from_terms(vec!["test"]);
+    let dict = DoubleArrayTrie::from_terms(vec!["test"]);
     let root = dict.root();
 
     println!("Root is_final: {}", root.is_final());
@@ -32,7 +32,7 @@ fn test_basic_dictionary_ops() {
 
 #[test]
 fn test_simple_query() {
-    let dict = PathMapDictionary::from_terms(vec!["test"]);
+    let dict = DoubleArrayTrie::from_terms(vec!["test"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     let results: Vec<_> = transducer.query("test", 0).collect();

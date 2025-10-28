@@ -5,7 +5,7 @@ use liblevenshtein::transducer::transition::{initial_state, transition_state};
 
 #[test]
 fn trace_aple_to_apple() {
-    let dict = PathMapDictionary::from_terms(vec!["apple"]);
+    let dict = DoubleArrayTrie::from_terms(vec!["apple"]);
     let root = dict.root();
 
     let query = b"aple";

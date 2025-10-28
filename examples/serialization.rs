@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "tested",
         "tester",
     ];
-    let dict = PathMapDictionary::from_terms(terms.clone());
+    let dict = DoubleArrayTrie::from_terms(terms.clone());
     println!("   Created dictionary with {} terms\n", dict.len().unwrap());
 
     // Serialize to bincode (compact binary format)
@@ -65,13 +65,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load from bincode
     println!("4. Loading from bincode...");
     let bincode_file = File::open("dict.bin")?;
-    let loaded_bincode: PathMapDictionary = BincodeSerializer::deserialize(bincode_file)?;
+    let loaded_bincode: DoubleArrayTrie = BincodeSerializer::deserialize(bincode_file)?;
     println!("   Loaded {} terms\n", loaded_bincode.len().unwrap());
 
     // Load from JSON
     println!("5. Loading from JSON...");
     let json_file = File::open("dict.json")?;
-    let loaded_json: PathMapDictionary = JsonSerializer::deserialize(json_file)?;
+    let loaded_json: DoubleArrayTrie = JsonSerializer::deserialize(json_file)?;
     println!("   Loaded {} terms\n", loaded_json.len().unwrap());
 
     // Verify loaded dictionaries work correctly
