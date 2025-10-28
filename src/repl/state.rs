@@ -8,6 +8,7 @@ use crate::commands::handlers::query::execute_query;
 use crate::dictionary::dawg::DawgDictionary;
 use crate::dictionary::dynamic_dawg::DynamicDawg;
 use crate::dictionary::pathmap::PathMapDictionary;
+use crate::dictionary::suffix_automaton::SuffixAutomaton;
 use crate::dictionary::{Dictionary, DictionaryNode};
 use crate::transducer::Algorithm;
 use anyhow::Result;
@@ -51,6 +52,8 @@ pub enum DictionaryBackend {
     Dawg,
     /// Dynamic DAWG (supports modifications, compressed)
     DynamicDawg,
+    /// Suffix automaton (substring matching, dynamic)
+    SuffixAutomaton,
 }
 
 impl std::fmt::Display for DictionaryBackend {
@@ -59,6 +62,7 @@ impl std::fmt::Display for DictionaryBackend {
             Self::PathMap => write!(f, "path-map"),
             Self::Dawg => write!(f, "dawg"),
             Self::DynamicDawg => write!(f, "dynamic-dawg"),
+            Self::SuffixAutomaton => write!(f, "suffix-automaton"),
         }
     }
 }
@@ -71,8 +75,9 @@ impl std::str::FromStr for DictionaryBackend {
             "pathmap" => Ok(Self::PathMap),
             "dawg" => Ok(Self::Dawg),
             "dynamic-dawg" | "dynamicdawg" => Ok(Self::DynamicDawg),
+            "suffix-automaton" | "suffixautomaton" => Ok(Self::SuffixAutomaton),
             _ => Err(anyhow::anyhow!(
-                "Unknown backend: {}. Valid options: pathmap, dawg, dynamic-dawg",
+                "Unknown backend: {}. Valid options: pathmap, dawg, dynamic-dawg, suffix-automaton",
                 s
             )),
         }
@@ -87,6 +92,8 @@ pub enum DictContainer {
     Dawg(DawgDictionary),
     /// Dynamic DAWG dictionary
     DynamicDawg(DynamicDawg),
+    /// Suffix automaton dictionary
+    SuffixAutomaton(SuffixAutomaton),
 }
 
 impl DictContainer {
@@ -96,6 +103,7 @@ impl DictContainer {
             Self::PathMap(_) => DictionaryBackend::PathMap,
             Self::Dawg(_) => DictionaryBackend::Dawg,
             Self::DynamicDawg(_) => DictionaryBackend::DynamicDawg,
+            Self::SuffixAutomaton(_) => DictionaryBackend::SuffixAutomaton,
         }
     }
 
@@ -105,6 +113,7 @@ impl DictContainer {
             Self::PathMap(d) => d.contains(term),
             Self::Dawg(d) => d.contains(term),
             Self::DynamicDawg(d) => d.contains(term),
+            Self::SuffixAutomaton(d) => d.contains(term),
         }
     }
 
@@ -112,8 +121,9 @@ impl DictContainer {
     pub fn insert(&mut self, term: &str) -> Result<bool> {
         match self {
             Self::PathMap(d) => Ok(d.insert(term)),
-            Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is read-only. Use 'backend dynamic-dawg' or 'backend pathmap' for modifications.")),
+            Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is read-only. Use 'backend dynamic-dawg', 'backend pathmap', or 'backend suffix-automaton' for modifications.")),
             Self::DynamicDawg(d) => Ok(d.insert(term)),
+            Self::SuffixAutomaton(d) => Ok(d.insert(term)),
         }
     }
 
@@ -121,8 +131,9 @@ impl DictContainer {
     pub fn remove(&mut self, term: &str) -> Result<bool> {
         match self {
             Self::PathMap(d) => Ok(d.remove(term)),
-            Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is read-only. Use 'backend dynamic-dawg' or 'backend pathmap' for modifications.")),
+            Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is read-only. Use 'backend dynamic-dawg', 'backend pathmap', or 'backend suffix-automaton' for modifications.")),
             Self::DynamicDawg(d) => Ok(d.remove(term)),
+            Self::SuffixAutomaton(d) => Ok(d.remove(term)),
         }
     }
 
@@ -132,6 +143,7 @@ impl DictContainer {
             Self::PathMap(d) => d.len().unwrap_or(0),
             Self::Dawg(d) => d.len().unwrap_or(0),
             Self::DynamicDawg(d) => d.len().unwrap_or(0),
+            Self::SuffixAutomaton(d) => d.string_count(),
         }
     }
 
@@ -146,6 +158,7 @@ impl DictContainer {
             Self::PathMap(d) => extract_terms(d),
             Self::Dawg(d) => extract_terms(d),
             Self::DynamicDawg(d) => extract_terms(d),
+            Self::SuffixAutomaton(d) => d.source_texts(),
         }
     }
 
@@ -169,6 +182,10 @@ impl DictContainer {
                 }
                 Self::DynamicDawg(dict)
             }
+            DictionaryBackend::SuffixAutomaton => {
+                let dict = SuffixAutomaton::from_texts(terms);
+                Self::SuffixAutomaton(dict)
+            }
         };
 
         Ok(new_dict)
@@ -187,6 +204,10 @@ impl DictContainer {
                 *self = Self::DynamicDawg(DynamicDawg::new());
                 Ok(())
             }
+            Self::SuffixAutomaton(d) => {
+                d.clear();
+                Ok(())
+            }
         }
     }
 
@@ -200,6 +221,10 @@ impl DictContainer {
             Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is already minimized")),
             Self::DynamicDawg(d) => {
                 d.minimize();
+                Ok(())
+            }
+            Self::SuffixAutomaton(d) => {
+                d.compact();
                 Ok(())
             }
         }
@@ -364,6 +389,7 @@ impl ReplState {
             DictContainer::PathMap(d) => execute_query(d, &params),
             DictContainer::Dawg(d) => execute_query(d, &params),
             DictContainer::DynamicDawg(d) => execute_query(d, &params),
+            DictContainer::SuffixAutomaton(d) => execute_query(d, &params),
         }
     }
 
@@ -381,6 +407,7 @@ impl ReplState {
             DictContainer::Dawg(d) => Some(d.node_count()),
             DictContainer::DynamicDawg(d) => Some(d.node_count()),
             DictContainer::PathMap(_) => None,
+            DictContainer::SuffixAutomaton(d) => Some(d.state_count()),
         }
     }
 }

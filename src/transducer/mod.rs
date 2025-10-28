@@ -36,7 +36,7 @@ use crate::dictionary::Dictionary;
 /// ```rust,ignore
 /// use liblevenshtein::prelude::*;
 ///
-/// let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
+/// let dict = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
 /// let transducer = Transducer::new(dict, Algorithm::Standard);
 ///
 /// for term in transducer.query("tset", 2) {
@@ -62,11 +62,12 @@ impl<D: Dictionary> Transducer<D> {
     ///
     /// Returns an iterator over matching terms (strings only)
     pub fn query(&self, term: &str, max_distance: usize) -> QueryIterator<D::Node> {
-        QueryIterator::new(
+        QueryIterator::with_substring_mode(
             self.dictionary.root(),
             term.to_string(),
             max_distance,
             self.algorithm,
+            self.dictionary.is_suffix_based(),
         )
     }
 
@@ -100,7 +101,7 @@ impl<D: Dictionary> Transducer<D> {
     /// ```rust,ignore
     /// use liblevenshtein::prelude::*;
     ///
-    /// let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest"]);
+    /// let dict = DoubleArrayTrie::from_terms(vec!["test", "best", "rest"]);
     /// let transducer = Transducer::new(dict, Algorithm::Standard);
     ///
     /// // Get first 3 closest matches
@@ -116,11 +117,12 @@ impl<D: Dictionary> Transducer<D> {
     /// }
     /// ```
     pub fn query_ordered(&self, term: &str, max_distance: usize) -> OrderedQueryIterator<D::Node> {
-        OrderedQueryIterator::new(
+        OrderedQueryIterator::with_substring_mode(
             self.dictionary.root(),
             term.to_string(),
             max_distance,
             self.algorithm,
+            self.dictionary.is_suffix_based(),
         )
     }
 

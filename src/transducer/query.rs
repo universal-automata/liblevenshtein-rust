@@ -31,11 +31,23 @@ pub struct QueryIterator<N: DictionaryNode> {
     algorithm: Algorithm,
     finished: bool,
     state_pool: StatePool, // Pool for State allocation reuse
+    substring_mode: bool,   // Enable substring matching (for suffix automata)
 }
 
 impl<N: DictionaryNode> QueryIterator<N> {
     /// Create a new query iterator
     pub fn new(root: N, query: String, max_distance: usize, algorithm: Algorithm) -> Self {
+        Self::with_substring_mode(root, query, max_distance, algorithm, false)
+    }
+
+    /// Create a new query iterator with substring matching mode
+    pub fn with_substring_mode(
+        root: N,
+        query: String,
+        max_distance: usize,
+        algorithm: Algorithm,
+        substring_mode: bool,
+    ) -> Self {
         let query_bytes = query.into_bytes();
         let initial = initial_state(query_bytes.len(), max_distance);
 
@@ -49,6 +61,7 @@ impl<N: DictionaryNode> QueryIterator<N> {
             algorithm,
             finished: false,
             state_pool: StatePool::new(), // Create pool for this query
+            substring_mode,
         }
     }
 
@@ -57,16 +70,25 @@ impl<N: DictionaryNode> QueryIterator<N> {
         while let Some(intersection) = self.pending.pop_front() {
             // Check if this is a final match
             if intersection.is_final() {
-                // Infer the distance
-                if let Some(distance) = intersection.state.infer_distance(self.query.len()) {
-                    if distance <= self.max_distance {
-                        let term = intersection.term();
+                // Infer the distance based on matching mode
+                let distance = if self.substring_mode {
+                    // Substring mode: don't penalize unmatched query suffix
+                    intersection.state.min_distance().unwrap_or(usize::MAX)
+                } else {
+                    // Standard mode: penalize remaining query characters
+                    intersection
+                        .state
+                        .infer_distance(self.query.len())
+                        .unwrap_or(usize::MAX)
+                };
 
-                        // Queue children for further exploration
-                        self.queue_children(&intersection);
+                if distance <= self.max_distance {
+                    let term = intersection.term();
 
-                        return Some(term);
-                    }
+                    // Queue children for further exploration
+                    self.queue_children(&intersection);
+
+                    return Some(term);
                 }
             }
 
@@ -90,7 +112,7 @@ impl<N: DictionaryNode> QueryIterator<N> {
                 &self.query,
                 self.max_distance,
                 self.algorithm,
-                false, // Exact matching (not prefix mode)
+                self.substring_mode, // Use prefix_mode=true only for substring matching
             ) {
                 // ✅ Create lightweight PathNode (no Arc clone!)
                 // Only stores label and parent chain - dictionary node not needed in parent
@@ -204,12 +226,12 @@ impl<N: DictionaryNode> CandidateIterator<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dictionary::pathmap::PathMapDictionary;
+    use crate::dictionary::double_array_trie::DoubleArrayTrie;
     use crate::dictionary::Dictionary;
 
     #[test]
     fn test_query_exact_match() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test"]);
         let query = QueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let result: Vec<_> = query.collect();
@@ -218,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_query_with_distance() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest", "testing"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "best", "rest", "testing"]);
         let query = QueryIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();
@@ -230,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_candidate_iterator() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "best"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "best"]);
         let query = CandidateIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
 
         let candidates: Vec<_> = query.collect();
@@ -244,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_empty_query() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test"]);
         let query = QueryIterator::new(dict.root(), "".to_string(), 0, Algorithm::Standard);
 
         let results: Vec<_> = query.collect();

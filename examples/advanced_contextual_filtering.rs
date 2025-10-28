@@ -132,7 +132,7 @@ fn main() {
 
     // Build dictionary
     let all_names: Vec<String> = symbols.iter().map(|s| s.name.clone()).collect();
-    let dict = PathMapDictionary::from_terms(all_names.iter().map(|s| s.as_str()));
+    let dict = DoubleArrayTrie::from_terms(all_names.iter().map(|s| s.as_str()));
 
     // Create contextual dictionary wrapper
     let mut ctx_dict = ContextualDictionary::new(dict, all_names.clone());

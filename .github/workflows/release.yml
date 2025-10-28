@@ -431,9 +431,34 @@ jobs:
           liblevenshtein query "tset" --dict /tmp/test-dict.txt -m 2
           echo "Basic query test passed!"
 
+  publish-crates-io:
+    name: Publish to crates.io
+    needs: [build-matrix, test-deb-package, test-rpm-package, test-arch-package]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Verify package builds without PathMap
+        run: cargo build --lib --verbose
+
+      - name: Run tests
+        run: cargo test --lib --verbose
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --verbose
+
   create-release:
     name: Create GitHub Release
-    needs: [build-matrix, package-deb, package-rpm, package-arch, test-deb-package, test-rpm-package, test-arch-package]
+    needs: [build-matrix, package-deb, package-rpm, package-arch, test-deb-package, test-rpm-package, test-arch-package, publish-crates-io]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -455,5 +480,7 @@ jobs:
           prerelease: false
           body: |
             See [CHANGELOG.md](https://github.com/universal-automata/liblevenshtein-rust/blob/master/CHANGELOG.md) for details.
+
+            **Available on crates.io**: `cargo add liblevenshtein`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

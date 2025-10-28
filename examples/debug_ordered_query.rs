@@ -16,7 +16,7 @@ fn main() {
 
     println!("Loaded {} words\n", words.len());
 
-    let dict = PathMapDictionary::from_terms(words.iter().map(|s| s.as_str()));
+    let dict = DoubleArrayTrie::from_terms(words.iter().map(|s| s.as_str()));
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Test with first query word from benchmark

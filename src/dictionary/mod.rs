@@ -4,10 +4,15 @@
 //! implementations (tries, DAWGs, etc.) for use with Levenshtein automata.
 
 pub mod dawg;
+pub mod dawg_optimized;
 pub mod dawg_query;
+pub mod double_array_trie;
 pub mod dynamic_dawg;
 pub mod factory;
+#[cfg(feature = "pathmap-backend")]
 pub mod pathmap;
+pub mod suffix_automaton;
+pub mod compressed_suffix_automaton;
 
 /// Synchronization strategy for dictionary operations.
 ///
@@ -75,6 +80,21 @@ pub trait Dictionary {
     /// Default: `ExternalSync` (conservative, always safe)
     fn sync_strategy(&self) -> SyncStrategy {
         SyncStrategy::ExternalSync
+    }
+
+    /// Check if this dictionary uses suffix-based matching (substring search).
+    ///
+    /// Suffix-based dictionaries (like SuffixAutomaton) match substrings anywhere
+    /// in the indexed text, whereas prefix-based dictionaries match complete words
+    /// from the beginning.
+    ///
+    /// This affects how the Levenshtein automaton computes match distances:
+    /// - Prefix-based: penalizes unmatched query suffix
+    /// - Suffix-based: allows partial query matches without penalty
+    ///
+    /// Default: `false` (prefix-based matching)
+    fn is_suffix_based(&self) -> bool {
+        false
     }
 }
 

@@ -1,0 +1,129 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: field `edge_arena` is never read
+   --> src/dictionary/dawg_optimized.rs:116:5
+    |
+102 | pub struct OptimizedDawgBuilder {
+    |            -------------------- field in this struct
+...
+116 |     edge_arena: Vec<(u8, u32)>,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `free_list` and `rebuild_threshold` are never read
+  --> src/dictionary/double_array_trie.rs:68:5
+   |
+63 | pub struct DoubleArrayTrie {
+   |            --------------- fields in this struct
+...
+68 |     free_list: Arc<Vec<usize>>,
+   |     ^^^^^^^^^
+...
+74 |     rebuild_threshold: f64,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `next_state` is never read
+  --> src/dictionary/double_array_trie.rs:95:5
+   |
+78 | pub struct DoubleArrayTrieBuilder {
+   |            ---------------------- field in this struct
+...
+95 |     next_state: usize,
+   |     ^^^^^^^^^^
+
+warning: field `needs_compaction` is never read
+   --> src/dictionary/compressed_suffix_automaton.rs:146:5
+    |
+129 | struct CompressedSuffixAutomatonInner {
+    |        ------------------------------ field in this struct
+...
+146 |     needs_compaction: bool,
+    |     ^^^^^^^^^^^^^^^^
+    |
+    = note: `CompressedSuffixAutomatonInner` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: missing documentation for a struct
+  --> src/dictionary/double_array_trie.rs:63:1
+   |
+63 | pub struct DoubleArrayTrie {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> src/lib.rs:26:9
+   |
+26 | #![warn(missing_docs)]
+   |         ^^^^^^^^^^^^
+
+warning: `liblevenshtein` (lib) generated 5 warnings
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 00s
+     Running benches/backend_comparison.rs (target/release/deps/backend_comparison-99338687d45c462c)
+Benchmarking construction/DoubleArrayTrie/10000
+Benchmarking construction/DoubleArrayTrie/10000: Warming up for 3.0000 s
+Benchmarking construction/DoubleArrayTrie/10000: Collecting 100 samples in estimated 5.1315 s (1700 iterations)
+Benchmarking construction/DoubleArrayTrie/10000: Analyzing
+construction/DoubleArrayTrie/10000
+                        time:   [2.8956 ms 2.9083 ms 2.9213 ms]
+                        change: [-6.2344% -5.6960% -5.1380%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking exact_matching/DoubleArrayTrie
+Benchmarking exact_matching/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking exact_matching/DoubleArrayTrie: Collecting 100 samples in estimated 5.0173 s (1.3M iterations)
+Benchmarking exact_matching/DoubleArrayTrie: Analyzing
+exact_matching/DoubleArrayTrie
+                        time:   [4.3768 µs 4.3938 µs 4.4113 µs]
+                        change: [-38.970% -38.459% -37.926%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking distance_1_matching/DoubleArrayTrie
+Benchmarking distance_1_matching/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking distance_1_matching/DoubleArrayTrie: Collecting 100 samples in estimated 5.0131 s (631k iterations)
+Benchmarking distance_1_matching/DoubleArrayTrie: Analyzing
+distance_1_matching/DoubleArrayTrie
+                        time:   [8.0525 µs 8.1389 µs 8.2314 µs]
+                        change: [-43.370% -42.769% -42.170%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 12 outliers among 100 measurements (12.00%)
+  9 (9.00%) low mild
+  3 (3.00%) high severe
+
+Benchmarking distance_2_matching/DoubleArrayTrie
+Benchmarking distance_2_matching/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking distance_2_matching/DoubleArrayTrie: Collecting 100 samples in estimated 5.0298 s (424k iterations)
+Benchmarking distance_2_matching/DoubleArrayTrie: Analyzing
+distance_2_matching/DoubleArrayTrie
+                        time:   [12.603 µs 12.676 µs 12.753 µs]
+                        change: [-39.502% -38.820% -38.134%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+
+Benchmarking contains_operation/DoubleArrayTrie
+Benchmarking contains_operation/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking contains_operation/DoubleArrayTrie: Collecting 100 samples in estimated 5.0001 s (22M iterations)
+Benchmarking contains_operation/DoubleArrayTrie: Analyzing
+contains_operation/DoubleArrayTrie
+                        time:   [232.81 ns 233.90 ns 235.05 ns]
+                        change: [-3.1767% -2.3981% -1.5845%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking memory_estimate/DoubleArrayTrie_construction
+Benchmarking memory_estimate/DoubleArrayTrie_construction: Warming up for 3.0000 s
+Benchmarking memory_estimate/DoubleArrayTrie_construction: Collecting 100 samples in estimated 5.2727 s (1500 iterations)
+Benchmarking memory_estimate/DoubleArrayTrie_construction: Analyzing
+memory_estimate/DoubleArrayTrie_construction
+                        time:   [3.3645 ms 3.3828 ms 3.4009 ms]
+                        change: [+15.733% +16.652% +17.635%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+

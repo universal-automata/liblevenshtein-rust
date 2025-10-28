@@ -8,14 +8,14 @@
 
 use liblevenshtein::prelude::*;
 
-fn create_dictionary(size: usize) -> PathMapDictionary {
+fn create_dictionary(size: usize) -> DoubleArrayTrie {
     let words: Vec<String> = (0..size)
         .map(|i| {
             let len = 4 + (i % 9);
             format!("word{:0width$}", i, width = len - 4)
         })
         .collect();
-    PathMapDictionary::from_terms(words)
+    DoubleArrayTrie::from_terms(words)
 }
 
 fn main() {
@@ -58,7 +58,7 @@ fn main() {
 
     // 5. Worst case similar words (maximum state expansion)
     println!("Running worst case queries...");
-    let worst_dict = PathMapDictionary::from_terms(vec![
+    let worst_dict = DoubleArrayTrie::from_terms(vec![
         "aaaa", "aaab", "aaba", "aabb", "abaa", "abab", "abba", "abbb", "baaa", "baab", "baba",
         "babb", "bbaa", "bbab", "bbba", "bbbb",
     ]);

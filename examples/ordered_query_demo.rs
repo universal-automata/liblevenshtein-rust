@@ -16,7 +16,7 @@ fn main() {
         "zest", "taste", "text", "tent", "temp", "team",
     ];
 
-    let dict = PathMapDictionary::from_terms(words.iter().map(|s| *s));
+    let dict = DoubleArrayTrie::from_terms(words.iter().map(|s| *s));
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Dictionary: {} words", words.len());

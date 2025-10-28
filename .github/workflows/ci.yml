@@ -194,20 +194,67 @@ jobs:
         cargo bench --all-features --target x86_64-unknown-linux-gnu --no-fail-fast -- --output-format bencher | tee output.txt
         echo "::endgroup::"
 
+    - name: Parse and format benchmark results
+      run: |
+        echo "## Benchmark Results" > benchmark-summary.md
+        echo "" >> benchmark-summary.md
+        echo "| Benchmark | Time | Throughput |" >> benchmark-summary.md
+        echo "|-----------|------|------------|" >> benchmark-summary.md
+
+        # Parse bencher output format: test name ... bench: <time> ns/iter (+/- <variance>)
+        grep "bench:" output.txt | while read -r line; do
+          # Extract benchmark name (everything before '...') and trim whitespace
+          name=$(echo "$line" | sed 's/test \(.*\) \.\.\..*/\1/' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+          # Extract time and unit
+          time=$(echo "$line" | grep -oP '[\d,]+ ns/iter' | head -1)
+
+          # Calculate throughput if available
+          if [[ "$time" =~ ([0-9,]+) ]]; then
+            ns="${BASH_REMATCH[1]//,/}"
+            if [ "$ns" -gt 0 ]; then
+              ops_per_sec=$(( 1000000000 / ns ))
+              # Format with thousand separators
+              throughput=$(printf "%'d ops/s" $ops_per_sec)
+            else
+              throughput="-"
+            fi
+          else
+            throughput="-"
+          fi
+
+          echo "| \`$name\` | $time | $throughput |" >> benchmark-summary.md
+        done
+
+        echo "" >> benchmark-summary.md
+        echo "**Note:** Benchmarks are run on GitHub Actions runners and may vary." >> benchmark-summary.md
+        echo "" >> benchmark-summary.md
+        echo "Full results available in artifacts." >> benchmark-summary.md
+
     - name: Upload benchmark results
       uses: actions/upload-artifact@v4
       with:
         name: benchmark-results
-        path: output.txt
+        path: |
+          output.txt
+          benchmark-summary.md
         retention-days: 30
 
   test-report:
     name: Test Report Summary
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [test, lint, benchmarks]
     if: always()
 
     steps:
+    - name: Download benchmark results
+      if: needs.benchmarks.result == 'success'
+      uses: actions/download-artifact@v4
+      with:
+        name: benchmark-results
+        path: ./benchmark-results
+      continue-on-error: true
+
     - name: Generate summary
       run: |
         echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
@@ -216,10 +263,26 @@ jobs:
         echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
         echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Benchmarks | ${{ needs.benchmarks.result }} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
         if [ "${{ needs.test.result }}" == "success" ] && [ "${{ needs.lint.result }}" == "success" ]; then
           echo "✅ All checks passed!" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ Some checks failed. Please review the logs." >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Include benchmark summary if available
+        if [ -f "./benchmark-results/benchmark-summary.md" ]; then
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat ./benchmark-results/benchmark-summary.md >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.benchmarks.result }}" == "skipped" ]; then
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⏭️ Benchmarks skipped (only run on master branch)" >> $GITHUB_STEP_SUMMARY
         fi

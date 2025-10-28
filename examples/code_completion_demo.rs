@@ -65,7 +65,7 @@ fn main() {
 
     // Build dictionary from identifier names
     let names: Vec<&str> = identifiers.iter().map(|id| id.name.as_str()).collect();
-    let dict = PathMapDictionary::from_terms(names);
+    let dict = DoubleArrayTrie::from_terms(names);
 
     println!("=== Code Completion Demo ===\n");
     println!("Dictionary contains {} identifiers\n", identifiers.len());

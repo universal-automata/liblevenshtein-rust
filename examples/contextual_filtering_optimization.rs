@@ -73,7 +73,7 @@ fn main() {
 
     // Build full dictionary
     let all_names: Vec<&str> = identifiers.iter().map(|id| id.name.as_str()).collect();
-    let full_dict = PathMapDictionary::from_terms(all_names.clone());
+    let full_dict = DoubleArrayTrie::from_terms(all_names.clone());
 
     println!("--- Strategy 1: Post-Filtering (Current Approach) ---\n");
 
@@ -116,7 +116,7 @@ fn main() {
         100 - (public_functions.len() * 100 / all_names.len())
     );
 
-    let filtered_dict = PathMapDictionary::from_terms(public_functions.clone());
+    let filtered_dict = DoubleArrayTrie::from_terms(public_functions.clone());
 
     // Benchmark pre-filtering
     let start = Instant::now();
@@ -210,7 +210,7 @@ fn main() {
 
     // Build dictionary from refined set
     let refined_terms: Vec<&str> = current_set.iter().copied().collect();
-    let refined_dict = PathMapDictionary::from_terms(refined_terms);
+    let refined_dict = DoubleArrayTrie::from_terms(refined_terms);
 
     println!("4. Query refined dictionary:");
     for candidate in Transducer::new(refined_dict, Algorithm::Standard)

@@ -44,7 +44,7 @@ pub struct OrderedCandidate {
 /// ```rust,ignore
 /// use liblevenshtein::prelude::*;
 ///
-/// let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest", "testing"]);
+/// let dict = DoubleArrayTrie::from_terms(vec!["test", "best", "rest", "testing"]);
 /// let transducer = Transducer::new(dict, Algorithm::Standard);
 ///
 /// // Get first 3 closest matches
@@ -74,13 +74,24 @@ pub struct OrderedQueryIterator<N: DictionaryNode> {
     algorithm: Algorithm,
     /// State pool for allocation reuse
     state_pool: StatePool,
-    /// Prefix matching mode
-    prefix_mode: bool,
+    /// Substring matching mode (for suffix automata)
+    substring_mode: bool,
 }
 
 impl<N: DictionaryNode> OrderedQueryIterator<N> {
     /// Create a new ordered query iterator
     pub fn new(root: N, query: String, max_distance: usize, algorithm: Algorithm) -> Self {
+        Self::with_substring_mode(root, query, max_distance, algorithm, false)
+    }
+
+    /// Create a new ordered query iterator with substring matching mode
+    pub fn with_substring_mode(
+        root: N,
+        query: String,
+        max_distance: usize,
+        algorithm: Algorithm,
+        substring_mode: bool,
+    ) -> Self {
         let query_bytes = query.into_bytes();
         let initial = initial_state(query_bytes.len(), max_distance);
 
@@ -100,7 +111,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             query: query_bytes,
             algorithm,
             state_pool: StatePool::new(),
-            prefix_mode: false, // Exact matching by default
+            substring_mode,
         }
     }
 
@@ -114,15 +125,25 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             {
                 // Check if this is a final match
                 if intersection.is_final() {
-                    if let Some(distance) = intersection.state.infer_distance(self.query.len()) {
-                        if distance <= self.max_distance && distance == self.current_distance {
-                            let term = intersection.term();
+                    // Compute distance based on matching mode
+                    let distance = if self.substring_mode {
+                        // Substring mode: don't penalize unmatched query suffix
+                        intersection.state.min_distance().unwrap_or(usize::MAX)
+                    } else {
+                        // Standard mode: penalize remaining query characters
+                        intersection
+                            .state
+                            .infer_distance(self.query.len())
+                            .unwrap_or(usize::MAX)
+                    };
 
-                            // Queue children for further exploration
-                            self.queue_children(&intersection);
+                    if distance <= self.max_distance && distance == self.current_distance {
+                        let term = intersection.term();
 
-                            return Some(OrderedCandidate { distance, term });
-                        }
+                        // Queue children for further exploration
+                        self.queue_children(&intersection);
+
+                        return Some(OrderedCandidate { distance, term });
                     }
                 }
 
@@ -151,7 +172,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
                 &self.query,
                 self.max_distance,
                 self.algorithm,
-                self.prefix_mode,
+                self.substring_mode, // Use prefix_mode=true only for substring matching
             ) {
                 // Determine minimum possible distance from this state
                 if let Some(min_dist) = next_state.min_distance() {
@@ -219,7 +240,9 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     /// query.prefix()
     /// ```
     pub fn prefix(mut self) -> PrefixOrderedQueryIterator<N> {
-        self.prefix_mode = true; // Enable prefix matching
+        // Enable substring mode for prefix matching
+        // This allows matching terms that start with the query without penalizing the unmatched suffix
+        self.substring_mode = true;
         PrefixOrderedQueryIterator { inner: self }
     }
 }
@@ -330,12 +353,12 @@ impl<N: DictionaryNode> Iterator for PrefixOrderedQueryIterator<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dictionary::pathmap::PathMapDictionary;
+    use crate::dictionary::double_array_trie::DoubleArrayTrie;
     use crate::dictionary::Dictionary;
 
     #[test]
     fn test_ordered_exact_match() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test"]);
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
@@ -347,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_ordered_distance_first() {
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "test",    // distance 0
             "best",    // distance 1
             "rest",    // distance 1
@@ -379,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_ordered_lexicographic_within_distance() {
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "test", "best", "fest", "nest", "rest", "west", "zest",
         ]);
 
@@ -411,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_ordered_take() {
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "test", "best", "rest", "nest", "testing", "resting",
         ]);
 
@@ -433,7 +456,7 @@ mod tests {
 
     #[test]
     fn test_ordered_take_while() {
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "test", "best", "rest", "nest", "testing", "resting",
         ]);
 
@@ -458,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_ordered_empty_query() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "best"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "best"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "xyz".to_string(), 0, Algorithm::Standard);
@@ -473,7 +496,7 @@ mod tests {
         use crate::transducer::query::QueryIterator;
 
         let dict =
-            PathMapDictionary::from_terms(vec!["test", "best", "rest", "nest", "fest", "testing"]);
+            DoubleArrayTrie::from_terms(vec!["test", "best", "rest", "nest", "fest", "testing"]);
 
         let ordered =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
@@ -492,7 +515,7 @@ mod tests {
     #[test]
     fn test_filtered_query() {
         let dict =
-            PathMapDictionary::from_terms(vec!["test", "Test", "TEST", "best", "Best", "rest"]);
+            DoubleArrayTrie::from_terms(vec!["test", "Test", "TEST", "best", "Best", "rest"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 1, Algorithm::Standard);
@@ -520,7 +543,7 @@ mod tests {
 
     #[test]
     fn test_filtered_query_with_distance() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "best", "rest", "nest"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "best", "rest", "nest"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
@@ -546,7 +569,7 @@ mod tests {
     #[test]
     fn test_filtered_query_maintains_order() {
         let dict =
-            PathMapDictionary::from_terms(vec!["a", "aa", "aaa", "ab", "abc", "b", "ba", "baa"]);
+            DoubleArrayTrie::from_terms(vec!["a", "aa", "aaa", "ab", "abc", "b", "ba", "baa"]);
 
         let query = OrderedQueryIterator::new(dict.root(), "a".to_string(), 2, Algorithm::Standard);
 
@@ -571,7 +594,7 @@ mod tests {
 
     #[test]
     fn test_filtered_query_with_take() {
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "test", "testing", "tester", "best", "rest", "nest", "fest",
         ]);
 
@@ -595,7 +618,7 @@ mod tests {
 
     #[test]
     fn test_prefix_exact_match() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tester", "tested"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "tester", "tested"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
@@ -623,7 +646,7 @@ mod tests {
     #[test]
     fn test_prefix_with_errors() {
         let dict =
-            PathMapDictionary::from_terms(vec!["test", "testing", "best", "resting", "rest"]);
+            DoubleArrayTrie::from_terms(vec!["test", "testing", "best", "resting", "rest"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "tes".to_string(), 1, Algorithm::Standard);
@@ -643,7 +666,7 @@ mod tests {
 
     #[test]
     fn test_prefix_ordering() {
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "test", "testing", "tester", "best", "resting", "rest",
         ]);
 
@@ -671,7 +694,7 @@ mod tests {
 
     #[test]
     fn test_prefix_vs_exact() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tester"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "tester"]);
 
         // Exact matching
         let exact_query =
@@ -699,7 +722,7 @@ mod tests {
     #[test]
     fn test_prefix_autocomplete_scenario() {
         // Simulating code completion
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "getValue",
             "getVariable",
             "getValue2",
@@ -727,7 +750,7 @@ mod tests {
     #[test]
     fn test_prefix_with_filter() {
         // Combining prefix matching with filtering
-        let dict = PathMapDictionary::from_terms(vec![
+        let dict = DoubleArrayTrie::from_terms(vec![
             "TestCase",
             "testMethod",
             "testHelper",

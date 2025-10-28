@@ -13,7 +13,7 @@ fn main() {
     println!("TransducerBuilder Demonstration\n");
     println!("================================\n");
 
-    let dict = PathMapDictionary::from_terms(vec![
+    let dict = DoubleArrayTrie::from_terms(vec![
         "apple",
         "application",
         "apply",

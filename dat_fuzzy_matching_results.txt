@@ -1,0 +1,90 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: unused import: `std::collections::VecDeque`
+  --> src/dictionary/double_array_trie.rs:37:5
+   |
+37 | use std::collections::VecDeque;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> src/dictionary/double_array_trie.rs:94:13
+   |
+94 |         let mut base = vec![-1, 0]; // -1 for sentinel, 0 for root
+   |             ----^^^^
+   |             |
+   |             help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+  --> src/dictionary/double_array_trie.rs:95:13
+   |
+95 |         let mut check = vec![-1, -1]; // -1 means unused
+   |             ----^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> src/dictionary/double_array_trie.rs:96:13
+   |
+96 |         let mut is_final = vec![false, false];
+   |             ----^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: field `edge_arena` is never read
+   --> src/dictionary/dawg_optimized.rs:116:5
+    |
+102 | pub struct OptimizedDawgBuilder {
+    |            -------------------- field in this struct
+...
+116 |     edge_arena: Vec<(u8, u32)>,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `free_list` and `rebuild_threshold` are never read
+  --> src/dictionary/double_array_trie.rs:56:5
+   |
+45 | pub struct DoubleArrayTrie {
+   |            --------------- fields in this struct
+...
+56 |     free_list: Arc<Vec<usize>>,
+   |     ^^^^^^^^^
+...
+62 |     rebuild_threshold: f64,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `next_state` is never read
+  --> src/dictionary/double_array_trie.rs:83:5
+   |
+66 | pub struct DoubleArrayTrieBuilder {
+   |            ---------------------- field in this struct
+...
+83 |     next_state: usize,
+   |     ^^^^^^^^^^
+
+warning: `liblevenshtein` (lib) generated 7 warnings (run `cargo fix --lib -p liblevenshtein` to apply 4 suggestions)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 04s
+     Running benches/backend_comparison.rs (target/release/deps/backend_comparison-99338687d45c462c)
+test distance_1_matching/PathMap ... bench:      890971 ns/iter (+/- 306258)
+test distance_1_matching/DAWG ... bench:      293958 ns/iter (+/- 9631)
+test distance_1_matching/OptimizedDawg ... bench:      344242 ns/iter (+/- 16378)
+test distance_1_matching/DoubleArrayTrie ... bench:       12918 ns/iter (+/- 348)
+test distance_1_matching/DynamicDAWG ... bench:      328329 ns/iter (+/- 10569)
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 13.3s, or reduce sample count to 30.
+test distance_1_matching/SuffixAutomaton ... bench:    37059823 ns/iter (+/- 2759879)
+
+test distance_2_matching/PathMap ... bench:     5577670 ns/iter (+/- 120794)
+test distance_2_matching/DAWG ... bench:     2177065 ns/iter (+/- 92784)
+test distance_2_matching/OptimizedDawg ... bench:     2189175 ns/iter (+/- 83287)
+test distance_2_matching/DoubleArrayTrie ... bench:       16310 ns/iter (+/- 502)
+test distance_2_matching/DynamicDAWG ... bench:     2211219 ns/iter (+/- 58226)
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 16.2s, or reduce sample count to 30.
+test distance_2_matching/SuffixAutomaton ... bench:   159148178 ns/iter (+/- 4173079)
+

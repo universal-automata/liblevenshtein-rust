@@ -30,9 +30,13 @@ This library provides efficient fuzzy string matching against large dictionaries
   - `Transposition`: adds character transposition (swap adjacent chars)
   - `MergeAndSplit`: adds merge and split operations
 - **Multiple dictionary backends**:
-  - **PathMap** (default) - high-performance trie with structural sharing
+  - **DoubleArrayTrie** (recommended) - O(1) transitions with excellent cache locality and minimal memory footprint
+  - **PathMap** - high-performance trie with structural sharing, supports dynamic updates
   - **DAWG** - Directed Acyclic Word Graph for space-efficient storage
+  - **OptimizedDawg** - Arena-based DAWG with 20-25% faster construction
   - **DynamicDawg** - DAWG with online insert/delete/minimize operations
+  - **SuffixAutomaton** - For substring/infix matching
+  - **CompressedSuffixAutomaton** ⚠️ (experimental, incomplete) - Compressed suffix automaton (single-text only)
   - Extensible trait-based design for custom backends
 - **Ordered results**: `OrderedQueryIterator` returns results sorted by distance first, then lexicographically
 - **Filtering and prefix matching**: Filter results with custom predicates, enable prefix mode for code completion
@@ -85,9 +89,9 @@ Download pre-built packages from the [GitHub Releases](https://github.com/univer
 ```rust
 use liblevenshtein::prelude::*;
 
-// Create a dictionary from terms
+// Create a dictionary from terms (using DoubleArrayTrie for best performance)
 let terms = vec!["test", "testing", "tested", "tester"];
-let dict = PathMapDictionary::from_terms(terms);
+let dict = DoubleArrayTrie::from_terms(terms);
 
 // Create a transducer with Standard algorithm
 let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -151,7 +155,7 @@ Get results sorted by edit distance first, then alphabetically:
 ```rust
 use liblevenshtein::prelude::*;
 
-let dict = PathMapDictionary::from_terms(vec!["apple", "apply", "ape", "app"]);
+let dict = DoubleArrayTrie::from_terms(vec!["apple", "apply", "ape", "app"]);
 let transducer = Transducer::new(dict, Algorithm::Standard);
 
 // Results ordered by distance, then alphabetically
@@ -174,7 +178,7 @@ Filter results and enable prefix matching for code completion:
 ```rust
 use liblevenshtein::prelude::*;
 
-let dict = PathMapDictionary::from_terms(vec![
+let dict = DoubleArrayTrie::from_terms(vec![
     "getValue", "getVariable", "setValue", "setVariable"
 ]);
 let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -196,6 +200,38 @@ getVariable: 1
 ```
 
 See [`examples/code_completion_demo.rs`](examples/code_completion_demo.rs) and [`examples/contextual_filtering_optimization.rs`](examples/contextual_filtering_optimization.rs) for more examples.
+
+### Dictionary Backend Comparison
+
+The library provides multiple dictionary backends optimized for different use cases:
+
+| Backend | Best For | Performance Highlights |
+|---------|----------|----------------------|
+| **DoubleArrayTrie** | **General use** (recommended) | 3x faster queries, 30x faster contains, 8 bytes/state |
+| **PathMap** | Dynamic updates, runtime modifications | Thread-safe insert/delete, fastest dynamic backend |
+| **DAWG** | Static dictionaries, moderate size | Good balance of speed and memory |
+| **OptimizedDawg** | Static dictionaries, construction speed | 20-25% faster construction than DAWG |
+| **DynamicDawg** | Occasional modifications | Best fuzzy matching for dynamic use |
+| **SuffixAutomaton** | Substring/infix matching | Find patterns anywhere in text |
+
+**Performance Comparison** (10,000 words):
+
+```
+Construction:     DAT: 3.2ms   PathMap: 3.5ms   DAWG: 7.2ms
+Exact Match:      DAT: 6.6µs   DAWG: 19.8µs     PathMap: 71.1µs
+Contains (100):   DAT: 0.22µs  DAWG: 6.7µs      PathMap: 132µs
+Distance 1:       DAT: 12.9µs  DAWG: 319µs      PathMap: 888µs
+Distance 2:       DAT: 16.3µs  DAWG: 2,150µs    PathMap: 5,919µs
+Memory/state:     DAT: ~8B     OptDawg: ~13B    DAWG: ~32B
+```
+
+**Prefix Matching Support**: All backends except `SuffixAutomaton` support efficient prefix matching through the `.prefix()` method, making them ideal for code completion and autocomplete applications.
+
+**When to use each backend**:
+- **Static dictionaries** → `DoubleArrayTrie` (best overall performance)
+- **Frequent updates** → `PathMap` (thread-safe runtime modifications)
+- **Substring search** → `SuffixAutomaton` (finds patterns anywhere in text)
+- **Memory-constrained** → `DoubleArrayTrie` (8 bytes/state, most efficient)
 
 ### Serialization and Compression
 

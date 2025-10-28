@@ -88,12 +88,12 @@ pub fn query_and_format<D: Dictionary + Clone>(dict: &D, params: &QueryParams) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dictionary::pathmap::PathMapDictionary;
+    use crate::dictionary::double_array_trie::DoubleArrayTrie;
     use crate::transducer::Algorithm;
 
     #[test]
     fn test_execute_query_exact() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "tested"]);
         let params = QueryParams {
             term: "test".to_string(),
             max_distance: 0,
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_execute_query_fuzzy() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "best", "rest"]);
         let params = QueryParams {
             term: "test".to_string(),
             max_distance: 1,
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_execute_query_with_limit() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "best", "rest", "nest"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "best", "rest", "nest"]);
         let params = QueryParams {
             term: "test".to_string(),
             max_distance: 1,
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_query_and_format() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test"]);
         let params = QueryParams {
             term: "test".to_string(),
             max_distance: 0,

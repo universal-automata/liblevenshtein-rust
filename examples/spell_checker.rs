@@ -31,7 +31,7 @@ fn main() {
         "Building dictionary with {} words...",
         dictionary_words.len()
     );
-    let dict = PathMapDictionary::from_terms(dictionary_words);
+    let dict = DoubleArrayTrie::from_terms(dictionary_words);
 
     // Create a transducer with Standard algorithm
     let transducer = Transducer::new(dict, Algorithm::Standard);

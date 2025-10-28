@@ -13,7 +13,7 @@ use crate::transducer::{Algorithm, Transducer};
 /// ```rust,ignore
 /// use liblevenshtein::prelude::*;
 ///
-/// let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
+/// let dict = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
 /// let transducer = TransducerBuilder::new()
 ///     .dictionary(dict)
 ///     .algorithm(Algorithm::Transposition)
@@ -53,7 +53,7 @@ impl<D: Dictionary> TransducerBuilder<D> {
     /// # Example
     ///
     /// ```rust,ignore
-    /// let dict = PathMapDictionary::from_terms(vec!["test"]);
+    /// let dict = DoubleArrayTrie::from_terms(vec!["test"]);
     /// let builder = TransducerBuilder::new()
     ///     .dictionary(dict);
     /// ```
@@ -117,11 +117,11 @@ impl<D: Dictionary> Default for TransducerBuilder<D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dictionary::pathmap::PathMapDictionary;
+    use crate::dictionary::double_array_trie::DoubleArrayTrie;
 
     #[test]
     fn test_builder_complete() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
         let transducer = TransducerBuilder::new()
             .dictionary(dict)
             .algorithm(Algorithm::Standard)
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_builder_missing_dictionary() {
-        let result: Result<Transducer<PathMapDictionary>, _> = TransducerBuilder::new()
+        let result: Result<Transducer<DoubleArrayTrie>, _> = TransducerBuilder::new()
             .algorithm(Algorithm::Standard)
             .build();
 
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_builder_missing_algorithm() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test"]);
         let result = TransducerBuilder::new().dictionary(dict).build();
 
         assert!(result.is_err());
@@ -153,8 +153,8 @@ mod tests {
 
     #[test]
     fn test_builder_order_independence() {
-        let dict1 = PathMapDictionary::from_terms(vec!["test"]);
-        let dict2 = PathMapDictionary::from_terms(vec!["test"]);
+        let dict1 = DoubleArrayTrie::from_terms(vec!["test"]);
+        let dict2 = DoubleArrayTrie::from_terms(vec!["test"]);
 
         // Algorithm first
         let t1 = TransducerBuilder::new()
@@ -180,7 +180,7 @@ mod tests {
             Algorithm::Transposition,
             Algorithm::MergeAndSplit,
         ] {
-            let dict = PathMapDictionary::from_terms(vec!["test"]);
+            let dict = DoubleArrayTrie::from_terms(vec!["test"]);
             let transducer = TransducerBuilder::new()
                 .dictionary(dict)
                 .algorithm(algo)

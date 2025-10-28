@@ -1,0 +1,116 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: field `edge_arena` is never read
+   --> src/dictionary/dawg_optimized.rs:116:5
+    |
+102 | pub struct OptimizedDawgBuilder {
+    |            -------------------- field in this struct
+...
+116 |     edge_arena: Vec<(u8, u32)>,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `free_list` and `rebuild_threshold` are never read
+  --> src/dictionary/double_array_trie.rs:55:5
+   |
+44 | pub struct DoubleArrayTrie {
+   |            --------------- fields in this struct
+...
+55 |     free_list: Arc<Vec<usize>>,
+   |     ^^^^^^^^^
+...
+61 |     rebuild_threshold: f64,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `next_state` is never read
+  --> src/dictionary/double_array_trie.rs:82:5
+   |
+65 | pub struct DoubleArrayTrieBuilder {
+   |            ---------------------- field in this struct
+...
+82 |     next_state: usize,
+   |     ^^^^^^^^^^
+
+warning: field `needs_compaction` is never read
+   --> src/dictionary/compressed_suffix_automaton.rs:146:5
+    |
+129 | struct CompressedSuffixAutomatonInner {
+    |        ------------------------------ field in this struct
+...
+146 |     needs_compaction: bool,
+    |     ^^^^^^^^^^^^^^^^
+    |
+    = note: `CompressedSuffixAutomatonInner` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: `liblevenshtein` (lib) generated 4 warnings
+warning: unused import: `black_box`
+ --> benches/dat_levenshtein_profiling.rs:8:17
+  |
+8 | use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+  |                 ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `liblevenshtein` (bench "dat_levenshtein_profiling") generated 1 warning (run `cargo fix --bench "dat_levenshtein_profiling"` to apply 1 suggestion)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 19.76s
+     Running benches/dat_levenshtein_profiling.rs (target/release/deps/dat_levenshtein_profiling-0c344c4c2c764fd9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+warning: field `edge_arena` is never read
+   --> src/dictionary/dawg_optimized.rs:116:5
+    |
+102 | pub struct OptimizedDawgBuilder {
+    |            -------------------- field in this struct
+...
+116 |     edge_arena: Vec<(u8, u32)>,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `free_list` and `rebuild_threshold` are never read
+  --> src/dictionary/double_array_trie.rs:55:5
+   |
+44 | pub struct DoubleArrayTrie {
+   |            --------------- fields in this struct
+...
+55 |     free_list: Arc<Vec<usize>>,
+   |     ^^^^^^^^^
+...
+61 |     rebuild_threshold: f64,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `next_state` is never read
+  --> src/dictionary/double_array_trie.rs:82:5
+   |
+65 | pub struct DoubleArrayTrieBuilder {
+   |            ---------------------- field in this struct
+...
+82 |     next_state: usize,
+   |     ^^^^^^^^^^
+
+warning: field `needs_compaction` is never read
+   --> src/dictionary/compressed_suffix_automaton.rs:146:5
+    |
+129 | struct CompressedSuffixAutomatonInner {
+    |        ------------------------------ field in this struct
+...
+146 |     needs_compaction: bool,
+    |     ^^^^^^^^^^^^^^^^
+    |
+    = note: `CompressedSuffixAutomatonInner` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: `liblevenshtein` (lib) generated 4 warnings
+    Finished `bench` profile [optimized + debuginfo] target(s) in 0.07s
+     Running benches/dat_levenshtein_profiling.rs (target/release/deps/dat_levenshtein_profiling-0c344c4c2c764fd9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

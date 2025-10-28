@@ -1,0 +1,417 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: field `edge_arena` is never read
+   --> src/dictionary/dawg_optimized.rs:116:5
+    |
+102 | pub struct OptimizedDawgBuilder {
+    |            -------------------- field in this struct
+...
+116 |     edge_arena: Vec<(u8, u32)>,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `free_list` and `rebuild_threshold` are never read
+  --> src/dictionary/double_array_trie.rs:68:5
+   |
+63 | pub struct DoubleArrayTrie {
+   |            --------------- fields in this struct
+...
+68 |     free_list: Arc<Vec<usize>>,
+   |     ^^^^^^^^^
+...
+74 |     rebuild_threshold: f64,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `next_state` is never read
+  --> src/dictionary/double_array_trie.rs:95:5
+   |
+78 | pub struct DoubleArrayTrieBuilder {
+   |            ---------------------- field in this struct
+...
+95 |     next_state: usize,
+   |     ^^^^^^^^^^
+
+warning: field `needs_compaction` is never read
+   --> src/dictionary/compressed_suffix_automaton.rs:146:5
+    |
+129 | struct CompressedSuffixAutomatonInner {
+    |        ------------------------------ field in this struct
+...
+146 |     needs_compaction: bool,
+    |     ^^^^^^^^^^^^^^^^
+    |
+    = note: `CompressedSuffixAutomatonInner` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: missing documentation for a struct
+  --> src/dictionary/double_array_trie.rs:63:1
+   |
+63 | pub struct DoubleArrayTrie {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> src/lib.rs:26:9
+   |
+26 | #![warn(missing_docs)]
+   |         ^^^^^^^^^^^^
+
+warning: `liblevenshtein` (lib) generated 5 warnings
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1m 01s
+     Running benches/backend_comparison.rs (target/release/deps/backend_comparison-99338687d45c462c)
+Benchmarking construction/PathMap/10000
+Benchmarking construction/PathMap/10000: Warming up for 3.0000 s
+Benchmarking construction/PathMap/10000: Collecting 100 samples in estimated 5.0421 s (1500 iterations)
+Benchmarking construction/PathMap/10000: Analyzing
+construction/PathMap/10000
+                        time:   [3.3156 ms 3.3278 ms 3.3403 ms]
+                        change: [-38.883% -30.310% -20.576%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Benchmarking construction/DAWG/10000
+Benchmarking construction/DAWG/10000: Warming up for 3.0000 s
+Benchmarking construction/DAWG/10000: Collecting 100 samples in estimated 5.1784 s (800 iterations)
+Benchmarking construction/DAWG/10000: Analyzing
+construction/DAWG/10000 time:   [6.3594 ms 6.3865 ms 6.4151 ms]
+                        change: [-41.899% -33.271% -24.118%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Benchmarking construction/OptimizedDawg/10000
+Benchmarking construction/OptimizedDawg/10000: Warming up for 3.0000 s
+Benchmarking construction/OptimizedDawg/10000: Collecting 100 samples in estimated 5.3945 s (1100 iterations)
+Benchmarking construction/OptimizedDawg/10000: Analyzing
+construction/OptimizedDawg/10000
+                        time:   [4.9396 ms 4.9559 ms 4.9725 ms]
+                        change: [-17.868% -17.344% -16.794%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+Benchmarking construction/DoubleArrayTrie/10000
+Benchmarking construction/DoubleArrayTrie/10000: Warming up for 3.0000 s
+Benchmarking construction/DoubleArrayTrie/10000: Collecting 100 samples in estimated 5.1376 s (1500 iterations)
+Benchmarking construction/DoubleArrayTrie/10000: Analyzing
+construction/DoubleArrayTrie/10000
+                        time:   [3.3099 ms 3.3292 ms 3.3493 ms]
+                        change: [+13.609% +14.475% +15.374%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking construction/DynamicDAWG/10000
+Benchmarking construction/DynamicDAWG/10000: Warming up for 3.0000 s
+Benchmarking construction/DynamicDAWG/10000: Collecting 100 samples in estimated 5.3860 s (1300 iterations)
+Benchmarking construction/DynamicDAWG/10000: Analyzing
+construction/DynamicDAWG/10000
+                        time:   [4.1494 ms 4.1692 ms 4.1894 ms]
+                        change: [-5.5250% -4.1906% -3.0198%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking construction/SuffixAutomaton/10000
+Benchmarking construction/SuffixAutomaton/10000: Warming up for 3.0000 s
+Benchmarking construction/SuffixAutomaton/10000: Collecting 100 samples in estimated 5.5715 s (400 iterations)
+Benchmarking construction/SuffixAutomaton/10000: Analyzing
+construction/SuffixAutomaton/10000
+                        time:   [13.499 ms 13.576 ms 13.655 ms]
+                        change: [+4.2212% +5.2018% +6.1019%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+
+Benchmarking exact_matching/PathMap
+Benchmarking exact_matching/PathMap: Warming up for 3.0000 s
+Benchmarking exact_matching/PathMap: Collecting 100 samples in estimated 5.0749 s (86k iterations)
+Benchmarking exact_matching/PathMap: Analyzing
+exact_matching/PathMap  time:   [58.731 µs 59.006 µs 59.306 µs]
+                        change: [-17.799% -16.946% -16.130%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking exact_matching/DAWG
+Benchmarking exact_matching/DAWG: Warming up for 3.0000 s
+Benchmarking exact_matching/DAWG: Collecting 100 samples in estimated 5.0098 s (273k iterations)
+Benchmarking exact_matching/DAWG: Analyzing
+exact_matching/DAWG     time:   [18.361 µs 18.434 µs 18.510 µs]
+                        change: [-9.6467% -7.5954% -6.1074%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+Benchmarking exact_matching/OptimizedDawg
+Benchmarking exact_matching/OptimizedDawg: Warming up for 3.0000 s
+Benchmarking exact_matching/OptimizedDawg: Collecting 100 samples in estimated 5.1009 s (237k iterations)
+Benchmarking exact_matching/OptimizedDawg: Analyzing
+exact_matching/OptimizedDawg
+                        time:   [21.376 µs 21.469 µs 21.560 µs]
+                        change: [-15.045% -14.374% -13.731%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  5 (5.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking exact_matching/DoubleArrayTrie
+Benchmarking exact_matching/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking exact_matching/DoubleArrayTrie: Collecting 100 samples in estimated 5.0057 s (1.2M iterations)
+Benchmarking exact_matching/DoubleArrayTrie: Analyzing
+exact_matching/DoubleArrayTrie
+                        time:   [4.1038 µs 4.1256 µs 4.1474 µs]
+                        change: [-7.0329% -6.1947% -5.3858%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking exact_matching/DynamicDAWG
+Benchmarking exact_matching/DynamicDAWG: Warming up for 3.0000 s
+Benchmarking exact_matching/DynamicDAWG: Collecting 100 samples in estimated 5.0681 s (237k iterations)
+Benchmarking exact_matching/DynamicDAWG: Analyzing
+exact_matching/DynamicDAWG
+                        time:   [21.710 µs 21.779 µs 21.844 µs]
+                        change: [+0.6494% +1.9164% +3.0985%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+Benchmarking exact_matching/SuffixAutomaton
+Benchmarking exact_matching/SuffixAutomaton: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.8s, enable flat sampling, or reduce sample count to 60.
+Benchmarking exact_matching/SuffixAutomaton: Collecting 100 samples in estimated 5.7981 s (5050 iterations)
+Benchmarking exact_matching/SuffixAutomaton: Analyzing
+exact_matching/SuffixAutomaton
+                        time:   [1.1362 ms 1.1428 ms 1.1496 ms]
+                        change: [-6.9546% -5.9489% -4.9403%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  2 (2.00%) low mild
+  6 (6.00%) high mild
+
+Benchmarking distance_1_matching/PathMap
+Benchmarking distance_1_matching/PathMap: Warming up for 3.0000 s
+Benchmarking distance_1_matching/PathMap: Collecting 100 samples in estimated 8.8702 s (10k iterations)
+Benchmarking distance_1_matching/PathMap: Analyzing
+distance_1_matching/PathMap
+                        time:   [859.72 µs 862.90 µs 866.20 µs]
+                        change: [-15.806% -9.9228% -4.8951%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking distance_1_matching/DAWG
+Benchmarking distance_1_matching/DAWG: Warming up for 3.0000 s
+Benchmarking distance_1_matching/DAWG: Collecting 100 samples in estimated 6.0959 s (20k iterations)
+Benchmarking distance_1_matching/DAWG: Analyzing
+distance_1_matching/DAWG
+                        time:   [306.29 µs 308.39 µs 310.49 µs]
+                        change: [+3.0288% +3.9308% +4.8548%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+Benchmarking distance_1_matching/OptimizedDawg
+Benchmarking distance_1_matching/OptimizedDawg: Warming up for 3.0000 s
+Benchmarking distance_1_matching/OptimizedDawg: Collecting 100 samples in estimated 6.5006 s (20k iterations)
+Benchmarking distance_1_matching/OptimizedDawg: Analyzing
+distance_1_matching/OptimizedDawg
+                        time:   [311.91 µs 313.85 µs 315.71 µs]
+                        change: [-10.266% -9.1936% -8.1045%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking distance_1_matching/DoubleArrayTrie
+Benchmarking distance_1_matching/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking distance_1_matching/DoubleArrayTrie: Collecting 100 samples in estimated 5.0020 s (621k iterations)
+Benchmarking distance_1_matching/DoubleArrayTrie: Analyzing
+distance_1_matching/DoubleArrayTrie
+                        time:   [8.0304 µs 8.0651 µs 8.1019 µs]
+                        change: [-3.1289% -2.2092% -1.2660%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking distance_1_matching/DynamicDAWG
+Benchmarking distance_1_matching/DynamicDAWG: Warming up for 3.0000 s
+Benchmarking distance_1_matching/DynamicDAWG: Collecting 100 samples in estimated 6.5201 s (20k iterations)
+Benchmarking distance_1_matching/DynamicDAWG: Analyzing
+distance_1_matching/DynamicDAWG
+                        time:   [319.77 µs 321.37 µs 323.01 µs]
+                        change: [-2.2044% -1.4047% -0.6133%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+Benchmarking distance_1_matching/SuffixAutomaton
+Benchmarking distance_1_matching/SuffixAutomaton: Warming up for 3.0000 s
+Benchmarking distance_1_matching/SuffixAutomaton: Collecting 100 samples in estimated 7.5219 s (200 iterations)
+Benchmarking distance_1_matching/SuffixAutomaton: Analyzing
+distance_1_matching/SuffixAutomaton
+                        time:   [35.772 ms 35.932 ms 36.098 ms]
+                        change: [-6.0664% -4.5810% -3.1976%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+
+Benchmarking distance_2_matching/PathMap
+Benchmarking distance_2_matching/PathMap: Warming up for 3.0000 s
+Benchmarking distance_2_matching/PathMap: Collecting 100 samples in estimated 5.0307 s (900 iterations)
+Benchmarking distance_2_matching/PathMap: Analyzing
+distance_2_matching/PathMap
+                        time:   [5.5561 ms 5.5828 ms 5.6098 ms]
+                        change: [-0.6803% -0.0379% +0.6291%] (p = 0.91 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+Benchmarking distance_2_matching/DAWG
+Benchmarking distance_2_matching/DAWG: Warming up for 3.0000 s
+Benchmarking distance_2_matching/DAWG: Collecting 100 samples in estimated 5.0012 s (2300 iterations)
+Benchmarking distance_2_matching/DAWG: Analyzing
+distance_2_matching/DAWG
+                        time:   [2.2095 ms 2.2206 ms 2.2320 ms]
+                        change: [-0.2989% +0.6857% +1.6586%] (p = 0.17 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking distance_2_matching/OptimizedDawg
+Benchmarking distance_2_matching/OptimizedDawg: Warming up for 3.0000 s
+Benchmarking distance_2_matching/OptimizedDawg: Collecting 100 samples in estimated 5.0551 s (2200 iterations)
+Benchmarking distance_2_matching/OptimizedDawg: Analyzing
+distance_2_matching/OptimizedDawg
+                        time:   [2.2591 ms 2.2694 ms 2.2796 ms]
+                        change: [+1.6013% +2.4935% +3.3845%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) low mild
+  2 (2.00%) high mild
+Benchmarking distance_2_matching/DoubleArrayTrie
+Benchmarking distance_2_matching/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking distance_2_matching/DoubleArrayTrie: Collecting 100 samples in estimated 5.0529 s (424k iterations)
+Benchmarking distance_2_matching/DoubleArrayTrie: Analyzing
+distance_2_matching/DoubleArrayTrie
+                        time:   [12.603 µs 12.676 µs 12.735 µs]
+                        change: [-4.4392% -2.9418% -1.5112%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Benchmarking distance_2_matching/DynamicDAWG
+Benchmarking distance_2_matching/DynamicDAWG: Warming up for 3.0000 s
+Benchmarking distance_2_matching/DynamicDAWG: Collecting 100 samples in estimated 5.1702 s (1900 iterations)
+Benchmarking distance_2_matching/DynamicDAWG: Analyzing
+distance_2_matching/DynamicDAWG
+                        time:   [2.6520 ms 2.9121 ms 3.2874 ms]
+                        change: [+19.048% +30.983% +47.763%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 12 outliers among 100 measurements (12.00%)
+  3 (3.00%) high mild
+  9 (9.00%) high severe
+Benchmarking distance_2_matching/SuffixAutomaton
+Benchmarking distance_2_matching/SuffixAutomaton: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 18.4s, or reduce sample count to 20.
+Benchmarking distance_2_matching/SuffixAutomaton: Collecting 100 samples in estimated 18.365 s (100 iterations)
+Benchmarking distance_2_matching/SuffixAutomaton: Analyzing
+distance_2_matching/SuffixAutomaton
+                        time:   [168.04 ms 169.90 ms 172.01 ms]
+                        change: [+4.4220% +5.8035% +7.2300%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 14 outliers among 100 measurements (14.00%)
+  5 (5.00%) high mild
+  9 (9.00%) high severe
+
+Benchmarking contains_operation/PathMap
+Benchmarking contains_operation/PathMap: Warming up for 3.0000 s
+Benchmarking contains_operation/PathMap: Collecting 100 samples in estimated 5.4203 s (45k iterations)
+Benchmarking contains_operation/PathMap: Analyzing
+contains_operation/PathMap
+                        time:   [119.62 µs 120.66 µs 121.73 µs]
+                        change: [-31.996% -24.126% -16.156%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking contains_operation/DAWG
+Benchmarking contains_operation/DAWG: Warming up for 3.0000 s
+Benchmarking contains_operation/DAWG: Collecting 100 samples in estimated 5.0046 s (722k iterations)
+Benchmarking contains_operation/DAWG: Analyzing
+contains_operation/DAWG time:   [6.8526 µs 6.8763 µs 6.8997 µs]
+                        change: [+1.7240% +2.4827% +3.2554%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 7 outliers among 100 measurements (7.00%)
+  4 (4.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking contains_operation/OptimizedDawg
+Benchmarking contains_operation/OptimizedDawg: Warming up for 3.0000 s
+Benchmarking contains_operation/OptimizedDawg: Collecting 100 samples in estimated 5.0271 s (763k iterations)
+Benchmarking contains_operation/OptimizedDawg: Analyzing
+contains_operation/OptimizedDawg
+                        time:   [6.5757 µs 6.6185 µs 6.6624 µs]
+                        change: [+2.5145% +3.5582% +4.5867%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking contains_operation/DoubleArrayTrie
+Benchmarking contains_operation/DoubleArrayTrie: Warming up for 3.0000 s
+Benchmarking contains_operation/DoubleArrayTrie: Collecting 100 samples in estimated 5.0005 s (22M iterations)
+Benchmarking contains_operation/DoubleArrayTrie: Analyzing
+contains_operation/DoubleArrayTrie
+                        time:   [229.26 ns 230.66 ns 232.12 ns]
+                        change: [-1.5550% -0.7009% +0.1897%] (p = 0.12 > 0.05)
+                        No change in performance detected.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking contains_operation/DynamicDAWG
+Benchmarking contains_operation/DynamicDAWG: Warming up for 3.0000 s
+Benchmarking contains_operation/DynamicDAWG: Collecting 100 samples in estimated 5.0457 s (212k iterations)
+Benchmarking contains_operation/DynamicDAWG: Analyzing
+contains_operation/DynamicDAWG
+                        time:   [23.707 µs 23.805 µs 23.910 µs]
+                        change: [+1.3856% +2.4634% +3.6473%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low severe
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking contains_operation/SuffixAutomaton
+Benchmarking contains_operation/SuffixAutomaton: Warming up for 3.0000 s
+Benchmarking contains_operation/SuffixAutomaton: Collecting 100 samples in estimated 5.0603 s (202k iterations)
+Benchmarking contains_operation/SuffixAutomaton: Analyzing
+contains_operation/SuffixAutomaton
+                        time:   [24.686 µs 24.795 µs 24.906 µs]
+                        change: [+9.3916% +10.202% +11.032%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking memory_estimate/PathMap_construction
+Benchmarking memory_estimate/PathMap_construction: Warming up for 3.0000 s
+Benchmarking memory_estimate/PathMap_construction: Collecting 100 samples in estimated 5.1472 s (1600 iterations)
+Benchmarking memory_estimate/PathMap_construction: Analyzing
+memory_estimate/PathMap_construction
+                        time:   [3.2337 ms 3.2559 ms 3.2793 ms]
+                        change: [-6.7835% -6.0785% -5.2194%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+Benchmarking memory_estimate/OptimizedDawg_construction
+Benchmarking memory_estimate/OptimizedDawg_construction: Warming up for 3.0000 s
+Benchmarking memory_estimate/OptimizedDawg_construction: Collecting 100 samples in estimated 5.0660 s (1100 iterations)
+Benchmarking memory_estimate/OptimizedDawg_construction: Analyzing
+memory_estimate/OptimizedDawg_construction
+                        time:   [4.5115 ms 4.5379 ms 4.5668 ms]
+                        change: [-1.6865% -0.9511% -0.2475%] (p = 0.02 < 0.05)
+                        Change within noise threshold.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking memory_estimate/DoubleArrayTrie_construction
+Benchmarking memory_estimate/DoubleArrayTrie_construction: Warming up for 3.0000 s
+Benchmarking memory_estimate/DoubleArrayTrie_construction: Collecting 100 samples in estimated 5.0128 s (1600 iterations)
+Benchmarking memory_estimate/DoubleArrayTrie_construction: Analyzing
+memory_estimate/DoubleArrayTrie_construction
+                        time:   [3.1958 ms 3.2219 ms 3.2476 ms]
+                        change: [-5.7385% -4.7562% -3.8626%] (p = 0.00 < 0.05)
+                        Performance has improved.
+

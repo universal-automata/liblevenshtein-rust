@@ -45,11 +45,16 @@ pub mod cli;
 /// Common imports for convenient usage
 pub mod prelude {
     pub use crate::dictionary::dawg::DawgDictionary;
+    pub use crate::dictionary::dawg_optimized::OptimizedDawg;
+    pub use crate::dictionary::double_array_trie::DoubleArrayTrie;
     pub use crate::dictionary::dynamic_dawg::DynamicDawg;
     pub use crate::dictionary::factory::{
         DictionaryBackend, DictionaryContainer, DictionaryFactory,
     };
+    #[cfg(feature = "pathmap-backend")]
     pub use crate::dictionary::pathmap::PathMapDictionary;
+    pub use crate::dictionary::suffix_automaton::SuffixAutomaton;
+    pub use crate::dictionary::compressed_suffix_automaton::CompressedSuffixAutomaton;
     pub use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
     pub use crate::transducer::{
         Algorithm, Candidate, QueryBuilder, Transducer, TransducerBuilder,
@@ -58,10 +63,14 @@ pub mod prelude {
     #[cfg(feature = "serialization")]
     pub use crate::serialization::{
         BincodeSerializer, DictionaryFromTerms, DictionarySerializer, JsonSerializer,
+        PlainTextSerializer,
     };
 
     #[cfg(feature = "protobuf")]
-    pub use crate::serialization::{OptimizedProtobufSerializer, ProtobufSerializer};
+    pub use crate::serialization::{
+        DatProtobufSerializer, OptimizedProtobufSerializer, ProtobufSerializer,
+        SuffixAutomatonProtobufSerializer,
+    };
 
     #[cfg(feature = "compression")]
     pub use crate::serialization::GzipSerializer;

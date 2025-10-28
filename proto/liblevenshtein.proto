@@ -63,10 +63,71 @@ message DictionaryV2 {
     uint64 edge_count = 5;
 }
 
-// Container message supporting both formats
+// Dictionary V3: Double-Array Trie (DAT) format
+//
+// Optimized format specifically for Double-Array Trie structures.
+// Directly serializes the BASE, CHECK, IS_FINAL, and edge list arrays.
+//
+// Benefits:
+// - Zero-copy deserialization into DAT structure
+// - No graph traversal required
+// - Preserves all DAT optimizations (edge lists, cache locality)
+// - Smallest format for DAT (direct array serialization)
+message DoubleArrayTrie {
+    // BASE array: offsets for computing next state
+    // Size: number of states in the trie
+    repeated sint32 base = 1 [packed=true];
+
+    // CHECK array: parent state verification
+    // Size: same as BASE array
+    repeated sint32 check = 2 [packed=true];
+
+    // IS_FINAL bitset: marks final states (valid term endings)
+    // Packed as bytes, 8 states per byte
+    // Size: ceil(num_states / 8)
+    bytes is_final = 3;
+
+    // Edge lists per state: which bytes have valid transitions
+    // Format: [state0_edge_count, edge0, edge1, ..., state1_edge_count, ...]
+    // Each edge is a single byte (u8)
+    bytes edge_data = 4;
+
+    // Free list: indices of deleted/unused states
+    repeated uint64 free_list = 5 [packed=true];
+
+    // Number of terms in the dictionary
+    uint64 term_count = 6;
+
+    // Rebuild threshold (0.0 to 1.0)
+    double rebuild_threshold = 7;
+}
+
+// Dictionary V4: Suffix Automaton format
+//
+// Optimized format specifically for Suffix Automaton structures.
+// Stores the original source texts rather than the automaton structure,
+// since suffix automata can be efficiently rebuilt from source texts.
+//
+// Benefits:
+// - Much smaller than serializing full graph structure
+// - Simple and reliable reconstruction
+// - Preserves source text metadata
+// - Fast deserialization (online construction is O(n))
+message SuffixAutomaton {
+    // Original source texts that were indexed
+    // The automaton is rebuilt from these texts on deserialization
+    repeated string source_texts = 1;
+
+    // Number of indexed strings (for validation)
+    uint64 string_count = 2;
+}
+
+// Container message supporting all formats
 message DictionaryContainer {
     oneof format {
         Dictionary v1 = 1;
         DictionaryV2 v2 = 2;
+        DoubleArrayTrie dat = 3;
+        SuffixAutomaton suffix = 4;
     }
 }

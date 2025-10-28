@@ -160,13 +160,13 @@ impl<N: DictionaryNode> Clone for Intersection<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dictionary::pathmap::PathMapDictionary;
+    use crate::dictionary::double_array_trie::DoubleArrayTrie;
     use crate::dictionary::Dictionary;
     use crate::transducer::Position;
 
     #[test]
     fn test_intersection_creation() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test"]);
         let root = dict.root();
         let state = State::single(Position::new(0, 0));
 
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_intersection_path_reconstruction() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test"]);
         let root = dict.root();
 
         // Build path: t -> e -> s using PathNode

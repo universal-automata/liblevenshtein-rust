@@ -10,6 +10,7 @@ use crate::commands::handlers::query::execute_query;
 use crate::dictionary::dawg::DawgDictionary;
 use crate::dictionary::dynamic_dawg::DynamicDawg;
 use crate::dictionary::pathmap::PathMapDictionary;
+use crate::dictionary::suffix_automaton::SuffixAutomaton;
 use crate::dictionary::{Dictionary, DictionaryNode};
 use crate::repl::state::{DictContainer, DictionaryBackend};
 use crate::transducer::Algorithm;
@@ -142,6 +143,7 @@ fn cmd_query(opts: QueryOptions) -> Result<()> {
         DictContainer::PathMap(d) => execute_query(d, &params),
         DictContainer::Dawg(d) => execute_query(d, &params),
         DictContainer::DynamicDawg(d) => execute_query(d, &params),
+        DictContainer::SuffixAutomaton(d) => execute_query(d, &params),
     };
 
     // Print results
@@ -542,6 +544,10 @@ fn load_bincode_dict(path: &Path, backend: DictionaryBackend) -> Result<DictCont
             let terms = extract_terms_from_dict(&dict);
             create_dict_from_terms(terms, backend)?
         }
+        DictionaryBackend::SuffixAutomaton => {
+            let dict = BincodeSerializer::deserialize_suffix_automaton(file)?;
+            DictContainer::SuffixAutomaton(dict)
+        }
     };
     Ok(container)
 }
@@ -563,6 +569,11 @@ fn load_json_dict(path: &Path, backend: DictionaryBackend) -> Result<DictContain
             let dict: PathMapDictionary = JsonSerializer::deserialize(file)?;
             let terms = extract_terms_from_dict(&dict);
             create_dict_from_terms(terms, backend)?
+        }
+        DictionaryBackend::SuffixAutomaton => {
+            // Use generic serialization
+            let dict: SuffixAutomaton = JsonSerializer::deserialize(file)?;
+            DictContainer::SuffixAutomaton(dict)
         }
     };
     Ok(container)
@@ -588,6 +599,10 @@ fn load_bincode_gzip_dict(path: &Path, backend: DictionaryBackend) -> Result<Dic
             let terms = extract_terms_from_dict(&dict);
             create_dict_from_terms(terms, backend)?
         }
+        DictionaryBackend::SuffixAutomaton => {
+            let dict: SuffixAutomaton = GzipSerializer::<BincodeSerializer>::deserialize(file)?;
+            DictContainer::SuffixAutomaton(dict)
+        }
     };
     Ok(container)
 }
@@ -611,6 +626,10 @@ fn load_json_gzip_dict(path: &Path, backend: DictionaryBackend) -> Result<DictCo
             let dict: PathMapDictionary = GzipSerializer::<JsonSerializer>::deserialize(file)?;
             let terms = extract_terms_from_dict(&dict);
             create_dict_from_terms(terms, backend)?
+        }
+        DictionaryBackend::SuffixAutomaton => {
+            let dict: SuffixAutomaton = GzipSerializer::<JsonSerializer>::deserialize(file)?;
+            DictContainer::SuffixAutomaton(dict)
         }
     };
     Ok(container)
@@ -658,6 +677,9 @@ fn create_dict_from_terms(terms: Vec<String>, backend: DictionaryBackend) -> Res
             }
             DictContainer::DynamicDawg(dict)
         }
+        DictionaryBackend::SuffixAutomaton => {
+            DictContainer::SuffixAutomaton(SuffixAutomaton::from_texts(terms))
+        }
     };
 
     Ok(container)
@@ -671,6 +693,7 @@ fn create_empty_dict(backend: DictionaryBackend) -> DictContainer {
             DictContainer::Dawg(DawgDictionary::from_iter(Vec::<&str>::new()))
         }
         DictionaryBackend::DynamicDawg => DictContainer::DynamicDawg(DynamicDawg::new()),
+        DictionaryBackend::SuffixAutomaton => DictContainer::SuffixAutomaton(SuffixAutomaton::new()),
     }
 }
 
@@ -719,6 +742,7 @@ fn save_bincode_dict(container: &DictContainer, path: &Path) -> Result<()> {
         DictContainer::PathMap(d) => BincodeSerializer::serialize(d, file)?,
         DictContainer::Dawg(d) => BincodeSerializer::serialize(d, file)?,
         DictContainer::DynamicDawg(d) => BincodeSerializer::serialize(d, file)?,
+        DictContainer::SuffixAutomaton(d) => BincodeSerializer::serialize_suffix_automaton(d, file)?,
     }
     Ok(())
 }
@@ -730,6 +754,7 @@ fn save_json_dict(container: &DictContainer, path: &Path) -> Result<()> {
         DictContainer::PathMap(d) => JsonSerializer::serialize(d, file)?,
         DictContainer::Dawg(d) => JsonSerializer::serialize(d, file)?,
         DictContainer::DynamicDawg(d) => JsonSerializer::serialize(d, file)?,
+        DictContainer::SuffixAutomaton(d) => JsonSerializer::serialize(d, file)?,
     }
     Ok(())
 }
@@ -743,6 +768,7 @@ fn save_bincode_gzip_dict(container: &DictContainer, path: &Path) -> Result<()> 
         DictContainer::PathMap(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
         DictContainer::Dawg(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
         DictContainer::DynamicDawg(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
+        DictContainer::SuffixAutomaton(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
     }
     Ok(())
 }
@@ -756,6 +782,7 @@ fn save_json_gzip_dict(container: &DictContainer, path: &Path) -> Result<()> {
         DictContainer::PathMap(d) => GzipSerializer::<JsonSerializer>::serialize(d, file)?,
         DictContainer::Dawg(d) => GzipSerializer::<JsonSerializer>::serialize(d, file)?,
         DictContainer::DynamicDawg(d) => GzipSerializer::<JsonSerializer>::serialize(d, file)?,
+        DictContainer::SuffixAutomaton(d) => GzipSerializer::<JsonSerializer>::serialize(d, file)?,
     }
     Ok(())
 }

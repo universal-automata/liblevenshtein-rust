@@ -78,12 +78,52 @@ jobs:
           cargo bench --all-features --target ${{ matrix.platform.target }} --no-fail-fast -- --output-format bencher | tee benchmark-results.txt
           echo "::endgroup::"
 
+      - name: Parse and format benchmark results
+        if: runner.os == 'Linux'
+        run: |
+          echo "## Benchmark Results - ${{ matrix.platform.name }}" > benchmark-summary.md
+          echo "" >> benchmark-summary.md
+          echo "| Benchmark | Time | Throughput |" >> benchmark-summary.md
+          echo "|-----------|------|------------|" >> benchmark-summary.md
+
+          # Parse bencher output format: test name ... bench: <time> ns/iter (+/- <variance>)
+          grep "bench:" benchmark-results.txt | while read -r line; do
+            # Extract benchmark name (everything before '...') and trim whitespace
+            name=$(echo "$line" | sed 's/test \(.*\) \.\.\..*/\1/' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+            # Extract time and unit
+            time=$(echo "$line" | grep -oP '[\d,]+ ns/iter' | head -1)
+
+            # Calculate throughput if available
+            if [[ "$time" =~ ([0-9,]+) ]]; then
+              ns="${BASH_REMATCH[1]//,/}"
+              if [ "$ns" -gt 0 ]; then
+                ops_per_sec=$(( 1000000000 / ns ))
+                # Format with thousand separators
+                throughput=$(printf "%'d ops/s" $ops_per_sec)
+              else
+                throughput="-"
+              fi
+            else
+              throughput="-"
+            fi
+
+            echo "| \`$name\` | $time | $throughput |" >> benchmark-summary.md
+          done
+
+          echo "" >> benchmark-summary.md
+          echo "**Note:** Benchmarks are run on GitHub Actions runners and may vary." >> benchmark-summary.md
+          echo "" >> benchmark-summary.md
+          echo "Full results available in artifacts." >> benchmark-summary.md
+
       - name: Upload benchmark results
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: nightly-benchmarks-${{ matrix.platform.name }}
-          path: benchmark-results.txt
+          path: |
+            benchmark-results.txt
+            benchmark-summary.md
           retention-days: 30
 
       - name: Check for performance regressions
@@ -158,6 +198,15 @@ jobs:
     if: always()
 
     steps:
+    - name: Download benchmark results
+      if: needs.nightly-matrix.result == 'success'
+      uses: actions/download-artifact@v4
+      with:
+        pattern: nightly-benchmarks-*
+        path: ./benchmark-results
+        merge-multiple: true
+      continue-on-error: true
+
     - name: Generate summary
       run: |
         echo "## Nightly Test Results" >> $GITHUB_STEP_SUMMARY
@@ -173,4 +222,13 @@ jobs:
           echo "✅ Nightly tests passed!" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ Nightly tests failed!" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Include benchmark summary if available
+        if [ -f "./benchmark-results/benchmark-summary.md" ]; then
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat ./benchmark-results/benchmark-summary.md >> $GITHUB_STEP_SUMMARY
         fi

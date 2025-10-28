@@ -1,0 +1,52 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: field `edge_arena` is never read
+   --> src/dictionary/dawg_optimized.rs:116:5
+    |
+102 | pub struct OptimizedDawgBuilder {
+    |            -------------------- field in this struct
+...
+116 |     edge_arena: Vec<(u8, u32)>,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `liblevenshtein` (lib) generated 1 warning
+    Finished `bench` profile [optimized + debuginfo] target(s) in 54.27s
+     Running benches/backend_comparison.rs (target/release/deps/backend_comparison-99338687d45c462c)
+test construction/PathMap/10000 ... bench:     3072958 ns/iter (+/- 134090)
+test construction/DAWG/10000 ... bench:     6230866 ns/iter (+/- 190389)
+test construction/OptimizedDawg/10000 ... bench:     5592382 ns/iter (+/- 183519)
+test construction/DynamicDAWG/10000 ... bench:     4017604 ns/iter (+/- 96842)
+test construction/SuffixAutomaton/10000 ... bench:    13133787 ns/iter (+/- 286891)
+
+test exact_matching/PathMap ... bench:       69658 ns/iter (+/- 1659)
+test exact_matching/DAWG ... bench:       18866 ns/iter (+/- 672)
+test exact_matching/OptimizedDawg ... bench:       21242 ns/iter (+/- 622)
+test exact_matching/DynamicDAWG ... bench:       25989 ns/iter (+/- 1061)
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.2s, enable flat sampling, or reduce sample count to 60.
+test exact_matching/SuffixAutomaton ... bench:     1223757 ns/iter (+/- 46538)
+
+test distance_1_matching/PathMap ... bench:      886909 ns/iter (+/- 24133)
+test distance_1_matching/DAWG ... bench:      291213 ns/iter (+/- 8134)
+test distance_1_matching/OptimizedDawg ... bench:      332750 ns/iter (+/- 7942)
+test distance_1_matching/DynamicDAWG ... bench:      327896 ns/iter (+/- 7911)
+test distance_1_matching/SuffixAutomaton ... bench:    37086589 ns/iter (+/- 1182081)
+
+test distance_2_matching/PathMap ... bench:     5550029 ns/iter (+/- 118871)
+test distance_2_matching/DAWG ... bench:     2120396 ns/iter (+/- 63317)
+test distance_2_matching/OptimizedDawg ... bench:     2340671 ns/iter (+/- 38952)
+test distance_2_matching/DynamicDAWG ... bench:     2384353 ns/iter (+/- 60944)
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 19.1s, or reduce sample count to 20.
+test distance_2_matching/SuffixAutomaton ... bench:   183810176 ns/iter (+/- 7530788)
+
+test contains_operation/PathMap ... bench:      115786 ns/iter (+/- 5471)
+test contains_operation/DAWG ... bench:        6538 ns/iter (+/- 240)
+test contains_operation/OptimizedDawg ... bench:        6434 ns/iter (+/- 268)
+test contains_operation/DynamicDAWG ... bench:       24001 ns/iter (+/- 804)
+test contains_operation/SuffixAutomaton ... bench:       25113 ns/iter (+/- 508)
+
+test memory_estimate/PathMap_construction ... bench:     3670672 ns/iter (+/- 76683)
+test memory_estimate/OptimizedDawg_construction ... bench:     4828906 ns/iter (+/- 120294)
+
