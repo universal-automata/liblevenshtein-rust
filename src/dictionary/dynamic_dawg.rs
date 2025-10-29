@@ -33,6 +33,7 @@ pub struct DynamicDawg {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 struct DynamicDawgInner {
     nodes: Vec<DawgNode>,
     // Track which nodes are reachable (for compaction)
@@ -50,6 +51,7 @@ struct NodeSignature {
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 struct DawgNode {
     edges: Vec<(u8, usize)>,
     is_final: bool,
@@ -608,6 +610,31 @@ impl DynamicDawgInner {
 impl Default for DynamicDawg {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(feature = "serialization")]
+impl serde::Serialize for DynamicDawg {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Extract the inner data by acquiring read lock
+        let inner = self.inner.read().unwrap();
+        inner.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serialization")]
+impl<'de> serde::Deserialize<'de> for DynamicDawg {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = DynamicDawgInner::deserialize(deserializer)?;
+        Ok(DynamicDawg {
+            inner: Arc::new(RwLock::new(inner)),
+        })
     }
 }
 

@@ -10,17 +10,21 @@ use crate::dictionary::DictionaryNode;
 ///
 /// # Memory Efficiency
 ///
-/// PathNode is ~16 bytes (label + pointer) vs ~50+ bytes for full Intersection.
-/// For queries exploring 1000 paths, this saves ~34KB per query.
+/// PathNode is ~24 bytes (label + depth + padding + pointer) vs ~50+ bytes for full Intersection.
+/// For queries exploring 1000 paths, this saves ~26KB per query.
 ///
 /// # Performance
 ///
 /// Eliminates Arc::clone operations in parent chains, reducing query overhead
 /// by an estimated 15-25% for DAWG dictionaries.
+///
+/// Depth is cached (O(1) access) vs recursive calculation (O(depth)).
 #[derive(Clone)]
 pub struct PathNode {
     /// Edge label from parent
     label: u8,
+    /// Cached depth from root (enables O(1) depth queries and Vec preallocation)
+    depth: u16,
     /// Parent in the path
     parent: Option<Box<PathNode>>,
 }
@@ -29,23 +33,30 @@ impl PathNode {
     /// Create a new path node
     #[inline(always)]
     pub fn new(label: u8, parent: Option<Box<PathNode>>) -> Self {
-        Self { label, parent }
+        let depth = match &parent {
+            Some(p) => p.depth + 1,
+            None => 1,
+        };
+        Self { label, depth, parent }
     }
 
     /// Collect labels into vector (for term reconstruction)
+    ///
+    /// Uses iterative approach to avoid stack overflow on deep paths.
+    /// Previous recursive implementation could overflow for paths > ~1000 levels.
     pub fn collect_labels(&self, labels: &mut Vec<u8>) {
-        labels.push(self.label);
-        if let Some(parent) = &self.parent {
-            parent.collect_labels(labels);
+        // Iteratively walk the parent chain
+        let mut current = Some(self);
+        while let Some(node) = current {
+            labels.push(node.label);
+            current = node.parent.as_deref();
         }
     }
 
     /// Get the depth (number of labels in the path)
+    #[inline(always)]
     pub fn depth(&self) -> usize {
-        match &self.parent {
-            Some(parent) => 1 + parent.depth(),
-            None => 1,
-        }
+        self.depth as usize
     }
 }
 

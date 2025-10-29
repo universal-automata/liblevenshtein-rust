@@ -29,6 +29,7 @@ use std::sync::Arc;
 /// providing better cache locality and reduced memory overhead compared
 /// to storing edges in per-node vectors.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub struct OptimizedDawg {
     /// All nodes stored contiguously
     nodes: Arc<Vec<OptimizedDawgNode>>,
@@ -45,6 +46,7 @@ pub struct OptimizedDawg {
 ///
 /// Uses only 8 bytes compared to ~32 bytes for standard DAWG node.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub struct OptimizedDawgNode {
     /// Offset into edge_arena where this node's edges start
     edge_offset: u32,
@@ -113,6 +115,8 @@ pub struct OptimizedDawgBuilder {
     active_path: Vec<usize>,
 
     /// Edge arena being built
+    /// TODO: Reserved for future optimization of edge storage during construction
+    #[allow(dead_code)]
     edge_arena: Vec<(u8, u32)>,
 }
 

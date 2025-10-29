@@ -49,7 +49,7 @@ impl<N: DictionaryNode> QueryIterator<N> {
         substring_mode: bool,
     ) -> Self {
         let query_bytes = query.into_bytes();
-        let initial = initial_state(query_bytes.len(), max_distance);
+        let initial = initial_state(query_bytes.len(), max_distance, algorithm);
 
         let mut pending = VecDeque::new();
         pending.push_back(Box::new(Intersection::new(root, initial)));

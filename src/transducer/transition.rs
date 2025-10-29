@@ -97,6 +97,25 @@ pub fn transition_position(
 ///
 /// # Prefix Matching Support
 ///
+/// Find the index of the first true value in characteristic_vector[start..start+limit]
+/// Returns None if no true value is found within the range.
+///
+/// This corresponds to the `index_of` function in the C++ implementation.
+#[inline]
+fn index_of_match(cv: &[bool], start: usize, limit: usize) -> Option<usize> {
+    for j in 0..limit {
+        if cv.get(start + j).copied().unwrap_or(false) {
+            return Some(j);
+        }
+    }
+    None
+}
+
+/// Standard Levenshtein position transition function.
+///
+/// This implementation follows the C++/Java logic exactly, including the
+/// multi-character deletion optimization via `index_of`.
+///
 /// When `prefix_mode` is true and term_index >= query_length, additional dictionary
 /// characters are treated as free matches, keeping the position "stuck" at query_length
 /// with the same error count.
@@ -111,41 +130,71 @@ fn transition_standard(
     let mut next = SmallVec::new();
     let i = position.term_index;
     let e = position.num_errors;
+    let h = 0; // cv is offset-adjusted to start at position i, so h = 0
+    let w = cv.len();
 
     // Prefix matching: if enabled and we've consumed the full query, treat any character as a free match
     if prefix_mode && i >= query_length {
-        // Keep position at query_length, don't add errors
         next.push(Position::new(i, e));
         return next;
     }
 
-    // Check cv[0] since the CV is already offset-adjusted
-    // cv[0] corresponds to query[position.term_index]
-    if !cv.is_empty() {
-        if cv[0] {
-            // Match: advance position without error
-            next.push(Position::new(i + 1, e));
-        } else if e < max_distance {
-            // Substitution: advance position with error
-            next.push(Position::new(i + 1, e + 1));
+    // Case 1: e < max_distance (can still add errors)
+    if e < max_distance {
+        // Subcase 1a: At least 2 characters remain in query (h + 2 <= w)
+        if h + 2 <= w {
+            let a = max_distance.saturating_sub(e).saturating_add(1);
+            let b = w - h;
+            let k = a.min(b);
+
+            match index_of_match(cv, h, k) {
+                Some(0) => {
+                    // Immediate match at cv[h]
+                    next.push(Position::new(i + 1, e));
+                }
+                Some(j) => {
+                    // Match found at cv[h + j]
+                    // Return: insertion, substitution, and multi-character deletion
+                    next.push(Position::new(i, e + 1));         // insertion
+                    next.push(Position::new(i + 1, e + 1));     // substitution
+                    next.push(Position::new(i + j + 1, e + j)); // deletion (skip j chars)
+                }
+                None => {
+                    // No match found in range
+                    next.push(Position::new(i, e + 1));     // insertion
+                    next.push(Position::new(i + 1, e + 1)); // substitution
+                }
+            }
+        }
+        // Subcase 1b: Exactly 1 character remains (h + 1 == w)
+        else if h + 1 == w {
+            if cv[h] {
+                // Match at last position
+                next.push(Position::new(i + 1, e));
+            } else {
+                // No match at last position
+                next.push(Position::new(i, e + 1));     // insertion
+                next.push(Position::new(i + 1, e + 1)); // substitution
+            }
+        }
+        // Subcase 1c: Past the end of query (h >= w)
+        else {
+            // Only insertion is possible
+            next.push(Position::new(i, e + 1));
         }
     }
-
-    // Insertion: consume dictionary char without advancing query position
-    // This handles the case where the dictionary has an extra character
-    if e < max_distance {
-        next.push(Position::new(i, e + 1));
+    // Case 2: e == max_distance (at max errors, only exact matches allowed)
+    else if e == max_distance && h + 1 <= w && cv[h] {
+        next.push(Position::new(i + 1, max_distance));
     }
-
-    // NOTE: Deletion (skipping query characters) is handled by having multiple
-    // positions in the state at different query indices, not during transition.
-    // The previous implementation incorrectly added (i+1, e+1) here, which
-    // duplicates the substitution operation above.
 
     next
 }
 
 /// Transposition algorithm transition (adds swap of adjacent chars)
+///
+/// This implements the transposition Levenshtein distance which allows
+/// swapping of two adjacent characters as a single edit operation.
 #[inline]
 fn transition_transposition(
     position: &Position,
@@ -154,24 +203,130 @@ fn transition_transposition(
     max_distance: usize,
     prefix_mode: bool,
 ) -> SmallVec<[Position; 4]> {
-    // Start with standard transitions
-    let mut next = transition_standard(position, cv, query_length, max_distance, prefix_mode);
-
+    let mut next = SmallVec::new();
     let i = position.term_index;
     let e = position.num_errors;
+    let t = position.is_special; // Transposition flag
+    let h = 0; // cv is offset-adjusted
+    let w = cv.len();
 
-    // Add transposition transitions
-    // Transposition: if we previously saw a mismatch, we might be swapping
-    // This is simplified - full implementation would track previous character
-    if !position.is_special && e < max_distance && i + 1 < query_length {
-        // Mark as special to indicate transposition in progress
-        next.push(Position::new_special(i + 1, e + 1));
+    // Prefix matching
+    if prefix_mode && i >= query_length {
+        next.push(Position::new(i, e));
+        return next;
+    }
+
+    // Case 1: e == 0 (no errors yet)
+    if e == 0 && max_distance > 0 {
+        if h + 2 <= w {
+            let a = max_distance.saturating_add(1);
+            let b = w - h;
+            let k = a.min(b);
+
+            match index_of_match(cv, h, k) {
+                Some(0) => {
+                    // Immediate match
+                    next.push(Position::new(i + 1, 0));
+                }
+                Some(1) => {
+                    // Match at next position - potential transposition
+                    next.push(Position::new(i, 1));          // insertion
+                    next.push(Position::new_special(i, 1));  // transposition start
+                    next.push(Position::new(i + 1, 1));      // substitution
+                    next.push(Position::new(i + 2, 1));      // special transposition
+                }
+                Some(j) => {
+                    // Match found at position j > 1
+                    next.push(Position::new(i, 1));         // insertion
+                    next.push(Position::new(i + 1, 1));     // substitution
+                    next.push(Position::new(i + j + 1, j)); // multi-char deletion
+                }
+                None => {
+                    // No match found
+                    next.push(Position::new(i, 1));     // insertion
+                    next.push(Position::new(i + 1, 1)); // substitution
+                }
+            }
+        } else if h + 1 == w {
+            if cv[h] {
+                next.push(Position::new(i + 1, 0));
+            } else {
+                next.push(Position::new(i, 1));
+                next.push(Position::new(i + 1, 1));
+            }
+        } else {
+            next.push(Position::new(i, 1));
+        }
+    }
+    // Case 2: 1 <= e < max_distance
+    else if e >= 1 && e < max_distance {
+        if h + 2 <= w {
+            if !t {
+                // Not in transposition state
+                let a = max_distance.saturating_sub(e).saturating_add(1);
+                let b = w - h;
+                let k = a.min(b);
+
+                match index_of_match(cv, h, k) {
+                    Some(0) => {
+                        next.push(Position::new(i + 1, e));
+                    }
+                    Some(1) => {
+                        next.push(Position::new(i, e + 1));
+                        next.push(Position::new_special(i, e + 1));
+                        next.push(Position::new(i + 1, e + 1));
+                        next.push(Position::new(i + 2, e + 1));
+                    }
+                    Some(j) => {
+                        next.push(Position::new(i, e + 1));
+                        next.push(Position::new(i + 1, e + 1));
+                        next.push(Position::new(i + j + 1, e + j));
+                    }
+                    None => {
+                        next.push(Position::new(i, e + 1));
+                        next.push(Position::new(i + 1, e + 1));
+                    }
+                }
+            } else {
+                // In transposition state (is_special == true)
+                if cv[h] {
+                    // Complete the transposition by matching
+                    next.push(Position::new(i + 2, e));
+                }
+                // else: no valid transitions from failed transposition
+            }
+        } else if h + 1 == w {
+            if cv[h] {
+                next.push(Position::new(i + 1, e));
+            } else {
+                next.push(Position::new(i, e + 1));
+                next.push(Position::new(i + 1, e + 1));
+            }
+        } else {
+            next.push(Position::new(i, e + 1));
+        }
+    }
+    // Case 3: e == max_distance (at max errors)
+    else if e == max_distance {
+        if h + 1 <= w && !t {
+            if cv[h] {
+                next.push(Position::new(i + 1, max_distance));
+            }
+            // else: no transitions at max distance without match
+        } else if h + 2 <= w && t && cv[h] {
+            // Complete transposition at max distance
+            next.push(Position::new(i + 2, max_distance));
+        }
     }
 
     next
 }
 
 /// Merge and split algorithm transition
+///
+/// This implements merge-and-split operations:
+/// - Merge: Two query characters combine into one dictionary character
+/// - Split: One query character expands into two dictionary characters
 #[inline]
 fn transition_merge_split(
     position: &Position,
@@ -180,22 +335,91 @@ fn transition_merge_split(
     max_distance: usize,
     prefix_mode: bool,
 ) -> SmallVec<[Position; 4]> {
-    // Start with transposition transitions (which include standard)
-    let mut next = transition_transposition(position, cv, query_length, max_distance, prefix_mode);
-
+    let mut next = SmallVec::new();
     let i = position.term_index;
     let e = position.num_errors;
+    let s = position.is_special; // Special flag for merge/split
+    let h = 0; // cv is offset-adjusted
+    let w = cv.len();
 
-    // Add merge/split operations
-    if e < max_distance {
-        // Merge: combine two query chars into one dict char
-        if i + 1 < query_length {
-            next.push(Position::new_special(i + 2, e + 1));
+    // Prefix matching
+    if prefix_mode && i >= query_length {
+        next.push(Position::new(i, e));
+        return next;
+    }
+
+    // Case 1: e == 0 (no errors yet)
+    if e == 0 && max_distance > 0 {
+        if h + 2 <= w {
+            if cv[h] {
+                // Immediate match
+                next.push(Position::new(i + 1, e));
+            } else {
+                // No match - add error operations including merge/split
+                next.push(Position::new(i, e + 1));          // insertion
+                next.push(Position::new_special(i, e + 1));  // split start
+                next.push(Position::new(i + 1, e + 1));      // substitution
+                next.push(Position::new(i + 2, e + 1));      // merge (skip 2 query chars)
+            }
+        } else if h + 1 == w {
+            if cv[h] {
+                next.push(Position::new(i + 1, e));
+            } else {
+                next.push(Position::new(i, e + 1));
+                next.push(Position::new_special(i, e + 1));
+                next.push(Position::new(i + 1, e + 1));
+            }
+        } else {
+            next.push(Position::new(i, e + 1));
         }
-
-        // Split: expand one query char into two dict chars
-        // (represented as advancing without consuming query char)
-        next.push(Position::new_special(i, e + 1));
+    }
+    // Case 2: e < max_distance (can still add errors)
+    else if e < max_distance {
+        if h + 2 <= w {
+            if !s {
+                // Not in special state
+                if cv[h] {
+                    next.push(Position::new(i + 1, e));
+                } else {
+                    next.push(Position::new(i, e + 1));
+                    next.push(Position::new_special(i, e + 1));
+                    next.push(Position::new(i + 1, e + 1));
+                    next.push(Position::new(i + 2, e + 1));
+                }
+            } else {
+                // In special state (completing split)
+                next.push(Position::new(i + 1, e));
+            }
+        } else if h + 1 == w {
+            if !s {
+                if cv[h] {
+                    next.push(Position::new(i + 1, e));
+                } else {
+                    next.push(Position::new(i, e + 1));
+                    next.push(Position::new_special(i, e + 1));
+                    next.push(Position::new(i + 1, e + 1));
+                }
+            } else {
+                // Special state at boundary
+                next.push(Position::new(i + 1, e));
+            }
+        } else {
+            next.push(Position::new(i, e + 1));
+        }
+    }
+    // Case 3: e == max_distance (at max errors)
+    else if e == max_distance {
+        if h + 1 <= w {
+            if !s {
+                if cv[h] {
+                    next.push(Position::new(i + 1, max_distance));
+                }
+                // else: no transitions at max distance without match
+            } else {
+                // Special state: can advance even at max distance (completing split)
+                next.push(Position::new(i + 1, e));
+            }
+        }
     }
 
     next
@@ -206,7 +430,12 @@ fn transition_merge_split(
 ///
 /// Optimized version that modifies the state in-place to avoid cloning.
 #[inline]
-fn epsilon_closure_mut(state: &mut State, query_length: usize, max_distance: usize) {
+fn epsilon_closure_mut(
+    state: &mut State,
+    query_length: usize,
+    max_distance: usize,
+    algorithm: Algorithm,
+) {
     // Pre-allocate with typical size to avoid reallocation
     let mut to_process: SmallVec<[Position; 8]> = SmallVec::with_capacity(8);
 
@@ -227,7 +456,7 @@ fn epsilon_closure_mut(state: &mut State, query_length: usize, max_distance: usi
             // Try to insert - State.insert handles deduplication efficiently
             // Only add to to_process if it was actually inserted (new position)
             let len_before = state.len();
-            state.insert(deleted);
+            state.insert(deleted, algorithm);
             if state.len() > len_before {
                 to_process.push(deleted);
             }
@@ -236,9 +465,14 @@ fn epsilon_closure_mut(state: &mut State, query_length: usize, max_distance: usi
 }
 
 /// Wrapper that creates a new state and applies epsilon closure
-fn epsilon_closure(state: &State, query_length: usize, max_distance: usize) -> State {
+fn epsilon_closure(
+    state: &State,
+    query_length: usize,
+    max_distance: usize,
+    algorithm: Algorithm,
+) -> State {
     let mut result = state.clone();
-    epsilon_closure_mut(&mut result, query_length, max_distance);
+    epsilon_closure_mut(&mut result, query_length, max_distance, algorithm);
     result
 }
 
@@ -259,12 +493,13 @@ fn epsilon_closure_into(
     target: &mut State,
     query_length: usize,
     max_distance: usize,
+    algorithm: Algorithm,
 ) {
     // Copy positions from source to target
     target.copy_from(source);
 
     // Apply epsilon closure in-place
-    epsilon_closure_mut(target, query_length, max_distance);
+    epsilon_closure_mut(target, query_length, max_distance, algorithm);
 }
 
 /// Transition an entire state given a dictionary character.
@@ -279,11 +514,11 @@ pub fn transition_state(
     algorithm: Algorithm,
     prefix_mode: bool,
 ) -> Option<State> {
-    let window_size = max_distance + 1;
+    let window_size = max_distance.saturating_add(1);
     let query_length = query.len();
 
     // First, compute epsilon closure to handle deletions
-    let expanded_state = epsilon_closure(state, query_length, max_distance);
+    let expanded_state = epsilon_closure(state, query_length, max_distance, algorithm);
 
     let mut next_state = State::new();
 
@@ -304,7 +539,7 @@ pub fn transition_state(
         );
 
         for next_pos in next_positions {
-            next_state.insert(next_pos);
+            next_state.insert(next_pos, algorithm);
         }
     }
 
@@ -351,14 +586,20 @@ pub fn transition_state_pooled(
     algorithm: Algorithm,
     prefix_mode: bool,
 ) -> Option<State> {
-    let window_size = max_distance + 1;
+    let window_size = max_distance.saturating_add(1);
     let query_length = query.len();
 
     // Acquire a state from pool for epsilon closure (reuses allocation!)
     let mut expanded_state = pool.acquire();
 
     // Compute epsilon closure into the pooled state (no clone!)
-    epsilon_closure_into(state, &mut expanded_state, query_length, max_distance);
+    epsilon_closure_into(
+        state,
+        &mut expanded_state,
+        query_length,
+        max_distance,
+        algorithm,
+    );
 
     // Acquire another state from pool for next state
     let mut next_state = pool.acquire();
@@ -380,7 +621,7 @@ pub fn transition_state_pooled(
         );
 
         for next_pos in next_positions {
-            next_state.insert(next_pos);
+            next_state.insert(next_pos, algorithm);
         }
     }
 
@@ -400,15 +641,15 @@ pub fn transition_state_pooled(
 ///
 /// The initial state contains positions representing all possible
 /// ways to start matching (including initial errors via deletions/insertions).
-pub fn initial_state(query_length: usize, max_distance: usize) -> State {
+pub fn initial_state(query_length: usize, max_distance: usize, algorithm: Algorithm) -> State {
     let mut state = State::new();
 
     // Start at position (0, 0) - no errors, beginning of query
-    state.insert(Position::new(0, 0));
+    state.insert(Position::new(0, 0), algorithm);
 
     // Also add positions for initial deletions (skipping query chars)
     for i in 1..=max_distance.min(query_length) {
-        state.insert(Position::new(i, i));
+        state.insert(Position::new(i, i), algorithm);
     }
 
     state
@@ -461,19 +702,23 @@ mod tests {
 
     #[test]
     fn test_initial_state() {
-        let state = initial_state(5, 2);
+        let state = initial_state(5, 2, Algorithm::Standard);
 
-        // Should have positions: (0,0), (1,1), (2,2)
+        // With Standard subsumption, (0,0) subsumes both (1,1) and (2,2)
+        // because |0-1|=1 <= (1-0)=1 and |0-2|=2 <= (2-0)=2
+        // So only (0,0) remains in the initial state.
+        //
+        // This is correct: (0,0) can reach everything that (1,1) and (2,2)
+        // can reach, so keeping only (0,0) is sufficient and more efficient.
+        assert_eq!(state.len(), 1);
         assert!(state.positions().contains(&Position::new(0, 0)));
-        assert!(state.positions().contains(&Position::new(1, 1)));
-        assert!(state.positions().contains(&Position::new(2, 2)));
     }
 
     #[test]
     fn test_transition_state() {
         let query = b"test";
         let mut state = State::new();
-        state.insert(Position::new(0, 0));
+        state.insert(Position::new(0, 0), Algorithm::Standard);
 
         let next = transition_state(&state, b't', query, 2, Algorithm::Standard, false);
         assert!(next.is_some());

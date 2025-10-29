@@ -65,7 +65,7 @@ proptest! {
     fn prop_results_within_distance(
         dict_words in small_dict_strategy(),
         query in word_strategy(),
-        max_dist in 0usize..=2
+        max_dist in 0usize..=5  // Increased from 2 to catch high-distance bugs
     ) {
         let dict = DoubleArrayTrie::from_terms(dict_words.clone());
         let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -111,7 +111,7 @@ proptest! {
     fn prop_all_close_words_found(
         dict_words in small_dict_strategy(),
         query in word_strategy(),
-        max_dist in 1usize..=2  // Start with distance 1-2
+        max_dist in 1usize..=5  // Increased from 2 to catch high-distance bugs
     ) {
         let dict = DoubleArrayTrie::from_terms(dict_words.clone());
         let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -137,21 +137,21 @@ proptest! {
 mod manual_shrink_tests {
     use super::*;
     
-    /// If proptest finds a failing case, we can manually create a minimal test here
+    /// Regression test: This was a minimal failing case discovered by proptest
+    /// that helped identify the deletion bug. Now fixed and serves as a regression test.
     #[test]
-    #[ignore] // Remove #[ignore] when you have a minimal failing case from proptest
     fn minimal_failing_case_from_proptest() {
-        // Example: proptest might find this minimal case
-        // Dict: ["abc", "xyz"], query: "abcd", distance: 1
-        // Expected: "abc" should be found (1 deletion)
-        
+        // Original failing case: Dict ["test", "apple", "world"], query "testt", distance 1
+        // Expected: "test" should be found (1 deletion from query)
+        // This bug was fixed in the Levenshtein query iterator
+
         let dict = DoubleArrayTrie::from_terms(vec!["test", "apple", "world"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
         let results: Vec<_> = transducer.query("testt", 1).collect();
-        
+
         assert!(
             results.contains(&"test".to_string()),
-            "Minimal failing case: 'testt' should find 'test' with distance 1"
+            "Regression: 'testt' should find 'test' with distance 1"
         );
     }
 }

@@ -129,7 +129,7 @@ impl DawgQueryIterator {
         algorithm: Algorithm,
     ) -> Self {
         let query_bytes = query.into_bytes();
-        let initial = initial_state(query_bytes.len(), max_distance);
+        let initial = initial_state(query_bytes.len(), max_distance, algorithm);
 
         let mut pending = VecDeque::new();
         pending.push_back(Box::new(DawgIntersection::new(0, initial)));

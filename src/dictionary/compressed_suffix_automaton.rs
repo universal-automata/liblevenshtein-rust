@@ -144,6 +144,8 @@ struct CompressedSuffixAutomatonInner {
     source_texts: Vec<String>,
 
     /// Compaction flag.
+    /// TODO: Reserved for future garbage collection support
+    #[allow(dead_code)]
     needs_compaction: bool,
 }
 

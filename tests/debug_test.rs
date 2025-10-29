@@ -7,7 +7,7 @@ fn test_transition_debug() {
     let max_distance = 0;
 
     // Initial state
-    let state = initial_state(query.len(), max_distance);
+    let state = initial_state(query.len(), max_distance, Algorithm::Standard);
     println!("Initial state positions: {:?}", state.positions());
 
     // Try transitioning with 't'

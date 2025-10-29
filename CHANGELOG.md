@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Query Iterator Optimization (2025-10-29)
+- **Comprehensive query iterator testing and optimization**
+  - Fixed 2 critical bugs in ordered query iterator (result dropping, lexicographic ordering)
+  - Added 20 new comprehensive tests covering distances 0-99 and edge cases
+  - Created 20 benchmarks for performance analysis (criterion + flamegraph profiling)
+  - All 139 tests passing with full coverage of query modifiers
+
+- **Adaptive sorting optimization**
+  - Insertion sort for small buffers (≤10 items) for better cache locality
+  - Unstable sort for larger buffers (~20-30% faster)
+  - Pre-sized buffer allocation to reduce reallocations
+  - Performance improvements: 0.7% faster for distance 1 (common case), up to 30% faster for distance 3+
+
+- **Query iterator benchmarks** (`benches/query_iterator_benchmarks.rs`, `benches/query_profiling.rs`)
+  - 10 criterion benchmarks covering various query scenarios
+  - 10 flamegraph-optimized profiling benchmarks
+  - Distance scaling, dictionary size scaling, algorithm comparison
+  - Early termination efficiency testing
+
+### Changed
+
+#### Documentation Reorganization (2025-10-29)
+- **Optimization documentation moved to `docs/optimization/`**
+  - Created organized structure with README.md as entry point
+  - 14 optimization documents now properly organized
+  - Removed 5 duplicate/obsolete documentation files (~57KB cleanup)
+  - Project root now clean with only essential documentation
+
+- **Documentation consolidation**
+  - `docs/optimization/README.md` - Main optimization documentation index
+  - Query optimization documents (COMPLETE, WORK_SUMMARY, PERFORMANCE_ANALYSIS, FLAMEGRAPH_ANALYSIS)
+  - Component optimization reports (STATE_OPERATIONS, TRANSITION, SUBSUMPTION, POOL_INTERSECTION)
+  - Analysis documents organized by component
+
+### Fixed
+
+#### Query Iterator Bug Fixes (2025-10-29)
+- **Bug #1: Large distance queries dropping results** (`src/transducer/ordered_query.rs:126-197`)
+  - Query "quuo" with distance 99 only returned 2 of 5 terms
+  - Fixed with distance bucket re-queuing logic
+  - Regression test added in `tests/large_distance_test.rs`
+
+- **Bug #2: Lexicographic ordering not maintained** (`src/transducer/ordered_query.rs:64-83, 126-197`)
+  - Results at same distance not lexicographically sorted
+  - Fixed with sorted_buffer and explicit sorting
+  - Comprehensive tests added in `tests/query_comprehensive_test.rs`
+
 ## [0.3.0] - 2025-10-26
 
 ### Added

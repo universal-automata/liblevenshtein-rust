@@ -113,6 +113,7 @@ use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 /// set of ending positions (endpos). This minimizes the number of states while
 /// maintaining the ability to recognize all substrings.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 struct SuffixNode {
     /// Outgoing edges: (byte label, target state index).
     ///
@@ -214,6 +215,7 @@ impl SuffixNode {
 /// This is wrapped in Arc<RwLock<...>> to provide thread-safe concurrent access
 /// with dynamic mutation support.
 #[derive(Debug)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 struct SuffixAutomatonInner {
     /// Node storage (index-based graph).
     ///
@@ -795,6 +797,31 @@ impl SuffixAutomaton {
 impl Default for SuffixAutomaton {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(feature = "serialization")]
+impl serde::Serialize for SuffixAutomaton {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Extract the inner data by acquiring read lock
+        let inner = self.inner.read().unwrap();
+        inner.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serialization")]
+impl<'de> serde::Deserialize<'de> for SuffixAutomaton {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = SuffixAutomatonInner::deserialize(deserializer)?;
+        Ok(SuffixAutomaton {
+            inner: Arc::new(RwLock::new(inner)),
+        })
     }
 }
 

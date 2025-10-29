@@ -29,6 +29,7 @@ use std::sync::Arc;
 /// - **Lookup**: O(m) where m is the query term length
 /// - **Thread-safe**: Fully immutable, safe for concurrent access
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub struct DawgDictionary {
     nodes: Arc<Vec<DawgNode>>,
     term_count: usize,
@@ -40,6 +41,7 @@ pub struct DawgDictionary {
 /// - A vector of edges (label, target_node_id)
 /// - A flag indicating if this node represents a complete word
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub struct DawgNode {
     /// Edges to child nodes: (byte label, target node index)
     pub edges: Vec<(u8, usize)>,

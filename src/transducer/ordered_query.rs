@@ -76,6 +76,10 @@ pub struct OrderedQueryIterator<N: DictionaryNode> {
     state_pool: StatePool,
     /// Substring matching mode (for suffix automata)
     substring_mode: bool,
+    /// Sorted buffer for current distance level (ensures lexicographic ordering)
+    sorted_buffer: Vec<OrderedCandidate>,
+    /// Index into sorted_buffer for next result
+    buffer_index: usize,
 }
 
 impl<N: DictionaryNode> OrderedQueryIterator<N> {
@@ -93,7 +97,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
         substring_mode: bool,
     ) -> Self {
         let query_bytes = query.into_bytes();
-        let initial = initial_state(query_bytes.len(), max_distance);
+        let initial = initial_state(query_bytes.len(), max_distance, algorithm);
 
         // Create buckets for each distance level (0..=max_distance)
         // Pre-allocate capacity to reduce reallocations during traversal
@@ -112,19 +116,33 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             algorithm,
             state_pool: StatePool::new(),
             substring_mode,
+            sorted_buffer: Vec::with_capacity(64),  // Heuristic: typical max results per distance
+            buffer_index: 0,
         }
     }
 
     /// Advance to the next match in order
     #[inline]
     fn advance(&mut self) -> Option<OrderedCandidate> {
-        // Explore distance levels in ascending order
+        // First, check if we have buffered results to yield
+        if self.buffer_index < self.sorted_buffer.len() {
+            let result = self.sorted_buffer[self.buffer_index].clone();
+            self.buffer_index += 1;
+            return Some(result);
+        }
+
+        // Buffer is exhausted, need to collect next distance level
         while self.current_distance <= self.max_distance {
-            // Try to get next intersection from current distance level
-            if let Some(intersection) = self.pending_by_distance[self.current_distance].pop_front()
+            // Clear buffer and reset index for new distance level
+            self.sorted_buffer.clear();
+            self.buffer_index = 0;
+
+            // Collect ALL results at the current distance level
+            while let Some(intersection) = self.pending_by_distance[self.current_distance].pop_front()
             {
                 // Check if this is a final match
-                if intersection.is_final() {
+                let is_final = intersection.is_final();
+                if is_final {
                     // Compute distance based on matching mode
                     let distance = if self.substring_mode {
                         // Substring mode: don't penalize unmatched query suffix
@@ -137,24 +155,55 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
                             .unwrap_or(usize::MAX)
                     };
 
-                    if distance <= self.max_distance && distance == self.current_distance {
-                        let term = intersection.term();
+                    if distance <= self.max_distance {
+                        if distance == self.current_distance {
+                            // Distance matches current level - add to buffer
+                            let term = intersection.term();
+                            self.sorted_buffer.push(OrderedCandidate { distance, term });
 
-                        // Queue children for further exploration
+                            // Queue children for further exploration
+                            self.queue_children(&intersection);
+                        } else if distance > self.current_distance {
+                            // Actual distance is higher than bucket - requeue to correct bucket
+                            // This can happen when min_dist underestimates final distance
+                            self.pending_by_distance[distance].push_back(intersection);
+                        }
+                        // If distance < current_distance, skip (already passed that level)
+                    } else {
+                        // Distance exceeds max_distance, but still queue children
                         self.queue_children(&intersection);
-
-                        return Some(OrderedCandidate { distance, term });
                     }
-                }
-
-                // Queue children even if not final (continue exploring)
-                if !intersection.is_final() {
+                } else {
+                    // Not final, queue children for further exploration
                     self.queue_children(&intersection);
                 }
-            } else {
-                // Current distance level exhausted, move to next
-                self.current_distance += 1;
             }
+
+            // If we collected any results at this distance, sort them and return first
+            if !self.sorted_buffer.is_empty() {
+                // Adaptive sorting: insertion sort for small n, unstable sort for larger n
+                // Threshold of 10 is empirically good for sorting algorithms crossover
+                if self.sorted_buffer.len() <= 10 {
+                    // For small buffers, insertion sort is faster due to better cache locality
+                    for i in 1..self.sorted_buffer.len() {
+                        let mut j = i;
+                        while j > 0 && self.sorted_buffer[j].term < self.sorted_buffer[j - 1].term {
+                            self.sorted_buffer.swap(j, j - 1);
+                            j -= 1;
+                        }
+                    }
+                } else {
+                    // For larger buffers, use unstable sort (faster, doesn't preserve order of equal elements)
+                    self.sorted_buffer.sort_unstable_by(|a, b| a.term.cmp(&b.term));
+                }
+
+                // Return first result from buffer
+                self.buffer_index = 1;
+                return Some(self.sorted_buffer[0].clone());
+            }
+
+            // No results at this distance, move to next
+            self.current_distance += 1;
         }
 
         None

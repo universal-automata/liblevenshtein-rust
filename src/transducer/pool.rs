@@ -65,13 +65,23 @@ impl StatePool {
     /// Initial capacity hint for the pool
     const INITIAL_CAPACITY: usize = 16;
 
-    /// Create a new empty state pool.
+    /// Create a new state pool with pre-warmed states.
     ///
-    /// The pool starts empty and will grow as states are released back to it.
+    /// The pool is pre-warmed with 4 states to avoid initial allocation overhead.
+    /// Based on profiling, most queries acquire 2-4 states during traversal.
+    /// Pre-warming eliminates the cold-start penalty for the first few transitions.
     pub fn new() -> Self {
+        const PREWARM_SIZE: usize = 4;
+        let mut pool = Vec::with_capacity(Self::INITIAL_CAPACITY);
+
+        // Pre-allocate states to avoid cold-start penalty
+        for _ in 0..PREWARM_SIZE {
+            pool.push(State::new());
+        }
+
         Self {
-            pool: Vec::with_capacity(Self::INITIAL_CAPACITY),
-            allocations: 0,
+            pool,
+            allocations: PREWARM_SIZE, // Count pre-warmed allocations
             reuses: 0,
         }
     }
@@ -161,8 +171,9 @@ mod tests {
     #[test]
     fn test_pool_new() {
         let pool = StatePool::new();
-        assert_eq!(pool.pool_size(), 0);
-        assert_eq!(pool.total_allocations(), 0);
+        // Pool is pre-warmed with 4 states
+        assert_eq!(pool.pool_size(), 4);
+        assert_eq!(pool.total_allocations(), 4);
         assert_eq!(pool.total_reuses(), 0);
     }
 
@@ -170,39 +181,43 @@ mod tests {
     fn test_pool_acquire_allocates_when_empty() {
         let mut pool = StatePool::new();
 
+        // Pool starts with 4 pre-warmed states, so first acquire reuses
         let state = pool.acquire();
         assert!(state.is_empty());
-        assert_eq!(pool.total_allocations(), 1);
-        assert_eq!(pool.total_reuses(), 0);
+        assert_eq!(pool.total_allocations(), 4); // Pre-warmed allocations
+        assert_eq!(pool.total_reuses(), 1); // First acquire is a reuse
     }
 
     #[test]
     fn test_pool_acquire_reuses_when_available() {
         let mut pool = StatePool::new();
 
-        // Acquire and release a state
+        // Acquire and release a state (from pre-warmed pool)
         let state = pool.acquire();
         pool.release(state);
 
-        assert_eq!(pool.pool_size(), 1);
+        assert_eq!(pool.pool_size(), 4); // 3 pre-warmed + 1 released
 
         // Acquire again - should reuse
         let state2 = pool.acquire();
         assert!(state2.is_empty());
-        assert_eq!(pool.total_allocations(), 1);
-        assert_eq!(pool.total_reuses(), 1);
-        assert_eq!(pool.pool_size(), 0);
+        assert_eq!(pool.total_allocations(), 4); // Still just pre-warmed
+        assert_eq!(pool.total_reuses(), 2); // Two reuses
+        assert_eq!(pool.pool_size(), 3); // Back to 3 in pool
     }
 
     #[test]
     fn test_pool_release_clears_state() {
+        use super::super::algorithm::Algorithm;
+
         let mut pool = StatePool::new();
 
         // Acquire a state and add positions
+        // Note: (1,0) subsumes (2,1) with Standard subsumption: |1-2|=1 <= (1-0)=1
         let mut state = pool.acquire();
-        state.insert(Position::new(1, 0));
-        state.insert(Position::new(2, 1));
-        assert_eq!(state.len(), 2);
+        state.insert(Position::new(1, 0), Algorithm::Standard);
+        state.insert(Position::new(2, 1), Algorithm::Standard); // Subsumed by (1,0)
+        assert_eq!(state.len(), 1); // Only (1,0) remains
 
         // Release it
         pool.release(state);
@@ -232,49 +247,55 @@ mod tests {
     fn test_pool_reuse_rate() {
         let mut pool = StatePool::new();
 
-        // No acquires yet
+        // Pool pre-warmed with 4, but no acquires yet
         assert_eq!(pool.reuse_rate(), 0.0);
 
-        // First acquire - allocation
+        // First acquire - reuse from pre-warmed
         let state1 = pool.acquire();
         pool.release(state1);
 
         // Second acquire - reuse
         let _state2 = pool.acquire();
 
-        // 1 allocation + 1 reuse = 50% reuse rate
-        assert!((pool.reuse_rate() - 0.5).abs() < 1e-6);
+        // 4 allocations + 2 reuses = 2/6 = 33.3% reuse rate
+        let expected = 2.0 / 6.0;
+        assert!((pool.reuse_rate() - expected).abs() < 1e-6);
     }
 
     #[test]
     fn test_pool_lifo_order() {
+        use super::super::algorithm::Algorithm;
+
         let mut pool = StatePool::new();
 
-        // Release two states
+        // Pool starts with 4 pre-warmed states
+        // Release two more states
         let mut state1 = State::new();
-        state1.insert(Position::new(1, 0));
+        state1.insert(Position::new(1, 0), Algorithm::Standard);
         pool.release(state1);
 
         let mut state2 = State::new();
-        state2.insert(Position::new(2, 0));
+        state2.insert(Position::new(2, 0), Algorithm::Standard);
         pool.release(state2);
 
         // Acquire should get state2 first (LIFO)
         let acquired = pool.acquire();
         assert!(acquired.is_empty()); // Should be cleared
 
-        // Pool should have 1 state left
-        assert_eq!(pool.pool_size(), 1);
+        // Pool should have 5 states left (4 pre-warmed + 1 remaining)
+        assert_eq!(pool.pool_size(), 5);
     }
 
     #[test]
     fn test_pool_capacity_preserved() {
+        use super::super::algorithm::Algorithm;
+
         let mut pool = StatePool::new();
 
         // Create a state with some capacity
         let mut state = pool.acquire();
         for i in 0..10 {
-            state.insert(Position::new(i, 0));
+            state.insert(Position::new(i, 0), Algorithm::Standard);
         }
 
         // The state's Vec should have capacity >= 10
@@ -287,7 +308,7 @@ mod tests {
         // Add 10 more positions - should not need reallocation
         // (This is an implementation detail test)
         for i in 0..10 {
-            state2.insert(Position::new(i, 0));
+            state2.insert(Position::new(i, 0), Algorithm::Standard);
         }
         assert_eq!(state2.len(), 10);
     }

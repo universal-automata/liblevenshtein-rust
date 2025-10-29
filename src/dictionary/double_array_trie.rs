@@ -107,11 +107,54 @@ struct DATShared {
     edges: Arc<Vec<Vec<u8>>>,
 }
 
+/// A compact, cache-efficient dictionary implementation using the Double-Array Trie data structure.
+///
+/// # Overview
+///
+/// Double-Array Trie (DAT) is a space-efficient trie implementation that uses two parallel
+/// arrays (BASE and CHECK) to represent state transitions. This provides:
+///
+/// - **Compact memory footprint**: O(n) space where n is alphabet size × number of states
+/// - **Fast lookups**: O(m) time where m is the query length, with excellent cache locality
+/// - **Static structure**: Optimized for read-heavy workloads after construction
+///
+/// # Performance Characteristics
+///
+/// - **Lookup**: O(m) where m is string length - excellent cache performance
+/// - **Construction**: O(n × m) where n is term count, m is average length
+/// - **Memory**: More compact than tree-based tries, comparable to DAWG
+/// - **Thread-safety**: Fully concurrent reads via Arc-based sharing
+///
+/// # Use Cases
+///
+/// Best suited for:
+/// - Static or rarely-modified dictionaries
+/// - Memory-constrained environments
+/// - High-throughput exact matching
+/// - Applications requiring fast startup (quick deserialization)
+///
+/// # Serialization
+///
+/// Supports multiple formats when the `serialization` feature is enabled:
+/// - **Bincode**: Fast binary format, smallest size
+/// - **JSON**: Human-readable, portable across platforms
+/// - **Gzip compression**: Available for both formats via `compression` feature
+///
+/// # Example
+///
+/// ```
+/// use liblevenshtein::prelude::*;
+///
+/// let terms = vec!["apple", "application", "apply"];
+/// let dict = DoubleArrayTrie::from_terms(terms);
+///
+/// assert!(dict.contains("apple"));
+/// assert!(!dict.contains("apricot"));
+/// ```
 #[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct DoubleArrayTrie {
     /// Shared data referenced by all nodes
-    #[cfg_attr(feature = "serialization", serde(flatten))]
     shared: DATShared,
 
     /// Free list for deleted/unused states
@@ -143,6 +186,8 @@ pub struct DoubleArrayTrieBuilder {
     term_count: usize,
 
     /// Next available state index
+    /// TODO: Reserved for future incremental construction support
+    #[allow(dead_code)]
     next_state: usize,
 
     /// Rebuild threshold

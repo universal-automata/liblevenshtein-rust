@@ -21,7 +21,7 @@ fn trace_aple_to_apple() {
         query.len()
     );
 
-    let mut state = initial_state(query.len(), max_distance);
+    let mut state = initial_state(query.len(), max_distance, Algorithm::Standard);
     println!("\nInitial state: {:?}", state);
 
     // Traverse 'a'
