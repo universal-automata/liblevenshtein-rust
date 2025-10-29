@@ -89,6 +89,73 @@ fn test_exact_match_with_prefix() {
     let results_za: Vec<_> = transducer.query("za", 0).collect();
     assert!(
         results_za.contains(&"za".to_string()),
-        "Should find exact match for 'za' (currently fails due to automaton bug)"
+        "Should find exact match for 'za'"
     );
+}
+
+#[test]
+fn test_dat_conflict_rh_qpo_ry() {
+    // Regression test: proptest found this minimal case
+    // Bug: DAT conflict resolution didn't preserve all children
+    let dict = DoubleArrayTrie::from_terms(vec!["rh", "qpo", "ry"]);
+
+    assert!(dict.contains("rh"), "DAT should contain 'rh'");
+    assert!(dict.contains("qpo"), "DAT should contain 'qpo'");
+    assert!(dict.contains("ry"), "DAT should contain 'ry'");
+
+    let transducer = Transducer::new(dict, Algorithm::Standard);
+    let results: Vec<_> = transducer.query("rh", 0).collect();
+    assert!(results.contains(&"rh".to_string()), "Should find 'rh'");
+}
+
+#[test]
+fn test_dat_grandchildren_gjzhkidoa_gl() {
+    // Regression test: proptest found this minimal case
+    // Bug: DAT relocation didn't update grandchildren's CHECK pointers
+    let dict = DoubleArrayTrie::from_terms(vec!["gjzhkidoa", "gl"]);
+
+    assert!(dict.contains("gjzhkidoa"), "DAT should contain 'gjzhkidoa'");
+    assert!(dict.contains("gl"), "DAT should contain 'gl'");
+
+    let transducer = Transducer::new(dict, Algorithm::Standard);
+    let results: Vec<_> = transducer.query("gjzhkidoa", 0).collect();
+    assert!(
+        results.contains(&"gjzhkidoa".to_string()),
+        "Should find 'gjzhkidoa'"
+    );
+}
+
+#[test]
+fn test_levenshtein_prefix_ve_v() {
+    // Regression test: proptest found this case
+    // Bug: query iteration didn't explore children of final nodes with distance > max
+    let dict = DoubleArrayTrie::from_terms(vec!["ve", "v"]);
+
+    let transducer = Transducer::new(dict, Algorithm::Standard);
+    let results: Vec<_> = transducer.query("ae", 1).collect();
+
+    // "ve" has distance 1 from "ae" (substitute 'a'->'v', match 'e')
+    assert!(
+        results.contains(&"ve".to_string()),
+        "Should find 've' from query 'ae' with distance 1"
+    );
+}
+
+#[test]
+fn test_dat_base_calculation_n_a_ag() {
+    // Regression test: original DAT bug from first proptest run
+    // Bug: find_free_base was subtracting bytes[0], causing off-by-one errors
+    let dict = DoubleArrayTrie::from_terms(vec!["n", "a", "ag"]);
+
+    assert!(dict.contains("n"), "DAT should contain 'n'");
+    assert!(dict.contains("a"), "DAT should contain 'a'");
+    assert!(dict.contains("ag"), "DAT should contain 'ag'");
+
+    let transducer = Transducer::new(dict, Algorithm::Standard);
+
+    let results_a: Vec<_> = transducer.query("a", 0).collect();
+    assert!(results_a.contains(&"a".to_string()), "Should find 'a'");
+
+    let results_ag: Vec<_> = transducer.query("ag", 0).collect();
+    assert!(results_ag.contains(&"ag".to_string()), "Should find 'ag'");
 }
