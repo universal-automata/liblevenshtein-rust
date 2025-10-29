@@ -5,3 +5,5 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 16de993f2e88d74379163d86ed07eb013108569d32ba7a1aaa9e90eba12730b2 # shrinks to dict_words = ["n", "a", "ag"], query = "a", max_dist = 1
+cc 53b74fa37e9d9351d568a261bf57292752666074b5dfd71802a531c678093b5e # shrinks to mut dict_words = ["za", "z"]
+cc 5c552af009fd4f7102d18f5ee581a8b9ee462965cf64e281ecbb632617266c01 # shrinks to dict_words = ["ve", "v"], query = "ae", max_dist = 1

@@ -47,26 +47,6 @@ fn test_apple_to_aple() {
 }
 
 #[test]
-#[ignore] // TODO: Fix Levenshtein automaton bug with specific dictionary configurations
-//
-// KNOWN ISSUE: The transducer fails to find matches in specific dictionary configurations.
-//
-// Failing cases:
-// - Dict ["test", "apple", "world"], query "testt" (distance 1) → should find "test" but doesn't
-// - Dict ["test", "testing", "apple", "world"], query "testt" (distance 1) → should find "test" but doesn't
-// - Dict ["test", "testing", "apple", "world"], query "aple" (distance 1) → should find "apple" but doesn't
-//
-// Working cases:
-// - Dict ["test"], query "testt" (distance 1) → finds "test" ✓
-// - Dict ["test", "testing"], query "testt" (distance 1) → finds "test" ✓
-// - Dict ["test", "testing", "apple"], query "testt" (distance 1) → finds "test" ✓
-// - Dict ["test", "testing", "world"], query "testt" (distance 1) → finds "test" ✓
-//
-// The bug appears when certain combinations of words create specific trie structures.
-// This is a pre-existing algorithmic issue in the Levenshtein automaton implementation,
-// not related to DoubleArrayTrie specifically (reproduces with other backends too).
-//
-// See: https://github.com/universal-automata/liblevenshtein-rust/issues/TBD
 fn test_deletion_operations() {
     // Test various deletion scenarios
     let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "apple", "world"]);
@@ -86,5 +66,50 @@ fn test_deletion_operations() {
     assert!(
         results.contains(&"apple".to_string()),
         "'aple' should match 'apple'"
+    );
+}
+
+#[test]
+#[ignore] // TODO: Fix Levenshtein automaton exact match bug with prefix words
+//
+// KNOWN ISSUE: When querying for an exact match (distance=0) of a word that is
+// a prefix of another word in the dictionary, the query fails to find it.
+//
+// Failing case:
+// - Dict ["z", "za"], query "za" (distance 0) → should find "za" but doesn't
+// - Dict contains("za") returns true ✓
+// - Manual traversal shows "za" is final ✓
+// - But query("za", 0) returns empty []
+//
+// Working cases:
+// - Dict ["z", "za"], query "z" (distance 0) → finds "z" ✓
+// - Dict ["za"], query "za" (distance 0) → finds "za" ✓
+// - Dict ["z", "za"], query "za" (distance 1) → finds "za" ✓ (only fails with distance=0)
+//
+// This is a bug in the Levenshtein automaton traversal logic when handling
+// exact matches where the query term has a prefix in the dictionary.
+// Affects ALL dictionary backends (not DAT-specific).
+//
+// Discovered by proptest: minimal failing case ["za", "z"]
+fn test_exact_match_with_prefix() {
+    let dict = DoubleArrayTrie::from_terms(vec!["z", "za"]);
+    let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
+
+    // Verify dictionary contains both terms
+    assert!(dict.contains("z"));
+    assert!(dict.contains("za"));
+
+    // Query for "z" should work
+    let results_z: Vec<_> = transducer.query("z", 0).collect();
+    assert!(
+        results_z.contains(&"z".to_string()),
+        "Should find exact match for 'z'"
+    );
+
+    // Query for "za" should work but currently fails
+    let results_za: Vec<_> = transducer.query("za", 0).collect();
+    assert!(
+        results_za.contains(&"za".to_string()),
+        "Should find exact match for 'za' (currently fails due to automaton bug)"
     );
 }
