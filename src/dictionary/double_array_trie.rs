@@ -258,9 +258,64 @@ impl DoubleArrayTrieBuilder {
         }
 
         if self.check[next_state] >= 0 {
-            // Conflict! Need to relocate (simplified: allocate new slot)
-            // In a full implementation, we'd relocate the smaller subtree
-            let new_base = self.find_free_base(next_state + 1, &[byte]);
+            // Conflict! Need to find a new BASE that accommodates ALL children
+            // Collect all existing children of this state
+            let mut all_bytes = Vec::new();
+            let old_base = self.base[state];
+
+            // Find existing transitions
+            for b in 0u8..=255 {
+                let child = (old_base as usize).wrapping_add(b as usize);
+                if child < self.check.len() && self.check[child] == state as i32 {
+                    all_bytes.push(b);
+                }
+            }
+
+            // Add the new byte we're trying to insert
+            all_bytes.push(byte);
+
+            // Find a BASE that works for ALL bytes
+            let new_base = self.find_free_base(next_state + 1, &all_bytes);
+
+            // Relocate all existing children to new BASE
+            for &b in &all_bytes {
+                if b == byte {
+                    continue; // Skip the new one, we'll add it below
+                }
+
+                let old_child = (old_base as usize).wrapping_add(b as usize);
+                let new_child = (new_base as usize).wrapping_add(b as usize);
+
+                // Ensure new slot exists
+                while new_child >= self.check.len() {
+                    self.base.push(-1);
+                    self.check.push(-1);
+                    self.is_final.push(false);
+                }
+
+                // Move the child's data
+                self.check[new_child] = state as i32; // CHECK points to parent
+                self.base[new_child] = self.base[old_child];
+                self.is_final[new_child] = self.is_final[old_child];
+
+                // Update all grandchildren's CHECK pointers
+                if self.base[old_child] >= 0 {
+                    let child_base = self.base[old_child] as usize;
+                    for gc_byte in 0u8..=255 {
+                        let grandchild = child_base + (gc_byte as usize);
+                        if grandchild < self.check.len() && self.check[grandchild] == old_child as i32 {
+                            self.check[grandchild] = new_child as i32;
+                        }
+                    }
+                }
+
+                // Clear old slot
+                self.check[old_child] = -1;
+                self.base[old_child] = -1;
+                self.is_final[old_child] = false;
+            }
+
+            // Update state's BASE
             self.base[state] = new_base;
             let new_next = (new_base as usize).wrapping_add(byte as usize);
 
