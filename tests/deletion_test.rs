@@ -70,27 +70,6 @@ fn test_deletion_operations() {
 }
 
 #[test]
-#[ignore] // TODO: Fix Levenshtein automaton exact match bug with prefix words
-//
-// KNOWN ISSUE: When querying for an exact match (distance=0) of a word that is
-// a prefix of another word in the dictionary, the query fails to find it.
-//
-// Failing case:
-// - Dict ["z", "za"], query "za" (distance 0) → should find "za" but doesn't
-// - Dict contains("za") returns true ✓
-// - Manual traversal shows "za" is final ✓
-// - But query("za", 0) returns empty []
-//
-// Working cases:
-// - Dict ["z", "za"], query "z" (distance 0) → finds "z" ✓
-// - Dict ["za"], query "za" (distance 0) → finds "za" ✓
-// - Dict ["z", "za"], query "za" (distance 1) → finds "za" ✓ (only fails with distance=0)
-//
-// This is a bug in the Levenshtein automaton traversal logic when handling
-// exact matches where the query term has a prefix in the dictionary.
-// Affects ALL dictionary backends (not DAT-specific).
-//
-// Discovered by proptest: minimal failing case ["za", "z"]
 fn test_exact_match_with_prefix() {
     let dict = DoubleArrayTrie::from_terms(vec!["z", "za"]);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);

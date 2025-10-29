@@ -83,12 +83,7 @@ proptest! {
     }
     
     /// Property: If a word is in the dictionary and distance=0, it should be found
-    ///
-    /// Currently ignored due to known bug: when a word is a prefix of another word
-    /// in the dictionary, exact match queries fail. See test_exact_match_with_prefix
-    /// in deletion_test.rs for details.
     #[test]
-    #[ignore]
     fn prop_exact_match_found(
         dict_words in small_dict_strategy(),
     ) {
@@ -111,14 +106,8 @@ proptest! {
     
     /// Property: All words in dictionary within max_distance should be found
     ///
-    /// Currently ignored due to known bug: when a word is a prefix of another word
-    /// in the dictionary, queries can fail to find words. Examples:
-    /// - Dict ["ve", "v"], query "ae" (distance 1) → should find "ve" but doesn't
-    /// - Dict ["z", "za"], query "za" (distance 0) → should find "za" but doesn't
-    ///
     /// This is the key property that can help find the deletion bug!
     #[test]
-    #[ignore]
     fn prop_all_close_words_found(
         dict_words in small_dict_strategy(),
         query in word_strategy(),

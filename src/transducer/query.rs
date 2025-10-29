@@ -89,11 +89,14 @@ impl<N: DictionaryNode> QueryIterator<N> {
                     self.queue_children(&intersection);
 
                     return Some(term);
+                } else {
+                    // Even if this final node is too far, we must still explore its children
+                    // Example: dict ["z", "za"], query "za" (dist=0)
+                    // At 'z': is_final=true, distance=1 (too far), but we must explore 'a'
+                    self.queue_children(&intersection);
                 }
-            }
-
-            // Queue children even if not final (continue exploring)
-            if !intersection.is_final() {
+            } else {
+                // Not final: queue children to continue exploring
                 self.queue_children(&intersection);
             }
         }
