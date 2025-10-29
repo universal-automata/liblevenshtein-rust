@@ -33,6 +33,12 @@ Start here if you're new to liblevenshtein-rust:
   - Performance optimization strategies
   - Real-world integration examples
 
+- **[Hierarchical Scope Completion](guides/HIERARCHICAL_SCOPE_COMPLETION.md)** - ⭐ **NEW**
+  - Contextual code completion with lexical scoping
+  - Sorted vector and bitmask intersection helpers
+  - 4.7% faster than HashSet baseline
+  - Quick start guide with examples
+
 ### Advanced Topics
 
 - **[DAWG Backend](DYNAMIC_DAWG.md)** - Directed Acyclic Word Graph implementation
@@ -70,6 +76,26 @@ Detailed historical analysis in [`archive/performance/`](archive/performance/):
 
 ---
 
+## 🔬 Analysis & Research
+
+In-depth analysis of recent feature development and optimization work:
+
+### Fuzzy Maps Optimization
+**[Fuzzy Maps Analysis](analysis/fuzzy-maps/)** - 7-phase optimization journey
+- Initial regression: -7.1% after adding generic value support
+- Final result: **+5.8% improvement** over baseline
+- Comprehensive flame graph profiling and targeted fixes
+- Production-ready with all 154 tests passing
+
+### Hierarchical Scope Completion
+**[Hierarchical Scope Analysis](analysis/hierarchical-scope/)** - Design and benchmarks
+- Evaluated 6 different approaches
+- Winner: Sorted Vector (4.7% faster than HashSet)
+- Alternative: Bitmask (7.9% faster for ≤64 scopes)
+- 4 test scenarios with 10,000 terms each
+
+---
+
 ## 🔧 Development
 
 - **[Publishing Guide](PUBLISHING.md)** - Requirements for publishing to crates.io
@@ -88,21 +114,46 @@ Detailed historical analysis in [`archive/performance/`](archive/performance/):
 
 ```
 docs/
-├── README.md (this file)          # Documentation index
+├── README.md (this file)           # Documentation index
 │
-├── User Guides
+├── guides/                         # User-facing documentation
 │   ├── FEATURES.md                 # Feature overview (v0.2.0)
 │   ├── CODE_COMPLETION_GUIDE.md    # Code completion tutorial
 │   ├── DYNAMIC_DAWG.md             # DAWG backend guide
 │   ├── PATHMAP_THREAD_SAFETY.md    # Thread safety patterns
-│   └── PROTOBUF_SERIALIZATION.md   # Protobuf format guide
+│   ├── PROTOBUF_SERIALIZATION.md   # Protobuf format guide
+│   └── HIERARCHICAL_SCOPE_COMPLETION.md  # ⭐ NEW: Scope completion guide
 │
-├── Performance & Development
+├── analysis/                       # ⭐ NEW: Research & optimization analysis
+│   ├── fuzzy-maps/                 # Fuzzy maps 7-phase optimization
+│   │   ├── 00_README.md            # Index of optimization journey
+│   │   ├── 01_BASELINE_ANALYSIS.md
+│   │   ├── 02_PHASE1_OPTIMIZATION.md
+│   │   ├── 03_BENCHMARK_RESULTS.md
+│   │   ├── 04_PROFILING_ANALYSIS.md
+│   │   ├── 05_PHASE4_OPTIMIZATION.md
+│   │   ├── 06_SERIALIZATION_ASSESSMENT.md
+│   │   └── 07_FINAL_REPORT.md      # ⭐ Complete summary
+│   │
+│   └── hierarchical-scope/         # Hierarchical scope analysis
+│       ├── README.md               # Index of design & results
+│       ├── DESIGN.md               # 6 approaches evaluated
+│       └── RESULTS.md              # Benchmark results
+│
+├── optimization/                   # Query optimization work ✅ Well-organized
+│   ├── README.md                   # Central index
+│   ├── QUERY_OPTIMIZATION_COMPLETE.md
+│   └── [Component-specific reports]
+│
+├── benchmarks/                     # Benchmark results ✅ Well-organized
+│   └── [Backend comparison results]
+│
+├── development/                    # Developer documentation
 │   ├── PERFORMANCE.md              # ⭐ Performance overview
 │   ├── PUBLISHING.md               # crates.io publication guide
 │   └── FUTURE_ENHANCEMENTS.md      # Roadmap
 │
-└── archive/                        # Historical documentation
+└── archive/                        # Historical documentation ✅ Well-organized
     ├── benchmarks/                 # Historical benchmark results
     ├── performance/                # Detailed optimization reports
     └── optimization/               # Phase-by-phase optimization journey

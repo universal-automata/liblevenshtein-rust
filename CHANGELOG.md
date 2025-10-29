@@ -30,7 +30,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-#### Documentation Reorganization (2025-10-29)
+#### Documentation Reorganization - Phase 2 (2025-10-29)
+- **Analysis documentation moved to `docs/analysis/`**
+  - Created `docs/analysis/fuzzy-maps/` - 7-phase optimization journey (01-07)
+  - Created `docs/analysis/hierarchical-scope/` - Design and benchmark analysis
+  - Moved 10 analysis files from project root to organized structure
+  - Added comprehensive index files (00_README.md, README.md) for navigation
+  - 58% reduction in root directory clutter (17 → 7 markdown files)
+
+- **Documentation structure improvements**
+  - `docs/analysis/fuzzy-maps/` - Complete fuzzy maps optimization story (-7.1% → +5.8%)
+  - `docs/analysis/hierarchical-scope/` - Scope completion design and results
+  - `docs/guides/HIERARCHICAL_SCOPE_COMPLETION.md` - User-facing guide
+  - Updated `docs/README.md` with new "Analysis & Research" section
+  - Fixed broken links after file moves
+  - Updated `.gitignore` with LaTeX artifact patterns
+
+#### Documentation Reorganization - Phase 1 (2025-10-29)
 - **Optimization documentation moved to `docs/optimization/`**
   - Created organized structure with README.md as entry point
   - 14 optimization documents now properly organized

@@ -40,3 +40,13 @@ baseline_metrics.txt
 analyze_*.py
 extract_*.sh
 profile_*.sh
+
+# LaTeX artifacts (documentation generation)
+*.aux
+*.log
+*.out
+*.toc
+*.tex
+*latex*.py
+generate_latex_doc.py
+liblevenshtein-rust-doc.pdf
