@@ -119,6 +119,10 @@ harness = false
 name = "query_profiling"
 harness = false
 
+[[bench]]
+name = "real_world_profiling"
+harness = false
+
 [[bin]]
 name = "liblevenshtein"
 path = "src/bin/liblevenshtein.rs"

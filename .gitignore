@@ -28,3 +28,15 @@ flamegraph.svg
 flamegraph_*.svg
 flamegraphs/
 perf.data*
+
+# Benchmark results and logs
+*_results.log
+*_bench.log
+*_run.log
+*_optimized.log
+baseline_metrics.txt
+
+# Analysis scripts (temporary/development)
+analyze_*.py
+extract_*.sh
+profile_*.sh
