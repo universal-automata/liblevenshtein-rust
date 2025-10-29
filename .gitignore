@@ -31,10 +31,16 @@ perf.data*
 
 # Benchmark results and logs
 *_results.log
+*_results.txt
 *_bench.log
 *_run.log
 *_optimized.log
-baseline_metrics.txt
+*_optimized.txt
+baseline_*.txt
+backend_comparison_*.txt
+fuzzy_map_*.txt
+hierarchical_scope_*.txt
+query_iterator_*.txt
 
 # Analysis scripts (temporary/development)
 analyze_*.py
