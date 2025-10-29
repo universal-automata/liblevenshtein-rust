@@ -47,7 +47,26 @@ fn test_apple_to_aple() {
 }
 
 #[test]
-#[ignore] // TODO: Fix deletion bug - "testt" should match "test" with distance 1
+#[ignore] // TODO: Fix Levenshtein automaton bug with specific dictionary configurations
+//
+// KNOWN ISSUE: The transducer fails to find matches in specific dictionary configurations.
+//
+// Failing cases:
+// - Dict ["test", "apple", "world"], query "testt" (distance 1) → should find "test" but doesn't
+// - Dict ["test", "testing", "apple", "world"], query "testt" (distance 1) → should find "test" but doesn't
+// - Dict ["test", "testing", "apple", "world"], query "aple" (distance 1) → should find "apple" but doesn't
+//
+// Working cases:
+// - Dict ["test"], query "testt" (distance 1) → finds "test" ✓
+// - Dict ["test", "testing"], query "testt" (distance 1) → finds "test" ✓
+// - Dict ["test", "testing", "apple"], query "testt" (distance 1) → finds "test" ✓
+// - Dict ["test", "testing", "world"], query "testt" (distance 1) → finds "test" ✓
+//
+// The bug appears when certain combinations of words create specific trie structures.
+// This is a pre-existing algorithmic issue in the Levenshtein automaton implementation,
+// not related to DoubleArrayTrie specifically (reproduces with other backends too).
+//
+// See: https://github.com/universal-automata/liblevenshtein-rust/issues/TBD
 fn test_deletion_operations() {
     // Test various deletion scenarios
     let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "apple", "world"]);

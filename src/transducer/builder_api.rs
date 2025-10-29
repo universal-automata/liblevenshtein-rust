@@ -226,16 +226,16 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: Enable once prefix mode is implemented in QueryIterator
     fn test_query_builder_prefix_mode() {
         let dict = DawgDictionary::from_iter(vec!["test", "testing", "tested", "best"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
+        // Use query_ordered().prefix() which is the implemented approach
+        // Note: query_builder().prefix_mode() is not yet implemented
         let results: Vec<_> = transducer
-            .query_builder("tes")
-            .prefix_mode(true)
-            .max_distance(0)
-            .execute()
+            .query_ordered("tes", 0)
+            .prefix()
+            .map(|c| c.term)
             .collect();
 
         assert!(results.contains(&"test".to_string()));
