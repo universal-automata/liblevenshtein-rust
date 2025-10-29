@@ -8,8 +8,8 @@
 //! Note: PathNode and Intersection benchmarks are internal-only since those
 //! types are in private modules. They are tested via integration tests.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use liblevenshtein::transducer::{StatePool, Position, Algorithm};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use liblevenshtein::transducer::{Algorithm, Position, StatePool};
 
 // ============================================================================
 // StatePool Benchmarks
@@ -70,7 +70,7 @@ fn bench_pool_reuse_patterns(c: &mut Criterion) {
                         pool.release(black_box(state));
                     }
                 });
-            }
+            },
         );
     }
 
@@ -99,10 +99,7 @@ fn bench_realistic_query_simulation(c: &mut Criterion) {
 
             // Simulate some work with states
             for state in &mut states {
-                state.insert(
-                    Position::new(0, 0),
-                    Algorithm::Standard,
-                );
+                state.insert(Position::new(0, 0), Algorithm::Standard);
             }
 
             // Release states

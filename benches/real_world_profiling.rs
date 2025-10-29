@@ -3,9 +3,8 @@
 //! This benchmark simulates realistic dictionary queries to identify
 //! performance bottlenecks through profiling and flame graph analysis.
 
+use liblevenshtein::prelude::*;
 use std::fs;
-use liblevenshtein::transducer::{Transducer, Algorithm};
-use liblevenshtein::dictionary::DoubleArrayTrie;
 
 fn main() {
     // Load a realistic dictionary
@@ -14,16 +13,32 @@ fn main() {
         contents
             .lines()
             .filter(|line| line.len() >= 3 && line.len() <= 15)
-            .take(10000)  // Use 10k words for realistic profiling
+            .take(10000) // Use 10k words for realistic profiling
             .map(|s| s.to_lowercase())
             .collect()
     } else {
         // Fallback if dictionary not available
         vec![
-            "test", "testing", "tester", "tested", "tests",
-            "hello", "world", "example", "benchmark", "performance",
-            "algorithm", "levenshtein", "automaton", "dictionary", "query",
-            "optimization", "profiling", "flamegraph", "analysis", "bottleneck"
+            "test",
+            "testing",
+            "tester",
+            "tested",
+            "tests",
+            "hello",
+            "world",
+            "example",
+            "benchmark",
+            "performance",
+            "algorithm",
+            "levenshtein",
+            "automaton",
+            "dictionary",
+            "query",
+            "optimization",
+            "profiling",
+            "flamegraph",
+            "analysis",
+            "bottleneck",
         ]
         .into_iter()
         .map(String::from)
@@ -58,15 +73,14 @@ fn main() {
     while start.elapsed().as_secs() < 30 {
         for (query, max_distance) in &queries {
             // Test all three algorithms
-            for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
-                let transducer = Transducer::builder()
-                    .dictionary(&dict)
-                    .algorithm(algorithm)
-                    .build();
+            for algorithm in [
+                Algorithm::Standard,
+                Algorithm::Transposition,
+                Algorithm::MergeAndSplit,
+            ] {
+                let transducer = Transducer::new(dict.clone(), algorithm);
 
-                let results: Vec<_> = transducer
-                    .query(query, *max_distance)
-                    .collect();
+                let results: Vec<_> = transducer.query(query, *max_distance).collect();
 
                 total_results += results.len();
             }
@@ -75,8 +89,12 @@ fn main() {
 
         // Progress indicator
         if iterations % 10 == 0 {
-            println!("  {} iterations, {} total results, {:.1}s elapsed",
-                     iterations, total_results, start.elapsed().as_secs_f64());
+            println!(
+                "  {} iterations, {} total results, {:.1}s elapsed",
+                iterations,
+                total_results,
+                start.elapsed().as_secs_f64()
+            );
         }
     }
 
@@ -84,6 +102,8 @@ fn main() {
     println!("Total iterations: {}", iterations);
     println!("Total results: {}", total_results);
     println!("Time: {:.2}s", start.elapsed().as_secs_f64());
-    println!("Throughput: {:.0} queries/sec",
-             (iterations * queries.len() * 3) as f64 / start.elapsed().as_secs_f64());
+    println!(
+        "Throughput: {:.0} queries/sec",
+        (iterations * queries.len() * 3) as f64 / start.elapsed().as_secs_f64()
+    );
 }

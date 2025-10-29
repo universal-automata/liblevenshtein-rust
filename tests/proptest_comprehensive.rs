@@ -18,11 +18,6 @@ fn ascii_word_strategy() -> impl Strategy<Value = String> {
     "[a-z]{1,10}"
 }
 
-/// Generate words with numbers
-fn alphanumeric_word_strategy() -> impl Strategy<Value = String> {
-    "[a-z0-9]{1,10}"
-}
-
 /// Generate Unicode words (stress test)
 fn unicode_word_strategy() -> impl Strategy<Value = String> {
     "[a-zA-Z0-9αβγδεζηθικλμνξοπρστυφχψω]{1,8}"
@@ -31,11 +26,6 @@ fn unicode_word_strategy() -> impl Strategy<Value = String> {
 /// Generate small dictionaries
 fn small_dict_strategy() -> impl Strategy<Value = Vec<String>> {
     prop::collection::vec(ascii_word_strategy(), 1..=10)
-}
-
-/// Generate medium dictionaries
-fn medium_dict_strategy() -> impl Strategy<Value = Vec<String>> {
-    prop::collection::vec(ascii_word_strategy(), 10..=50)
 }
 
 /// Generate dictionaries with unicode
@@ -61,8 +51,8 @@ fn naive_levenshtein(s1: &str, s2: &str) -> usize {
 
     let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
-    for i in 0..=len1 {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
     }
     for j in 0..=len2 {
         matrix[0][j] = j;
@@ -73,13 +63,17 @@ fn naive_levenshtein(s1: &str, s2: &str) -> usize {
 
     for i in 1..=len1 {
         for j in 1..=len2 {
-            let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
+            let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             matrix[i][j] = std::cmp::min(
                 std::cmp::min(
-                    matrix[i - 1][j] + 1,      // deletion
-                    matrix[i][j - 1] + 1       // insertion
+                    matrix[i - 1][j] + 1, // deletion
+                    matrix[i][j - 1] + 1, // insertion
                 ),
-                matrix[i - 1][j - 1] + cost    // substitution
+                matrix[i - 1][j - 1] + cost, // substitution
             );
         }
     }
@@ -647,9 +641,24 @@ enum DictOperation {
 fn dict_operations_strategy() -> impl Strategy<Value = Vec<DictOperation>> {
     prop::collection::vec(
         prop::strategy::Union::new_weighted(vec![
-            (5, ascii_word_strategy().prop_map(DictOperation::Insert).boxed()),
-            (2, ascii_word_strategy().prop_map(DictOperation::Remove).boxed()),
-            (3, ascii_word_strategy().prop_map(DictOperation::Contains).boxed()),
+            (
+                5,
+                ascii_word_strategy()
+                    .prop_map(DictOperation::Insert)
+                    .boxed(),
+            ),
+            (
+                2,
+                ascii_word_strategy()
+                    .prop_map(DictOperation::Remove)
+                    .boxed(),
+            ),
+            (
+                3,
+                ascii_word_strategy()
+                    .prop_map(DictOperation::Contains)
+                    .boxed(),
+            ),
         ]),
         0..50,
     )

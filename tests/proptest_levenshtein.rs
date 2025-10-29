@@ -20,45 +20,49 @@ fn small_dict_strategy() -> impl Strategy<Value = Vec<String>> {
 fn naive_levenshtein_distance(s1: &str, s2: &str) -> usize {
     let len1 = s1.chars().count();
     let len2 = s2.chars().count();
-    
+
     if len1 == 0 {
         return len2;
     }
     if len2 == 0 {
         return len1;
     }
-    
+
     let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
-    
-    for i in 0..=len1 {
-        matrix[i][0] = i;
+
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
     }
     for j in 0..=len2 {
         matrix[0][j] = j;
     }
-    
+
     let s1_chars: Vec<char> = s1.chars().collect();
     let s2_chars: Vec<char> = s2.chars().collect();
-    
+
     for i in 1..=len1 {
         for j in 1..=len2 {
-            let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
+            let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             matrix[i][j] = std::cmp::min(
                 std::cmp::min(
-                    matrix[i - 1][j] + 1,      // deletion
-                    matrix[i][j - 1] + 1       // insertion
+                    matrix[i - 1][j] + 1, // deletion
+                    matrix[i][j - 1] + 1, // insertion
                 ),
-                matrix[i - 1][j - 1] + cost    // substitution
+                matrix[i - 1][j - 1] + cost, // substitution
             );
         }
     }
-    
+
     matrix[len1][len2]
 }
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
-    
+
     /// Property: For any dictionary and query, all returned results should have
     /// Levenshtein distance <= max_distance
     #[test]
@@ -69,9 +73,9 @@ proptest! {
     ) {
         let dict = DoubleArrayTrie::from_terms(dict_words.clone());
         let transducer = Transducer::new(dict, Algorithm::Standard);
-        
+
         let results: Vec<_> = transducer.query(&query, max_dist).collect();
-        
+
         for result in results {
             let actual_dist = naive_levenshtein_distance(&query, &result);
             prop_assert!(
@@ -81,7 +85,7 @@ proptest! {
             );
         }
     }
-    
+
     /// Property: If a word is in the dictionary and distance=0, it should be found
     #[test]
     fn prop_exact_match_found(
@@ -90,20 +94,20 @@ proptest! {
         if dict_words.is_empty() {
             return Ok(());
         }
-        
+
         let query_word = dict_words[0].clone();
         let dict = DoubleArrayTrie::from_terms(dict_words);
         let transducer = Transducer::new(dict, Algorithm::Standard);
-        
+
         let results: Vec<_> = transducer.query(&query_word, 0).collect();
-        
+
         prop_assert!(
             results.contains(&query_word),
             "Dictionary should contain exact match for '{}'",
             query_word
         );
     }
-    
+
     /// Property: All words in dictionary within max_distance should be found
     ///
     /// This is the key property that can help find the deletion bug!
@@ -115,9 +119,9 @@ proptest! {
     ) {
         let dict = DoubleArrayTrie::from_terms(dict_words.clone());
         let transducer = Transducer::new(dict, Algorithm::Standard);
-        
+
         let results: Vec<_> = transducer.query(&query, max_dist).collect();
-        
+
         // Check that all words in dictionary within max_distance are found
         for dict_word in &dict_words {
             let actual_dist = naive_levenshtein_distance(&query, dict_word);
@@ -136,7 +140,7 @@ proptest! {
 #[cfg(test)]
 mod manual_shrink_tests {
     use super::*;
-    
+
     /// Regression test: This was a minimal failing case discovered by proptest
     /// that helped identify the deletion bug. Now fixed and serves as a regression test.
     #[test]

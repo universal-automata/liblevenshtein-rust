@@ -46,10 +46,11 @@ fn bench_matching_modes_by_distance(c: &mut Criterion) {
             &distance,
             |b, &dist| {
                 b.iter(|| {
-                    let results: Vec<_> = Transducer::new(pathmap_dict.clone(), Algorithm::Standard)
-                        .query_ordered(black_box(query), dist)
-                        .take(10)
-                        .collect();
+                    let results: Vec<_> =
+                        Transducer::new(pathmap_dict.clone(), Algorithm::Standard)
+                            .query_ordered(black_box(query), dist)
+                            .take(10)
+                            .collect();
                     black_box(results);
                 });
             },
@@ -61,11 +62,12 @@ fn bench_matching_modes_by_distance(c: &mut Criterion) {
             &distance,
             |b, &dist| {
                 b.iter(|| {
-                    let results: Vec<_> = Transducer::new(pathmap_dict.clone(), Algorithm::Standard)
-                        .query_ordered(black_box(query), dist)
-                        .prefix()
-                        .take(10)
-                        .collect();
+                    let results: Vec<_> =
+                        Transducer::new(pathmap_dict.clone(), Algorithm::Standard)
+                            .query_ordered(black_box(query), dist)
+                            .prefix()
+                            .take(10)
+                            .collect();
                     black_box(results);
                 });
             },
@@ -98,12 +100,7 @@ fn bench_matching_modes_by_query_length(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("matching_modes_by_query_length");
 
-    let queries = [
-        ("te", 2),
-        ("test", 4),
-        ("testing", 7),
-        ("testability", 11),
-    ];
+    let queries = [("te", 2), ("test", 4), ("testing", 7), ("testability", 11)];
 
     for (query, len) in queries.iter() {
         // Exact matching

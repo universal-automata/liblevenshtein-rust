@@ -5,12 +5,9 @@ use liblevenshtein::prelude::*;
 // Test dictionary with predictable patterns
 fn create_test_dict() -> DoubleArrayTrie {
     let terms = vec![
-        "a", "ab", "abc", "abcd", "abcde",
-        "b", "bc", "bcd", "bcde",
-        "test", "testing", "tested", "tester", "tests",
-        "best", "rest", "nest", "west", "quest",
-        "foo", "food", "fool", "football",
-        "bar", "bark", "barn", "barley",
+        "a", "ab", "abc", "abcd", "abcde", "b", "bc", "bcd", "bcde", "test", "testing", "tested",
+        "tester", "tests", "best", "rest", "nest", "west", "quest", "foo", "food", "fool",
+        "football", "bar", "bark", "barn", "barley",
     ];
     DoubleArrayTrie::from_terms(terms)
 }
@@ -35,7 +32,11 @@ fn test_ordered_query_distance_1() {
     let results: Vec<_> = transducer.query_ordered("test", 1).collect();
 
     // Should find: test(0), tests(1), best/rest/nest/west (1 each)
-    assert!(results.len() >= 5, "Distance 1 should find at least 5 matches, found {}", results.len());
+    assert!(
+        results.len() >= 5,
+        "Distance 1 should find at least 5 matches, found {}",
+        results.len()
+    );
 
     // Verify ordering: distance 0 first, then distance 1 in lexicographic order
     assert_eq!(results[0].distance, 0);
@@ -54,13 +55,19 @@ fn test_ordered_query_distance_2() {
     let results: Vec<_> = transducer.query_ordered("test", 2).collect();
 
     // Should find many more matches
-    assert!(results.len() >= 7, "Distance 2 should find at least 7 matches");
+    assert!(
+        results.len() >= 7,
+        "Distance 2 should find at least 7 matches"
+    );
 
     // Verify ordering by distance
     let mut prev_distance = 0;
     for r in &results {
         assert!(r.distance <= 2, "Distance should not exceed 2");
-        assert!(r.distance >= prev_distance, "Results should be ordered by distance");
+        assert!(
+            r.distance >= prev_distance,
+            "Results should be ordered by distance"
+        );
         prev_distance = r.distance;
     }
 }
@@ -79,7 +86,12 @@ fn test_ordered_query_distance_10() {
     let mut prev_distance = 0;
     for r in &results {
         assert!(r.distance <= 10);
-        assert!(r.distance >= prev_distance, "Results not ordered: {} came after {}", r.distance, prev_distance);
+        assert!(
+            r.distance >= prev_distance,
+            "Results not ordered: {} came after {}",
+            r.distance,
+            prev_distance
+        );
         prev_distance = r.distance;
     }
 }
@@ -93,7 +105,11 @@ fn test_ordered_query_large_distance() {
 
     let results: Vec<_> = transducer.query_ordered("quuo", 99).collect();
 
-    assert_eq!(results.len(), 5, "Should find all 5 terms with large distance");
+    assert_eq!(
+        results.len(),
+        5,
+        "Should find all 5 terms with large distance"
+    );
 
     // Verify all terms are present
     let term_set: std::collections::HashSet<_> = results.iter().map(|r| r.term.as_str()).collect();
@@ -141,7 +157,11 @@ fn test_unordered_query_large_distance() {
 
     let results: Vec<_> = transducer.query("quuo", 99).collect();
 
-    assert_eq!(results.len(), 5, "Unordered query should also find all 5 terms");
+    assert_eq!(
+        results.len(),
+        5,
+        "Unordered query should also find all 5 terms"
+    );
 }
 
 #[test]
@@ -152,11 +172,19 @@ fn test_prefix_mode_distance_0() {
     let results: Vec<_> = transducer.query_ordered("test", 0).prefix().collect();
 
     // Should find: test, testing, tested, tester, tests (all start with "test")
-    assert_eq!(results.len(), 5, "Prefix mode should find all terms starting with 'test'");
+    assert_eq!(
+        results.len(),
+        5,
+        "Prefix mode should find all terms starting with 'test'"
+    );
 
     for r in &results {
         assert_eq!(r.distance, 0);
-        assert!(r.term.starts_with("test"), "{} should start with 'test'", r.term);
+        assert!(
+            r.term.starts_with("test"),
+            "{} should start with 'test'",
+            r.term
+        );
     }
 }
 
@@ -168,7 +196,10 @@ fn test_prefix_mode_distance_1() {
     let results: Vec<_> = transducer.query_ordered("tes", 1).prefix().collect();
 
     // Should find many terms approximately starting with "tes"
-    assert!(results.len() >= 5, "Prefix mode with distance 1 should find multiple matches");
+    assert!(
+        results.len() >= 5,
+        "Prefix mode with distance 1 should find multiple matches"
+    );
 }
 
 #[test]
@@ -189,11 +220,20 @@ fn test_prefix_vs_standard_mode() {
 fn test_all_algorithms_distance_0() {
     let dict = create_test_dict();
 
-    for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
+    for algorithm in [
+        Algorithm::Standard,
+        Algorithm::Transposition,
+        Algorithm::MergeAndSplit,
+    ] {
         let transducer = Transducer::new(dict.clone(), algorithm);
         let results: Vec<_> = transducer.query_ordered("test", 0).collect();
 
-        assert_eq!(results.len(), 1, "Algorithm {:?} should find exact match", algorithm);
+        assert_eq!(
+            results.len(),
+            1,
+            "Algorithm {:?} should find exact match",
+            algorithm
+        );
         assert_eq!(results[0].term, "test");
     }
 }
@@ -202,11 +242,19 @@ fn test_all_algorithms_distance_0() {
 fn test_all_algorithms_distance_2() {
     let dict = create_test_dict();
 
-    for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
+    for algorithm in [
+        Algorithm::Standard,
+        Algorithm::Transposition,
+        Algorithm::MergeAndSplit,
+    ] {
         let transducer = Transducer::new(dict.clone(), algorithm);
         let results: Vec<_> = transducer.query_ordered("test", 2).collect();
 
-        assert!(results.len() >= 5, "Algorithm {:?} should find matches", algorithm);
+        assert!(
+            results.len() >= 5,
+            "Algorithm {:?} should find matches",
+            algorithm
+        );
 
         // Verify ordering
         let mut prev_distance = 0;
@@ -227,7 +275,11 @@ fn test_empty_query_distance_0() {
 
     // Empty query with distance 0 should match empty string only (if in dict)
     // Our test dict doesn't have empty string, so should be empty
-    assert_eq!(results.len(), 0, "Empty query with distance 0 should match nothing in our dict");
+    assert_eq!(
+        results.len(),
+        0,
+        "Empty query with distance 0 should match nothing in our dict"
+    );
 }
 
 #[test]
@@ -266,10 +318,11 @@ fn test_ordered_query_returns_in_order() {
         let curr = &results[i];
 
         assert!(
-            prev.distance < curr.distance ||
-            (prev.distance == curr.distance && prev.term <= curr.term),
+            prev.distance < curr.distance
+                || (prev.distance == curr.distance && prev.term <= curr.term),
             "Results not properly ordered: {:?} should come before {:?}",
-            prev, curr
+            prev,
+            curr
         );
     }
 }

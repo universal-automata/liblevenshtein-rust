@@ -15,9 +15,7 @@ fn load_dictionary() -> Vec<String> {
         contents.lines().take(10000).map(String::from).collect()
     } else {
         // Generate sample dictionary
-        (0..10000)
-            .map(|i| format!("word{:04}", i))
-            .collect()
+        (0..10000).map(|i| format!("word{:04}", i)).collect()
     }
 }
 
@@ -69,12 +67,7 @@ fn bench_levenshtein_query_pipeline(c: &mut Criterion) {
     let dat = DoubleArrayTrie::from_terms(terms);
     let transducer = Transducer::new(dat, Algorithm::Standard);
 
-    let queries = vec![
-        ("test", 1),
-        ("hello", 2),
-        ("world", 1),
-        ("programming", 2),
-    ];
+    let queries = vec![("test", 1), ("hello", 2), ("world", 1), ("programming", 2)];
 
     let mut group = c.benchmark_group("levenshtein_pipeline");
 

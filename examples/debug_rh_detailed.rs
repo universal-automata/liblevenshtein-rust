@@ -15,13 +15,30 @@ fn main() {
     println!("\nManual traversal:");
     let root = dict.root();
     for (byte, node) in root.edges() {
-        println!("Root -> {} (0x{:02x}), is_final: {}", byte as char, byte, node.is_final());
+        println!(
+            "Root -> {} (0x{:02x}), is_final: {}",
+            byte as char,
+            byte,
+            node.is_final()
+        );
 
         for (byte2, node2) in node.edges() {
-            println!("  {} -> {} (0x{:02x}), is_final: {}", byte as char, byte2 as char, byte2, node2.is_final());
+            println!(
+                "  {} -> {} (0x{:02x}), is_final: {}",
+                byte as char,
+                byte2 as char,
+                byte2,
+                node2.is_final()
+            );
 
             for (byte3, node3) in node2.edges() {
-                println!("    {} -> {} (0x{:02x}), is_final: {}", byte2 as char, byte3 as char, byte3, node3.is_final());
+                println!(
+                    "    {} -> {} (0x{:02x}), is_final: {}",
+                    byte2 as char,
+                    byte3 as char,
+                    byte3,
+                    node3.is_final()
+                );
             }
         }
     }

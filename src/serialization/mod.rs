@@ -242,8 +242,7 @@ mod tests {
 
         // Test protobuf serialization
         let mut buffer = Vec::new();
-        SuffixAutomatonProtobufSerializer::serialize_suffix_automaton(&dict, &mut buffer)
-            .unwrap();
+        SuffixAutomatonProtobufSerializer::serialize_suffix_automaton(&dict, &mut buffer).unwrap();
 
         let loaded =
             SuffixAutomatonProtobufSerializer::deserialize_suffix_automaton(&buffer[..]).unwrap();
@@ -305,7 +304,8 @@ mod tests {
         let mut buffer = Vec::new();
 
         OptimizedProtobufSerializer::serialize(&dict, &mut buffer).unwrap();
-        let loaded: DoubleArrayTrie = OptimizedProtobufSerializer::deserialize(&buffer[..]).unwrap();
+        let loaded: DoubleArrayTrie =
+            OptimizedProtobufSerializer::deserialize(&buffer[..]).unwrap();
 
         assert!(loaded.contains("alpha"));
         assert!(loaded.contains("beta"));
@@ -318,8 +318,15 @@ mod tests {
     fn test_protobuf_format_comparison() {
         // Compare serialization sizes for different protobuf formats
         let dict = DoubleArrayTrie::from_terms(vec![
-            "test", "testing", "tested", "tester", "tests",
-            "apple", "apply", "application", "applicable",
+            "test",
+            "testing",
+            "tested",
+            "tester",
+            "tests",
+            "apple",
+            "apply",
+            "application",
+            "applicable",
         ]);
 
         // Standard ProtobufSerializer (V1 format)
@@ -349,7 +356,8 @@ mod tests {
 
         // Verify all formats deserialize correctly
         let loaded_v1: DoubleArrayTrie = ProtobufSerializer::deserialize(&buf_v1[..]).unwrap();
-        let loaded_v2: DoubleArrayTrie = OptimizedProtobufSerializer::deserialize(&buf_v2[..]).unwrap();
+        let loaded_v2: DoubleArrayTrie =
+            OptimizedProtobufSerializer::deserialize(&buf_v2[..]).unwrap();
         let loaded_dat = DatProtobufSerializer::deserialize_dat(&buf_dat[..]).unwrap();
 
         for term in ["test", "testing", "apple", "application"] {

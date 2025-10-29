@@ -139,8 +139,11 @@ fn bench_subsumption_by_distance(c: &mut Criterion) {
     for &max_distance in &[0, 1, 2, 5, 10, 50, 100, usize::MAX / 2] {
         let positions = generate_positions(pos_count, max_distance.min(100), query_length);
 
-        for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit]
-        {
+        for algorithm in [
+            Algorithm::Standard,
+            Algorithm::Transposition,
+            Algorithm::MergeAndSplit,
+        ] {
             group.throughput(Throughput::Elements(pos_count as u64));
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("{:?}/d={}", algorithm, max_distance)),
@@ -174,8 +177,11 @@ fn bench_no_subsumption(c: &mut Criterion) {
             positions.push(Position::new(i, 0)); // All at different indices with 0 errors
         }
 
-        for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit]
-        {
+        for algorithm in [
+            Algorithm::Standard,
+            Algorithm::Transposition,
+            Algorithm::MergeAndSplit,
+        ] {
             group.throughput(Throughput::Elements(pos_count as u64));
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("{:?}/n={}", algorithm, pos_count)),
@@ -210,8 +216,11 @@ fn bench_all_subsumed(c: &mut Criterion) {
             positions.push(Position::new(i % 5, i % (max_distance + 1)));
         }
 
-        for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit]
-        {
+        for algorithm in [
+            Algorithm::Standard,
+            Algorithm::Transposition,
+            Algorithm::MergeAndSplit,
+        ] {
             group.throughput(Throughput::Elements(pos_count as u64));
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("{:?}/n={}", algorithm, pos_count)),

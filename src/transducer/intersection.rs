@@ -37,7 +37,11 @@ impl PathNode {
             Some(p) => p.depth + 1,
             None => 1,
         };
-        Self { label, depth, parent }
+        Self {
+            label,
+            depth,
+            parent,
+        }
     }
 
     /// Collect labels into vector (for term reconstruction)
@@ -193,7 +197,7 @@ mod tests {
 
         // Build path: t -> e -> s using PathNode
         let t_node = root.transition(b't').unwrap();
-        let i2 = Intersection::with_parent(
+        let _i2 = Intersection::with_parent(
             b't',
             t_node.clone(),
             State::new(),
@@ -201,7 +205,7 @@ mod tests {
         );
 
         let e_node = t_node.transition(b'e').unwrap();
-        let i3 = Intersection::with_parent(
+        let _i3 = Intersection::with_parent(
             b'e',
             e_node.clone(),
             State::new(),

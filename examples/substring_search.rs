@@ -162,11 +162,7 @@ fn ordered_results_example() {
     println!("Search: \"qick\" (typo in 'quick', distance=2, top 10 results)");
     println!("Results ordered by: 1) edit distance, 2) alphabetical\n");
 
-    for (i, candidate) in transducer
-        .query_ordered("qick", 2)
-        .take(10)
-        .enumerate()
-    {
+    for (i, candidate) in transducer.query_ordered("qick", 2).take(10).enumerate() {
         println!(
             "  {}. {} (distance={})",
             i + 1,
@@ -176,11 +172,7 @@ fn ordered_results_example() {
     }
 
     println!("\nSearch: \"box\" (exact match, show all variations)");
-    for (i, candidate) in transducer
-        .query_ordered("box", 0)
-        .take(10)
-        .enumerate()
-    {
+    for (i, candidate) in transducer.query_ordered("box", 0).take(10).enumerate() {
         println!("  {}. {}", i + 1, candidate.term);
     }
 

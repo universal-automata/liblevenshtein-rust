@@ -6,7 +6,16 @@ mod serialization_tests {
 
     /// Test data
     fn test_terms() -> Vec<&'static str> {
-        vec!["apple", "application", "apply", "banana", "band", "test", "testing", "zebra"]
+        vec![
+            "apple",
+            "application",
+            "apply",
+            "banana",
+            "band",
+            "test",
+            "testing",
+            "zebra",
+        ]
     }
 
     // ============================================================================
@@ -23,14 +32,20 @@ mod serialization_tests {
 
         // Serialize using PathMap's native format
         let mut buffer = Vec::new();
-        dict.serialize_paths(&mut buffer).expect("Failed to serialize PathMapDictionary");
+        dict.serialize_paths(&mut buffer)
+            .expect("Failed to serialize PathMapDictionary");
 
         // Deserialize
-        let deserialized = PathMapDictionary::deserialize_paths(&buffer[..]).expect("Failed to deserialize PathMapDictionary");
+        let deserialized = PathMapDictionary::deserialize_paths(&buffer[..])
+            .expect("Failed to deserialize PathMapDictionary");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "PathMapDictionary missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "PathMapDictionary missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.term_count(), deserialized.term_count());
     }
@@ -45,11 +60,16 @@ mod serialization_tests {
         bincode::serialize_into(&mut buffer, &dict).expect("Failed to serialize DoubleArrayTrie");
 
         // Deserialize
-        let deserialized: DoubleArrayTrie = bincode::deserialize(&buffer).expect("Failed to deserialize DoubleArrayTrie");
+        let deserialized: DoubleArrayTrie =
+            bincode::deserialize(&buffer).expect("Failed to deserialize DoubleArrayTrie");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "DoubleArrayTrie missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "DoubleArrayTrie missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.len(), deserialized.len());
     }
@@ -64,11 +84,16 @@ mod serialization_tests {
         bincode::serialize_into(&mut buffer, &dict).expect("Failed to serialize DawgDictionary");
 
         // Deserialize
-        let deserialized: DawgDictionary = bincode::deserialize(&buffer).expect("Failed to deserialize DawgDictionary");
+        let deserialized: DawgDictionary =
+            bincode::deserialize(&buffer).expect("Failed to deserialize DawgDictionary");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "DawgDictionary missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "DawgDictionary missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.len(), deserialized.len());
     }
@@ -83,11 +108,16 @@ mod serialization_tests {
         bincode::serialize_into(&mut buffer, &dict).expect("Failed to serialize OptimizedDawg");
 
         // Deserialize
-        let deserialized: OptimizedDawg = bincode::deserialize(&buffer).expect("Failed to deserialize OptimizedDawg");
+        let deserialized: OptimizedDawg =
+            bincode::deserialize(&buffer).expect("Failed to deserialize OptimizedDawg");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "OptimizedDawg missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "OptimizedDawg missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.len(), deserialized.len());
     }
@@ -102,11 +132,16 @@ mod serialization_tests {
         bincode::serialize_into(&mut buffer, &dict).expect("Failed to serialize DynamicDawg");
 
         // Deserialize
-        let deserialized: DynamicDawg = bincode::deserialize(&buffer).expect("Failed to deserialize DynamicDawg");
+        let deserialized: DynamicDawg =
+            bincode::deserialize(&buffer).expect("Failed to deserialize DynamicDawg");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "DynamicDawg missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "DynamicDawg missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.term_count(), deserialized.term_count());
     }
@@ -121,11 +156,16 @@ mod serialization_tests {
         bincode::serialize_into(&mut buffer, &dict).expect("Failed to serialize SuffixAutomaton");
 
         // Deserialize
-        let deserialized: SuffixAutomaton = bincode::deserialize(&buffer).expect("Failed to deserialize SuffixAutomaton");
+        let deserialized: SuffixAutomaton =
+            bincode::deserialize(&buffer).expect("Failed to deserialize SuffixAutomaton");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "SuffixAutomaton missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "SuffixAutomaton missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.string_count(), deserialized.string_count());
     }
@@ -145,14 +185,20 @@ mod serialization_tests {
         // PathMap uses its own native .paths format, not JSON
         // Test serialization using the native format
         let mut buffer = Vec::new();
-        dict.serialize_paths(&mut buffer).expect("Failed to serialize PathMapDictionary");
+        dict.serialize_paths(&mut buffer)
+            .expect("Failed to serialize PathMapDictionary");
 
         // Deserialize
-        let deserialized = PathMapDictionary::deserialize_paths(&buffer[..]).expect("Failed to deserialize PathMapDictionary");
+        let deserialized = PathMapDictionary::deserialize_paths(&buffer[..])
+            .expect("Failed to deserialize PathMapDictionary");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "PathMapDictionary missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "PathMapDictionary missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.term_count(), deserialized.term_count());
     }
@@ -163,14 +209,20 @@ mod serialization_tests {
         let dict = DoubleArrayTrie::from_terms(terms.clone());
 
         // Serialize
-        let json = serde_json::to_string(&dict).expect("Failed to serialize DoubleArrayTrie to JSON");
+        let json =
+            serde_json::to_string(&dict).expect("Failed to serialize DoubleArrayTrie to JSON");
 
         // Deserialize
-        let deserialized: DoubleArrayTrie = serde_json::from_str(&json).expect("Failed to deserialize DoubleArrayTrie from JSON");
+        let deserialized: DoubleArrayTrie =
+            serde_json::from_str(&json).expect("Failed to deserialize DoubleArrayTrie from JSON");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "DoubleArrayTrie missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "DoubleArrayTrie missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.len(), deserialized.len());
     }
@@ -181,14 +233,20 @@ mod serialization_tests {
         let dict = DawgDictionary::from_iter(terms.iter().copied());
 
         // Serialize
-        let json = serde_json::to_string(&dict).expect("Failed to serialize DawgDictionary to JSON");
+        let json =
+            serde_json::to_string(&dict).expect("Failed to serialize DawgDictionary to JSON");
 
         // Deserialize
-        let deserialized: DawgDictionary = serde_json::from_str(&json).expect("Failed to deserialize DawgDictionary from JSON");
+        let deserialized: DawgDictionary =
+            serde_json::from_str(&json).expect("Failed to deserialize DawgDictionary from JSON");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "DawgDictionary missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "DawgDictionary missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.len(), deserialized.len());
     }
@@ -202,11 +260,16 @@ mod serialization_tests {
         let json = serde_json::to_string(&dict).expect("Failed to serialize OptimizedDawg to JSON");
 
         // Deserialize
-        let deserialized: OptimizedDawg = serde_json::from_str(&json).expect("Failed to deserialize OptimizedDawg from JSON");
+        let deserialized: OptimizedDawg =
+            serde_json::from_str(&json).expect("Failed to deserialize OptimizedDawg from JSON");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "OptimizedDawg missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "OptimizedDawg missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.len(), deserialized.len());
     }
@@ -220,11 +283,16 @@ mod serialization_tests {
         let json = serde_json::to_string(&dict).expect("Failed to serialize DynamicDawg to JSON");
 
         // Deserialize
-        let deserialized: DynamicDawg = serde_json::from_str(&json).expect("Failed to deserialize DynamicDawg from JSON");
+        let deserialized: DynamicDawg =
+            serde_json::from_str(&json).expect("Failed to deserialize DynamicDawg from JSON");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "DynamicDawg missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "DynamicDawg missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.term_count(), deserialized.term_count());
     }
@@ -235,14 +303,20 @@ mod serialization_tests {
         let dict = SuffixAutomaton::from_texts(terms.clone());
 
         // Serialize
-        let json = serde_json::to_string(&dict).expect("Failed to serialize SuffixAutomaton to JSON");
+        let json =
+            serde_json::to_string(&dict).expect("Failed to serialize SuffixAutomaton to JSON");
 
         // Deserialize
-        let deserialized: SuffixAutomaton = serde_json::from_str(&json).expect("Failed to deserialize SuffixAutomaton from JSON");
+        let deserialized: SuffixAutomaton =
+            serde_json::from_str(&json).expect("Failed to deserialize SuffixAutomaton from JSON");
 
         // Verify
         for term in &terms {
-            assert!(deserialized.contains(term), "SuffixAutomaton missing term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "SuffixAutomaton missing term: {}",
+                term
+            );
         }
         assert_eq!(dict.string_count(), deserialized.string_count());
     }
@@ -332,7 +406,11 @@ mod serialization_tests {
         let deserialized: DoubleArrayTrie = bincode::deserialize(&serialized).unwrap();
 
         for term in &unicode_terms {
-            assert!(deserialized.contains(term), "Missing unicode term: {}", term);
+            assert!(
+                deserialized.contains(term),
+                "Missing unicode term: {}",
+                term
+            );
         }
     }
 

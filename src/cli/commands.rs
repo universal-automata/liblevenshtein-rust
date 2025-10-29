@@ -755,7 +755,9 @@ fn create_empty_dict(backend: DictionaryBackend) -> DictContainer {
             DictContainer::OptimizedDawg(OptimizedDawg::from_terms(Vec::<String>::new()))
         }
         DictionaryBackend::DynamicDawg => DictContainer::DynamicDawg(DynamicDawg::new()),
-        DictionaryBackend::SuffixAutomaton => DictContainer::SuffixAutomaton(SuffixAutomaton::new()),
+        DictionaryBackend::SuffixAutomaton => {
+            DictContainer::SuffixAutomaton(SuffixAutomaton::new())
+        }
     }
 }
 
@@ -806,7 +808,9 @@ fn save_bincode_dict(container: &DictContainer, path: &Path) -> Result<()> {
         DictContainer::Dawg(d) => BincodeSerializer::serialize(d, file)?,
         DictContainer::OptimizedDawg(d) => BincodeSerializer::serialize(d, file)?,
         DictContainer::DynamicDawg(d) => BincodeSerializer::serialize(d, file)?,
-        DictContainer::SuffixAutomaton(d) => BincodeSerializer::serialize_suffix_automaton(d, file)?,
+        DictContainer::SuffixAutomaton(d) => {
+            BincodeSerializer::serialize_suffix_automaton(d, file)?
+        }
     }
     Ok(())
 }
@@ -832,11 +836,15 @@ fn save_bincode_gzip_dict(container: &DictContainer, path: &Path) -> Result<()> 
     let file = std::fs::File::create(path)?;
     match container {
         DictContainer::PathMap(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
-        DictContainer::DoubleArrayTrie(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
+        DictContainer::DoubleArrayTrie(d) => {
+            GzipSerializer::<BincodeSerializer>::serialize(d, file)?
+        }
         DictContainer::Dawg(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
         DictContainer::OptimizedDawg(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
         DictContainer::DynamicDawg(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
-        DictContainer::SuffixAutomaton(d) => GzipSerializer::<BincodeSerializer>::serialize(d, file)?,
+        DictContainer::SuffixAutomaton(d) => {
+            GzipSerializer::<BincodeSerializer>::serialize(d, file)?
+        }
     }
     Ok(())
 }

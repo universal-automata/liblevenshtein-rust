@@ -3,6 +3,7 @@
 //! This module provides traits that abstract over different dictionary
 //! implementations (tries, DAWGs, etc.) for use with Levenshtein automata.
 
+pub mod compressed_suffix_automaton;
 pub mod dawg;
 pub mod dawg_optimized;
 pub mod dawg_query;
@@ -12,7 +13,6 @@ pub mod factory;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap;
 pub mod suffix_automaton;
-pub mod compressed_suffix_automaton;
 
 /// Synchronization strategy for dictionary operations.
 ///

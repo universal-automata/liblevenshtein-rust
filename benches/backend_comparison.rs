@@ -41,9 +41,14 @@ fn load_dictionary() -> Vec<String> {
 fn sample_queries() -> Vec<&'static str> {
     vec![
         // Short queries
-        "te", "ab", "in",
+        "te",
+        "ab",
+        "in",
         // Medium queries
-        "test", "data", "algo", "perf",
+        "test",
+        "data",
+        "algo",
+        "perf",
         // Longer queries with typos
         "aproximate", // approximate with typo
         "performnce", // performance with typo

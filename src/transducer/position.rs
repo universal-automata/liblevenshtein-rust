@@ -93,7 +93,7 @@ impl Position {
         match algorithm {
             Algorithm::Standard => {
                 // Standard algorithm: |i - j| <= (f - e)
-                let index_diff = if i < j { j - i } else { i - j };
+                let index_diff = i.abs_diff(j);
                 let error_diff = f - e;
                 index_diff <= error_diff
             }
@@ -124,7 +124,7 @@ impl Position {
                 }
 
                 // Neither special: standard formula
-                let index_diff = if i < j { j - i } else { i - j };
+                let index_diff = i.abs_diff(j);
                 let error_diff = f - e;
                 index_diff <= error_diff
             }
@@ -137,7 +137,7 @@ impl Position {
                 }
 
                 // Otherwise: standard formula
-                let index_diff = if i < j { j - i } else { i - j };
+                let index_diff = i.abs_diff(j);
                 let error_diff = f - e;
                 index_diff <= error_diff
             }

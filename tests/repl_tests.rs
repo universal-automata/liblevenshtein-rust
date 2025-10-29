@@ -18,7 +18,7 @@ mod repl_integration_tests {
             } => {
                 assert_eq!(term, "test");
                 assert_eq!(distance, Some(2));
-                assert_eq!(prefix, false);
+                assert!(!prefix);
                 assert_eq!(limit, None);
             }
             _ => panic!("Wrong command type"),
@@ -37,7 +37,7 @@ mod repl_integration_tests {
             } => {
                 assert_eq!(term, "test");
                 assert_eq!(distance, Some(2));
-                assert_eq!(prefix, true);
+                assert!(prefix);
                 assert_eq!(limit, Some(10));
             }
             _ => panic!("Wrong command type"),
@@ -184,25 +184,25 @@ mod repl_integration_tests {
     #[test]
     fn test_prefix_mode_toggle() {
         let mut state = ReplState::new();
-        assert_eq!(state.prefix_mode, false);
+        assert!(!state.prefix_mode);
 
         let cmd = Command::parse("prefix on").unwrap();
         cmd.execute(&mut state).unwrap();
-        assert_eq!(state.prefix_mode, true);
+        assert!(state.prefix_mode);
 
         let cmd = Command::parse("prefix off").unwrap();
         cmd.execute(&mut state).unwrap();
-        assert_eq!(state.prefix_mode, false);
+        assert!(!state.prefix_mode);
     }
 
     #[test]
     fn test_show_distances_toggle() {
         let mut state = ReplState::new();
-        assert_eq!(state.show_distances, false);
+        assert!(!state.show_distances);
 
         let cmd = Command::parse("show-distances on").unwrap();
         cmd.execute(&mut state).unwrap();
-        assert_eq!(state.show_distances, true);
+        assert!(state.show_distances);
     }
 
     #[test]

@@ -103,12 +103,7 @@ pub fn transition_position(
 /// This corresponds to the `index_of` function in the C++ implementation.
 #[inline]
 fn index_of_match(cv: &[bool], start: usize, limit: usize) -> Option<usize> {
-    for j in 0..limit {
-        if cv.get(start + j).copied().unwrap_or(false) {
-            return Some(j);
-        }
-    }
-    None
+    (0..limit).find(|&j| cv.get(start + j).copied().unwrap_or(false))
 }
 
 /// Standard Levenshtein position transition function.
@@ -155,13 +150,13 @@ fn transition_standard(
                 Some(j) => {
                     // Match found at cv[h + j]
                     // Return: insertion, substitution, and multi-character deletion
-                    next.push(Position::new(i, e + 1));         // insertion
-                    next.push(Position::new(i + 1, e + 1));     // substitution
+                    next.push(Position::new(i, e + 1)); // insertion
+                    next.push(Position::new(i + 1, e + 1)); // substitution
                     next.push(Position::new(i + j + 1, e + j)); // deletion (skip j chars)
                 }
                 None => {
                     // No match found in range
-                    next.push(Position::new(i, e + 1));     // insertion
+                    next.push(Position::new(i, e + 1)); // insertion
                     next.push(Position::new(i + 1, e + 1)); // substitution
                 }
             }
@@ -173,7 +168,7 @@ fn transition_standard(
                 next.push(Position::new(i + 1, e));
             } else {
                 // No match at last position
-                next.push(Position::new(i, e + 1));     // insertion
+                next.push(Position::new(i, e + 1)); // insertion
                 next.push(Position::new(i + 1, e + 1)); // substitution
             }
         }
@@ -184,7 +179,7 @@ fn transition_standard(
         }
     }
     // Case 2: e == max_distance (at max errors, only exact matches allowed)
-    else if e == max_distance && h + 1 <= w && cv[h] {
+    else if e == max_distance && h < w && cv[h] {
         next.push(Position::new(i + 1, max_distance));
     }
 
@@ -230,20 +225,20 @@ fn transition_transposition(
                 }
                 Some(1) => {
                     // Match at next position - potential transposition
-                    next.push(Position::new(i, 1));          // insertion
-                    next.push(Position::new_special(i, 1));  // transposition start
-                    next.push(Position::new(i + 1, 1));      // substitution
-                    next.push(Position::new(i + 2, 1));      // special transposition
+                    next.push(Position::new(i, 1)); // insertion
+                    next.push(Position::new_special(i, 1)); // transposition start
+                    next.push(Position::new(i + 1, 1)); // substitution
+                    next.push(Position::new(i + 2, 1)); // special transposition
                 }
                 Some(j) => {
                     // Match found at position j > 1
-                    next.push(Position::new(i, 1));         // insertion
-                    next.push(Position::new(i + 1, 1));     // substitution
+                    next.push(Position::new(i, 1)); // insertion
+                    next.push(Position::new(i + 1, 1)); // substitution
                     next.push(Position::new(i + j + 1, j)); // multi-char deletion
                 }
                 None => {
                     // No match found
-                    next.push(Position::new(i, 1));     // insertion
+                    next.push(Position::new(i, 1)); // insertion
                     next.push(Position::new(i + 1, 1)); // substitution
                 }
             }
@@ -308,7 +303,7 @@ fn transition_transposition(
     }
     // Case 3: e == max_distance (at max errors)
     else if e == max_distance {
-        if h + 1 <= w && !t {
+        if h < w && !t {
             if cv[h] {
                 next.push(Position::new(i + 1, max_distance));
             }
@@ -356,10 +351,10 @@ fn transition_merge_split(
                 next.push(Position::new(i + 1, e));
             } else {
                 // No match - add error operations including merge/split
-                next.push(Position::new(i, e + 1));          // insertion
-                next.push(Position::new_special(i, e + 1));  // split start
-                next.push(Position::new(i + 1, e + 1));      // substitution
-                next.push(Position::new(i + 2, e + 1));      // merge (skip 2 query chars)
+                next.push(Position::new(i, e + 1)); // insertion
+                next.push(Position::new_special(i, e + 1)); // split start
+                next.push(Position::new(i + 1, e + 1)); // substitution
+                next.push(Position::new(i + 2, e + 1)); // merge (skip 2 query chars)
             }
         } else if h + 1 == w {
             if cv[h] {
@@ -408,17 +403,15 @@ fn transition_merge_split(
         }
     }
     // Case 3: e == max_distance (at max errors)
-    else if e == max_distance {
-        if h + 1 <= w {
-            if !s {
-                if cv[h] {
-                    next.push(Position::new(i + 1, max_distance));
-                }
-                // else: no transitions at max distance without match
-            } else {
-                // Special state: can advance even at max distance (completing split)
-                next.push(Position::new(i + 1, e));
+    else if e == max_distance && h < w {
+        if !s {
+            if cv[h] {
+                next.push(Position::new(i + 1, max_distance));
             }
+            // else: no transitions at max distance without match
+        } else {
+            // Special state: can advance even at max distance (completing split)
+            next.push(Position::new(i + 1, e));
         }
     }
 

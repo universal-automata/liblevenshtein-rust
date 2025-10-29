@@ -116,7 +116,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             algorithm,
             state_pool: StatePool::new(),
             substring_mode,
-            sorted_buffer: Vec::with_capacity(64),  // Heuristic: typical max results per distance
+            sorted_buffer: Vec::with_capacity(64), // Heuristic: typical max results per distance
             buffer_index: 0,
         }
     }
@@ -138,7 +138,8 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             self.buffer_index = 0;
 
             // Collect ALL results at the current distance level
-            while let Some(intersection) = self.pending_by_distance[self.current_distance].pop_front()
+            while let Some(intersection) =
+                self.pending_by_distance[self.current_distance].pop_front()
             {
                 // Check if this is a final match
                 let is_final = intersection.is_final();
@@ -194,7 +195,8 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
                     }
                 } else {
                     // For larger buffers, use unstable sort (faster, doesn't preserve order of equal elements)
-                    self.sorted_buffer.sort_unstable_by(|a, b| a.term.cmp(&b.term));
+                    self.sorted_buffer
+                        .sort_unstable_by(|a, b| a.term.cmp(&b.term));
                 }
 
                 // Return first result from buffer
@@ -483,9 +485,8 @@ mod tests {
 
     #[test]
     fn test_ordered_take() {
-        let dict = DoubleArrayTrie::from_terms(vec![
-            "test", "best", "rest", "nest", "testing", "resting",
-        ]);
+        let dict =
+            DoubleArrayTrie::from_terms(vec!["test", "best", "rest", "nest", "testing", "resting"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
@@ -505,9 +506,8 @@ mod tests {
 
     #[test]
     fn test_ordered_take_while() {
-        let dict = DoubleArrayTrie::from_terms(vec![
-            "test", "best", "rest", "nest", "testing", "resting",
-        ]);
+        let dict =
+            DoubleArrayTrie::from_terms(vec!["test", "best", "rest", "nest", "testing", "resting"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 3, Algorithm::Standard);
@@ -694,8 +694,7 @@ mod tests {
 
     #[test]
     fn test_prefix_with_errors() {
-        let dict =
-            DoubleArrayTrie::from_terms(vec!["test", "testing", "best", "resting", "rest"]);
+        let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "best", "resting", "rest"]);
 
         let query =
             OrderedQueryIterator::new(dict.root(), "tes".to_string(), 1, Algorithm::Standard);

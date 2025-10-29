@@ -19,7 +19,9 @@ fn test_high_distance_returns_all_terms() {
     let found_terms: HashSet<_> = results.iter().map(|t| t.as_str()).collect();
     let expected_terms: HashSet<_> = terms.iter().copied().collect();
 
-    assert_eq!(found_terms, expected_terms,
+    assert_eq!(
+        found_terms,
+        expected_terms,
         "With max_distance=99, all terms should be found. Missing: {:?}",
         expected_terms.difference(&found_terms).collect::<Vec<_>>()
     );
@@ -32,13 +34,17 @@ fn test_query_longer_than_term() {
         let len1 = s1.chars().count();
         let len2 = s2.chars().count();
 
-        if len1 == 0 { return len2; }
-        if len2 == 0 { return len1; }
+        if len1 == 0 {
+            return len2;
+        }
+        if len2 == 0 {
+            return len1;
+        }
 
         let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
-        for i in 0..=len1 {
-            matrix[i][0] = i;
+        for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+            row[0] = i;
         }
         for j in 0..=len2 {
             matrix[0][j] = j;
@@ -49,10 +55,14 @@ fn test_query_longer_than_term() {
 
         for i in 1..=len1 {
             for j in 1..=len2 {
-                let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
+                let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                    0
+                } else {
+                    1
+                };
                 matrix[i][j] = std::cmp::min(
                     std::cmp::min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1),
-                    matrix[i - 1][j - 1] + cost
+                    matrix[i - 1][j - 1] + cost,
                 );
             }
         }
@@ -63,7 +73,10 @@ fn test_query_longer_than_term() {
     let query = "aahaara";
     let term = "hr";
     let actual_distance = naive_lev(query, term);
-    eprintln!("Actual Levenshtein distance from '{}' to '{}': {}", query, term, actual_distance);
+    eprintln!(
+        "Actual Levenshtein distance from '{}' to '{}': {}",
+        query, term, actual_distance
+    );
 
     let dict = DoubleArrayTrie::from_terms(vec![term]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -71,13 +84,22 @@ fn test_query_longer_than_term() {
     // Test with different distances to find the boundary
     for d in 1..=10 {
         let results: Vec<_> = transducer.query(query, d).collect();
-        eprintln!("Distance {}: Found {} results: {:?}", d, results.len(), results);
+        eprintln!(
+            "Distance {}: Found {} results: {:?}",
+            d,
+            results.len(),
+            results
+        );
     }
 
     // Should find with actual distance
     let results: Vec<_> = transducer.query(query, actual_distance).collect();
-    assert!(results.contains(&term.to_string()),
-        "Should find '{}' when searching '{}' with distance {}", term, query, actual_distance
+    assert!(
+        results.contains(&term.to_string()),
+        "Should find '{}' when searching '{}' with distance {}",
+        term,
+        query,
+        actual_distance
     );
 }
 
@@ -129,17 +151,32 @@ fn test_distance_zero() {
 
     // Exact match should return exactly one result
     let results: Vec<_> = transducer.query("test", 0).collect();
-    assert_eq!(results, vec!["test"], "Distance 0 should only return exact matches");
+    assert_eq!(
+        results,
+        vec!["test"],
+        "Distance 0 should only return exact matches"
+    );
 
     // Non-match should return nothing
     let results: Vec<_> = transducer.query("fest", 0).collect();
-    assert_eq!(results.len(), 0, "Distance 0 should return nothing for non-exact matches");
+    assert_eq!(
+        results.len(),
+        0,
+        "Distance 0 should return nothing for non-exact matches"
+    );
 }
 
 #[test]
 fn test_distance_max() {
     // Test that distance=usize::MAX returns all terms in the dictionary
-    let terms = vec!["foo", "bar", "baz", "qux", "quo", "abcdefghijklmnopqrstuvwxyz"];
+    let terms = vec![
+        "foo",
+        "bar",
+        "baz",
+        "qux",
+        "quo",
+        "abcdefghijklmnopqrstuvwxyz",
+    ];
     let dict = DoubleArrayTrie::from_terms(terms.clone());
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
@@ -149,7 +186,9 @@ fn test_distance_max() {
     let found_terms: HashSet<_> = results.iter().map(|t| t.as_str()).collect();
     let expected_terms: HashSet<_> = terms.iter().copied().collect();
 
-    assert_eq!(found_terms, expected_terms,
+    assert_eq!(
+        found_terms,
+        expected_terms,
         "With max_distance=usize::MAX, all terms should be found. Missing: {:?}",
         expected_terms.difference(&found_terms).collect::<Vec<_>>()
     );
@@ -161,11 +200,19 @@ fn test_all_algorithms_distance_zero() {
     let terms = vec!["test", "rest", "best"];
     let dict = DoubleArrayTrie::from_terms(terms.clone());
 
-    for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
+    for algorithm in [
+        Algorithm::Standard,
+        Algorithm::Transposition,
+        Algorithm::MergeAndSplit,
+    ] {
         let transducer = Transducer::new(dict.clone(), algorithm);
         let results: Vec<_> = transducer.query("test", 0).collect();
-        assert_eq!(results, vec!["test"],
-            "Algorithm {:?} with distance 0 should only return exact match", algorithm);
+        assert_eq!(
+            results,
+            vec!["test"],
+            "Algorithm {:?} with distance 0 should only return exact match",
+            algorithm
+        );
     }
 }
 
@@ -175,16 +222,23 @@ fn test_all_algorithms_distance_max() {
     let terms = vec!["foo", "bar", "baz"];
     let dict = DoubleArrayTrie::from_terms(terms.clone());
 
-    for algorithm in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
+    for algorithm in [
+        Algorithm::Standard,
+        Algorithm::Transposition,
+        Algorithm::MergeAndSplit,
+    ] {
         let transducer = Transducer::new(dict.clone(), algorithm);
         let results: Vec<_> = transducer.query("x", usize::MAX).collect();
 
         let found_terms: HashSet<_> = results.iter().map(|t| t.as_str()).collect();
         let expected_terms: HashSet<_> = terms.iter().copied().collect();
 
-        assert_eq!(found_terms, expected_terms,
+        assert_eq!(
+            found_terms,
+            expected_terms,
             "Algorithm {:?} with max_distance=usize::MAX should return all terms. Missing: {:?}",
-            algorithm, expected_terms.difference(&found_terms).collect::<Vec<_>>()
+            algorithm,
+            expected_terms.difference(&found_terms).collect::<Vec<_>>()
         );
     }
 }

@@ -34,7 +34,7 @@
 //! let loaded: DoubleArrayTrie = PlainTextSerializer::deserialize(file)?;
 //! ```
 
-use super::{DictionaryFromTerms, DictionarySerializer, SerializationError, extract_terms};
+use super::{extract_terms, DictionaryFromTerms, DictionarySerializer, SerializationError};
 use crate::dictionary::Dictionary;
 use std::io::{BufRead, BufReader, Write};
 

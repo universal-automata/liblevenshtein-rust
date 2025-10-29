@@ -85,25 +85,52 @@ where
 /// Supports insertions and deletions with XOR-based relocation and lazy rebuilding.
 /// Shared data structure for all nodes in a DAT.
 /// Reduces Arc cloning overhead by grouping all shared arrays together.
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Clone, Debug)]
 struct DATShared {
     /// BASE array: offset for computing next state
-    #[cfg_attr(feature = "serialization", serde(serialize_with = "serialize_arc_vec", deserialize_with = "deserialize_arc_vec"))]
+    #[cfg_attr(
+        feature = "serialization",
+        serde(
+            serialize_with = "serialize_arc_vec",
+            deserialize_with = "deserialize_arc_vec"
+        )
+    )]
     base: Arc<Vec<i32>>,
 
     /// CHECK array: parent state verification
-    #[cfg_attr(feature = "serialization", serde(serialize_with = "serialize_arc_vec", deserialize_with = "deserialize_arc_vec"))]
+    #[cfg_attr(
+        feature = "serialization",
+        serde(
+            serialize_with = "serialize_arc_vec",
+            deserialize_with = "deserialize_arc_vec"
+        )
+    )]
     check: Arc<Vec<i32>>,
 
     /// Final states marking valid term endings
-    #[cfg_attr(feature = "serialization", serde(serialize_with = "serialize_arc_vec", deserialize_with = "deserialize_arc_vec"))]
+    #[cfg_attr(
+        feature = "serialization",
+        serde(
+            serialize_with = "serialize_arc_vec",
+            deserialize_with = "deserialize_arc_vec"
+        )
+    )]
     is_final: Arc<Vec<bool>>,
 
     /// Edge lists per state: which bytes have valid transitions
     /// This optimizes the edges() iterator to only check actual edges
     /// instead of all 256 possible bytes.
-    #[cfg_attr(feature = "serialization", serde(serialize_with = "serialize_arc_vec_vec", deserialize_with = "deserialize_arc_vec_vec"))]
+    #[cfg_attr(
+        feature = "serialization",
+        serde(
+            serialize_with = "serialize_arc_vec_vec",
+            deserialize_with = "deserialize_arc_vec_vec"
+        )
+    )]
     edges: Arc<Vec<Vec<u8>>>,
 }
 
@@ -151,14 +178,23 @@ struct DATShared {
 /// assert!(dict.contains("apple"));
 /// assert!(!dict.contains("apricot"));
 /// ```
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Clone, Debug)]
 pub struct DoubleArrayTrie {
     /// Shared data referenced by all nodes
     shared: DATShared,
 
     /// Free list for deleted/unused states
-    #[cfg_attr(feature = "serialization", serde(serialize_with = "serialize_arc_vec", deserialize_with = "deserialize_arc_vec"))]
+    #[cfg_attr(
+        feature = "serialization",
+        serde(
+            serialize_with = "serialize_arc_vec",
+            deserialize_with = "deserialize_arc_vec"
+        )
+    )]
     free_list: Arc<Vec<usize>>,
 
     /// Number of terms in the dictionary
@@ -209,7 +245,7 @@ impl DoubleArrayTrieBuilder {
             is_final,
             free_list: Vec::new(),
             term_count: 0,
-            next_state: 2, // Next available state
+            next_state: 2,          // Next available state
             rebuild_threshold: 0.2, // Rebuild when 20% deleted
         }
     }
@@ -251,7 +287,6 @@ impl DoubleArrayTrieBuilder {
             true
         }
     }
-
 
     /// Transition from a state via a byte.
     fn transition(&self, state: usize, byte: u8) -> Option<usize> {
@@ -348,7 +383,9 @@ impl DoubleArrayTrieBuilder {
                     let child_base = self.base[old_child] as usize;
                     for gc_byte in 0u8..=255 {
                         let grandchild = child_base + (gc_byte as usize);
-                        if grandchild < self.check.len() && self.check[grandchild] == old_child as i32 {
+                        if grandchild < self.check.len()
+                            && self.check[grandchild] == old_child as i32
+                        {
                             self.check[grandchild] = new_child as i32;
                         }
                     }
@@ -427,15 +464,14 @@ impl DoubleArrayTrieBuilder {
         start_base + 10000
     }
 
-
     /// Build the final DoubleArrayTrie.
     pub fn build(self) -> DoubleArrayTrie {
         // Compute edge lists for each state to optimize edges() iteration
         let mut edges = vec![Vec::new(); self.base.len()];
 
-        for state in 0..self.base.len() {
-            if self.base[state] >= 0 {
-                let base = self.base[state] as usize;
+        for (state, base_entry) in self.base.iter().enumerate() {
+            if *base_entry >= 0 {
+                let base = *base_entry as usize;
 
                 // Find all valid edges for this state
                 for byte in 0u8..=255 {
@@ -481,10 +517,8 @@ impl DoubleArrayTrie {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let mut sorted_terms: Vec<String> = terms
-            .into_iter()
-            .map(|s| s.as_ref().to_string())
-            .collect();
+        let mut sorted_terms: Vec<String> =
+            terms.into_iter().map(|s| s.as_ref().to_string()).collect();
         sorted_terms.sort();
         sorted_terms.dedup();
 
@@ -578,7 +612,7 @@ impl DictionaryNode for DoubleArrayTrieNode {
         if next < self.shared.check.len() && self.shared.check[next] == self.state as i32 {
             Some(DoubleArrayTrieNode {
                 state: next,
-                shared: self.shared.clone(),  // Single Arc clone
+                shared: self.shared.clone(), // Single Arc clone
             })
         } else {
             None
@@ -603,10 +637,13 @@ impl DictionaryNode for DoubleArrayTrieNode {
             .iter()
             .map(|&byte| {
                 let next = (base as usize) + (byte as usize);
-                (byte, DoubleArrayTrieNode {
-                    state: next,
-                    shared: self.shared.clone(),  // Single Arc clone
-                })
+                (
+                    byte,
+                    DoubleArrayTrieNode {
+                        state: next,
+                        shared: self.shared.clone(), // Single Arc clone
+                    },
+                )
             })
             .collect();
 
@@ -697,15 +734,17 @@ mod tests {
 
     #[test]
     fn test_memory_efficiency() {
-        let dat = DoubleArrayTrie::from_terms(vec![
-            "band", "banana", "bandana", "can", "cane", "candy",
-        ]);
+        let dat =
+            DoubleArrayTrie::from_terms(vec!["band", "banana", "bandana", "can", "cane", "candy"]);
 
         let memory = dat.memory_bytes();
         let state_count = dat.state_count();
 
         println!("DAT memory: {} bytes for {} states", memory, state_count);
-        println!("  Approximately {} bytes/state", memory / state_count.max(1));
+        println!(
+            "  Approximately {} bytes/state",
+            memory / state_count.max(1)
+        );
 
         // Should be around 8-10 bytes per state (BASE + CHECK + flags)
         assert!(memory < state_count * 12);

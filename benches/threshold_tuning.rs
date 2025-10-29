@@ -3,6 +3,7 @@ use liblevenshtein::prelude::*;
 
 /// Parameterized DAWG for testing different thresholds
 /// We'll manually implement the search with different thresholds
+#[allow(dead_code)]
 fn search_with_threshold(nodes: &[DawgNode], term: &str, threshold: usize) -> bool {
     let mut node_idx = 0;
 
@@ -30,8 +31,6 @@ fn search_with_threshold(nodes: &[DawgNode], term: &str, threshold: usize) -> bo
 }
 
 // Expose DawgNode for benchmarking (normally private)
-use std::sync::Arc;
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DawgNode {
     pub edges: Vec<(u8, usize)>,
@@ -40,6 +39,7 @@ pub struct DawgNode {
 
 /// Extract nodes from DawgDictionary for direct testing
 /// This is a bit hacky but allows us to test different thresholds
+#[allow(dead_code)]
 fn extract_nodes(dict: &DawgDictionary) -> Vec<DawgNode> {
     // We can't directly access the Arc<Vec<DawgNode>> since it's private
     // Instead, we'll traverse and rebuild
@@ -91,7 +91,7 @@ fn generate_terms(count: usize) -> Vec<String> {
 /// Benchmark different threshold values
 fn bench_threshold_values(c: &mut Criterion) {
     let dict_sizes = [500, 1000, 5000];
-    let thresholds = [2, 4, 6, 8, 10, 12, 16, 32];
+    let _thresholds = [2, 4, 6, 8, 10, 12, 16, 32];
 
     for &dict_size in &dict_sizes {
         let terms = generate_terms(dict_size);
@@ -154,7 +154,7 @@ fn bench_search_strategies(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     let result = edges.binary_search_by_key(&target, |(l, _)| *l);
-                    black_box(result);
+                    let _ = black_box(result);
                 });
             },
         );

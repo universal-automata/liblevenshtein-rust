@@ -100,7 +100,7 @@ fn bench_epsilon_closure(c: &mut Criterion) {
     for state_size in [1, 3, 5, 8].iter() {
         let mut state = State::new();
         for i in 0..*state_size {
-            state.insert(Position::new(i, 0));
+            state.insert(Position::new(i, 0), Algorithm::Standard);
         }
 
         group.bench_with_input(
@@ -117,7 +117,7 @@ fn bench_epsilon_closure(c: &mut Criterion) {
                     let mut to_process: SmallVec<[Position; 8]> = SmallVec::new();
 
                     for pos in result.positions() {
-                        to_process.push(pos.clone());
+                        to_process.push(*pos);
                     }
 
                     let mut processed = 0;
@@ -130,7 +130,7 @@ fn bench_epsilon_closure(c: &mut Criterion) {
                             let deleted =
                                 Position::new(position.term_index + 1, position.num_errors + 1);
                             if !to_process.contains(&deleted) {
-                                result.insert(deleted.clone());
+                                result.insert(deleted, Algorithm::Standard);
                                 to_process.push(deleted);
                             }
                         }
@@ -157,7 +157,7 @@ fn bench_state_operations(c: &mut Criterion) {
             b.iter(|| {
                 let mut state = State::new();
                 for i in 0..n {
-                    state.insert(Position::new(i, 0));
+                    state.insert(Position::new(i, 0), Algorithm::Standard);
                 }
                 black_box(state);
             });
@@ -167,7 +167,7 @@ fn bench_state_operations(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("contains", size), size, |b, &n| {
             let mut state = State::new();
             for i in 0..n {
-                state.insert(Position::new(i, 0));
+                state.insert(Position::new(i, 0), Algorithm::Standard);
             }
 
             b.iter(|| {
@@ -185,10 +185,9 @@ fn bench_state_operations(c: &mut Criterion) {
 /// Benchmark transition operations
 fn bench_transition_overhead(c: &mut Criterion) {
     use liblevenshtein::transducer::transition::{initial_state, transition_state};
-    use liblevenshtein::transducer::{Position, State};
 
     let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
-    let root = dict.root();
+    let _root = dict.root();
 
     let mut group = c.benchmark_group("transition_overhead");
 
@@ -200,11 +199,11 @@ fn bench_transition_overhead(c: &mut Criterion) {
                 let query = b"test";
 
                 b.iter(|| {
-                    let state = initial_state(query.len(), max_dist);
+                    let state = initial_state(query.len(), max_dist, Algorithm::Standard);
 
                     // Transition through 't'
                     let state =
-                        transition_state(&state, b't', query, max_dist, Algorithm::Standard);
+                        transition_state(&state, b't', query, max_dist, Algorithm::Standard, false);
 
                     black_box(state);
                 });

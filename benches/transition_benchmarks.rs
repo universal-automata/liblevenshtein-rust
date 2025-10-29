@@ -3,7 +3,9 @@ use liblevenshtein::transducer::{Algorithm, Position};
 use smallvec::SmallVec;
 
 // Re-export internal functions for benchmarking
-use liblevenshtein::transducer::transition::{initial_state, transition_position, transition_state};
+use liblevenshtein::transducer::transition::{
+    initial_state, transition_position, transition_state,
+};
 
 //==============================================================================
 // MICRO-BENCHMARKS: Individual Function Performance
@@ -44,10 +46,10 @@ fn bench_index_of_match(c: &mut Criterion) {
 
     // Test different match patterns
     let patterns = vec![
-        ("immediate", vec![true, false, false, false]),  // Match at start
-        ("middle", vec![false, false, true, false]),     // Match in middle
-        ("end", vec![false, false, false, true]),        // Match at end
-        ("no_match", vec![false, false, false, false]),  // No match
+        ("immediate", vec![true, false, false, false]), // Match at start
+        ("middle", vec![false, false, true, false]),    // Match in middle
+        ("end", vec![false, false, false, true]),       // Match at end
+        ("no_match", vec![false, false, false, false]), // No match
     ];
 
     for (name, cv) in patterns {
@@ -81,7 +83,7 @@ fn bench_transition_standard(c: &mut Criterion) {
 
     // Test different scenarios
     let scenarios = vec![
-        ("match", vec![true, false, false]),   // Immediate match (best case)
+        ("match", vec![true, false, false]), // Immediate match (best case)
         ("no_match", vec![false, false, false]), // No match (worst case)
         ("delayed_match", vec![false, false, true]), // Match after deletions
     ];
@@ -329,10 +331,7 @@ fn bench_prefix_mode(c: &mut Criterion) {
             let state = initial_state(query.len(), 2, algorithm);
 
             group.bench_with_input(
-                BenchmarkId::from_parameter(format!(
-                    "{:?}/prefix={}",
-                    algorithm, prefix_mode
-                )),
+                BenchmarkId::from_parameter(format!("{:?}/prefix={}", algorithm, prefix_mode)),
                 &(state, query, algorithm, prefix_mode),
                 |b, (state, query, algo, prefix)| {
                     b.iter(|| {

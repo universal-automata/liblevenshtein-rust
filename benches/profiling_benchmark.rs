@@ -9,7 +9,7 @@ fn load_dictionary() -> Vec<String> {
     if let Ok(file) = File::open("/usr/share/dict/words") {
         BufReader::new(file)
             .lines()
-            .filter_map(Result::ok)
+            .map_while(Result::ok)
             .take(10000) // Use 10k words for realistic profiling
             .collect()
     } else {

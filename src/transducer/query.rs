@@ -31,7 +31,7 @@ pub struct QueryIterator<N: DictionaryNode> {
     algorithm: Algorithm,
     finished: bool,
     state_pool: StatePool, // Pool for State allocation reuse
-    substring_mode: bool,   // Enable substring matching (for suffix automata)
+    substring_mode: bool,  // Enable substring matching (for suffix automata)
 }
 
 impl<N: DictionaryNode> QueryIterator<N> {

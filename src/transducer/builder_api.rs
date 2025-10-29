@@ -190,9 +190,7 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::dictionary::dawg::DawgDictionary;
-    use crate::dictionary::Dictionary;
     use crate::transducer::{Algorithm, Transducer};
 
     #[test]

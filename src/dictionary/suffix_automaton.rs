@@ -113,7 +113,10 @@ use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 /// set of ending positions (endpos). This minimizes the number of states while
 /// maintaining the ability to recognize all substrings.
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 struct SuffixNode {
     /// Outgoing edges: (byte label, target state index).
     ///
@@ -175,7 +178,10 @@ impl SuffixNode {
     /// Threshold at 16 edges based on benchmarks from DAWG implementation.
     fn find_edge(&self, label: u8) -> Option<usize> {
         if self.edges.len() < 16 {
-            self.edges.iter().find(|(b, _)| *b == label).map(|(_, t)| *t)
+            self.edges
+                .iter()
+                .find(|(b, _)| *b == label)
+                .map(|(_, t)| *t)
         } else {
             self.edges
                 .binary_search_by_key(&label, |(b, _)| *b)
@@ -215,7 +221,10 @@ impl SuffixNode {
 /// This is wrapped in Arc<RwLock<...>> to provide thread-safe concurrent access
 /// with dynamic mutation support.
 #[derive(Debug)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 struct SuffixAutomatonInner {
     /// Node storage (index-based graph).
     ///
@@ -302,11 +311,7 @@ impl SuffixAutomatonInner {
             p = self.nodes[p_idx].suffix_link;
         }
 
-        if p.is_none() {
-            // Reached root without finding transition - simple case
-            self.nodes[cur].suffix_link = Some(0);
-        } else {
-            let p_idx = p.unwrap();
+        if let Some(p_idx) = p {
             let q = self.nodes[p_idx].find_edge(ch).unwrap();
 
             if self.nodes[p_idx].max_length + 1 == self.nodes[q].max_length {
@@ -339,6 +344,9 @@ impl SuffixAutomatonInner {
                     }
                 }
             }
+        } else {
+            // Reached root without finding transition - simple case
+            self.nodes[cur].suffix_link = Some(0);
         }
 
         self.last_state = cur;
@@ -506,7 +514,7 @@ impl SuffixAutomaton {
         inner
             .positions
             .entry(last_state)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((string_id, text.len()));
 
         inner.string_count += 1;
@@ -846,10 +854,12 @@ impl DictionaryNode for SuffixNodeHandle {
 
     fn transition(&self, label: u8) -> Option<Self> {
         let inner = self.automaton.read().unwrap();
-        inner.nodes[self.state_id].find_edge(label).map(|target| Self {
-            automaton: Arc::clone(&self.automaton),
-            state_id: target,
-        })
+        inner.nodes[self.state_id]
+            .find_edge(label)
+            .map(|target| Self {
+                automaton: Arc::clone(&self.automaton),
+                state_id: target,
+            })
     }
 
     fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {

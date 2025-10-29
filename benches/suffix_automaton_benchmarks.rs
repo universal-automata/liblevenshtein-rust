@@ -102,7 +102,8 @@ fn bench_query_varying_distance(c: &mut Criterion) {
 
 /// Benchmark: Substring query performance with varying query lengths
 fn bench_query_varying_query_length(c: &mut Criterion) {
-    let text = "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.";
+    let text =
+        "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.";
     let dict = SuffixAutomaton::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("suffix_automaton_query_length");
@@ -170,11 +171,11 @@ fn bench_code_search(c: &mut Criterion) {
     let mut group = c.benchmark_group("suffix_automaton_code_search");
 
     let searches = [
-        ("calculate", 0),   // Exact match
-        ("calculte", 1),    // 1 typo
-        ("async fn", 0),    // Multi-word exact
-        ("async func", 2),  // Multi-word with typos
-        ("derive", 0),      // Attribute search
+        ("calculate", 0),  // Exact match
+        ("calculte", 1),   // 1 typo
+        ("async fn", 0),   // Multi-word exact
+        ("async func", 2), // Multi-word with typos
+        ("derive", 0),     // Attribute search
     ];
 
     for (query, distance) in searches.iter() {

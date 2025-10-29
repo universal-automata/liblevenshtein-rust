@@ -33,7 +33,10 @@ pub struct DynamicDawg {
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 struct DynamicDawgInner {
     nodes: Vec<DawgNode>,
     // Track which nodes are reachable (for compaction)
@@ -51,7 +54,10 @@ struct NodeSignature {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 struct DawgNode {
     edges: Vec<(u8, usize)>,
     is_final: bool,
@@ -847,7 +853,7 @@ mod tests {
     #[test]
     fn test_minimize_vs_compact() {
         // Test that minimize() achieves same minimality as compact()
-        let _terms = vec!["band", "banana", "bandana", "can", "cane", "candy"];
+        let _terms = ["band", "banana", "bandana", "can", "cane", "candy"];
 
         // Create two identical DAWGs with unsorted insertion
         let dawg1 = DynamicDawg::new();

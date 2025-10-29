@@ -29,7 +29,10 @@ use std::sync::Arc;
 /// providing better cache locality and reduced memory overhead compared
 /// to storing edges in per-node vectors.
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct OptimizedDawg {
     /// All nodes stored contiguously
     nodes: Arc<Vec<OptimizedDawgNode>>,
@@ -46,7 +49,10 @@ pub struct OptimizedDawg {
 ///
 /// Uses only 8 bytes compared to ~32 bytes for standard DAWG node.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct OptimizedDawgNode {
     /// Offset into edge_arena where this node's edges start
     edge_offset: u32,
@@ -56,7 +62,6 @@ pub struct OptimizedDawgNode {
 
     /// True if this node marks the end of a valid term
     is_final: bool,
-
     // Total size: 4 + 1 + 1 = 6 bytes (+ 2 bytes padding = 8 bytes)
 }
 
@@ -298,10 +303,8 @@ impl OptimizedDawg {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let mut sorted_terms: Vec<String> = terms
-            .into_iter()
-            .map(|s| s.as_ref().to_string())
-            .collect();
+        let mut sorted_terms: Vec<String> =
+            terms.into_iter().map(|s| s.as_ref().to_string()).collect();
         sorted_terms.sort();
         sorted_terms.dedup();
 
@@ -379,13 +382,12 @@ impl DictionaryNode for OptimizedDawgNodeRef {
 
     fn transition(&self, label: u8) -> Option<Self> {
         let node = &self.nodes[self.index];
-        node.find_edge(label, &self.edge_arena).map(|target| {
-            OptimizedDawgNodeRef {
+        node.find_edge(label, &self.edge_arena)
+            .map(|target| OptimizedDawgNodeRef {
                 index: target as usize,
                 nodes: Arc::clone(&self.nodes),
                 edge_arena: Arc::clone(&self.edge_arena),
-            }
-        })
+            })
     }
 
     fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
@@ -473,9 +475,8 @@ mod tests {
 
     #[test]
     fn test_memory_efficiency() {
-        let dawg = OptimizedDawg::from_terms(vec![
-            "band", "banana", "bandana", "can", "cane", "candy",
-        ]);
+        let dawg =
+            OptimizedDawg::from_terms(vec!["band", "banana", "bandana", "can", "cane", "candy"]);
 
         // Each OptimizedDawgNode is 8 bytes
         let node_memory = dawg.node_count() * 8;

@@ -13,11 +13,21 @@ fn main() {
     let root = dict.root();
     println!("\nRoot transitions:");
     for (byte, node) in root.edges() {
-        println!("  {} (0x{:02x}) -> is_final: {}", byte as char, byte, node.is_final());
+        println!(
+            "  {} (0x{:02x}) -> is_final: {}",
+            byte as char,
+            byte,
+            node.is_final()
+        );
 
         // Check children
         for (byte2, node2) in node.edges() {
-            println!("    {} (0x{:02x}) -> is_final: {}", byte2 as char, byte2, node2.is_final());
+            println!(
+                "    {} (0x{:02x}) -> is_final: {}",
+                byte2 as char,
+                byte2,
+                node2.is_final()
+            );
         }
     }
 

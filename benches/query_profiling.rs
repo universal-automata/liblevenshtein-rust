@@ -21,19 +21,17 @@ fn load_large_dictionary() -> DoubleArrayTrie {
 
     // Fallback: create synthetic dictionary
     let words: Vec<String> = (0..10000)
-        .map(|i| {
-            match i % 10 {
-                0 => format!("test{}", i),
-                1 => format!("best{}", i),
-                2 => format!("rest{}", i),
-                3 => format!("nest{}", i),
-                4 => format!("word{}", i),
-                5 => format!("term{}", i),
-                6 => format!("item{}", i),
-                7 => format!("code{}", i),
-                8 => format!("data{}", i),
-                _ => format!("info{}", i),
-            }
+        .map(|i| match i % 10 {
+            0 => format!("test{}", i),
+            1 => format!("best{}", i),
+            2 => format!("rest{}", i),
+            3 => format!("nest{}", i),
+            4 => format!("word{}", i),
+            5 => format!("term{}", i),
+            6 => format!("item{}", i),
+            7 => format!("code{}", i),
+            8 => format!("data{}", i),
+            _ => format!("info{}", i),
         })
         .collect();
     DoubleArrayTrie::from_terms(words)

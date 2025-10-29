@@ -41,6 +41,11 @@ fn main() {
 
     println!("\nAll edges from root:");
     for (byte, node) in root.edges() {
-        println!("  {} (0x{:02x}) -> is_final: {}", byte as char, byte, node.is_final());
+        println!(
+            "  {} (0x{:02x}) -> is_final: {}",
+            byte as char,
+            byte,
+            node.is_final()
+        );
     }
 }

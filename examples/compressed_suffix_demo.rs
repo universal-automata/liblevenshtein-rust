@@ -15,12 +15,18 @@ fn main() {
         "How vexingly quick daft zebras jump",
     ];
 
-    println!("Building compressed suffix automaton from {} texts...", texts.len());
+    println!(
+        "Building compressed suffix automaton from {} texts...",
+        texts.len()
+    );
     let compressed_sa = CompressedSuffixAutomaton::from_texts(texts.clone());
 
     println!("States: {}", compressed_sa.state_count());
     println!("Memory: {} bytes", compressed_sa.memory_bytes());
-    println!("Bytes per state: {}\n", compressed_sa.memory_bytes() / compressed_sa.state_count());
+    println!(
+        "Bytes per state: {}\n",
+        compressed_sa.memory_bytes() / compressed_sa.state_count()
+    );
 
     // Test exact substring matching
     println!("--- Exact Substring Matching ---");
@@ -47,16 +53,16 @@ fn main() {
 
     for (query, description) in &queries {
         println!("\nQuery: '{}' ({})", query, description);
-        let matches: Vec<_> = transducer
-            .query_with_distance(query, 1)
-            .take(5)
-            .collect();
+        let matches: Vec<_> = transducer.query_with_distance(query, 1).take(5).collect();
 
         if matches.is_empty() {
             println!("  No matches found");
         } else {
             for candidate in matches {
-                println!("  → '{}' (distance: {})", candidate.term, candidate.distance);
+                println!(
+                    "  → '{}' (distance: {})",
+                    candidate.term, candidate.distance
+                );
             }
         }
     }
@@ -67,16 +73,18 @@ fn main() {
 
     println!("Original SuffixAutomaton:");
     println!("  States: {}", original_sa.state_count());
-    println!("  Estimated memory (HashMap-based): ~{} bytes/state",
-             48); // Rough estimate
+    println!("  Estimated memory (HashMap-based): ~{} bytes/state", 48); // Rough estimate
 
     println!("\nCompressed SuffixAutomaton:");
     println!("  States: {}", compressed_sa.state_count());
-    println!("  Actual memory: ~{} bytes/state",
-             compressed_sa.memory_bytes() / compressed_sa.state_count());
+    println!(
+        "  Actual memory: ~{} bytes/state",
+        compressed_sa.memory_bytes() / compressed_sa.state_count()
+    );
 
-    let savings_percent = (1.0 - (compressed_sa.memory_bytes() as f64 /
-                                  (original_sa.state_count() * 48) as f64)) * 100.0;
+    let savings_percent = (1.0
+        - (compressed_sa.memory_bytes() as f64 / (original_sa.state_count() * 48) as f64))
+        * 100.0;
     println!("\nEstimated memory savings: {:.1}%", savings_percent);
 
     println!("\n=== Demo Complete ===");

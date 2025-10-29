@@ -232,7 +232,9 @@ impl DictContainer {
                 d.clear();
                 Ok(())
             }
-            Self::DoubleArrayTrie(_) => Err(anyhow::anyhow!("DoubleArrayTrie dictionary is read-only")),
+            Self::DoubleArrayTrie(_) => {
+                Err(anyhow::anyhow!("DoubleArrayTrie dictionary is read-only"))
+            }
             Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is read-only")),
             Self::OptimizedDawg(_) => Err(anyhow::anyhow!("OptimizedDawg dictionary is read-only")),
             Self::DynamicDawg(_) => {
@@ -254,9 +256,13 @@ impl DictContainer {
                 // PathMap doesn't need compaction
                 Ok(())
             }
-            Self::DoubleArrayTrie(_) => Err(anyhow::anyhow!("DoubleArrayTrie dictionary is already minimized")),
+            Self::DoubleArrayTrie(_) => Err(anyhow::anyhow!(
+                "DoubleArrayTrie dictionary is already minimized"
+            )),
             Self::Dawg(_) => Err(anyhow::anyhow!("DAWG dictionary is already minimized")),
-            Self::OptimizedDawg(_) => Err(anyhow::anyhow!("OptimizedDawg dictionary is already minimized")),
+            Self::OptimizedDawg(_) => Err(anyhow::anyhow!(
+                "OptimizedDawg dictionary is already minimized"
+            )),
             Self::DynamicDawg(d) => {
                 d.minimize();
                 Ok(())
@@ -377,7 +383,8 @@ impl ReplState {
                     DictContainer::DynamicDawg(dict)
                 }
                 DictionaryBackend::SuffixAutomaton => {
-                    let dict = SuffixAutomaton::from_texts(terms.iter().map(|s| s.to_string()).collect());
+                    let dict =
+                        SuffixAutomaton::from_texts(terms.iter().map(|s| s.to_string()).collect());
                     DictContainer::SuffixAutomaton(dict)
                 }
             };

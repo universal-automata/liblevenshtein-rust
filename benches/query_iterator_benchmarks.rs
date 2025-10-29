@@ -84,16 +84,7 @@ fn bench_ordered_query_varying_distance(c: &mut Criterion) {
 /// Benchmark: Prefix mode vs standard mode
 fn bench_prefix_vs_standard(c: &mut Criterion) {
     let dict = DoubleArrayTrie::from_terms(vec![
-        "test",
-        "testing",
-        "tested",
-        "tester",
-        "tests",
-        "best",
-        "rest",
-        "nest",
-        "fest",
-        "west",
+        "test", "testing", "tested", "tester", "tests", "best", "rest", "nest", "fest", "west",
     ]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("prefix_vs_standard");
@@ -210,16 +201,7 @@ fn bench_ordered_query_sorting_overhead(c: &mut Criterion) {
 /// Benchmark: Prefix mode with varying query lengths
 fn bench_prefix_varying_query_length(c: &mut Criterion) {
     let dict = DoubleArrayTrie::from_terms(vec![
-        "t",
-        "te",
-        "tes",
-        "test",
-        "testi",
-        "testin",
-        "testing",
-        "testings",
-        "best",
-        "resting",
+        "t", "te", "tes", "test", "testi", "testin", "testing", "testings", "best", "resting",
     ]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("prefix_varying_query_length");

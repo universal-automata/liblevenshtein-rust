@@ -485,9 +485,11 @@ impl SuffixAutomatonProtobufSerializer {
         }
 
         // Rebuild suffix automaton from source texts
-        Ok(crate::dictionary::suffix_automaton::SuffixAutomaton::from_texts(
-            proto_suffix.source_texts,
-        ))
+        Ok(
+            crate::dictionary::suffix_automaton::SuffixAutomaton::from_texts(
+                proto_suffix.source_texts,
+            ),
+        )
     }
 }
 
@@ -527,10 +529,10 @@ impl DatProtobufSerializer {
         // Create a marker protobuf message indicating this is a DAT serialization
         // We'll use the term count as a simple serialization
         let proto_dat = proto::DoubleArrayTrie {
-            base: Vec::new(),  // Placeholder - we serialize via terms
+            base: Vec::new(), // Placeholder - we serialize via terms
             check: Vec::new(),
             is_final: Vec::new(),
-            edge_data: terms.join("\n").into_bytes(),  // Store terms as newline-delimited
+            edge_data: terms.join("\n").into_bytes(), // Store terms as newline-delimited
             free_list: Vec::new(),
             term_count: terms.len() as u64,
             rebuild_threshold: 0.2,

@@ -40,9 +40,7 @@ fn bench_min_distance(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &state,
             |b, state| {
-                b.iter(|| {
-                    black_box(state.min_distance())
-                });
+                b.iter(|| black_box(state.min_distance()));
             },
         );
     }
@@ -63,9 +61,7 @@ fn bench_infer_distance(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &(&state, query_length),
             |b, (state, query_length)| {
-                b.iter(|| {
-                    black_box(state.infer_distance(*query_length))
-                });
+                b.iter(|| black_box(state.infer_distance(*query_length)));
             },
         );
     }
@@ -87,9 +83,7 @@ fn bench_infer_prefix_distance(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}", n)),
             &(&state, query_length),
             |b, (state, query_length)| {
-                b.iter(|| {
-                    black_box(state.infer_prefix_distance(*query_length))
-                });
+                b.iter(|| black_box(state.infer_prefix_distance(*query_length)));
             },
         );
     }
@@ -190,32 +184,24 @@ fn bench_state_creation(c: &mut Criterion) {
 
     // Benchmark State::new()
     group.bench_function("new", |b| {
-        b.iter(|| {
-            black_box(State::new())
-        });
+        b.iter(|| black_box(State::new()));
     });
 
     // Benchmark State::single()
     group.bench_function("single", |b| {
-        b.iter(|| {
-            black_box(State::single(Position::new(0, 0)))
-        });
+        b.iter(|| black_box(State::single(Position::new(0, 0))));
     });
 
     // Benchmark State::from_positions()
     for &n in &[1, 3, 5, 10, 20] {
-        let positions: Vec<Position> = (0..n)
-            .map(|i| Position::new(i, i % 3))
-            .collect();
+        let positions: Vec<Position> = (0..n).map(|i| Position::new(i, i % 3)).collect();
 
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("from_positions/n={}", n)),
             &positions,
             |b, positions| {
-                b.iter(|| {
-                    black_box(State::from_positions(positions.clone()))
-                });
+                b.iter(|| black_box(State::from_positions(positions.clone())));
             },
         );
     }
@@ -234,27 +220,19 @@ fn bench_accessors(c: &mut Criterion) {
     let state = generate_state(5, 3);
 
     group.bench_function("head", |b| {
-        b.iter(|| {
-            black_box(state.head())
-        });
+        b.iter(|| black_box(state.head()));
     });
 
     group.bench_function("is_empty", |b| {
-        b.iter(|| {
-            black_box(state.is_empty())
-        });
+        b.iter(|| black_box(state.is_empty()));
     });
 
     group.bench_function("len", |b| {
-        b.iter(|| {
-            black_box(state.len())
-        });
+        b.iter(|| black_box(state.len()));
     });
 
     group.bench_function("positions", |b| {
-        b.iter(|| {
-            black_box(state.positions())
-        });
+        b.iter(|| black_box(state.positions()));
     });
 
     group.bench_function("iter", |b| {
@@ -290,9 +268,7 @@ fn bench_distance_comparison(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("{}/min_distance", name)),
             state,
             |b, state| {
-                b.iter(|| {
-                    black_box(state.min_distance())
-                });
+                b.iter(|| black_box(state.min_distance()));
             },
         );
 
@@ -300,9 +276,7 @@ fn bench_distance_comparison(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("{}/infer_distance", name)),
             &(state, query_length),
             |b, (state, query_length)| {
-                b.iter(|| {
-                    black_box(state.infer_distance(*query_length))
-                });
+                b.iter(|| black_box(state.infer_distance(*query_length)));
             },
         );
 
@@ -310,9 +284,7 @@ fn bench_distance_comparison(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("{}/infer_prefix_distance", name)),
             &(state, query_length),
             |b, (state, query_length)| {
-                b.iter(|| {
-                    black_box(state.infer_prefix_distance(*query_length))
-                });
+                b.iter(|| black_box(state.infer_prefix_distance(*query_length)));
             },
         );
     }

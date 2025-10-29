@@ -16,7 +16,7 @@ fn main() {
         "zest", "taste", "text", "tent", "temp", "team",
     ];
 
-    let dict = DoubleArrayTrie::from_terms(words.iter().map(|s| *s));
+    let dict = DoubleArrayTrie::from_terms(words.iter().copied());
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Dictionary: {} words", words.len());
@@ -25,7 +25,7 @@ fn main() {
 
     // Example 1: Show all results in order
     println!("=== Example 1: All Results (Ordered) ===\n");
-    println!("{:<3} {:<10} {}", "Rank", "Distance", "Term");
+    println!("{:<3} {:<10} Term", "Rank", "Distance");
     println!("{:-<30}", "");
 
     for (rank, candidate) in transducer.query_ordered("tset", 3).enumerate() {

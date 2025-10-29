@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn test_state_single_position() {
         let pos = Position::new(3, 1);
-        let state = State::single(pos.clone());
+        let state = State::single(pos);
         assert_eq!(state.len(), 1);
         assert_eq!(state.head(), Some(&pos));
     }

@@ -31,7 +31,9 @@ impl BincodeSerializer {
     }
 
     /// Deserialize a suffix automaton from source texts.
-    pub fn deserialize_suffix_automaton<R>(mut reader: R) -> Result<SuffixAutomaton, SerializationError>
+    pub fn deserialize_suffix_automaton<R>(
+        mut reader: R,
+    ) -> Result<SuffixAutomaton, SerializationError>
     where
         R: Read,
     {

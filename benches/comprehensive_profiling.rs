@@ -39,8 +39,8 @@ fn main() {
     let suffix_dict = SuffixAutomaton::from_texts(words.iter().map(|s| s.as_str()));
 
     let queries = vec![
-        "test", "get", "set", "value", "user", "data", "calc", "find",
-        "prog", "proc", "func", "class", "method", "var", "const", "let",
+        "test", "get", "set", "value", "user", "data", "calc", "find", "prog", "proc", "func",
+        "class", "method", "var", "const", "let",
     ];
 
     eprintln!("Warming up...");
