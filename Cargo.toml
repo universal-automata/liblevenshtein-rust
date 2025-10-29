@@ -123,6 +123,21 @@ harness = false
 name = "real_world_profiling"
 harness = false
 
+[[bench]]
+name = "fuzzy_map_benchmarks"
+harness = false
+required-features = ["pathmap-backend"]
+
+[[bench]]
+name = "fuzzy_map_profiling"
+harness = false
+required-features = ["pathmap-backend"]
+
+[[bench]]
+name = "hierarchical_scope_benchmarks"
+harness = false
+required-features = ["pathmap-backend"]
+
 [[bin]]
 name = "liblevenshtein"
 path = "src/bin/liblevenshtein.rs"
@@ -131,6 +146,14 @@ required-features = ["cli"]
 [[example]]
 name = "serialization"
 required-features = ["serialization"]
+
+[[example]]
+name = "hierarchical_scope_completion"
+required-features = ["pathmap-backend"]
+
+[[example]]
+name = "fuzzy_maps_code_completion"
+required-features = ["pathmap-backend"]
 
 [profile.release]
 opt-level = 3

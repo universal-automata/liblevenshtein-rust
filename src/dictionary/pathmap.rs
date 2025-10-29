@@ -1,10 +1,11 @@
 //! PathMap-backed dictionary implementation.
 
-use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
+use crate::dictionary::{Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::value::DictionaryValue;
 #[cfg(feature = "serialization")]
 use crate::serialization::DictionaryFromTerms;
 use pathmap::utils::BitMask;
-use pathmap::zipper::{Zipper, ZipperMoving};
+use pathmap::zipper::{Zipper, ZipperMoving, ZipperValues};
 use pathmap::PathMap;
 use smallvec::SmallVec;
 use std::sync::{Arc, RwLock};
@@ -17,33 +18,56 @@ use std::sync::{Arc, RwLock};
 /// The dictionary uses `RwLock` for interior mutability, allowing:
 /// - Multiple concurrent readers (queries)
 /// - Exclusive write access for modifications (insert/remove)
+///
+/// # Generic Values
+///
+/// The dictionary can map terms to arbitrary values via the `V` type parameter:
+/// - `PathMapDictionary<()>`: No values (backward compatible)
+/// - `PathMapDictionary<u32>`: Map terms to scope IDs
+/// - `PathMapDictionary<Vec<String>>`: Map terms to lists of metadata
+///
+/// # Examples
+///
+/// ```
+/// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+///
+/// // Simple dictionary (no values)
+/// let dict: PathMapDictionary<()> = PathMapDictionary::new();
+///
+/// // Dictionary with scope IDs
+/// let dict_with_scopes: PathMapDictionary<u32> = PathMapDictionary::new();
+/// ```
 #[derive(Clone, Debug)]
-pub struct PathMapDictionary {
-    map: Arc<RwLock<PathMap<()>>>,
+pub struct PathMapDictionary<V: DictionaryValue = ()> {
+    map: Arc<RwLock<PathMap<V>>>,
     term_count: Arc<RwLock<usize>>,
 }
 
-impl PathMapDictionary {
+impl<V: DictionaryValue> PathMapDictionary<V> {
     /// Create a new empty dictionary
-    pub fn new() -> Self {
+    pub fn new() -> Self
+    where
+        V: Default,
+    {
         Self {
             map: Arc::new(RwLock::new(PathMap::new())),
             term_count: Arc::new(RwLock::new(0)),
         }
     }
 
-    /// Create a dictionary from an iterator of terms
+    /// Create a dictionary from an iterator of terms with a default value
     pub fn from_terms<I, S>(terms: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
+        V: Default,
     {
         let mut map = PathMap::new();
         let mut count = 0;
 
         for term in terms {
             let bytes = term.as_ref().as_bytes();
-            if map.insert(bytes, ()).is_none() {
+            if map.insert(bytes, V::default()).is_none() {
                 count += 1;
             }
         }
@@ -54,7 +78,29 @@ impl PathMapDictionary {
         }
     }
 
-    /// Insert a term into the dictionary
+    /// Create a dictionary from an iterator of (term, value) pairs
+    pub fn from_terms_with_values<I, S>(terms: I) -> Self
+    where
+        I: IntoIterator<Item = (S, V)>,
+        S: AsRef<str>,
+    {
+        let mut map = PathMap::new();
+        let mut count = 0;
+
+        for (term, value) in terms {
+            let bytes = term.as_ref().as_bytes();
+            if map.insert(bytes, value).is_none() {
+                count += 1;
+            }
+        }
+
+        Self {
+            map: Arc::new(RwLock::new(map)),
+            term_count: Arc::new(RwLock::new(count)),
+        }
+    }
+
+    /// Insert a term with a default value into the dictionary
     ///
     /// Returns `true` if the term was newly inserted, `false` if it already existed.
     ///
@@ -65,12 +111,31 @@ impl PathMapDictionary {
     /// # Panics
     ///
     /// Panics if the lock is poisoned (another thread panicked while holding the lock).
-    pub fn insert(&self, term: &str) -> bool {
+    pub fn insert(&self, term: &str) -> bool
+    where
+        V: Default,
+    {
+        self.insert_with_value(term, V::default())
+    }
+
+    /// Insert a term with a specific value into the dictionary
+    ///
+    /// Returns `true` if the term was newly inserted, `false` if it already existed.
+    /// If the term already existed, its value is updated.
+    ///
+    /// # Thread Safety
+    ///
+    /// This method acquires a write lock, blocking concurrent reads and writes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lock is poisoned (another thread panicked while holding the lock).
+    pub fn insert_with_value(&self, term: &str, value: V) -> bool {
         let bytes = term.as_bytes();
         let mut map = self.map.write().unwrap();
         let mut count = self.term_count.write().unwrap();
 
-        if map.insert(bytes, ()).is_none() {
+        if map.insert(bytes, value).is_none() {
             *count += 1;
             true
         } else {
@@ -151,12 +216,15 @@ impl PathMapDictionary {
     /// Deserialize from PathMap's native .paths format
     ///
     /// Creates a new dictionary from the serialized data.
-    pub fn deserialize_paths<R: std::io::Read>(reader: R) -> std::io::Result<Self> {
+    pub fn deserialize_paths<R: std::io::Read>(reader: R) -> std::io::Result<Self>
+    where
+        V: Default,
+    {
         use pathmap::paths_serialization::deserialize_paths;
         use pathmap::zipper::ZipperIteration;
 
         let mut map = PathMap::new();
-        deserialize_paths(map.write_zipper(), reader, ())?;
+        deserialize_paths(map.write_zipper(), reader, V::default())?;
 
         // Count terms to populate term_count
         let count = {
@@ -173,9 +241,26 @@ impl PathMapDictionary {
             term_count: Arc::new(RwLock::new(count)),
         })
     }
+
+    /// Get the value associated with a term
+    ///
+    /// Returns `None` if the term doesn't exist in the dictionary.
+    ///
+    /// # Thread Safety
+    ///
+    /// This method acquires a read lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lock is poisoned.
+    pub fn get_value(&self, term: &str) -> Option<V> {
+        let bytes = term.as_bytes();
+        let map = self.map.read().unwrap();
+        map.get_val_at(bytes).cloned()
+    }
 }
 
-impl Default for PathMapDictionary {
+impl<V: DictionaryValue + Default> Default for PathMapDictionary<V> {
     fn default() -> Self {
         Self::new()
     }
@@ -188,9 +273,10 @@ impl DictionaryFromTerms for PathMapDictionary {
     }
 }
 
-impl Dictionary for PathMapDictionary {
-    type Node = PathMapNode;
+impl<V: DictionaryValue> Dictionary for PathMapDictionary<V> {
+    type Node = PathMapNode<V>;
 
+    #[inline]
     fn root(&self) -> Self::Node {
         PathMapNode {
             map: Arc::clone(&self.map),
@@ -198,10 +284,12 @@ impl Dictionary for PathMapDictionary {
         }
     }
 
+    #[inline]
     fn len(&self) -> Option<usize> {
         Some(self.term_count())
     }
 
+    #[inline]
     fn sync_strategy(&self) -> SyncStrategy {
         // PathMap uses Arc for structural sharing and UnsafeCell for mutations.
         // Current analysis: requires external sync for safety.
@@ -209,6 +297,14 @@ impl Dictionary for PathMapDictionary {
         // Future: If PathMap's UnsafeCell usage is proven thread-safe,
         // this could return SyncStrategy::InternalSync or ::Persistent
         SyncStrategy::ExternalSync
+    }
+}
+
+impl<V: DictionaryValue> MappedDictionary for PathMapDictionary<V> {
+    type Value = V;
+
+    fn get_value(&self, term: &str) -> Option<Self::Value> {
+        PathMapDictionary::get_value(self, term)
     }
 }
 
@@ -229,18 +325,19 @@ impl Dictionary for PathMapDictionary {
 /// Since paths are never mutated after creation, Arc provides efficient
 /// reference counting with minimal overhead compared to Vec cloning.
 #[derive(Clone)]
-pub struct PathMapNode {
-    map: Arc<RwLock<PathMap<()>>>,
+pub struct PathMapNode<V: DictionaryValue> {
+    map: Arc<RwLock<PathMap<V>>>,
     path: Arc<Vec<u8>>, // Arc for path sharing
 }
 
-impl PathMapNode {
+impl<V: DictionaryValue> PathMapNode<V> {
     /// Create a zipper at the current path
     ///
     /// Acquires a read lock on the underlying PathMap.
+    #[inline(always)]
     fn with_zipper<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(pathmap::zipper::ReadZipperUntracked<'_, 'static, ()>) -> R,
+        F: FnOnce(pathmap::zipper::ReadZipperUntracked<'_, 'static, V>) -> R,
     {
         let map = self.map.read().unwrap();
         let zipper = if self.path.is_empty() {
@@ -252,11 +349,13 @@ impl PathMapNode {
     }
 }
 
-impl DictionaryNode for PathMapNode {
+impl<V: DictionaryValue> DictionaryNode for PathMapNode<V> {
+    #[inline]
     fn is_final(&self) -> bool {
         self.with_zipper(|z| z.is_val())
     }
 
+    #[inline]
     fn transition(&self, label: u8) -> Option<Self> {
         // Check if this path exists first
         let exists = self.with_zipper(|mut z| {
@@ -332,19 +431,28 @@ impl DictionaryNode for PathMapNode {
     }
 }
 
+impl<V: DictionaryValue> MappedDictionaryNode for PathMapNode<V> {
+    type Value = V;
+
+    #[inline]
+    fn value(&self) -> Option<Self::Value> {
+        self.with_zipper(|zipper| zipper.val().cloned())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_pathmap_dictionary_creation() {
-        let dict = PathMapDictionary::from_terms(vec!["hello", "world", "test"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["hello", "world", "test"]);
         assert_eq!(dict.len(), Some(3));
     }
 
     #[test]
     fn test_pathmap_dictionary_contains() {
-        let dict = PathMapDictionary::from_terms(vec!["hello", "world"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["hello", "world"]);
         assert!(dict.contains("hello"));
         assert!(dict.contains("world"));
         assert!(!dict.contains("goodbye"));
@@ -352,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_node_traversal() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["test", "testing"]);
         let root = dict.root();
 
         // Navigate: t -> e -> s -> t
@@ -370,7 +478,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_node_edges() {
-        let dict = PathMapDictionary::from_terms(vec!["ab", "ac", "ad"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["ab", "ac", "ad"]);
         let root = dict.root();
         let a = root.transition(b'a').expect("should have 'a'");
 
@@ -383,7 +491,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_insert() {
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["test"]);
         assert_eq!(dict.term_count(), 1);
 
         // Insert new term
@@ -398,7 +506,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_remove() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
         assert_eq!(dict.term_count(), 3);
 
         // Remove existing term
@@ -415,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_clear() {
-        let dict = PathMapDictionary::from_terms(vec!["test", "testing"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["test", "testing"]);
         assert_eq!(dict.term_count(), 2);
 
         dict.clear();
@@ -428,7 +536,7 @@ mod tests {
     fn test_pathmap_dictionary_concurrent_operations() {
         use std::thread;
 
-        let dict = PathMapDictionary::from_terms(vec!["test"]);
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["test"]);
         let dict_clone = dict.clone();
 
         // Spawn thread that inserts while main thread queries
@@ -447,5 +555,61 @@ mod tests {
         assert!(dict.contains("testing"));
         assert!(dict.contains("tested"));
         assert_eq!(dict.term_count(), 3);
+    }
+
+    #[test]
+    fn test_pathmap_dictionary_with_values() {
+        // Test dictionary with u32 values (scope IDs)
+        let terms_with_values = vec![
+            ("hello", 1u32),
+            ("world", 2u32),
+            ("test", 3u32),
+        ];
+        let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(terms_with_values);
+
+        assert_eq!(dict.len(), Some(3));
+        assert!(dict.contains("hello"));
+        assert_eq!(dict.get_value("hello"), Some(1));
+        assert_eq!(dict.get_value("world"), Some(2));
+        assert_eq!(dict.get_value("test"), Some(3));
+        assert_eq!(dict.get_value("missing"), None);
+    }
+
+    #[test]
+    fn test_pathmap_dictionary_insert_with_value() {
+        let dict: PathMapDictionary<u32> = PathMapDictionary::new();
+
+        // Insert with values
+        assert!(dict.insert_with_value("hello", 42));
+        assert_eq!(dict.get_value("hello"), Some(42));
+
+        // Update existing value
+        assert!(!dict.insert_with_value("hello", 99));
+        assert_eq!(dict.get_value("hello"), Some(99));
+        assert_eq!(dict.term_count(), 1);
+    }
+
+    #[test]
+    fn test_pathmap_node_value() {
+        let terms_with_values = vec![
+            ("hello", 10u32),
+            ("world", 20u32),
+        ];
+        let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(terms_with_values);
+        let root = dict.root();
+
+        // Navigate to "hello"
+        let h = root.transition(b'h').expect("should have 'h'");
+        let e = h.transition(b'e').expect("should have 'e'");
+        let l1 = e.transition(b'l').expect("should have first 'l'");
+        let l2 = l1.transition(b'l').expect("should have second 'l'");
+        let o = l2.transition(b'o').expect("should have 'o'");
+
+        assert!(o.is_final());
+        assert_eq!(o.value(), Some(10));
+
+        // Non-final node should have no value
+        assert!(!h.is_final());
+        assert_eq!(h.value(), None);
     }
 }

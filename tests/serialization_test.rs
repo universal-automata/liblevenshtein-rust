@@ -28,7 +28,7 @@ mod serialization_tests {
         use liblevenshtein::dictionary::pathmap::PathMapDictionary;
 
         let terms = test_terms();
-        let dict = PathMapDictionary::from_terms(terms.iter().copied());
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(terms.iter().copied());
 
         // Serialize using PathMap's native format
         let mut buffer = Vec::new();
@@ -36,7 +36,7 @@ mod serialization_tests {
             .expect("Failed to serialize PathMapDictionary");
 
         // Deserialize
-        let deserialized = PathMapDictionary::deserialize_paths(&buffer[..])
+        let deserialized: PathMapDictionary<()> = PathMapDictionary::deserialize_paths(&buffer[..])
             .expect("Failed to deserialize PathMapDictionary");
 
         // Verify
@@ -180,7 +180,7 @@ mod serialization_tests {
         use liblevenshtein::dictionary::pathmap::PathMapDictionary;
 
         let terms = test_terms();
-        let dict = PathMapDictionary::from_terms(terms.iter().copied());
+        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(terms.iter().copied());
 
         // PathMap uses its own native .paths format, not JSON
         // Test serialization using the native format
@@ -189,7 +189,7 @@ mod serialization_tests {
             .expect("Failed to serialize PathMapDictionary");
 
         // Deserialize
-        let deserialized = PathMapDictionary::deserialize_paths(&buffer[..])
+        let deserialized: PathMapDictionary<()> = PathMapDictionary::deserialize_paths(&buffer[..])
             .expect("Failed to deserialize PathMapDictionary");
 
         // Verify
@@ -354,7 +354,7 @@ mod serialization_tests {
 
         let terms = test_terms();
 
-        let pathmap = PathMapDictionary::from_terms(terms.iter().copied());
+        let pathmap: PathMapDictionary<()> = PathMapDictionary::from_terms(terms.iter().copied());
         let dat = DoubleArrayTrie::from_terms(terms.clone());
         let dawg = DawgDictionary::from_iter(terms.iter().copied());
         let optimized = OptimizedDawg::from_terms(terms.clone());

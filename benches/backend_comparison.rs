@@ -72,7 +72,7 @@ fn bench_construction(c: &mut Criterion) {
         &sample,
         |b, terms| {
             b.iter(|| {
-                let dict = PathMapDictionary::from_terms(terms.clone());
+                let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(terms.clone());
                 black_box(dict)
             })
         },
@@ -143,7 +143,7 @@ fn bench_exact_matching(c: &mut Criterion) {
     let sample: Vec<String> = words.iter().take(sample_size).cloned().collect();
     let queries = sample_queries();
 
-    let pathmap_dict = PathMapDictionary::from_terms(sample.clone());
+    let pathmap_dict: PathMapDictionary<()> = PathMapDictionary::from_terms(sample.clone());
     let dawg_dict = DawgDictionary::from_iter(sample.clone());
     let optimized_dawg_dict = OptimizedDawg::from_terms(sample.clone());
     let dat_dict = DoubleArrayTrie::from_terms(sample.clone());
@@ -222,7 +222,7 @@ fn bench_distance_1_matching(c: &mut Criterion) {
     let sample: Vec<String> = words.iter().take(sample_size).cloned().collect();
     let queries = sample_queries();
 
-    let pathmap_dict = PathMapDictionary::from_terms(sample.clone());
+    let pathmap_dict: PathMapDictionary<()> = PathMapDictionary::from_terms(sample.clone());
     let dawg_dict = DawgDictionary::from_iter(sample.clone());
     let optimized_dawg_dict = OptimizedDawg::from_terms(sample.clone());
     let dat_dict = DoubleArrayTrie::from_terms(sample.clone());
@@ -301,7 +301,7 @@ fn bench_distance_2_matching(c: &mut Criterion) {
     let sample: Vec<String> = words.iter().take(sample_size).cloned().collect();
     let queries = sample_queries();
 
-    let pathmap_dict = PathMapDictionary::from_terms(sample.clone());
+    let pathmap_dict: PathMapDictionary<()> = PathMapDictionary::from_terms(sample.clone());
     let dawg_dict = DawgDictionary::from_iter(sample.clone());
     let optimized_dawg_dict = OptimizedDawg::from_terms(sample.clone());
     let dat_dict = DoubleArrayTrie::from_terms(sample.clone());
@@ -379,7 +379,7 @@ fn bench_contains_operation(c: &mut Criterion) {
     let sample_size = 10_000.min(words.len());
     let sample: Vec<String> = words.iter().take(sample_size).cloned().collect();
 
-    let pathmap_dict = PathMapDictionary::from_terms(sample.clone());
+    let pathmap_dict: PathMapDictionary<()> = PathMapDictionary::from_terms(sample.clone());
     let dawg_dict = DawgDictionary::from_iter(sample.clone());
     let optimized_dawg_dict = OptimizedDawg::from_terms(sample.clone());
     let dat_dict = DoubleArrayTrie::from_terms(sample.clone());
@@ -456,7 +456,7 @@ fn bench_memory_footprint(c: &mut Criterion) {
 
     group.bench_function("PathMap_construction", |b| {
         b.iter(|| {
-            let dict = PathMapDictionary::from_terms(sample.clone());
+            let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(sample.clone());
             // PathMap uses HashMap-based trie, roughly 64 bytes per node + string data
             black_box(dict)
         })
