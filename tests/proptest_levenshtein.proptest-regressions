@@ -7,3 +7,5 @@
 cc 16de993f2e88d74379163d86ed07eb013108569d32ba7a1aaa9e90eba12730b2 # shrinks to dict_words = ["n", "a", "ag"], query = "a", max_dist = 1
 cc 53b74fa37e9d9351d568a261bf57292752666074b5dfd71802a531c678093b5e # shrinks to mut dict_words = ["za", "z"]
 cc 5c552af009fd4f7102d18f5ee581a8b9ee462965cf64e281ecbb632617266c01 # shrinks to dict_words = ["ve", "v"], query = "ae", max_dist = 1
+cc 4598a159d6fa1a60214b106b5cde319baa8e2a2e4d3132d291998d3aa877afa7 # shrinks to dict_words = ["rh", "qpo", "ry"]
+cc 2b3965c4118f35478613a4dd78cfdcf98d26654a6e74eaa35f6ba5f94d2bf442 # shrinks to dict_words = ["gjzhkidoa", "gl"]
