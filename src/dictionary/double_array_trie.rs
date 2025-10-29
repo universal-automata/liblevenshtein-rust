@@ -278,27 +278,53 @@ impl DoubleArrayTrieBuilder {
         }
     }
 
-    /// Find a free BASE value starting from a hint position.
+    /// Find a free BASE value for a state that needs to have transitions for the given bytes.
+    ///
+    /// The double-array formula is: next_state = BASE[current_state] + byte
+    ///
+    /// This function finds a BASE value such that for each byte in `bytes`,
+    /// the computed next_state position is available (CHECK[next_state] < 0).
+    ///
+    /// Returns the BASE value to store in BASE[current_state].
     fn find_free_base(&self, start: usize, bytes: &[u8]) -> i32 {
-        // Try base values starting from start
-        for base in start..start + 10000 {
+        if bytes.is_empty() {
+            return 0;
+        }
+
+        // Search for a BASE value where all required slots are free
+        // We search in the range [start, start + 10000)
+        // For each candidate BASE value, check if BASE + byte is free for all bytes
+        let start_base = start as i32;
+
+        for base in start_base..start_base + 10000 {
             let mut all_free = true;
 
             for &byte in bytes {
-                let next = base + byte as usize;
-                if next < self.check.len() && self.check[next] >= 0 {
+                // Compute next_state = BASE + byte
+                let next = base + (byte as i32);
+
+                // next_state must be non-negative and within bounds (or we'll grow)
+                if next < 0 {
+                    all_free = false;
+                    break;
+                }
+
+                let next_usize = next as usize;
+
+                // Check if this slot is free (CHECK[next] < 0 means unused)
+                if next_usize < self.check.len() && self.check[next_usize] >= 0 {
                     all_free = false;
                     break;
                 }
             }
 
             if all_free {
-                return base as i32 - bytes[0] as i32;
+                return base;
             }
         }
 
-        // Fallback: use a large offset
-        (start + 10000) as i32 - bytes[0] as i32
+        // Fallback: use a large BASE value
+        start_base + 10000
     }
 
 
