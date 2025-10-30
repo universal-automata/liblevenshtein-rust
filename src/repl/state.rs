@@ -16,6 +16,11 @@ use crate::transducer::Algorithm;
 use anyhow::Result;
 use std::path::Path;
 
+#[cfg(feature = "pathmap-backend")]
+use crate::cache::{FuzzyCacheBuilder, FuzzyCache};
+#[cfg(feature = "pathmap-backend")]
+use crate::cache::strategy::*;
+
 /// Helper to extract all terms from any dictionary using DFS
 fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
     let est_size = dict.len().unwrap_or(100);
@@ -275,6 +280,25 @@ impl DictContainer {
     }
 }
 
+/// Cache container for different eviction strategies
+#[cfg(feature = "pathmap-backend")]
+pub enum CacheContainer {
+    /// Least Recently Used (LRU) eviction strategy
+    Lru(FuzzyCache<String, LruStrategy<String>>),
+    /// Least Frequently Used (LFU) eviction strategy
+    Lfu(FuzzyCache<String, LfuStrategy>),
+    /// Time-To-Live (TTL) eviction strategy
+    Ttl(FuzzyCache<String, TtlStrategy>),
+    /// Age-based eviction strategy
+    Age(FuzzyCache<String, AgeStrategy>),
+    /// Cost-aware eviction strategy (balances age, size, hits)
+    CostAware(FuzzyCache<String, CostAwareStrategy>),
+    /// Memory pressure-based eviction strategy
+    MemoryPressure(FuzzyCache<String, MemoryPressureStrategy>),
+    /// Manual eviction strategy (FIFO when full)
+    Manual(FuzzyCache<String, ManualStrategy>),
+}
+
 /// REPL state
 pub struct ReplState {
     /// Dictionary container
@@ -299,6 +323,9 @@ pub struct ReplState {
     pub auto_sync_path: Option<std::path::PathBuf>,
     /// Custom config file path
     pub config_file_path: Option<std::path::PathBuf>,
+    /// Optional fuzzy cache
+    #[cfg(feature = "pathmap-backend")]
+    pub cache: Option<CacheContainer>,
 }
 
 impl ReplState {
@@ -322,6 +349,8 @@ impl ReplState {
             auto_sync: false,
             auto_sync_path: None,
             config_file_path: None,
+            #[cfg(feature = "pathmap-backend")]
+            cache: None,
         }
     }
 
@@ -431,6 +460,35 @@ impl ReplState {
 
     /// Query the dictionary
     pub fn query(&self, term: &str) -> Vec<(String, usize)> {
+        // Try cache first (only works with PathMap backend)
+        #[cfg(feature = "pathmap-backend")]
+        if let (Some(cache), DictContainer::PathMap(_)) = (&self.cache, &self.dictionary) {
+            // Use cache.query() which returns Vec<Candidate>
+            let candidates = match cache {
+                CacheContainer::Lru(c) => c.query(term, self.max_distance),
+                CacheContainer::Lfu(c) => c.query(term, self.max_distance),
+                CacheContainer::Ttl(c) => c.query(term, self.max_distance),
+                CacheContainer::Age(c) => c.query(term, self.max_distance),
+                CacheContainer::CostAware(c) => c.query(term, self.max_distance),
+                CacheContainer::MemoryPressure(c) => c.query(term, self.max_distance),
+                CacheContainer::Manual(c) => c.query(term, self.max_distance),
+            };
+
+            // Convert Candidate to (String, usize) and apply limit
+            let mut results: Vec<(String, usize)> = candidates
+                .into_iter()
+                .map(|c| (c.term, c.distance))
+                .collect();
+
+            // Apply result limit if set
+            if let Some(limit) = self.result_limit {
+                results.truncate(limit);
+            }
+
+            return results;
+        }
+
+        // Fall back to direct dictionary query
         let params = QueryParams {
             term: term.to_string(),
             max_distance: self.max_distance,
@@ -467,6 +525,124 @@ impl ReplState {
             DictContainer::OptimizedDawg(d) => Some(d.node_count()),
             DictContainer::DynamicDawg(d) => Some(d.node_count()),
             DictContainer::SuffixAutomaton(d) => Some(d.state_count()),
+        }
+    }
+
+    /// Enable fuzzy cache with specified strategy
+    #[cfg(feature = "pathmap-backend")]
+    pub fn enable_cache(&mut self, strategy: &str, max_size: Option<usize>) -> Result<()> {
+        use std::time::Duration;
+
+        let default_max_size = 1000;
+        let max_size = max_size.unwrap_or(default_max_size);
+
+        let cache = match strategy.to_lowercase().as_str() {
+            "lru" => {
+                let c = FuzzyCacheBuilder::<String>::new()
+                    .max_size(max_size)
+                    .algorithm(self.algorithm)
+                    .lru();
+                CacheContainer::Lru(c)
+            }
+            "lfu" => {
+                let c = FuzzyCacheBuilder::<String>::new()
+                    .max_size(max_size)
+                    .algorithm(self.algorithm)
+                    .lfu();
+                CacheContainer::Lfu(c)
+            }
+            "ttl" => {
+                let c = FuzzyCacheBuilder::<String>::new()
+                    .max_size(max_size)
+                    .algorithm(self.algorithm)
+                    .ttl(Duration::from_secs(300));
+                CacheContainer::Ttl(c)
+            }
+            "age" => {
+                let c = FuzzyCacheBuilder::<String>::new()
+                    .max_size(max_size)
+                    .algorithm(self.algorithm)
+                    .age();
+                CacheContainer::Age(c)
+            }
+            "cost-aware" | "cost" => {
+                let c = FuzzyCacheBuilder::<String>::new()
+                    .max_size(max_size)
+                    .algorithm(self.algorithm)
+                    .cost_aware();
+                CacheContainer::CostAware(c)
+            }
+            "memory-pressure" | "memory" => {
+                let c = FuzzyCacheBuilder::<String>::new()
+                    .max_size(max_size)
+                    .algorithm(self.algorithm)
+                    .memory_pressure();
+                CacheContainer::MemoryPressure(c)
+            }
+            "manual" | "fifo" => {
+                let c = FuzzyCacheBuilder::<String>::new()
+                    .max_size(max_size)
+                    .algorithm(self.algorithm)
+                    .manual();
+                CacheContainer::Manual(c)
+            }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unknown cache strategy: '{}'. Valid: lru, lfu, ttl, age, cost-aware, memory-pressure, manual",
+                    strategy
+                ));
+            }
+        };
+
+        self.cache = Some(cache);
+        Ok(())
+    }
+
+    /// Disable fuzzy cache
+    #[cfg(feature = "pathmap-backend")]
+    pub fn disable_cache(&mut self) {
+        self.cache = None;
+    }
+
+    /// Get cache statistics
+    #[cfg(feature = "pathmap-backend")]
+    pub fn cache_stats(&self) -> String {
+        if let Some(cache) = &self.cache {
+            let (capacity, size, metrics_report) = match cache {
+                CacheContainer::Lru(c) => (c.capacity(), c.len(), c.metrics().report()),
+                CacheContainer::Lfu(c) => (c.capacity(), c.len(), c.metrics().report()),
+                CacheContainer::Ttl(c) => (c.capacity(), c.len(), c.metrics().report()),
+                CacheContainer::Age(c) => (c.capacity(), c.len(), c.metrics().report()),
+                CacheContainer::CostAware(c) => (c.capacity(), c.len(), c.metrics().report()),
+                CacheContainer::MemoryPressure(c) => (c.capacity(), c.len(), c.metrics().report()),
+                CacheContainer::Manual(c) => (c.capacity(), c.len(), c.metrics().report()),
+            };
+
+            format!(
+                "Cache Status: Enabled\nCapacity: {}\nCurrent Size: {}\n\n{}",
+                capacity, size, metrics_report
+            )
+        } else {
+            "Cache Status: Disabled".to_string()
+        }
+    }
+
+    /// Clear cache
+    #[cfg(feature = "pathmap-backend")]
+    pub fn clear_cache(&mut self) -> Result<()> {
+        if let Some(cache) = &mut self.cache {
+            match cache {
+                CacheContainer::Lru(c) => c.clear(),
+                CacheContainer::Lfu(c) => c.clear(),
+                CacheContainer::Ttl(c) => c.clear(),
+                CacheContainer::Age(c) => c.clear(),
+                CacheContainer::CostAware(c) => c.clear(),
+                CacheContainer::MemoryPressure(c) => c.clear(),
+                CacheContainer::Manual(c) => c.clear(),
+            }
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Cache is not enabled"))
         }
     }
 }

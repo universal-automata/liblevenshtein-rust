@@ -129,6 +129,19 @@ pub enum Command {
         /// Help topic
         topic: Option<String>,
     },
+    /// Enable cache: cache enable <strategy> [max-size]
+    CacheEnable {
+        /// Cache strategy
+        strategy: String,
+        /// Maximum cache size
+        max_size: Option<usize>,
+    },
+    /// Disable cache: cache disable
+    CacheDisable,
+    /// Show cache statistics: cache stats
+    CacheStats,
+    /// Clear cache: cache clear
+    CacheClear,
     /// Exit REPL: exit | quit
     Exit,
 }
@@ -180,6 +193,7 @@ impl Command {
             "settings" | "set" | "options" | "opts" => Ok(Self::Settings),
             "config" | "configuration" => Self::parse_config(&parts[1..]),
             "help" | "?" => Self::parse_help(&parts[1..]),
+            "cache" => Self::parse_cache(&parts[1..]),
             "exit" | "quit" => Ok(Self::Exit),
             _ => Err(anyhow::anyhow!(
                 "Unknown command: '{}'. Type 'help' for available commands.",
@@ -454,6 +468,42 @@ impl Command {
         Ok(Self::Help {
             topic: args.first().map(|s| s.to_string()),
         })
+    }
+
+    fn parse_cache(args: &[&str]) -> Result<Self> {
+        if args.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Usage: cache <subcommand>\n\
+                 Subcommands: enable <strategy> [max-size], disable, stats, clear"
+            ));
+        }
+
+        match args[0].to_lowercase().as_str() {
+            "enable" => {
+                if args.len() < 2 {
+                    return Err(anyhow::anyhow!(
+                        "Usage: cache enable <strategy> [max-size]\n\
+                         Strategies: lru, lfu, ttl, age, cost-aware, memory-pressure, manual"
+                    ));
+                }
+
+                let strategy = args[1].to_string();
+                let max_size = if args.len() > 2 {
+                    Some(args[2].parse().context("Invalid max-size value")?)
+                } else {
+                    None
+                };
+
+                Ok(Self::CacheEnable { strategy, max_size })
+            }
+            "disable" | "off" => Ok(Self::CacheDisable),
+            "stats" | "info" => Ok(Self::CacheStats),
+            "clear" => Ok(Self::CacheClear),
+            _ => Err(anyhow::anyhow!(
+                "Unknown cache subcommand: '{}'. Valid: enable, disable, stats, clear",
+                args[0]
+            )),
+        }
     }
 
     /// Execute command
@@ -1086,6 +1136,67 @@ impl Command {
                 Ok(CommandResult::Continue(help_text))
             }
 
+            Self::CacheEnable { strategy, max_size } => {
+                #[cfg(feature = "pathmap-backend")]
+                {
+                    state.enable_cache(strategy, *max_size)?;
+                    let msg = format!(
+                        "Cache enabled with {} strategy{}",
+                        strategy.green().bold(),
+                        max_size.map(|s| format!(" (max {} entries)", s)).unwrap_or_default()
+                    );
+                    Ok(CommandResult::Continue(msg))
+                }
+                #[cfg(not(feature = "pathmap-backend"))]
+                {
+                    Err(anyhow::anyhow!(
+                        "Cache feature requires 'pathmap-backend' feature to be enabled"
+                    ))
+                }
+            }
+
+            Self::CacheDisable => {
+                #[cfg(feature = "pathmap-backend")]
+                {
+                    state.disable_cache();
+                    Ok(CommandResult::Continue("Cache disabled".yellow().to_string()))
+                }
+                #[cfg(not(feature = "pathmap-backend"))]
+                {
+                    Err(anyhow::anyhow!(
+                        "Cache feature requires 'pathmap-backend' feature to be enabled"
+                    ))
+                }
+            }
+
+            Self::CacheStats => {
+                #[cfg(feature = "pathmap-backend")]
+                {
+                    let stats = state.cache_stats();
+                    Ok(CommandResult::Continue(stats))
+                }
+                #[cfg(not(feature = "pathmap-backend"))]
+                {
+                    Err(anyhow::anyhow!(
+                        "Cache feature requires 'pathmap-backend' feature to be enabled"
+                    ))
+                }
+            }
+
+            Self::CacheClear => {
+                #[cfg(feature = "pathmap-backend")]
+                {
+                    state.clear_cache()?;
+                    Ok(CommandResult::Continue("Cache cleared".green().to_string()))
+                }
+                #[cfg(not(feature = "pathmap-backend"))]
+                {
+                    Err(anyhow::anyhow!(
+                        "Cache feature requires 'pathmap-backend' feature to be enabled"
+                    ))
+                }
+            }
+
             Self::Exit => Ok(CommandResult::Exit),
         }
     }
@@ -1149,6 +1260,15 @@ impl Command {
   settings, config, set     Show current settings
 
 {}
+  cache enable <strategy> [max-size]
+                            Enable fuzzy cache with specified strategy
+                            Strategies: lru, lfu, ttl, age, cost-aware,
+                                       memory-pressure, manual
+  cache disable             Disable fuzzy cache
+  cache stats               Show cache metrics and performance
+  cache clear               Clear all cached entries
+
+{}
   help, ? [command]         Show this help or help for specific command
   exit, quit                Exit REPL
 
@@ -1171,6 +1291,7 @@ For detailed help on a command, type: help <command>
             "File Operations:".bold(),
             "Configuration:".bold(),
             "Maintenance:".bold(),
+            "Cache Operations:".bold(),
             "Utility:".bold(),
             "Examples:".bold(),
         )
@@ -1307,6 +1428,79 @@ For detailed help on a command, type: help <command>
                 "Description:".bold(),
                 "Algorithms:".bold(),
                 "Examples:".bold(),
+            ),
+            "cache" => format!(
+                r#"{}
+
+{}
+  cache enable <strategy> [max-size]
+  cache disable
+  cache stats
+  cache clear
+
+{}
+  Manage fuzzy query result caching to accelerate repeated queries.
+
+  When enabled, the cache stores results from fuzzy queries to avoid
+  redundant computations. Different eviction strategies optimize for
+  different usage patterns.
+
+{}
+  cache enable <strategy> [max-size]
+      Enable caching with specified strategy and optional size limit.
+
+      Available strategies:
+        lru               Least Recently Used - evicts oldest accessed entries
+        lfu               Least Frequently Used - evicts rarely accessed entries
+        ttl               Time-To-Live - evicts expired entries (5min default)
+        age               FIFO - evicts oldest entries first
+        cost-aware        Balances age, size, and access frequency
+        memory-pressure   Prioritizes evicting large entries
+        manual            Only evicts when full (FIFO), no automatic eviction
+
+      max-size: Maximum cache entries (default: 1000)
+
+  cache disable
+      Disable caching and free cache memory.
+
+  cache stats
+      Show cache metrics including hits, misses, evictions, and hit rate.
+
+  cache clear
+      Remove all cached entries (keeps cache enabled).
+
+{}
+  # Enable LRU cache with default size
+  cache enable lru
+
+  # Enable LFU cache with custom size
+  cache enable lfu 5000
+
+  # Manual eviction for testing
+  cache enable manual 100
+
+  # View performance metrics
+  cache stats
+
+  # Clear cached results
+  cache clear
+
+  # Disable caching
+  cache disable
+
+{}
+  - Enable cache before loading large dictionaries for best performance
+  - LRU strategy works well for general-purpose use cases
+  - Manual strategy is useful for testing or explicit cache control
+  - Check cache stats regularly to optimize strategy choice
+  - Clear cache when switching dictionaries or algorithms
+"#,
+                "cache - Fuzzy Query Result Caching".bold().underline(),
+                "Usage:".bold(),
+                "Description:".bold(),
+                "Commands:".bold(),
+                "Examples:".bold(),
+                "Tips:".bold(),
             ),
             _ => format!(
                 "No help available for '{}'. Try 'help' for general help.",

@@ -15,7 +15,7 @@ pub mod pathmap;
 pub mod suffix_automaton;
 pub mod value;
 
-use value::DictionaryValue;
+pub use value::DictionaryValue;
 
 /// Synchronization strategy for dictionary operations.
 ///

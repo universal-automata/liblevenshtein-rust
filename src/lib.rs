@@ -34,6 +34,10 @@ pub mod transducer;
 #[cfg(feature = "serialization")]
 pub mod serialization;
 
+/// Fuzzy cache with composable eviction strategies
+#[cfg(feature = "pathmap-backend")]
+pub mod cache;
+
 /// Interactive REPL for exploring Levenshtein dictionaries
 #[cfg(feature = "cli")]
 pub mod repl;
@@ -74,4 +78,7 @@ pub mod prelude {
 
     #[cfg(feature = "compression")]
     pub use crate::serialization::GzipSerializer;
+
+    #[cfg(feature = "pathmap-backend")]
+    pub use crate::cache::eviction;
 }
