@@ -16,6 +16,9 @@ mod state;
 pub mod transition;
 mod value_filtered_query;
 
+#[cfg(feature = "simd")]
+pub mod simd;
+
 pub use algorithm::Algorithm;
 pub use builder::{BuilderError, TransducerBuilder};
 pub use builder_api::QueryBuilder;
