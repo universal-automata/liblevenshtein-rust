@@ -161,9 +161,71 @@ fn bench_subsumption_realistic_workload(c: &mut Criterion) {
     }
 }
 
+/// Benchmark minimum distance finding with SIMD
+///
+/// This benchmark measures the performance of SIMD horizontal reduction
+/// for finding the minimum error count across positions in a state.
+fn bench_minimum_distance_simd(c: &mut Criterion) {
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    {
+        use liblevenshtein::transducer::simd::find_minimum_simd;
+
+        let mut group = c.benchmark_group("minimum_distance_simd");
+
+        // Test case 1: Small state (2 positions - common case)
+        let errors_2 = vec![2, 1];
+
+        group.bench_function("2_values", |b| {
+            b.iter(|| {
+                black_box(find_minimum_simd(black_box(&errors_2), black_box(2)))
+            });
+        });
+
+        // Test case 2: Medium state (4 positions - SSE4.1 threshold)
+        let errors_4 = vec![3, 1, 2, 4];
+
+        group.bench_function("4_values", |b| {
+            b.iter(|| {
+                black_box(find_minimum_simd(black_box(&errors_4), black_box(4)))
+            });
+        });
+
+        // Test case 3: Large state (8 positions - AVX2 full)
+        let errors_8 = vec![5, 2, 7, 1, 3, 6, 4, 8];
+
+        group.bench_function("8_values", |b| {
+            b.iter(|| {
+                black_box(find_minimum_simd(black_box(&errors_8), black_box(8)))
+            });
+        });
+
+        // Test case 4: Realistic workload (many states, varying sizes)
+        let test_data: Vec<(Vec<usize>, usize)> = vec![
+            (vec![2, 1], 2),
+            (vec![3, 1, 2], 3),
+            (vec![5, 2, 7, 1], 4),
+            (vec![3, 1, 2, 4, 6], 5),
+            (vec![5, 2, 7, 1, 3, 6], 6),
+            (vec![5, 2, 7, 1, 3, 6, 4], 7),
+            (vec![5, 2, 7, 1, 3, 6, 4, 8], 8),
+        ];
+
+        group.bench_function("realistic_workload", |b| {
+            b.iter(|| {
+                for (values, count) in &test_data {
+                    black_box(find_minimum_simd(black_box(values), black_box(*count)));
+                }
+            });
+        });
+
+        group.finish();
+    }
+}
+
 criterion_group!(
     benches,
     bench_subsumption_simd_vs_scalar,
     bench_subsumption_realistic_workload,
+    bench_minimum_distance_simd,
 );
 criterion_main!(benches);

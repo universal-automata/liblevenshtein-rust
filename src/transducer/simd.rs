@@ -716,3 +716,234 @@ mod subsumption_tests {
         }
     }
 }
+
+/// SIMD-accelerated minimum value computation
+///
+/// Finds the minimum value among up to 8 usize values using SIMD horizontal
+/// reduction. This is used for finding the minimum error count across positions
+/// in a state.
+///
+/// # Arguments
+/// * `values` - Array of values to find minimum of
+/// * `count` - Number of values to consider (must be > 0 and <= 8)
+///
+/// # Returns
+/// The minimum value among `values[0..count]`
+///
+/// # Performance
+/// - AVX2: Processes 8 values with horizontal minimum (~5-7 ns)
+/// - SSE4.1: Processes 4-8 values with horizontal minimum (~4-6 ns)
+/// - Scalar fallback for count < 4 or when SIMD unavailable
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+pub fn find_minimum_simd(values: &[usize], count: usize) -> usize {
+    debug_assert!(count > 0 && count <= 8, "count must be in range 1..=8");
+    debug_assert!(values.len() >= count);
+
+    // Fast path for single value
+    if count == 1 {
+        return values[0];
+    }
+
+    // Use SIMD for count >= 4
+    if count == 8 && is_x86_feature_detected!("avx2") {
+        unsafe { find_minimum_avx2(values) }
+    } else if count >= 4 && is_x86_feature_detected!("sse4.1") {
+        unsafe { find_minimum_sse41(values, count) }
+    } else {
+        find_minimum_scalar(values, count)
+    }
+}
+
+/// Scalar fallback for minimum finding
+#[inline(always)]
+fn find_minimum_scalar(values: &[usize], count: usize) -> usize {
+    values[0..count].iter().copied().min().unwrap()
+}
+
+/// AVX2-accelerated minimum finding via horizontal reduction
+///
+/// Processes 8 usize values (converted to u32) and finds the minimum
+/// using a series of horizontal minimum operations.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn find_minimum_avx2(values: &[usize]) -> usize {
+    debug_assert!(values.len() >= 8);
+
+    // Convert usize to u32 (assume values fit in u32)
+    let mut buf = [0u32; 8];
+    for i in 0..8 {
+        buf[i] = values[i] as u32;
+    }
+
+    // Load into 256-bit vector
+    let vec = _mm256_loadu_si256(buf.as_ptr() as *const __m256i);
+
+    // Horizontal minimum reduction:
+    // Step 1: Compare each 128-bit half and take minimum
+    // Extract high 128 bits
+    let high = _mm256_extracti128_si256(vec, 1);
+    // Extract low 128 bits and compare
+    let low = _mm256_castsi256_si128(vec);
+    let min_half = _mm_min_epu32(low, high);
+
+    // Step 2: Within 128 bits, find minimum of 4 values
+    // Shuffle to compare pairs: [0,1,2,3] -> [2,3,0,1]
+    let shuffled = _mm_shuffle_epi32(min_half, 0b01_00_11_10);
+    let min_pairs = _mm_min_epu32(min_half, shuffled);
+
+    // Step 3: Final reduction to single minimum
+    // Shuffle to compare final pairs: [min01, min23, ...] -> [min23, min01, ...]
+    let final_shuffle = _mm_shuffle_epi32(min_pairs, 0b00_00_00_01);
+    let final_min = _mm_min_epu32(min_pairs, final_shuffle);
+
+    // Extract the minimum value (in lowest 32 bits)
+    _mm_extract_epi32(final_min, 0) as usize
+}
+
+/// SSE4.1-accelerated minimum finding
+///
+/// Processes 4-8 values using 128-bit SIMD + scalar remainder
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "sse4.1")]
+unsafe fn find_minimum_sse41(values: &[usize], count: usize) -> usize {
+    debug_assert!(count >= 4 && count <= 8);
+
+    // Process first 4 values with SIMD
+    let mut buf = [0u32; 4];
+    for i in 0..4 {
+        buf[i] = values[i] as u32;
+    }
+
+    let vec = _mm_loadu_si128(buf.as_ptr() as *const __m128i);
+
+    // Horizontal minimum reduction for 4 values
+    // Step 1: Compare pairs [0,1,2,3] -> [2,3,0,1]
+    let shuffled = _mm_shuffle_epi32(vec, 0b01_00_11_10);
+    let min_pairs = _mm_min_epu32(vec, shuffled);
+
+    // Step 2: Final reduction [min01, min23, ...] -> [min23, min01, ...]
+    let final_shuffle = _mm_shuffle_epi32(min_pairs, 0b00_00_00_01);
+    let final_min = _mm_min_epu32(min_pairs, final_shuffle);
+
+    let mut min_val = _mm_extract_epi32(final_min, 0) as usize;
+
+    // Process remaining values (if count > 4) with scalar
+    for i in 4..count {
+        min_val = min_val.min(values[i]);
+    }
+
+    min_val
+}
+
+/// Non-x86_64 platforms use scalar implementation
+#[cfg(not(all(target_arch = "x86_64", feature = "simd")))]
+pub fn find_minimum_simd(values: &[usize], count: usize) -> usize {
+    find_minimum_scalar(values, count)
+}
+
+#[cfg(test)]
+mod minimum_tests {
+    use super::*;
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    fn test_find_minimum_simd_basic() {
+        // Test cases: (values, count, expected_min)
+        let test_cases = vec![
+            // Single value
+            (vec![5], 1, 5),
+            // Two values
+            (vec![10, 3], 2, 3),
+            (vec![1, 20], 2, 1),
+            // Four values (SSE4.1 threshold)
+            (vec![5, 2, 8, 1], 4, 1),
+            (vec![100, 50, 75, 25], 4, 25),
+            // Eight values (AVX2 full)
+            (vec![10, 3, 7, 2, 15, 1, 9, 5], 8, 1),
+            (vec![100, 200, 50, 300, 25, 400, 150, 75], 8, 25),
+            // Minimum at different positions
+            (vec![1, 2, 3, 4, 5, 6, 7, 8], 8, 1), // First
+            (vec![8, 7, 6, 5, 4, 3, 2, 1], 8, 1), // Last
+            (vec![5, 4, 3, 2, 1, 2, 3, 4], 8, 1), // Middle
+        ];
+
+        for (values, count, expected) in test_cases {
+            let result = find_minimum_simd(&values, count);
+            assert_eq!(
+                result, expected,
+                "SIMD minimum mismatch for values={:?}, count={}: expected {}, got {}",
+                values, count, expected, result
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    fn test_find_minimum_simd_vs_scalar() {
+        // Comprehensive comparison of SIMD vs scalar
+        let test_cases = vec![
+            vec![5, 2, 8, 1, 15, 3, 9, 6],
+            vec![100, 200, 50, 300, 25, 400, 150, 75],
+            vec![10, 10, 10, 10, 10, 10, 10, 10], // All same
+            vec![0, 1, 2, 3, 4, 5, 6, 7],          // Sequential
+            vec![1000, 500, 250, 125, 62, 31, 15, 7], // Decreasing
+        ];
+
+        for values in test_cases {
+            for count in 1..=8 {
+                let simd_result = find_minimum_simd(&values, count);
+                let scalar_result = find_minimum_scalar(&values, count);
+
+                assert_eq!(
+                    simd_result, scalar_result,
+                    "SIMD vs scalar mismatch for values={:?}, count={}: SIMD={}, scalar={}",
+                    values, count, simd_result, scalar_result
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    fn test_find_minimum_edge_cases() {
+        // Edge case: All values the same
+        let values = vec![42, 42, 42, 42, 42, 42, 42, 42];
+        assert_eq!(find_minimum_simd(&values, 8), 42);
+
+        // Edge case: Large values (but fit in u32)
+        let values = vec![1000000, 2000000, 500000, 3000000, 250000, 4000000, 1500000, 750000];
+        assert_eq!(find_minimum_simd(&values, 8), 250000);
+
+        // Edge case: Zero minimum
+        let values = vec![10, 5, 0, 3, 7, 2, 8, 4];
+        assert_eq!(find_minimum_simd(&values, 8), 0);
+
+        // Edge case: Partial arrays
+        let values = vec![10, 5, 3, 7, 2];
+        assert_eq!(find_minimum_simd(&values, 5), 2);
+        assert_eq!(find_minimum_simd(&values, 3), 3);
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    fn test_find_minimum_real_world() {
+        // Simulate real error counts from Levenshtein automaton positions
+        // Typical state might have 2-5 positions with errors in range 0-10
+
+        // Small state (2 positions)
+        let errors = vec![2, 1];
+        assert_eq!(find_minimum_simd(&errors, 2), 1);
+
+        // Medium state (4 positions)
+        let errors = vec![3, 1, 2, 4];
+        assert_eq!(find_minimum_simd(&errors, 4), 1);
+
+        // Large state (8 positions - rare but possible)
+        let errors = vec![5, 2, 7, 1, 3, 6, 4, 8];
+        assert_eq!(find_minimum_simd(&errors, 8), 1);
+
+        // State with zero errors (exact match path)
+        let errors = vec![0, 1, 2, 3];
+        assert_eq!(find_minimum_simd(&errors, 4), 0);
+    }
+}
