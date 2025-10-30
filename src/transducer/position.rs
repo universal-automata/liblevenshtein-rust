@@ -114,6 +114,23 @@ impl Position {
                 }
 
                 if t {
+                    // CRITICAL FIX: Special positions (transposition-in-progress) represent
+                    // fundamentally different computational paths than normal positions.
+                    // A normal position should NEVER subsume a special position, as this
+                    // would prematurely terminate exploration of valid transposition paths.
+                    //
+                    // Example bug case: Query "ab", dict "ba"
+                    //   (1,1,false) was incorrectly subsuming (0,1,true)
+                    //   The special position is needed to complete the transposition!
+                    //
+                    // This appears to be a bug in the original Java/C++ implementations
+                    // that was not caught by their test suites.
+                    if !s {
+                        // lhs is normal, rhs is special → cannot subsume
+                        return false;
+                    }
+
+                    // Both are special: use adjusted formula
                     // rhs is special: adjusted formula
                     // ((j < i) ? (i - j - 1) : (j - i + 1)) <= (f - e)
                     let adjusted_diff = if j < i {
