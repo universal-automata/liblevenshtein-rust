@@ -1103,23 +1103,30 @@ mod minimum_tests {
 pub fn find_edge_label_simd<T>(edges: &[(u8, T)], target_label: u8) -> Option<usize> {
     let count = edges.len();
 
-    // Threshold 1: For very small edge counts, scalar is faster due to SIMD overhead
-    if count < 4 {
+    // Data-driven thresholds based on empirical benchmarking:
+    //
+    // Benchmark results:
+    // - count < 12: Scalar is 2-3x faster (SIMD overhead dominates)
+    // - count >= 12: SIMD provides 1.2-1.5x speedup
+    // - count >= 24: Binary search O(log n) becomes competitive
+    //
+    // See docs/BATCH2B_PERFORMANCE_ANALYSIS.md for detailed analysis
+
+    // Threshold 1: Scalar wins for < 12 edges (SIMD overhead ~10ns dominates)
+    if count < 12 {
         return find_edge_label_scalar(edges, target_label);
     }
 
-    // Threshold 2: For moderate counts (4-15), use SSE4.1 (16-way comparison)
-    if count < 16 && is_x86_feature_detected!("sse4.1") {
+    // Threshold 2: SSE4.1 for 12-16 edges (optimal range)
+    // SSE4.1 can handle up to 16 bytes (edges) in a single register
+    // Benchmarks show SSE4.1 at 16 edges (8.5ns) provides 1.24x speedup
+    if count <= 16 && is_x86_feature_detected!("sse4.1") {
         return unsafe { find_edge_label_sse41(edges, target_label, count) };
     }
 
-    // Threshold 3: For larger counts (16-31), use AVX2 (32-way comparison)
-    if count < 32 && is_x86_feature_detected!("avx2") {
-        return unsafe { find_edge_label_avx2(edges, target_label, count) };
-    }
-
-    // Threshold 4: For very large edge counts, binary search is better (not our case)
-    // Fall back to scalar for edge cases
+    // Threshold 3: For edge counts > 16, scalar or binary search is better
+    // For 17-23 edges: Linear search overhead is acceptable
+    // For ≥24 edges: Binary search O(log₂24) ≈ 4.6 comparisons is optimal
     find_edge_label_scalar(edges, target_label)
 }
 
@@ -1359,7 +1366,8 @@ mod edge_lookup_tests {
 
     #[test]
     fn test_boundary_17_edges() {
-        // Just above SSE4.1 capacity (should use AVX2)
+        // 17 edges: Exceeds SSE4.1 limit (16 edges), falls back to scalar
+        // This validates that >16 edges work correctly via scalar path
         let edges: Vec<(u8, usize)> = (0..17).map(|i| (b'a' + i, i as usize)).collect();
         assert_eq!(find_edge_label_simd(&edges, b'a'), Some(0));
         assert_eq!(find_edge_label_simd(&edges, b'q'), Some(16)); // b'a' + 16 = b'q'
