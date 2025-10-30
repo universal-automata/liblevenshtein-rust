@@ -180,6 +180,10 @@ harness = false
 name = "batch2a_integration_benchmarks"
 harness = false
 
+[[bench]]
+name = "batch2b_edge_lookup_benchmarks"
+harness = false
+
 [[bin]]
 name = "liblevenshtein"
 path = "src/bin/liblevenshtein.rs"
