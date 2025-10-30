@@ -12,6 +12,7 @@ mod ordered_query;
 mod pool;
 mod position;
 mod query;
+mod query_result;
 mod state;
 pub mod transition;
 mod value_filtered_query;
@@ -26,7 +27,8 @@ pub use intersection::{Intersection, PathNode};
 pub use ordered_query::{OrderedCandidate, OrderedQueryIterator};
 pub use pool::StatePool;
 pub use position::Position;
-pub use query::{Candidate, CandidateIterator, QueryIterator};
+pub use query::{Candidate, CandidateIterator, QueryIterator, StringQueryIterator};
+pub use query_result::QueryResult;
 pub use state::State;
 pub use value_filtered_query::{ValueFilteredQueryIterator, ValueSetFilteredQueryIterator};
 
@@ -68,7 +70,7 @@ impl<D: Dictionary> Transducer<D> {
     /// Query for terms within `max_distance` edits of `term`
     ///
     /// Returns an iterator over matching terms (strings only)
-    pub fn query(&self, term: &str, max_distance: usize) -> QueryIterator<D::Node> {
+    pub fn query(&self, term: &str, max_distance: usize) -> QueryIterator<D::Node, String> {
         QueryIterator::with_substring_mode(
             self.dictionary.root(),
             term.to_string(),
@@ -81,17 +83,18 @@ impl<D: Dictionary> Transducer<D> {
     /// Query for terms with their edit distances
     ///
     /// Returns an iterator over `Candidate` structs containing both
-    /// the matching term and its computed distance
+    /// the matching term and its edit distance computed from automaton states
     pub fn query_with_distance(
         &self,
         term: &str,
         max_distance: usize,
-    ) -> CandidateIterator<D::Node> {
-        CandidateIterator::new(
+    ) -> QueryIterator<D::Node, Candidate> {
+        QueryIterator::with_substring_mode(
             self.dictionary.root(),
             term.to_string(),
             max_distance,
             self.algorithm,
+            self.dictionary.is_suffix_based(),
         )
     }
 

@@ -1,9 +1,11 @@
 //! Lazy query iterators for approximate string matching.
 
+use super::query_result::QueryResult;
 use super::transition::{initial_state, transition_state_pooled};
 use super::{Algorithm, Intersection, StatePool};
 use crate::dictionary::DictionaryNode;
 use std::collections::VecDeque;
+use std::marker::PhantomData;
 
 /// Query result containing term and distance.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,17 +16,55 @@ pub struct Candidate {
     pub distance: usize,
 }
 
-/// Lazy iterator over matching terms (strings only).
+/// Lazy iterator over query matches with configurable result type.
 ///
-/// Iterates over all dictionary terms within `max_distance` edits
-/// of the query term, yielding just the term strings.
+/// This iterator can return either:
+/// - `String`: Just the matching terms (set `R = String`)
+/// - `Candidate`: Terms with their edit distances (set `R = Candidate`)
+/// - Custom types: Implement `QueryResult` trait
+///
+/// The result type is determined by the generic parameter `R`, which defaults
+/// to `String` for backward compatibility.
+///
+/// # Type Parameter
+///
+/// - `N`: Dictionary node type
+/// - `R`: Result type (defaults to `String`). Must implement `QueryResult`.
 ///
 /// # Performance
 ///
 /// Uses StatePool to eliminate State cloning overhead during traversal.
 /// The pool is created per-query and reuses State allocations across
 /// all transitions, reducing memory allocation by 6-10% of runtime.
-pub struct QueryIterator<N: DictionaryNode> {
+///
+/// Distance is computed once from automaton states (zero overhead), then
+/// converted to the result type via `QueryResult::from_match()` which is
+/// inlined and monomorphized at compile time (zero-cost abstraction).
+///
+/// # Examples
+///
+/// ```
+/// use liblevenshtein::prelude::*;
+///
+/// let dict = DoubleArrayTrie::from_terms(vec!["test"]);
+///
+/// // Returns String (default)
+/// let iter: QueryIterator<_, String> = QueryIterator::new(
+///     dict.root(), "test".to_string(), 1, Algorithm::Standard
+/// );
+/// for term in iter {
+///     println!("{}", term);
+/// }
+///
+/// // Returns Candidate (term + distance)
+/// let iter: QueryIterator<_, Candidate> = QueryIterator::new(
+///     dict.root(), "test".to_string(), 1, Algorithm::Standard
+/// );
+/// for candidate in iter {
+///     println!("{}: {}", candidate.term, candidate.distance);
+/// }
+/// ```
+pub struct QueryIterator<N: DictionaryNode, R: QueryResult = String> {
     pending: VecDeque<Box<Intersection<N>>>,
     query: Vec<u8>,
     max_distance: usize,
@@ -32,9 +72,10 @@ pub struct QueryIterator<N: DictionaryNode> {
     finished: bool,
     state_pool: StatePool, // Pool for State allocation reuse
     substring_mode: bool,  // Enable substring matching (for suffix automata)
+    _result_type: PhantomData<R>, // Zero-sized marker for result type
 }
 
-impl<N: DictionaryNode> QueryIterator<N> {
+impl<N: DictionaryNode, R: QueryResult> QueryIterator<N, R> {
     /// Create a new query iterator
     pub fn new(root: N, query: String, max_distance: usize, algorithm: Algorithm) -> Self {
         Self::with_substring_mode(root, query, max_distance, algorithm, false)
@@ -65,11 +106,12 @@ impl<N: DictionaryNode> QueryIterator<N> {
             finished: false,
             state_pool: StatePool::new(), // Create pool for this query
             substring_mode,
+            _result_type: PhantomData, // Zero-sized, no runtime cost
         }
     }
 
     /// Advance to the next match
-    fn advance(&mut self) -> Option<String> {
+    fn advance(&mut self) -> Option<R> {
         while let Some(intersection) = self.pending.pop_front() {
             // Check if this is a final match
             if intersection.is_final() {
@@ -91,7 +133,10 @@ impl<N: DictionaryNode> QueryIterator<N> {
                     // Queue children for further exploration
                     self.queue_children(&intersection);
 
-                    return Some(term);
+                    // Convert (term, distance) to result type R
+                    // This is zero-cost: QueryResult::from_match is inlined
+                    // and monomorphized at compile time
+                    return Some(R::from_match(term, distance));
                 } else {
                     // Even if this final node is too far, we must still explore its children
                     // Example: dict ["z", "za"], query "za" (dist=0)
@@ -142,8 +187,8 @@ impl<N: DictionaryNode> QueryIterator<N> {
     }
 }
 
-impl<N: DictionaryNode> Iterator for QueryIterator<N> {
-    type Item = String;
+impl<N: DictionaryNode, R: QueryResult> Iterator for QueryIterator<N, R> {
+    type Item = R;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.finished {
@@ -154,80 +199,16 @@ impl<N: DictionaryNode> Iterator for QueryIterator<N> {
     }
 }
 
-/// Lazy iterator over matching candidates (term + distance).
+// Type aliases for ergonomic use
+/// Type alias for query iterator that returns just term strings.
 ///
-/// Iterates over all dictionary terms within `max_distance` edits
-/// of the query term, yielding `Candidate` structs with both the
-/// term and its computed edit distance.
-pub struct CandidateIterator<N: DictionaryNode> {
-    inner: QueryIterator<N>,
-}
+/// Equivalent to `QueryIterator<N, String>`.
+pub type StringQueryIterator<N> = QueryIterator<N, String>;
 
-impl<N: DictionaryNode> CandidateIterator<N> {
-    /// Create a new candidate iterator
-    pub fn new(root: N, query: String, max_distance: usize, algorithm: Algorithm) -> Self {
-        Self {
-            inner: QueryIterator::new(root, query, max_distance, algorithm),
-        }
-    }
-}
-
-impl<N: DictionaryNode> Iterator for CandidateIterator<N> {
-    type Item = Candidate;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Get next term from inner iterator
-        let term = self.inner.advance()?;
-
-        // Recompute distance (could be optimized by caching)
-        // For now, use simple character-level comparison
-        let distance = self.compute_distance(&term);
-
-        Some(Candidate { term, distance })
-    }
-}
-
-impl<N: DictionaryNode> CandidateIterator<N> {
-    /// Compute edit distance between query and term.
-    ///
-    /// This is a simplified implementation using dynamic programming.
-    /// In production, you'd use the distance module implementations.
-    fn compute_distance(&self, term: &str) -> usize {
-        let query = std::str::from_utf8(&self.inner.query).unwrap_or("");
-        let query_chars: Vec<char> = query.chars().collect();
-        let term_chars: Vec<char> = term.chars().collect();
-
-        let m = query_chars.len();
-        let n = term_chars.len();
-
-        let mut dp = vec![vec![0; n + 1]; m + 1];
-
-        // Initialize first row and column
-        for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
-            row[0] = i;
-        }
-        for j in 0..=n {
-            dp[0][j] = j;
-        }
-
-        // Fill the DP table
-        for i in 1..=m {
-            for j in 1..=n {
-                let cost = if query_chars[i - 1] == term_chars[j - 1] {
-                    0
-                } else {
-                    1
-                };
-
-                dp[i][j] = (dp[i - 1][j] + 1) // deletion
-                    .min(dp[i][j - 1] + 1) // insertion
-                    .min(dp[i - 1][j - 1] + cost); // substitution
-            }
-        }
-
-        dp[m][n]
-    }
-}
+/// Type alias for query iterator that returns Candidate structs (term + distance).
+///
+/// Equivalent to `QueryIterator<N, Candidate>`.
+pub type CandidateIterator<N> = QueryIterator<N, Candidate>;
 
 #[cfg(test)]
 mod tests {
