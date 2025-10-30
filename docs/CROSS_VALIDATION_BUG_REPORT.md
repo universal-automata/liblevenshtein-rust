@@ -50,10 +50,29 @@ standard_distance("", "") == 0  // ✓ Correct
 ```
 
 ### Root Cause Analysis
-Likely issues:
-1. **Dictionary construction**: DoubleArrayTrie may not properly store empty strings
-2. **Query initialization**: Automaton may not handle empty query strings as initial state
-3. **Acceptance condition**: Automaton may not recognize empty path as accepting state
+
+**UPDATE (2025-10-30)**: Root cause confirmed through testing:
+
+**The bug is in dictionary construction, NOT the query algorithm.**
+
+Test results:
+```rust
+let dict = DoubleArrayTrie::from_terms(vec!["".to_string()]);
+println!("Root is_final: {}", dict.root().is_final());
+// Output: Root is_final: false
+//         ^^^^^^^^ SHOULD BE TRUE!
+```
+
+The DoubleArrayTrie builder does not mark the root node as final when empty strings are inserted.
+
+**Fix Status**:
+- ✅ Query logic fix added (root finality check in QueryIterator/OrderedQueryIterator)
+- ❌ Dictionary construction fix needed (DoubleArrayTrieBuilder must mark root as final)
+
+Original suspected issues (investigation complete):
+1. ✅ **Dictionary construction**: CONFIRMED - DoubleArrayTrie does not mark root as final for empty strings
+2. ❌ **Query initialization**: Not the issue - query logic would work if dict were correct
+3. ❌ **Acceptance condition**: Not the issue - root finality check added but dict returns false
 
 ### Minimal Failing Case
 ```rust
