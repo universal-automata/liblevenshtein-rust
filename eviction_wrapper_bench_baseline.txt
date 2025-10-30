@@ -1,0 +1,24 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: fields `free_list` and `rebuild_threshold` are never read
+   --> src/dictionary/double_array_trie.rs:198:5
+    |
+186 | pub struct DoubleArrayTrie {
+    |            --------------- fields in this struct
+...
+198 |     free_list: Arc<Vec<usize>>,
+    |     ^^^^^^^^^
+...
+204 |     rebuild_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^
+    |
+    = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `liblevenshtein` (lib) generated 1 warning
+    Finished `bench` profile [optimized + debuginfo] target(s) in 19.84s
+     Running benches/eviction_wrapper_benchmarks.rs (target/release/deps/eviction_wrapper_benchmarks-1656309667f3fb74)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

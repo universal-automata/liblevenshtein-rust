@@ -1,0 +1,314 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: fields `free_list` and `rebuild_threshold` are never read
+   --> src/dictionary/double_array_trie.rs:198:5
+    |
+186 | pub struct DoubleArrayTrie {
+    |            --------------- fields in this struct
+...
+198 |     free_list: Arc<Vec<usize>>,
+    |     ^^^^^^^^^
+...
+204 |     rebuild_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^
+    |
+    = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: missing documentation for an associated function
+   --> src/cache/eviction/lru_optimized.rs:166:5
+    |
+166 |     pub fn new(dict: D) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: the lint level is defined here
+   --> src/lib.rs:26:9
+    |
+ 26 | #![warn(missing_docs)]
+    |         ^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:185:5
+    |
+185 |     pub fn into_inner(self) -> D {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:190:5
+    |
+190 |     pub fn inner(&self) -> &D {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:216:5
+    |
+216 |     pub fn recency(&self, term: &str) -> Option<u64> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:233:5
+    |
+233 |     pub fn find_lru(&self, terms: &[&str]) -> Option<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:260:5
+    |
+260 |     pub fn evict_lru(&self, terms: &[&str]) -> Option<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:283:5
+    |
+283 |     pub fn clear_metadata(&self) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct
+   --> src/cache/eviction/lru_optimized.rs:351:1
+    |
+351 | pub struct LruOptimizedNode<N> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `liblevenshtein` (lib) generated 9 warnings
+    Finished `bench` profile [optimized + debuginfo] target(s) in 59.28s
+     Running benches/eviction_wrapper_benchmarks.rs (target/release/deps/eviction_wrapper_benchmarks-9131c2e0eb151a47)
+Benchmarking baseline/get_value
+Benchmarking baseline/get_value: Warming up for 3.0000 s
+Benchmarking baseline/get_value: Collecting 100 samples in estimated 5.0382 s (566k iterations)
+Benchmarking baseline/get_value: Analyzing
+baseline/get_value      time:   [8.6441 µs 8.7355 µs 8.8166 µs]
+
+Benchmarking noop/get_value
+Benchmarking noop/get_value: Warming up for 3.0000 s
+Benchmarking noop/get_value: Collecting 100 samples in estimated 5.0167 s (545k iterations)
+Benchmarking noop/get_value: Analyzing
+noop/get_value          time:   [9.8735 µs 10.325 µs 11.082 µs]
+Found 12 outliers among 100 measurements (12.00%)
+  5 (5.00%) high mild
+  7 (7.00%) high severe
+
+Benchmarking lru/get_value
+Benchmarking lru/get_value: Warming up for 3.0000 s
+Benchmarking lru/get_value: Collecting 100 samples in estimated 5.0830 s (288k iterations)
+Benchmarking lru/get_value: Analyzing
+lru/get_value           time:   [17.754 µs 17.803 µs 17.850 µs]
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+
+Benchmarking lfu/get_value
+Benchmarking lfu/get_value: Warming up for 3.0000 s
+Benchmarking lfu/get_value: Collecting 100 samples in estimated 5.0768 s (318k iterations)
+Benchmarking lfu/get_value: Analyzing
+lfu/get_value           time:   [15.643 µs 15.697 µs 15.751 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking ttl/get_value
+Benchmarking ttl/get_value: Warming up for 3.0000 s
+Benchmarking ttl/get_value: Collecting 100 samples in estimated 5.0732 s (222k iterations)
+Benchmarking ttl/get_value: Analyzing
+ttl/get_value           time:   [22.280 µs 22.416 µs 22.560 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking age/get_value
+Benchmarking age/get_value: Warming up for 3.0000 s
+Benchmarking age/get_value: Collecting 100 samples in estimated 5.0386 s (313k iterations)
+Benchmarking age/get_value: Analyzing
+age/get_value           time:   [16.353 µs 16.412 µs 16.466 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) low mild
+
+Benchmarking cost_aware/get_value
+Benchmarking cost_aware/get_value: Warming up for 3.0000 s
+Benchmarking cost_aware/get_value: Collecting 100 samples in estimated 5.0813 s (303k iterations)
+Benchmarking cost_aware/get_value: Analyzing
+cost_aware/get_value    time:   [16.665 µs 16.727 µs 16.791 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high severe
+
+Benchmarking memory_pressure/get_value
+Benchmarking memory_pressure/get_value: Warming up for 3.0000 s
+Benchmarking memory_pressure/get_value: Collecting 100 samples in estimated 5.0444 s (298k iterations)
+Benchmarking memory_pressure/get_value: Analyzing
+memory_pressure/get_value
+                        time:   [16.685 µs 16.728 µs 16.774 µs]
+Found 13 outliers among 100 measurements (13.00%)
+  2 (2.00%) low severe
+  4 (4.00%) low mild
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking composed/lru_ttl/get_value
+Benchmarking composed/lru_ttl/get_value: Warming up for 3.0000 s
+Benchmarking composed/lru_ttl/get_value: Collecting 100 samples in estimated 5.0782 s (146k iterations)
+Benchmarking composed/lru_ttl/get_value: Analyzing
+composed/lru_ttl/get_value
+                        time:   [34.469 µs 34.639 µs 34.811 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high severe
+
+Benchmarking lru/concurrent/1_threads
+Benchmarking lru/concurrent/1_threads: Warming up for 3.0000 s
+Benchmarking lru/concurrent/1_threads: Collecting 100 samples in estimated 5.0604 s (66k iterations)
+Benchmarking lru/concurrent/1_threads: Analyzing
+lru/concurrent/1_threads
+                        time:   [75.403 µs 75.848 µs 76.338 µs]
+                        thrpt:  [1.3100 Melem/s 1.3184 Melem/s 1.3262 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) high mild
+  2 (2.00%) high severe
+Benchmarking lru/concurrent/2_threads
+Benchmarking lru/concurrent/2_threads: Warming up for 3.0000 s
+Benchmarking lru/concurrent/2_threads: Collecting 100 samples in estimated 5.2597 s (50k iterations)
+Benchmarking lru/concurrent/2_threads: Analyzing
+lru/concurrent/2_threads
+                        time:   [103.05 µs 103.47 µs 103.91 µs]
+                        thrpt:  [1.9248 Melem/s 1.9329 Melem/s 1.9409 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking lru/concurrent/4_threads
+Benchmarking lru/concurrent/4_threads: Warming up for 3.0000 s
+Benchmarking lru/concurrent/4_threads: Collecting 100 samples in estimated 5.6389 s (30k iterations)
+Benchmarking lru/concurrent/4_threads: Analyzing
+lru/concurrent/4_threads
+                        time:   [185.24 µs 186.51 µs 187.77 µs]
+                        thrpt:  [2.1303 Melem/s 2.1446 Melem/s 2.1593 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking lru/concurrent/8_threads
+Benchmarking lru/concurrent/8_threads: Warming up for 3.0000 s
+Benchmarking lru/concurrent/8_threads: Collecting 100 samples in estimated 5.5551 s (15k iterations)
+Benchmarking lru/concurrent/8_threads: Analyzing
+lru/concurrent/8_threads
+                        time:   [336.20 µs 342.22 µs 348.22 µs]
+                        thrpt:  [2.2974 Melem/s 2.3377 Melem/s 2.3796 Melem/s]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+
+Benchmarking lru/find_lru
+Benchmarking lru/find_lru: Warming up for 3.0000 s
+Benchmarking lru/find_lru: Collecting 100 samples in estimated 5.0011 s (803k iterations)
+Benchmarking lru/find_lru: Analyzing
+lru/find_lru            time:   [6.1704 µs 6.1997 µs 6.2297 µs]
+Found 12 outliers among 100 measurements (12.00%)
+  5 (5.00%) low mild
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking lru/metadata/clear/100
+Benchmarking lru/metadata/clear/100: Warming up for 3.0000 s
+Benchmarking lru/metadata/clear/100: Collecting 100 samples in estimated 5.0001 s (325M iterations)
+Benchmarking lru/metadata/clear/100: Analyzing
+lru/metadata/clear/100  time:   [15.256 ns 15.327 ns 15.400 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking lru/metadata/clear/1000
+Benchmarking lru/metadata/clear/1000: Warming up for 3.0000 s
+Benchmarking lru/metadata/clear/1000: Collecting 100 samples in estimated 5.0001 s (323M iterations)
+Benchmarking lru/metadata/clear/1000: Analyzing
+lru/metadata/clear/1000 time:   [15.367 ns 15.449 ns 15.528 ns]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking lru/metadata/clear/10000
+Benchmarking lru/metadata/clear/10000: Warming up for 3.0000 s
+Benchmarking lru/metadata/clear/10000: Collecting 100 samples in estimated 5.0000 s (330M iterations)
+Benchmarking lru/metadata/clear/10000: Analyzing
+lru/metadata/clear/10000
+                        time:   [14.982 ns 15.058 ns 15.140 ns]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking string_allocation/preallocated
+Benchmarking string_allocation/preallocated: Warming up for 3.0000 s
+Benchmarking string_allocation/preallocated: Collecting 100 samples in estimated 5.0044 s (389k iterations)
+Benchmarking string_allocation/preallocated: Analyzing
+string_allocation/preallocated
+                        time:   [12.938 µs 13.003 µs 13.070 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking string_allocation/per_access
+Benchmarking string_allocation/per_access: Warming up for 3.0000 s
+Benchmarking string_allocation/per_access: Collecting 100 samples in estimated 5.0696 s (288k iterations)
+Benchmarking string_allocation/per_access: Analyzing
+string_allocation/per_access
+                        time:   [17.206 µs 17.295 µs 17.388 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking lru_comparison/baseline_lru
+Benchmarking lru_comparison/baseline_lru: Warming up for 3.0000 s
+Benchmarking lru_comparison/baseline_lru: Collecting 100 samples in estimated 5.0132 s (288k iterations)
+Benchmarking lru_comparison/baseline_lru: Analyzing
+lru_comparison/baseline_lru
+                        time:   [17.124 µs 17.218 µs 17.314 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking lru_comparison/optimized_lru
+Benchmarking lru_comparison/optimized_lru: Warming up for 3.0000 s
+Benchmarking lru_comparison/optimized_lru: Collecting 100 samples in estimated 5.0660 s (288k iterations)
+Benchmarking lru_comparison/optimized_lru: Analyzing
+lru_comparison/optimized_lru
+                        time:   [17.519 µs 17.585 µs 17.654 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking lru_optimized/concurrent/1_threads
+Benchmarking lru_optimized/concurrent/1_threads: Warming up for 3.0000 s
+Benchmarking lru_optimized/concurrent/1_threads: Collecting 100 samples in estimated 5.0577 s (66k iterations)
+Benchmarking lru_optimized/concurrent/1_threads: Analyzing
+lru_optimized/concurrent/1_threads
+                        time:   [71.160 µs 71.507 µs 71.863 µs]
+                        thrpt:  [1.3915 Melem/s 1.3985 Melem/s 1.4053 Melem/s]
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) high mild
+  3 (3.00%) high severe
+Benchmarking lru_optimized/concurrent/2_threads
+Benchmarking lru_optimized/concurrent/2_threads: Warming up for 3.0000 s
+Benchmarking lru_optimized/concurrent/2_threads: Collecting 100 samples in estimated 5.3339 s (20k iterations)
+Benchmarking lru_optimized/concurrent/2_threads: Analyzing
+lru_optimized/concurrent/2_threads
+                        time:   [104.70 µs 105.31 µs 105.92 µs]
+                        thrpt:  [1.8882 Melem/s 1.8992 Melem/s 1.9103 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) high mild
+  2 (2.00%) high severe
+Benchmarking lru_optimized/concurrent/4_threads
+Benchmarking lru_optimized/concurrent/4_threads: Warming up for 3.0000 s
+Benchmarking lru_optimized/concurrent/4_threads: Collecting 100 samples in estimated 5.4021 s (30k iterations)
+Benchmarking lru_optimized/concurrent/4_threads: Analyzing
+lru_optimized/concurrent/4_threads
+                        time:   [177.09 µs 178.02 µs 179.02 µs]
+                        thrpt:  [2.2344 Melem/s 2.2470 Melem/s 2.2587 Melem/s]
+Found 8 outliers among 100 measurements (8.00%)
+  7 (7.00%) high mild
+  1 (1.00%) high severe
+Benchmarking lru_optimized/concurrent/8_threads
+Benchmarking lru_optimized/concurrent/8_threads: Warming up for 3.0000 s
+Benchmarking lru_optimized/concurrent/8_threads: Collecting 100 samples in estimated 5.3403 s (15k iterations)
+Benchmarking lru_optimized/concurrent/8_threads: Analyzing
+lru_optimized/concurrent/8_threads
+                        time:   [365.92 µs 368.66 µs 371.10 µs]
+                        thrpt:  [2.1558 Melem/s 2.1700 Melem/s 2.1863 Melem/s]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+

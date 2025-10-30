@@ -1,0 +1,232 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: fields `free_list` and `rebuild_threshold` are never read
+   --> src/dictionary/double_array_trie.rs:198:5
+    |
+186 | pub struct DoubleArrayTrie {
+    |            --------------- fields in this struct
+...
+198 |     free_list: Arc<Vec<usize>>,
+    |     ^^^^^^^^^
+...
+204 |     rebuild_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^
+    |
+    = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: missing documentation for an associated function
+   --> src/cache/eviction/lru_optimized.rs:166:5
+    |
+166 |     pub fn new(dict: D) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: the lint level is defined here
+   --> src/lib.rs:26:9
+    |
+ 26 | #![warn(missing_docs)]
+    |         ^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:185:5
+    |
+185 |     pub fn into_inner(self) -> D {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:190:5
+    |
+190 |     pub fn inner(&self) -> &D {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:216:5
+    |
+216 |     pub fn recency(&self, term: &str) -> Option<u64> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:233:5
+    |
+233 |     pub fn find_lru(&self, terms: &[&str]) -> Option<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:260:5
+    |
+260 |     pub fn evict_lru(&self, terms: &[&str]) -> Option<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:283:5
+    |
+283 |     pub fn clear_metadata(&self) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct
+   --> src/cache/eviction/lru_optimized.rs:351:1
+    |
+351 | pub struct LruOptimizedNode<N> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `liblevenshtein` (lib) generated 9 warnings
+warning: unused import: `std::time::Duration`
+  --> benches/rayon_evaluation_benchmarks.rs:29:9
+   |
+29 |     use std::time::Duration;
+   |         ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::time::Duration`
+  --> benches/rayon_evaluation_benchmarks.rs:51:9
+   |
+51 |     use std::time::Duration;
+   |         ^^^^^^^^^^^^^^^^^^^
+
+warning: `liblevenshtein` (bench "rayon_evaluation_benchmarks") generated 2 warnings (run `cargo fix --bench "rayon_evaluation_benchmarks"` to apply 2 suggestions)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 47.42s
+     Running benches/rayon_evaluation_benchmarks.rs (target/release/deps/rayon_evaluation_benchmarks-602880b697c49ad2)
+Benchmarking batch_recency/sequential/100
+Benchmarking batch_recency/sequential/100: Warming up for 3.0000 s
+Benchmarking batch_recency/sequential/100: Collecting 100 samples in estimated 5.0204 s (571k iterations)
+Benchmarking batch_recency/sequential/100: Analyzing
+batch_recency/sequential/100
+                        time:   [8.7150 µs 8.7530 µs 8.7954 µs]
+                        thrpt:  [11.370 Melem/s 11.425 Melem/s 11.475 Melem/s]
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+Benchmarking batch_recency/sequential/1000
+Benchmarking batch_recency/sequential/1000: Warming up for 3.0000 s
+Benchmarking batch_recency/sequential/1000: Collecting 100 samples in estimated 5.3708 s (45k iterations)
+Benchmarking batch_recency/sequential/1000: Analyzing
+batch_recency/sequential/1000
+                        time:   [115.91 µs 116.45 µs 117.02 µs]
+                        thrpt:  [8.5457 Melem/s 8.5872 Melem/s 8.6271 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking batch_recency/sequential/10000
+Benchmarking batch_recency/sequential/10000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.1s, enable flat sampling, or reduce sample count to 50.
+Benchmarking batch_recency/sequential/10000: Collecting 100 samples in estimated 8.0723 s (5050 iterations)
+Benchmarking batch_recency/sequential/10000: Analyzing
+batch_recency/sequential/10000
+                        time:   [1.5947 ms 1.5995 ms 1.6050 ms]
+                        thrpt:  [6.2307 Melem/s 6.2519 Melem/s 6.2706 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking find_n_lru/sequential/100_find_10
+Benchmarking find_n_lru/sequential/100_find_10: Warming up for 3.0000 s
+Benchmarking find_n_lru/sequential/100_find_10: Collecting 100 samples in estimated 5.0152 s (550k iterations)
+Benchmarking find_n_lru/sequential/100_find_10: Analyzing
+find_n_lru/sequential/100_find_10
+                        time:   [8.9753 µs 9.0141 µs 9.0534 µs]
+                        thrpt:  [11.046 Melem/s 11.094 Melem/s 11.142 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) high mild
+  2 (2.00%) high severe
+Benchmarking find_n_lru/sequential/1000_find_100
+Benchmarking find_n_lru/sequential/1000_find_100: Warming up for 3.0000 s
+Benchmarking find_n_lru/sequential/1000_find_100: Collecting 100 samples in estimated 5.0399 s (56k iterations)
+Benchmarking find_n_lru/sequential/1000_find_100: Analyzing
+find_n_lru/sequential/1000_find_100
+                        time:   [94.386 µs 94.974 µs 95.589 µs]
+                        thrpt:  [10.461 Melem/s 10.529 Melem/s 10.595 Melem/s]
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+Benchmarking find_n_lru/sequential/10000_find_1000
+Benchmarking find_n_lru/sequential/10000_find_1000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.9s, enable flat sampling, or reduce sample count to 60.
+Benchmarking find_n_lru/sequential/10000_find_1000: Collecting 100 samples in estimated 5.8638 s (5050 iterations)
+Benchmarking find_n_lru/sequential/10000_find_1000: Analyzing
+find_n_lru/sequential/10000_find_1000
+                        time:   [1.1608 ms 1.1652 ms 1.1695 ms]
+                        thrpt:  [8.5507 Melem/s 8.5825 Melem/s 8.6144 Melem/s]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+Benchmarking size_comparison/sequential/10
+Benchmarking size_comparison/sequential/10: Warming up for 3.0000 s
+Benchmarking size_comparison/sequential/10: Collecting 100 samples in estimated 5.0038 s (4.3M iterations)
+Benchmarking size_comparison/sequential/10: Analyzing
+size_comparison/sequential/10
+                        time:   [1.1432 µs 1.1490 µs 1.1551 µs]
+                        thrpt:  [8.6571 Melem/s 8.7029 Melem/s 8.7476 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low severe
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking size_comparison/sequential/50
+Benchmarking size_comparison/sequential/50: Warming up for 3.0000 s
+Benchmarking size_comparison/sequential/50: Collecting 100 samples in estimated 5.0198 s (763k iterations)
+Benchmarking size_comparison/sequential/50: Analyzing
+size_comparison/sequential/50
+                        time:   [6.4476 µs 6.4687 µs 6.4910 µs]
+                        thrpt:  [7.7029 Melem/s 7.7295 Melem/s 7.7548 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high severe
+Benchmarking size_comparison/sequential/100
+Benchmarking size_comparison/sequential/100: Warming up for 3.0000 s
+Benchmarking size_comparison/sequential/100: Collecting 100 samples in estimated 5.0269 s (389k iterations)
+Benchmarking size_comparison/sequential/100: Analyzing
+size_comparison/sequential/100
+                        time:   [13.191 µs 13.246 µs 13.302 µs]
+                        thrpt:  [7.5176 Melem/s 7.5495 Melem/s 7.5809 Melem/s]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+Benchmarking size_comparison/sequential/500
+Benchmarking size_comparison/sequential/500: Warming up for 3.0000 s
+Benchmarking size_comparison/sequential/500: Collecting 100 samples in estimated 5.1531 s (81k iterations)
+Benchmarking size_comparison/sequential/500: Analyzing
+size_comparison/sequential/500
+                        time:   [63.127 µs 63.352 µs 63.584 µs]
+                        thrpt:  [7.8636 Melem/s 7.8925 Melem/s 7.9206 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking size_comparison/sequential/1000
+Benchmarking size_comparison/sequential/1000: Warming up for 3.0000 s
+Benchmarking size_comparison/sequential/1000: Collecting 100 samples in estimated 5.2491 s (40k iterations)
+Benchmarking size_comparison/sequential/1000: Analyzing
+size_comparison/sequential/1000
+                        time:   [129.44 µs 129.95 µs 130.45 µs]
+                        thrpt:  [7.6657 Melem/s 7.6952 Melem/s 7.7257 Melem/s]
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking size_comparison/sequential/5000
+Benchmarking size_comparison/sequential/5000: Warming up for 3.0000 s
+Benchmarking size_comparison/sequential/5000: Collecting 100 samples in estimated 7.9129 s (10k iterations)
+Benchmarking size_comparison/sequential/5000: Analyzing
+size_comparison/sequential/5000
+                        time:   [782.42 µs 784.74 µs 787.03 µs]
+                        thrpt:  [6.3530 Melem/s 6.3715 Melem/s 6.3904 Melem/s]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking size_comparison/sequential/10000
+Benchmarking size_comparison/sequential/10000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.1s, enable flat sampling, or reduce sample count to 50.
+Benchmarking size_comparison/sequential/10000: Collecting 100 samples in estimated 8.1140 s (5050 iterations)
+Benchmarking size_comparison/sequential/10000: Analyzing
+size_comparison/sequential/10000
+                        time:   [1.5901 ms 1.5952 ms 1.6004 ms]
+                        thrpt:  [6.2483 Melem/s 6.2687 Melem/s 6.2888 Melem/s]
+Found 10 outliers among 100 measurements (10.00%)
+  6 (6.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+

@@ -1,0 +1,142 @@
+   Compiling liblevenshtein v0.3.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: fields `free_list` and `rebuild_threshold` are never read
+   --> src/dictionary/double_array_trie.rs:198:5
+    |
+186 | pub struct DoubleArrayTrie {
+    |            --------------- fields in this struct
+...
+198 |     free_list: Arc<Vec<usize>>,
+    |     ^^^^^^^^^
+...
+204 |     rebuild_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^
+    |
+    = note: `DoubleArrayTrie` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: missing documentation for an associated function
+   --> src/cache/eviction/lru_optimized.rs:166:5
+    |
+166 |     pub fn new(dict: D) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: the lint level is defined here
+   --> src/lib.rs:26:9
+    |
+ 26 | #![warn(missing_docs)]
+    |         ^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:185:5
+    |
+185 |     pub fn into_inner(self) -> D {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:190:5
+    |
+190 |     pub fn inner(&self) -> &D {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:216:5
+    |
+216 |     pub fn recency(&self, term: &str) -> Option<u64> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:233:5
+    |
+233 |     pub fn find_lru(&self, terms: &[&str]) -> Option<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:260:5
+    |
+260 |     pub fn evict_lru(&self, terms: &[&str]) -> Option<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> src/cache/eviction/lru_optimized.rs:283:5
+    |
+283 |     pub fn clear_metadata(&self) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct
+   --> src/cache/eviction/lru_optimized.rs:351:1
+    |
+351 | pub struct LruOptimizedNode<N> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `liblevenshtein` (lib) generated 9 warnings
+    Finished `bench` profile [optimized + debuginfo] target(s) in 54.60s
+     Running benches/fuzzy_multimap_profiling.rs (target/release/deps/fuzzy_multimap_profiling-c68387d0edfcee47)
+Benchmarking fuzzy_multimap_query
+Benchmarking fuzzy_multimap_query: Warming up for 3.0000 s
+Benchmarking fuzzy_multimap_query: Collecting 100 samples in estimated 5.1451 s (136k iterations)
+Benchmarking fuzzy_multimap_query: Analyzing
+fuzzy_multimap_query    time:   [38.337 µs 38.552 µs 38.779 µs]
+Found 9 outliers among 100 measurements (9.00%)
+  3 (3.00%) low mild
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking fuzzy_multimap_high_aggregation
+Benchmarking fuzzy_multimap_high_aggregation: Warming up for 3.0000 s
+Benchmarking fuzzy_multimap_high_aggregation: Collecting 100 samples in estimated 6.0738 s (15k iterations)
+Benchmarking fuzzy_multimap_high_aggregation: Analyzing
+fuzzy_multimap_high_aggregation
+                        time:   [393.38 µs 394.96 µs 396.55 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking fuzzy_multimap_vec_concat
+Benchmarking fuzzy_multimap_vec_concat: Warming up for 3.0000 s
+Benchmarking fuzzy_multimap_vec_concat: Collecting 100 samples in estimated 5.0166 s (131k iterations)
+Benchmarking fuzzy_multimap_vec_concat: Analyzing
+fuzzy_multimap_vec_concat
+                        time:   [38.006 µs 38.131 µs 38.260 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking transducer_query_baseline
+Benchmarking transducer_query_baseline: Warming up for 3.0000 s
+Benchmarking transducer_query_baseline: Collecting 100 samples in estimated 5.1854 s (111k iterations)
+Benchmarking transducer_query_baseline: Analyzing
+transducer_query_baseline
+                        time:   [46.515 µs 46.686 µs 46.868 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking dict_get_value_hashset
+Benchmarking dict_get_value_hashset: Warming up for 3.0000 s
+Benchmarking dict_get_value_hashset: Collecting 100 samples in estimated 5.0058 s (4.2M iterations)
+Benchmarking dict_get_value_hashset: Analyzing
+dict_get_value_hashset  time:   [1.1912 µs 1.1963 µs 1.2018 µs]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low severe
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking hashset_aggregation
+Benchmarking hashset_aggregation: Warming up for 3.0000 s
+Benchmarking hashset_aggregation: Collecting 100 samples in estimated 5.0108 s (444k iterations)
+Benchmarking hashset_aggregation: Analyzing
+hashset_aggregation     time:   [11.476 µs 11.533 µs 11.594 µs]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+
+Benchmarking fuzzy_multimap_complete
+Benchmarking fuzzy_multimap_complete: Warming up for 3.0000 s
+Benchmarking fuzzy_multimap_complete: Collecting 100 samples in estimated 5.3449 s (25k iterations)
+Benchmarking fuzzy_multimap_complete: Analyzing
+fuzzy_multimap_complete time:   [210.36 µs 211.45 µs 212.59 µs]
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
