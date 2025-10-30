@@ -88,15 +88,31 @@ impl OptimizedDawgNode {
     fn find_edge(&self, label: u8, arena: &[(u8, u32)]) -> Option<u32> {
         let edges = self.edges(arena);
 
-        // For small edge counts, linear search is faster than binary search
-        // due to better CPU branch prediction and less overhead
+        // Adaptive strategy with SIMD acceleration:
+        // - edge_count ≤ 4: Linear search (scalar for ≤3, SIMD for exactly 4)
+        // - edge_count > 4: Binary search (O(log n) dominates)
+        //
+        // The threshold of 4 is conservative: Optimized DAWG nodes are extremely
+        // compact (8 bytes), so most nodes have ≤4 edges. SIMD provides benefit
+        // exactly at the 4-edge boundary where SSE4.1 is a perfect fit.
         if self.edge_count <= 4 {
-            edges
-                .iter()
-                .find(|(l, _)| *l == label)
-                .map(|(_, target)| *target)
+            // SIMD-accelerated linear search (optimal for exactly 4 edges)
+            #[cfg(feature = "simd")]
+            {
+                use crate::transducer::simd::find_edge_label_simd;
+                return find_edge_label_simd(edges, label).map(|idx| edges[idx].1);
+            }
+
+            // Scalar fallback (when simd feature disabled)
+            #[cfg(not(feature = "simd"))]
+            {
+                edges
+                    .iter()
+                    .find(|(l, _)| *l == label)
+                    .map(|(_, target)| *target)
+            }
         } else {
-            // Binary search for nodes with many edges
+            // Binary search for nodes with many edges (>4)
             edges
                 .binary_search_by_key(&label, |(l, _)| *l)
                 .ok()

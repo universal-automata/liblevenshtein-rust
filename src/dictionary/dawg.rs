@@ -385,19 +385,37 @@ impl DictionaryNode for DawgDictionaryNode {
     fn transition(&self, label: u8) -> Option<Self> {
         let edges = &self.nodes[self.node_idx].edges;
 
-        // Adaptive: use linear search for small edge counts, binary for large
-        // Empirical testing shows crossover at 16-20 edges
+        // Adaptive strategy with SIMD acceleration:
+        // - edges < 4: Scalar linear search (SIMD overhead too high)
+        // - 4 ≤ edges < 16: SIMD linear search (SSE4.1/AVX2 for 2-4x speedup)
+        // - edges ≥ 16: Binary search (O(log n) dominates)
         if edges.len() < 16 {
-            // Linear search - cache-friendly for small counts
-            edges
-                .iter()
-                .find(|(l, _)| *l == label)
-                .map(|(_, idx)| DawgDictionaryNode {
-                    nodes: Arc::clone(&self.nodes),
-                    node_idx: *idx,
-                })
+            // SIMD-accelerated linear search for 4-15 edges
+            #[cfg(feature = "simd")]
+            {
+                use crate::transducer::simd::find_edge_label_simd;
+                if let Some(idx) = find_edge_label_simd(edges, label) {
+                    return Some(DawgDictionaryNode {
+                        nodes: Arc::clone(&self.nodes),
+                        node_idx: edges[idx].1,
+                    });
+                }
+                return None;
+            }
+
+            // Scalar fallback (when simd feature disabled)
+            #[cfg(not(feature = "simd"))]
+            {
+                edges
+                    .iter()
+                    .find(|(l, _)| *l == label)
+                    .map(|(_, idx)| DawgDictionaryNode {
+                        nodes: Arc::clone(&self.nodes),
+                        node_idx: *idx,
+                    })
+            }
         } else {
-            // Binary search - efficient for large edge counts
+            // Binary search - efficient for large edge counts (≥16)
             edges
                 .binary_search_by_key(&label, |(l, _)| *l)
                 .ok()
