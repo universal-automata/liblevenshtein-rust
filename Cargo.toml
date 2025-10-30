@@ -16,8 +16,14 @@ readme = "README.md"
 pathmap = { git = "https://github.com/Adam-Vandervorst/PathMap.git", branch = "master", optional = true }
 # SmallVec for stack-allocated vectors (performance optimization)
 smallvec = "1.13"
+# Fast non-cryptographic hashing for internal use
+rustc-hash = "1.1"
 # Error handling
 thiserror = "2.0"
+# Faster RwLock for eviction wrappers (optional)
+parking_lot = { version = "0.12", optional = true }
+# Lock-free concurrent hashmap for eviction wrappers (optional)
+dashmap = { version = "6.1", optional = true }
 # Serialization support (optional)
 serde = { version = "1.0", features = ["derive", "rc"], optional = true }
 bincode = { version = "1.3", optional = true }
@@ -31,6 +37,7 @@ anyhow = { version = "1.0", optional = true }
 rustyline = { version = "13.0", optional = true }
 colored = { version = "2.0", optional = true }
 dirs = { version = "5.0", optional = true }
+# SIMD optimization uses std::arch (no external dependencies needed)
 
 [dev-dependencies]
 criterion = "0.5"
@@ -134,9 +141,32 @@ harness = false
 required-features = ["pathmap-backend"]
 
 [[bench]]
+name = "fuzzy_multimap_profiling"
+harness = false
+required-features = ["pathmap-backend"]
+
+[[bench]]
 name = "hierarchical_scope_benchmarks"
 harness = false
 required-features = ["pathmap-backend"]
+
+[[bench]]
+name = "eviction_wrapper_benchmarks"
+harness = false
+required-features = ["pathmap-backend"]
+
+[[bench]]
+name = "rayon_evaluation_benchmarks"
+harness = false
+required-features = ["pathmap-backend"]
+
+[[bench]]
+name = "distance_benchmarks"
+harness = false
+
+[[bench]]
+name = "distance_profiling"
+harness = false
 
 [[bin]]
 name = "liblevenshtein"
@@ -171,6 +201,22 @@ serialization = ["serde", "bincode", "serde_json"]
 protobuf = ["prost", "bytes", "prost-build", "serialization"]
 compression = ["flate2", "serialization"]
 cli = ["clap", "anyhow", "rustyline", "colored", "dirs", "pathmap-backend", "serialization"]
+
+# Eviction wrapper optimization features
+eviction-parking-lot = ["parking_lot"]
+eviction-dashmap = ["dashmap"]
+eviction-arc-str = []
+eviction-compact-metadata = []
+eviction-coarse-timestamps = []
+
+# Eviction optimization profiles
+eviction-opt-none = []
+eviction-opt-balanced = ["eviction-parking-lot", "eviction-arc-str", "eviction-compact-metadata"]
+eviction-opt-concurrent = ["eviction-dashmap", "eviction-parking-lot", "eviction-arc-str", "eviction-compact-metadata"]
+eviction-opt-memory = ["eviction-compact-metadata"]
+
+# SIMD optimization with AVX2/SSE4.1 intrinsics (Phase 3)
+simd = []
 
 [package.metadata.generate-rpm]
 assets = [
