@@ -105,28 +105,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             .map(|_| VecDeque::with_capacity(32))
             .collect();
 
-        // Check if root node is final (handles empty string case)
-        // Without this check, empty strings in the dictionary are never returned
-        // because the root node has no outgoing edges to trigger the finality check.
-        // See: docs/CROSS_VALIDATION_BUG_REPORT.md
-        let root_intersection = Intersection::new(root.clone(), initial.clone());
-        if root_intersection.is_final() {
-            let distance = if substring_mode {
-                root_intersection.state.min_distance().unwrap_or(usize::MAX)
-            } else {
-                root_intersection
-                    .state
-                    .infer_distance(query_bytes.len())
-                    .unwrap_or(usize::MAX)
-            };
-
-            if distance <= max_distance {
-                // Root is final and within distance: add to appropriate distance bucket
-                pending_by_distance[distance].push_front(Box::new(root_intersection.clone()));
-            }
-        }
-
-        // Start with root at distance 0
+        // Start with root at distance 0 - it will be checked for finality in advance()
         pending_by_distance[0].push_back(Box::new(Intersection::new(root, initial)));
 
         Self {

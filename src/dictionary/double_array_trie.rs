@@ -261,8 +261,22 @@ impl DoubleArrayTrieBuilder {
 
     /// Insert a term into the trie.
     pub fn insert(&mut self, term: &str) -> bool {
+        // Handle empty string: mark root (state 1) as final
         if term.is_empty() {
-            return false;
+            // Ensure is_final is large enough for root state (state 1)
+            while self.is_final.len() <= 1 {
+                self.is_final.push(false);
+            }
+
+            // Check if root is already final (empty string already inserted)
+            if self.is_final[1] {
+                return false; // Already exists
+            }
+
+            // Mark root as final and increment term count
+            self.is_final[1] = true;
+            self.term_count += 1;
+            return true;
         }
 
         let bytes = term.as_bytes();
