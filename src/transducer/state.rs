@@ -180,7 +180,18 @@ impl State {
                 return first.num_errors;
             }
 
-            // Otherwise, find the minimum
+            // SIMD path: use vectorized horizontal minimum for 4-8 positions
+            #[cfg(feature = "simd")]
+            {
+                let len = self.positions.len();
+                if len >= 4 && len <= 8 {
+                    let errors: smallvec::SmallVec<[usize; 8]> =
+                        self.positions.iter().map(|p| p.num_errors).collect();
+                    return super::simd::find_minimum_simd(&errors, len);
+                }
+            }
+
+            // Scalar fallback for len > 8 or when SIMD unavailable
             self.positions.iter().map(|p| p.num_errors).min().unwrap()
         })
     }
