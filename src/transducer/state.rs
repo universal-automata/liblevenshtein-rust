@@ -79,16 +79,16 @@ impl State {
     /// ## Implementation
     ///
     /// Maintains sorted order and removes subsumed positions incrementally.
-    pub fn insert(&mut self, position: Position, algorithm: Algorithm) {
+    pub fn insert(&mut self, position: Position, algorithm: Algorithm, query_length: usize) {
         // Check if this position is subsumed by an existing one
         for existing in &self.positions {
-            if existing.subsumes(&position, algorithm) {
+            if existing.subsumes(&position, algorithm, query_length) {
                 return; // Already covered by existing position
             }
         }
 
         // Remove any positions that this new position subsumes
-        self.positions.retain(|p| !position.subsumes(p, algorithm));
+        self.positions.retain(|p| !position.subsumes(p, algorithm, query_length));
 
         // Insert in sorted position
         let insert_pos = self
@@ -99,9 +99,9 @@ impl State {
     }
 
     /// Merge another state into this one
-    pub fn merge(&mut self, other: &State, algorithm: Algorithm) {
+    pub fn merge(&mut self, other: &State, algorithm: Algorithm, query_length: usize) {
         for position in &other.positions {
-            self.insert(*position, algorithm);
+            self.insert(*position, algorithm, query_length);
         }
     }
 
@@ -283,12 +283,13 @@ mod tests {
     #[test]
     fn test_state_insert_maintains_order() {
         let mut state = State::new();
+        let max_distance = 3;
         // Insert positions - (3,1) will subsume (2,2) and (4,2) with Standard subsumption
         // (3,1) subsumes (2,2): |3-2|=1 <= (2-1)=1 ✓
         // (3,1) subsumes (4,2): |3-4|=1 <= (2-1)=1 ✓
-        state.insert(Position::new(2, 2), Algorithm::Standard);
-        state.insert(Position::new(3, 1), Algorithm::Standard); // This subsumes (2,2)
-        state.insert(Position::new(4, 2), Algorithm::Standard); // This is subsumed by (3,1)
+        state.insert(Position::new(2, 2), Algorithm::Standard, max_distance);
+        state.insert(Position::new(3, 1), Algorithm::Standard, max_distance); // This subsumes (2,2)
+        state.insert(Position::new(4, 2), Algorithm::Standard, max_distance); // This is subsumed by (3,1)
 
         let positions: Vec<_> = state.positions().to_vec();
         // Only (3,1) should remain
@@ -299,15 +300,16 @@ mod tests {
     #[test]
     fn test_state_subsumption() {
         let mut state = State::new();
-        state.insert(Position::new(5, 2), Algorithm::Standard);
+        let max_distance = 3;
+        state.insert(Position::new(5, 2), Algorithm::Standard, max_distance);
         assert_eq!(state.len(), 1);
 
         // Try to insert a position that IS subsumed: (5,2) subsumes (4,3) because |5-4|=1 <= (3-2)=1
-        state.insert(Position::new(4, 3), Algorithm::Standard); // Subsumed by (5,2)
+        state.insert(Position::new(4, 3), Algorithm::Standard, max_distance); // Subsumed by (5,2)
         assert_eq!(state.len(), 1, "(4,3) should be subsumed by (5,2)");
 
         // Insert a position at SAME index with fewer errors - should subsume
-        state.insert(Position::new(5, 1), Algorithm::Standard); // Subsumes (5,2) at same position
+        state.insert(Position::new(5, 1), Algorithm::Standard, max_distance); // Subsumes (5,2) at same position
         assert_eq!(state.len(), 1, "(5,1) should replace (5,2)");
 
         // Verify (5,1) is in the state
@@ -322,9 +324,10 @@ mod tests {
     #[test]
     fn test_state_min_distance() {
         let mut state = State::new();
-        state.insert(Position::new(3, 2), Algorithm::Standard);
-        state.insert(Position::new(4, 1), Algorithm::Standard);
-        state.insert(Position::new(5, 3), Algorithm::Standard);
+        let max_distance = 3;
+        state.insert(Position::new(3, 2), Algorithm::Standard, max_distance);
+        state.insert(Position::new(4, 1), Algorithm::Standard, max_distance);
+        state.insert(Position::new(5, 3), Algorithm::Standard, max_distance);
 
         assert_eq!(state.min_distance(), Some(1));
     }
@@ -332,8 +335,9 @@ mod tests {
     #[test]
     fn test_state_infer_distance() {
         let mut state = State::new();
-        state.insert(Position::new(3, 1), Algorithm::Standard); // At position 3 with 1 error
-        state.insert(Position::new(4, 2), Algorithm::Standard); // At position 4 with 2 errors
+        let max_distance = 3;
+        state.insert(Position::new(3, 1), Algorithm::Standard, max_distance); // At position 3 with 1 error
+        state.insert(Position::new(4, 2), Algorithm::Standard, max_distance); // At position 4 with 2 errors
 
         let query_length = 7;
         // Position (3,1): needs 4 more chars = 1+4=5 distance

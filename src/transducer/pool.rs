@@ -211,12 +211,13 @@ mod tests {
         use super::super::algorithm::Algorithm;
 
         let mut pool = StatePool::new();
+        let max_distance = 2;
 
         // Acquire a state and add positions
         // Note: (1,0) subsumes (2,1) with Standard subsumption: |1-2|=1 <= (1-0)=1
         let mut state = pool.acquire();
-        state.insert(Position::new(1, 0), Algorithm::Standard);
-        state.insert(Position::new(2, 1), Algorithm::Standard); // Subsumed by (1,0)
+        state.insert(Position::new(1, 0), Algorithm::Standard, max_distance);
+        state.insert(Position::new(2, 1), Algorithm::Standard, max_distance); // Subsumed by (1,0)
         assert_eq!(state.len(), 1); // Only (1,0) remains
 
         // Release it
@@ -267,15 +268,16 @@ mod tests {
         use super::super::algorithm::Algorithm;
 
         let mut pool = StatePool::new();
+        let max_distance = 2;
 
         // Pool starts with 4 pre-warmed states
         // Release two more states
         let mut state1 = State::new();
-        state1.insert(Position::new(1, 0), Algorithm::Standard);
+        state1.insert(Position::new(1, 0), Algorithm::Standard, max_distance);
         pool.release(state1);
 
         let mut state2 = State::new();
-        state2.insert(Position::new(2, 0), Algorithm::Standard);
+        state2.insert(Position::new(2, 0), Algorithm::Standard, max_distance);
         pool.release(state2);
 
         // Acquire should get state2 first (LIFO)
@@ -291,11 +293,12 @@ mod tests {
         use super::super::algorithm::Algorithm;
 
         let mut pool = StatePool::new();
+        let max_distance = 10;
 
         // Create a state with some capacity
         let mut state = pool.acquire();
         for i in 0..10 {
-            state.insert(Position::new(i, 0), Algorithm::Standard);
+            state.insert(Position::new(i, 0), Algorithm::Standard, max_distance);
         }
 
         // The state's Vec should have capacity >= 10
@@ -308,7 +311,7 @@ mod tests {
         // Add 10 more positions - should not need reallocation
         // (This is an implementation detail test)
         for i in 0..10 {
-            state2.insert(Position::new(i, 0), Algorithm::Standard);
+            state2.insert(Position::new(i, 0), Algorithm::Standard, max_distance);
         }
         assert_eq!(state2.len(), 10);
     }

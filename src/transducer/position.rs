@@ -76,7 +76,10 @@ impl Position {
     /// - Otherwise: standard formula
     ///
     /// Based on C++ implementation in subsumes.cpp
-    pub fn subsumes(&self, other: &Position, algorithm: Algorithm) -> bool {
+    ///
+    /// # Parameters
+    /// - `query_length`: Length of the query term (n in C++/Java code)
+    pub fn subsumes(&self, other: &Position, algorithm: Algorithm, query_length: usize) -> bool {
         let i = self.term_index;
         let e = self.num_errors;
         let s = self.is_special;
@@ -105,11 +108,9 @@ impl Position {
                         // Both special: must be at same position
                         return i == j;
                     }
-                    // lhs special, rhs not: requires rhs at max distance and same position
-                    // Note: In practice, we don't have max_distance here, so we check if i == j
-                    // The C++ checks (f == n) && (i == j), but without n we can't verify
-                    // For now, follow the position equality check
-                    return i == j;
+                    // lhs special, rhs not: requires rhs at query length and same position
+                    // The C++ checks (f == n) && (i == j), where n is query length
+                    return (f == query_length) && (i == j);
                 }
 
                 if t {
@@ -188,13 +189,14 @@ mod tests {
     #[test]
     fn test_position_subsumption_standard() {
         // Standard algorithm subsumption: |i - j| <= (f - e)
+        let max_distance = 3; // Max distance for tests
 
         // (5, 2) should subsume (5, 3) - same position, fewer errors
         // |5-5| = 0 <= (3-2) = 1 ✓
         let p1 = Position::new(5, 2);
         let p2 = Position::new(5, 3);
         assert!(
-            p1.subsumes(&p2, Algorithm::Standard),
+            p1.subsumes(&p2, Algorithm::Standard, max_distance),
             "p1(5,2) should subsume p2(5,3)"
         );
 
@@ -202,7 +204,7 @@ mod tests {
         let p3 = Position::new(5, 2);
         let p4 = Position::new(4, 3);
         assert!(
-            p3.subsumes(&p4, Algorithm::Standard),
+            p3.subsumes(&p4, Algorithm::Standard, max_distance),
             "p3(5,2) should subsume p4(4,3) per C++ logic"
         );
 
@@ -210,7 +212,7 @@ mod tests {
         let p5 = Position::new(3, 2);
         let p6 = Position::new(3, 2);
         assert!(
-            p5.subsumes(&p6, Algorithm::Standard),
+            p5.subsumes(&p6, Algorithm::Standard, max_distance),
             "p5(3,2) should subsume p6(3,2)"
         );
 
@@ -218,7 +220,7 @@ mod tests {
         let p7 = Position::new(3, 3);
         let p8 = Position::new(5, 2);
         assert!(
-            !p7.subsumes(&p8, Algorithm::Standard),
+            !p7.subsumes(&p8, Algorithm::Standard, max_distance),
             "p7(3,3) should NOT subsume p8(5,2)"
         );
     }
@@ -226,42 +228,43 @@ mod tests {
     #[test]
     fn test_position_subsumption_transposition() {
         // Transposition subsumption tests
+        let max_distance = 3; // Max distance for tests
 
         // Both special: must be at same position
         let p1 = Position::new_special(5, 2);
         let p2 = Position::new_special(5, 3);
         assert!(
-            p1.subsumes(&p2, Algorithm::Transposition),
+            p1.subsumes(&p2, Algorithm::Transposition, max_distance),
             "special(5,2) should subsume special(5,3) - same position"
         );
 
         let p3 = Position::new_special(5, 2);
         let p4 = Position::new_special(6, 3);
         assert!(
-            !p3.subsumes(&p4, Algorithm::Transposition),
+            !p3.subsumes(&p4, Algorithm::Transposition, max_distance),
             "special(5,2) should NOT subsume special(6,3) - different position"
         );
 
-        // lhs special, rhs not: same position check
+        // lhs special, rhs not: same position check, requires f == max_distance
         let p5 = Position::new_special(5, 2);
-        let p6 = Position::new(5, 3);
+        let p6 = Position::new(5, 3); // f=3, max_distance=3, i=j=5 → should subsume
         assert!(
-            p5.subsumes(&p6, Algorithm::Transposition),
-            "special(5,2) should subsume normal(5,3)"
+            p5.subsumes(&p6, Algorithm::Transposition, max_distance),
+            "special(5,2) should subsume normal(5,3) when f==max_distance"
         );
 
         // rhs special: adjusted formula - ((j < i) ? (i - j - 1) : (j - i + 1)) <= (f - e)
         let p7 = Position::new(5, 2);
         let p8 = Position::new_special(4, 3); // j=4, i=5: (5-4-1)=0 <= (3-2)=1 ✓
         assert!(
-            p7.subsumes(&p8, Algorithm::Transposition),
+            p7.subsumes(&p8, Algorithm::Transposition, max_distance),
             "normal(5,2) should subsume special(4,3)"
         );
 
         let p9 = Position::new(5, 2);
         let p10 = Position::new_special(6, 3); // j=6, i=5: (6-5+1)=2 > (3-2)=1 ✗
         assert!(
-            !p9.subsumes(&p10, Algorithm::Transposition),
+            !p9.subsumes(&p10, Algorithm::Transposition, max_distance),
             "normal(5,2) should NOT subsume special(6,3)"
         );
 
@@ -269,7 +272,7 @@ mod tests {
         let p11 = Position::new(5, 2);
         let p12 = Position::new(4, 3);
         assert!(
-            p11.subsumes(&p12, Algorithm::Transposition),
+            p11.subsumes(&p12, Algorithm::Transposition, max_distance),
             "normal(5,2) should subsume normal(4,3) - standard formula"
         );
     }
@@ -277,12 +280,13 @@ mod tests {
     #[test]
     fn test_position_subsumption_merge_split() {
         // MergeAndSplit subsumption tests
+        let max_distance = 3; // Max distance for tests
 
         // lhs special but not rhs: cannot subsume
         let p1 = Position::new_special(5, 2);
         let p2 = Position::new(5, 3);
         assert!(
-            !p1.subsumes(&p2, Algorithm::MergeAndSplit),
+            !p1.subsumes(&p2, Algorithm::MergeAndSplit, max_distance),
             "special(5,2) should NOT subsume normal(5,3) for MergeAndSplit"
         );
 
@@ -290,14 +294,14 @@ mod tests {
         let p3 = Position::new(5, 2);
         let p4 = Position::new(4, 3);
         assert!(
-            p3.subsumes(&p4, Algorithm::MergeAndSplit),
+            p3.subsumes(&p4, Algorithm::MergeAndSplit, max_distance),
             "normal(5,2) should subsume normal(4,3)"
         );
 
         let p5 = Position::new_special(5, 2);
         let p6 = Position::new_special(5, 3);
         assert!(
-            p5.subsumes(&p6, Algorithm::MergeAndSplit),
+            p5.subsumes(&p6, Algorithm::MergeAndSplit, max_distance),
             "special(5,2) should subsume special(5,3)"
         );
     }

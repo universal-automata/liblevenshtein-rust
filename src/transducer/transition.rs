@@ -449,7 +449,7 @@ fn epsilon_closure_mut(
             // Try to insert - State.insert handles deduplication efficiently
             // Only add to to_process if it was actually inserted (new position)
             let len_before = state.len();
-            state.insert(deleted, algorithm);
+            state.insert(deleted, algorithm, query_length);
             if state.len() > len_before {
                 to_process.push(deleted);
             }
@@ -532,7 +532,7 @@ pub fn transition_state(
         );
 
         for next_pos in next_positions {
-            next_state.insert(next_pos, algorithm);
+            next_state.insert(next_pos, algorithm, query_length);
         }
     }
 
@@ -614,7 +614,7 @@ pub fn transition_state_pooled(
         );
 
         for next_pos in next_positions {
-            next_state.insert(next_pos, algorithm);
+            next_state.insert(next_pos, algorithm, query_length);
         }
     }
 
@@ -638,11 +638,11 @@ pub fn initial_state(query_length: usize, max_distance: usize, algorithm: Algori
     let mut state = State::new();
 
     // Start at position (0, 0) - no errors, beginning of query
-    state.insert(Position::new(0, 0), algorithm);
+    state.insert(Position::new(0, 0), algorithm, query_length);
 
     // Also add positions for initial deletions (skipping query chars)
     for i in 1..=max_distance.min(query_length) {
-        state.insert(Position::new(i, i), algorithm);
+        state.insert(Position::new(i, i), algorithm, query_length);
     }
 
     state
@@ -710,10 +710,11 @@ mod tests {
     #[test]
     fn test_transition_state() {
         let query = b"test";
+        let max_distance = 2;
         let mut state = State::new();
-        state.insert(Position::new(0, 0), Algorithm::Standard);
+        state.insert(Position::new(0, 0), Algorithm::Standard, max_distance);
 
-        let next = transition_state(&state, b't', query, 2, Algorithm::Standard, false);
+        let next = transition_state(&state, b't', query, max_distance, Algorithm::Standard, false);
         assert!(next.is_some());
 
         let next_state = next.unwrap();
