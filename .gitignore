@@ -41,11 +41,19 @@ backend_comparison_*.txt
 fuzzy_map_*.txt
 hierarchical_scope_*.txt
 query_iterator_*.txt
+bench_results_*.txt
+eviction_wrapper_bench_*.txt
+rayon_eval_*.txt
+batch*_*.txt
+*_analysis.md
+fuzzy_multimap_*.txt
+fuzzy_multimap_*.md
 
 # Analysis scripts (temporary/development)
 analyze_*.py
 extract_*.sh
 profile_*.sh
+benchmark_*.sh
 
 # LaTeX artifacts (documentation generation)
 *.aux

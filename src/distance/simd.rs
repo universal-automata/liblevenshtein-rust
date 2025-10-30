@@ -353,6 +353,9 @@ fn min3_scalar(a: u32, b: u32, c: u32) -> u32 {
 }
 
 /// Vectorized min3 using AVX2
+///
+/// Helper function for potential future AVX2 optimizations.
+#[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 unsafe fn min3_avx2(a: __m256i, b: __m256i, c: __m256i) -> __m256i {

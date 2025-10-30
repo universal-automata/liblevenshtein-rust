@@ -187,7 +187,8 @@ pub struct DoubleArrayTrie {
     /// Shared data referenced by all nodes
     shared: DATShared,
 
-    /// Free list for deleted/unused states
+    /// Free list for deleted/unused states (reserved for future dynamic operations)
+    #[allow(dead_code)]
     #[cfg_attr(
         feature = "serialization",
         serde(
@@ -201,6 +202,8 @@ pub struct DoubleArrayTrie {
     term_count: usize,
 
     /// Threshold for triggering rebuild (0.0 to 1.0, e.g., 0.2 = 20% deleted)
+    /// Reserved for future dynamic operations.
+    #[allow(dead_code)]
     rebuild_threshold: f64,
 }
 

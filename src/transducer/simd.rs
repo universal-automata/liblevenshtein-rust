@@ -1216,6 +1216,13 @@ unsafe fn find_edge_label_sse41<T>(
 ///
 /// Requires AVX2 CPU feature. Caller must verify with
 /// `is_x86_feature_detected!("avx2")` before calling.
+///
+/// # Note
+///
+/// Currently unused due to performance analysis showing buffer copy overhead
+/// dominates. Kept for future optimization when pre-extracted label arrays
+/// are implemented. See docs/BATCH2B_PERFORMANCE_ANALYSIS.md for details.
+#[allow(dead_code)]
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 #[target_feature(enable = "avx2")]
 unsafe fn find_edge_label_avx2<T>(
