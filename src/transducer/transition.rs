@@ -178,9 +178,9 @@ fn transition_standard(
             next.push(Position::new(i, e + 1));
         }
     }
-    // Case 2: e == max_distance (at max errors, only exact matches allowed)
-    else if e == max_distance && h < w && cv[h] {
-        next.push(Position::new(i + 1, max_distance));
+    // Case 2: e == query_length (consumed entire query, only exact matches allowed)
+    else if e == query_length && h < w && cv[h] {
+        next.push(Position::new(i + 1, query_length));
     }
 
     next
@@ -253,8 +253,8 @@ fn transition_transposition(
             next.push(Position::new(i, 1));
         }
     }
-    // Case 2: 1 <= e < max_distance
-    else if e >= 1 && e < max_distance {
+    // Case 2: 1 <= e < query_length
+    else if e >= 1 && e < query_length {
         if h + 2 <= w {
             if !t {
                 // Not in transposition state
@@ -301,16 +301,16 @@ fn transition_transposition(
             next.push(Position::new(i, e + 1));
         }
     }
-    // Case 3: e == max_distance (at max errors)
-    else if e == max_distance {
+    // Case 3: e == query_length (consumed entire query)
+    else if e == query_length {
         if h < w && !t {
             if cv[h] {
-                next.push(Position::new(i + 1, max_distance));
+                next.push(Position::new(i + 1, query_length));
             }
-            // else: no transitions at max distance without match
+            // else: no transitions when query is consumed without match
         } else if h + 2 <= w && t && cv[h] {
-            // Complete transposition at max distance
-            next.push(Position::new(i + 2, max_distance));
+            // Complete transposition when query is consumed
+            next.push(Position::new(i + 2, query_length));
         }
     }
 
@@ -402,15 +402,15 @@ fn transition_merge_split(
             next.push(Position::new(i, e + 1));
         }
     }
-    // Case 3: e == max_distance (at max errors)
-    else if e == max_distance && h < w {
+    // Case 3: e == query_length (consumed entire query)
+    else if e == query_length && h < w {
         if !s {
             if cv[h] {
-                next.push(Position::new(i + 1, max_distance));
+                next.push(Position::new(i + 1, query_length));
             }
-            // else: no transitions at max distance without match
+            // else: no transitions when query is consumed without match
         } else {
-            // Special state: can advance even at max distance (completing split)
+            // Special state: can advance even at query_length (completing split)
             next.push(Position::new(i + 1, e));
         }
     }
