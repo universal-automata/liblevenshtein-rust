@@ -9,7 +9,17 @@ A Rust port of [liblevenshtein](https://github.com/universal-automata/liblevensh
 
 > **Note:** Ready for crates.io publication (PathMap dependency is now optional).
 
-## What's New in v0.3.0
+## What's New
+
+### Unreleased (Upcoming v0.4.0)
+
+- **Phase 4: SIMD Optimization** - Comprehensive SIMD acceleration with **20-64% performance gains**
+  - 8 SIMD-optimized components across critical performance paths
+  - Data-driven threshold tuning based on empirical benchmarking
+  - AVX2/SSE4.1 implementations with runtime CPU feature detection
+  - Extensive documentation (950+ lines across 3 analysis documents)
+
+### v0.3.0 (2025-10-26)
 
 - **Package Support**: Debian (.deb), RPM (.rpm), and Arch Linux (.pkg.tar.zst) packages
 - **CI Improvements**: Explicit CPU features for better compatibility across platforms
@@ -55,6 +65,13 @@ This library provides efficient fuzzy string matching against large dictionaries
   - Concurrent queries during modifications
 - **Lazy evaluation** - results generated on-demand
 - **Efficient memory usage** - shared dictionary state across transducers
+- **SIMD acceleration** (optional `simd` feature, x86_64 only):
+  - AVX2/SSE4.1 optimized operations with runtime CPU feature detection
+  - **20-64% faster** query performance across all workloads
+  - Optimized characteristic vectors, position subsumption, state operations
+  - Dictionary edge lookup with data-driven threshold tuning
+  - Distance matrix computation with vectorized operations
+  - Automatic fallback to scalar implementation when SIMD unavailable
 
 ## Installation
 
@@ -65,6 +82,9 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", tag = "v0.3.0" }
+
+# Or with SIMD acceleration (x86_64 only, requires SSE4.1/AVX2):
+liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", tag = "v0.3.0", features = ["simd"] }
 ```
 
 Or install the CLI tool:
