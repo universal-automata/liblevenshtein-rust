@@ -168,6 +168,10 @@ harness = false
 name = "distance_profiling"
 harness = false
 
+[[bench]]
+name = "batch1_simd_benchmarks"
+harness = false
+
 [[bin]]
 name = "liblevenshtein"
 path = "src/bin/liblevenshtein.rs"

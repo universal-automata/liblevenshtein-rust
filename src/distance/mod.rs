@@ -16,7 +16,7 @@ use smallvec::SmallVec;
 use rustc_hash::FxHashMap;
 
 #[cfg(feature = "simd")]
-mod simd;
+pub mod simd;
 
 #[cfg(feature = "eviction-dashmap")]
 use dashmap::DashMap;
@@ -106,7 +106,7 @@ fn substring_from(s: &str, char_offset: usize) -> &str {
 /// This optimization significantly speeds up distance computation for
 /// strings with substantial overlap.
 #[inline(always)]
-pub(crate) fn strip_common_affixes(a: &str, b: &str) -> (usize, usize, usize) {
+pub fn strip_common_affixes(a: &str, b: &str) -> (usize, usize, usize) {
     let a_chars: SmallVec<[char; 32]> = a.chars().collect();
     let b_chars: SmallVec<[char; 32]> = b.chars().collect();
 
