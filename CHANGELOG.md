@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-10-30
+
 ### Added
 
-#### Phase 4: SIMD Optimization (2025-10-30)
+#### Phase 4: SIMD Optimization
 - **Comprehensive SIMD acceleration across critical performance paths**
   - 8 SIMD-optimized components with 20-64% real-world performance gains
   - ~2,300 lines of optimized SIMD code with runtime CPU feature detection

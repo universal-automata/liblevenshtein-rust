@@ -11,7 +11,7 @@ A Rust port of [liblevenshtein](https://github.com/universal-automata/liblevensh
 
 ## What's New
 
-### Unreleased (Upcoming v0.4.0)
+### v0.4.0 (2025-10-30)
 
 - **Phase 4: SIMD Optimization** - Comprehensive SIMD acceleration with **20-64% performance gains**
   - 8 SIMD-optimized components across critical performance paths
