@@ -13,6 +13,8 @@ readme = "README.md"
 
 [dependencies]
 # PathMap as an optional dictionary backend
+# NOTE: PathMap uses a git dependency and is NOT available when installing from crates.io
+# To use PathMap, build from source: cargo install --git <repo-url> --features pathmap-backend
 pathmap = { git = "https://github.com/Adam-Vandervorst/PathMap.git", branch = "master", optional = true }
 # SmallVec for stack-allocated vectors (performance optimization)
 smallvec = "1.13"
