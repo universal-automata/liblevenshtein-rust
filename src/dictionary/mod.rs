@@ -197,11 +197,8 @@ pub trait MappedDictionary: Dictionary {
     fn get_value(&self, term: &str) -> Option<Self::Value> {
         // Default implementation: traverse to find the term, but return no value
         // (for backward compatibility with non-mapped dictionaries)
-        if self.contains(term) {
-            None
-        } else {
-            None
-        }
+        let _ = self.contains(term);
+        None
     }
 
     /// Check if a term exists and its value matches a predicate
@@ -212,7 +209,7 @@ pub trait MappedDictionary: Dictionary {
     where
         F: Fn(&Self::Value) -> bool,
     {
-        self.get_value(term).map_or(false, |v| predicate(&v))
+        self.get_value(term).is_some_and(|v| predicate(&v))
     }
 }
 

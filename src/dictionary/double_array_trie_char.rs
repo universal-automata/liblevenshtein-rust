@@ -23,7 +23,7 @@
 //! - Edit distance must be measured in characters, not bytes
 //! - Correctness is more important than maximum performance
 
-use crate::dictionary::{CharUnit, Dictionary, DictionaryNode};
+use crate::dictionary::{Dictionary, DictionaryNode};
 use std::sync::Arc;
 
 #[cfg(feature = "serialization")]

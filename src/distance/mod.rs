@@ -576,7 +576,7 @@ pub fn transposition_distance_recursive(source: &str, target: &str, cache: &Memo
 
         // Check for transposition
         // Requires at least 2 chars remaining in both strings
-        if s.len() > 0 && t.len() > 0 {
+        if !s.is_empty() && !t.is_empty() {
             let s_chars: SmallVec<[char; 32]> = s.chars().collect();
             let t_chars: SmallVec<[char; 32]> = t.chars().collect();
 
