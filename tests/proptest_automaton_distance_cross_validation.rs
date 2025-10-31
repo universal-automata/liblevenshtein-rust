@@ -203,14 +203,23 @@ proptest! {
     }
 
     /// Test with Unicode strings (Standard algorithm)
+    ///
+    /// Note: Uses DoubleArrayTrieChar for character-level matching to match
+    /// the character-level distance function behavior.
     #[test]
     fn prop_standard_unicode_matches(
         dict_words in prop::collection::vec(unicode_word_strategy(), 1..=10),
         query in unicode_word_strategy(),
         max_dist in 0usize..=2
     ) {
+        use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+
         let linear_results = linear_scan_standard(&dict_words, &query, max_dist);
-        let automaton_results = automaton_query(&dict_words, &query, max_dist, Algorithm::Standard);
+
+        // Use character-level dictionary for Unicode to match character-level distance function
+        let dict = DoubleArrayTrieChar::from_terms(dict_words.clone());
+        let transducer = Transducer::new(dict, Algorithm::Standard);
+        let automaton_results: HashSet<String> = transducer.query(&query, max_dist).collect();
 
         prop_assert_eq!(
             automaton_results,

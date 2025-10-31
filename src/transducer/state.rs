@@ -206,13 +206,20 @@ impl State {
         // Fast path: single position (common case)
         if self.positions.len() == 1 {
             let p = &self.positions[0];
+            // Skip special positions (transposition/merge-split intermediate states)
+            if p.is_special {
+                return None;
+            }
             let remaining = query_length.saturating_sub(p.term_index);
             return Some(p.num_errors + remaining);
         }
 
-        // General case: find minimum across all positions
+        // General case: find minimum across all NON-SPECIAL positions
+        // Special positions are intermediate states for transposition/merge/split
+        // and should not contribute to the final distance calculation
         self.positions
             .iter()
+            .filter(|p| !p.is_special)  // CRITICAL: Skip special positions
             .map(|p| {
                 // Distance is errors already accumulated plus remaining chars
                 let remaining = query_length.saturating_sub(p.term_index);

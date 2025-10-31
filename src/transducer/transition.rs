@@ -355,7 +355,10 @@ fn transition_merge_split(
                 next.push(Position::new(i, e + 1)); // insertion
                 next.push(Position::new_special(i, e + 1)); // split start
                 next.push(Position::new(i + 1, e + 1)); // substitution
-                next.push(Position::new(i + 2, e + 1)); // merge (skip 2 query chars)
+                // Merge operation: skip 2 query chars (only if we have 2 chars available)
+                if i + 2 <= query_length {
+                    next.push(Position::new(i + 2, e + 1));
+                }
             }
         } else if h + 1 == w {
             if cv[h] {
@@ -380,7 +383,10 @@ fn transition_merge_split(
                     next.push(Position::new(i, e + 1));
                     next.push(Position::new_special(i, e + 1));
                     next.push(Position::new(i + 1, e + 1));
-                    next.push(Position::new(i + 2, e + 1));
+                    // Merge operation: skip 2 query chars (only if we have 2 chars available)
+                    if i + 2 <= query_length {
+                        next.push(Position::new(i + 2, e + 1));
+                    }
                 }
             } else {
                 // In special state (completing split)

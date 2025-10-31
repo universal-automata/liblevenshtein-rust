@@ -150,13 +150,20 @@ impl Position {
             }
 
             Algorithm::MergeAndSplit => {
-                // From C++ subsumes.cpp lines 41-56
-                if s && !t {
-                    // lhs special but not rhs: cannot subsume
+                // From C++ subsumes.cpp lines 41-56, with critical fix:
+                // The C++/Java implementations have a bug where non-special positions
+                // can subsume special positions, preventing split/merge from working.
+                //
+                // Correct logic: Special and non-special positions represent different
+                // computational paths and should not subsume each other.
+                if s != t {
+                    // One is special, the other is not: cannot subsume
+                    // This prevents (i, e, false) from subsuming (i, e, true)
+                    // which would block split/merge operations from being explored
                     return false;
                 }
 
-                // Otherwise: standard formula
+                // Both special or both non-special: standard formula
                 let index_diff = i.abs_diff(j);
                 let error_diff = f - e;
                 index_diff <= error_diff
