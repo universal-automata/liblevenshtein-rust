@@ -372,6 +372,8 @@ See [`docs/BUILD.md`](docs/BUILD.md) for comprehensive CLI documentation.
 
 The library is highly optimized for performance:
 
+### Core Optimizations
+
 - **Arc Path Sharing**: Eliminated expensive cloning operations during traversal
 - **StatePool**: Object pool pattern for state reuse with exceptional performance gains
 - **SmallVec Integration**: Stack-allocated vectors reduce heap allocation pressure
@@ -379,6 +381,41 @@ The library is highly optimized for performance:
 - **Aggressive Inlining**: Hot path functions inlined for optimal performance
 
 Benchmarks show 3.3x speedup for DAWG operations and 5-18% improvements across filtering/prefix scenarios.
+
+### SIMD Acceleration (optional `simd` feature)
+
+When compiled with the `simd` feature on x86_64 platforms, the library achieves **20-64% performance gains** through:
+
+- **8 SIMD-optimized components** across critical performance paths
+- **AVX2/SSE4.1 implementations** with runtime CPU feature detection
+- **Data-driven threshold tuning** based on empirical benchmarking
+- **Automatic fallback** to scalar implementation when SIMD unavailable
+
+Key optimizations:
+- Characteristic vector operations (vectorized bit manipulation)
+- Position subsumption checking (parallel state comparisons)
+- State operations (vectorized distance computations)
+- Dictionary edge lookups (batched queries with adaptive thresholds)
+- Distance matrix computation (vectorized row/column operations)
+
+Performance improvements vary by workload:
+- Small dictionaries (< 1,000 terms): 20-30% faster
+- Medium dictionaries (1,000-10,000 terms): 30-45% faster
+- Large dictionaries (> 10,000 terms): 45-64% faster
+
+See `docs/analysis/` for detailed SIMD performance analysis (950+ lines of documentation).
+
+### Unicode Performance
+
+Character-level dictionary variants (`*Char`) for Unicode support:
+- **~5% overhead** for UTF-8 decoding during traversal
+- **4x memory** for edge labels (4 bytes per `char` vs 1 byte per `u8`)
+- **Zero-cost abstraction** via monomorphization (no runtime polymorphism)
+- Same query performance characteristics as byte-level variants
+
+When to use:
+- ✅ Use `*Char` variants for multi-language dictionaries with non-ASCII Unicode
+- ✅ Use byte-level variants (`DoubleArrayTrie`, `PathMapDictionary`) for ASCII/Latin-1 content
 
 ## Theoretical Background
 
