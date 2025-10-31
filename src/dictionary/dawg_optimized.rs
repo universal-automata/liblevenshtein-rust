@@ -100,7 +100,7 @@ impl OptimizedDawgNode {
             #[cfg(feature = "simd")]
             {
                 use crate::transducer::simd::find_edge_label_simd;
-                return find_edge_label_simd(edges, label).map(|idx| edges[idx].1);
+                find_edge_label_simd(edges, label).map(|idx| edges[idx].1)
             }
 
             // Scalar fallback (when simd feature disabled)

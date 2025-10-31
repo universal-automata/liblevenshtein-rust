@@ -295,9 +295,7 @@ where
             .peekable();
 
         // Check if we have any results before aggregating
-        if values.peek().is_none() {
-            return None;
-        }
+        values.peek()?;
 
         // Aggregate using collection-specific logic
         Some(C::aggregate(values))

@@ -417,7 +417,7 @@ unsafe fn check_subsumption_sse41<'a>(
     count: usize,
     results: &'a mut [bool; 8],
 ) -> &'a [bool] {
-    debug_assert!(count >= 4 && count <= 8);
+    debug_assert!((4..=8).contains(&count));
 
     // Process first 4 with SIMD
     let mut lhs_i_buf = [0u32; 4];
@@ -836,7 +836,7 @@ unsafe fn find_minimum_avx2(values: &[usize]) -> usize {
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse4.1")]
 unsafe fn find_minimum_sse41(values: &[usize], count: usize) -> usize {
-    debug_assert!(count >= 4 && count <= 8);
+    debug_assert!((4..=8).contains(&count));
 
     // Process first 4 values with SIMD
     let mut buf = [0u32; 4];
