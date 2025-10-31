@@ -463,9 +463,160 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --verbose --allow-dirty
 
+  test-crates-io:
+    name: Test crates.io package
+    needs: publish-crates-io
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Wait for crates.io to update
+        run: |
+          echo "Waiting 60 seconds for crates.io to propagate the new version..."
+          sleep 60
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Installing version: $VERSION"
+
+      - name: Install library from crates.io
+        run: |
+          cargo install liblevenshtein --version ${{ steps.version.outputs.version }} --verbose
+
+      - name: Test CLI functionality
+        run: |
+          # Test CLI is available
+          which liblevenshtein
+          liblevenshtein --version
+          liblevenshtein --help
+
+          # Create test dictionary
+          echo -e "test\ntesting\ntested\ntester\nbest\nrest" > /tmp/test-dict.txt
+
+          # Test basic query
+          echo "Testing basic query..."
+          liblevenshtein query "tset" --dict /tmp/test-dict.txt -m 2 | tee /tmp/results.txt
+
+          # Verify we got expected results
+          if grep -q "test" /tmp/results.txt; then
+            echo "✓ Basic query test passed!"
+          else
+            echo "✗ Basic query test failed - 'test' not found in results"
+            exit 1
+          fi
+
+      - name: Create test project
+        run: |
+          # Create a new cargo project to test library usage
+          cargo new --lib test-liblevenshtein
+          cd test-liblevenshtein
+
+          # Add liblevenshtein as dependency
+          cat >> Cargo.toml <<EOF
+
+          [dependencies]
+          liblevenshtein = "${{ steps.version.outputs.version }}"
+          EOF
+
+          # Create a test file
+          cat > src/lib.rs <<'EOF'
+          use liblevenshtein::prelude::*;
+
+          #[test]
+          fn test_basic_usage() {
+              let dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "tested"]);
+              let transducer = Transducer::new(dict, Algorithm::Standard);
+
+              let results: Vec<String> = transducer.query("tset", 2).collect();
+              assert!(!results.is_empty(), "Should find matches");
+              assert!(results.contains(&"test".to_string()), "Should find 'test'");
+          }
+
+          #[test]
+          fn test_unicode_support() {
+              let dict = DoubleArrayTrieChar::from_terms(vec!["café", "naïve"]);
+              let transducer = Transducer::new(dict, Algorithm::Standard);
+
+              let results: Vec<String> = transducer.query("cafe", 1).collect();
+              assert!(!results.is_empty(), "Should find Unicode matches");
+          }
+
+          #[test]
+          fn test_algorithms() {
+              let dict = DoubleArrayTrie::from_terms(vec!["test", "best"]);
+
+              // Test all algorithms compile and run
+              let _ = Transducer::new(dict.clone(), Algorithm::Standard);
+              let _ = Transducer::new(dict.clone(), Algorithm::Transposition);
+              let _ = Transducer::new(dict, Algorithm::MergeAndSplit);
+          }
+          EOF
+
+          # Run tests
+          cargo test --verbose
+
+      - name: Test serialization feature
+        run: |
+          cd test-liblevenshtein
+
+          # Update Cargo.toml to include serialization
+          cat > Cargo.toml <<EOF
+          [package]
+          name = "test-liblevenshtein"
+          version = "0.1.0"
+          edition = "2021"
+
+          [dependencies]
+          liblevenshtein = { version = "${{ steps.version.outputs.version }}", features = ["serialization"] }
+          EOF
+
+          # Test serialization
+          cat > src/lib.rs <<'EOF'
+          use liblevenshtein::prelude::*;
+          use liblevenshtein::serialization::{DictionarySerializer, Format};
+
+          #[test]
+          fn test_serialization() {
+              let dict = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
+
+              // Serialize to bytes
+              let mut buffer = Vec::new();
+              dict.serialize(&mut buffer, Format::Bincode).unwrap();
+
+              assert!(!buffer.is_empty(), "Should serialize to non-empty buffer");
+
+              // Deserialize
+              let loaded: DoubleArrayTrie =
+                  DoubleArrayTrie::deserialize(&buffer[..], Format::Bincode).unwrap();
+
+              assert_eq!(loaded.len(), Some(2), "Should have 2 terms after deserialization");
+          }
+          EOF
+
+          cargo test --verbose
+
+      - name: Report success
+        run: |
+          echo "✅ All crates.io sanity checks passed!"
+          echo ""
+          echo "Verified:"
+          echo "  - Package installs from crates.io"
+          echo "  - CLI tool works correctly"
+          echo "  - Library API functions properly"
+          echo "  - Unicode support works"
+          echo "  - All algorithms available"
+          echo "  - Serialization feature works"
+
   create-release:
     name: Create GitHub Release
-    needs: [build-matrix, package-deb, package-rpm, package-arch, test-deb-package, test-rpm-package, test-arch-package, publish-crates-io]
+    needs: [build-matrix, package-deb, package-rpm, package-arch, test-deb-package, test-rpm-package, test-arch-package, test-crates-io]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
