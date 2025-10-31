@@ -402,7 +402,7 @@ impl DictionaryNode for DawgDictionaryNode {
                         node_idx: edges[idx].1,
                     });
                 }
-                return None;
+                None
             }
 
             // Scalar fallback (when simd feature disabled)

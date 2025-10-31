@@ -190,8 +190,13 @@ unsafe fn init_row_simd_avx2(row: &mut [u32]) {
     }
 
     // Fill remainder
-    for i in (simd_count * 8)..n {
-        row[i] = i as u32;
+    for (i, cell) in row
+        .iter_mut()
+        .enumerate()
+        .skip(simd_count * 8)
+        .take(n - simd_count * 8)
+    {
+        *cell = i as u32;
     }
 }
 
@@ -217,8 +222,13 @@ unsafe fn init_row_simd_sse41(row: &mut [u32]) {
     }
 
     // Fill remainder
-    for i in (simd_count * 4)..n {
-        row[i] = i as u32;
+    for (i, cell) in row
+        .iter_mut()
+        .enumerate()
+        .skip(simd_count * 4)
+        .take(n - simd_count * 4)
+    {
+        *cell = i as u32;
     }
 }
 

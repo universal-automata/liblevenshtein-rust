@@ -185,7 +185,7 @@ impl State {
             #[cfg(feature = "simd")]
             {
                 let len = self.positions.len();
-                if len >= 4 && len <= 8 {
+                if (4..=8).contains(&len) {
                     let errors: smallvec::SmallVec<[usize; 8]> =
                         self.positions.iter().map(|p| p.num_errors).collect();
                     return super::simd::find_minimum_simd(&errors, len);

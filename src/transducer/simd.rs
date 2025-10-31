@@ -79,9 +79,9 @@ unsafe fn characteristic_vector_avx2<'a>(
 
     // Load 8 query characters (with bounds checking)
     let mut query_buf = [0u8; 32]; // 256-bit = 32 bytes
-    for i in 0..8 {
+    for (i, cell) in query_buf.iter_mut().enumerate().take(8) {
         let query_idx = offset + i;
-        query_buf[i] = if query_idx < query.len() {
+        *cell = if query_idx < query.len() {
             query[query_idx]
         } else {
             0xFF // Out of bounds = use invalid byte that won't match
@@ -98,8 +98,8 @@ unsafe fn characteristic_vector_avx2<'a>(
     let mask = _mm256_movemask_epi8(cmp_result);
 
     // Write results to buffer (first 8 bits of mask)
-    for i in 0..8 {
-        buffer[i] = (mask & (1 << i)) != 0;
+    for (i, cell) in buffer.iter_mut().enumerate().take(8) {
+        *cell = (mask & (1 << i)) != 0;
     }
 
     &buffer[..len]
@@ -124,9 +124,9 @@ unsafe fn characteristic_vector_sse41<'a>(
 
     // Process first 4 characters
     let mut query_buf = [0u8; 4];
-    for i in 0..4 {
+    for (i, cell) in query_buf.iter_mut().enumerate().take(4) {
         let query_idx = offset + i;
-        query_buf[i] = if query_idx < query.len() {
+        *cell = if query_idx < query.len() {
             query[query_idx]
         } else {
             0 // Out of bounds = no match
@@ -142,8 +142,8 @@ unsafe fn characteristic_vector_sse41<'a>(
     let mask = _mm_movemask_epi8(cmp_result);
 
     // Write first 4 results
-    for i in 0..4 {
-        buffer[i] = (mask & (1 << i)) != 0;
+    for (i, cell) in buffer.iter_mut().enumerate().take(4) {
+        *cell = (mask & (1 << i)) != 0;
     }
 
     // Process remaining elements with scalar

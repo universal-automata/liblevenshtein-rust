@@ -10,11 +10,17 @@
 
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+#[cfg(not(feature = "eviction-dashmap"))]
+use std::sync::RwLock;
 
 #[cfg(feature = "eviction-dashmap")]
 use dashmap::DashMap;
+
+#[cfg(not(feature = "eviction-dashmap"))]
 use rustc_hash::FxHashMap;
+
 use smallvec::SmallVec;
 
 #[cfg(feature = "simd")]

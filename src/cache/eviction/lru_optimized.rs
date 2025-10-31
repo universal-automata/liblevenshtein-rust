@@ -14,9 +14,12 @@ use crate::dictionary::{
 use std::sync::Arc;
 
 // Conditional imports based on feature flags
-#[cfg(feature = "eviction-parking-lot")]
+#[cfg(all(feature = "eviction-parking-lot", not(feature = "eviction-dashmap")))]
 use parking_lot::RwLock;
-#[cfg(not(feature = "eviction-parking-lot"))]
+#[cfg(all(
+    not(feature = "eviction-parking-lot"),
+    not(feature = "eviction-dashmap")
+))]
 use std::sync::RwLock;
 
 #[cfg(feature = "eviction-dashmap")]
