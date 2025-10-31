@@ -130,7 +130,11 @@ where
     let mut terms = Vec::with_capacity(est_size);
     let mut current_term = Vec::with_capacity(32); // Most words < 32 bytes
 
-    fn dfs<N: DictionaryNode<Unit = u8>>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
+    fn dfs<N: DictionaryNode<Unit = u8>>(
+        node: &N,
+        current_term: &mut Vec<u8>,
+        terms: &mut Vec<String>,
+    ) {
         if node.is_final() {
             // SAFETY: Dictionary implementations maintain the invariant that
             // all terms are valid UTF-8. We avoid the clone by using

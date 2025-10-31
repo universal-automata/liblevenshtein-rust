@@ -33,7 +33,11 @@ where
     let mut terms = Vec::with_capacity(est_size);
     let mut current_term = Vec::with_capacity(32);
 
-    fn dfs<N: DictionaryNode<Unit = u8>>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
+    fn dfs<N: DictionaryNode<Unit = u8>>(
+        node: &N,
+        current_term: &mut Vec<u8>,
+        terms: &mut Vec<String>,
+    ) {
         if node.is_final() {
             if let Ok(term) = String::from_utf8(current_term.clone()) {
                 terms.push(term);

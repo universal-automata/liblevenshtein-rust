@@ -219,7 +219,7 @@ impl State {
         // and should not contribute to the final distance calculation
         self.positions
             .iter()
-            .filter(|p| !p.is_special)  // CRITICAL: Skip special positions
+            .filter(|p| !p.is_special) // CRITICAL: Skip special positions
             .map(|p| {
                 // Distance is errors already accumulated plus remaining chars
                 let remaining = query_length.saturating_sub(p.term_index);

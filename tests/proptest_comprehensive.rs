@@ -6,8 +6,8 @@
 //! - Cross-backend consistency
 //! - Edge cases and special characters
 
-use liblevenshtein::prelude::*;
 use liblevenshtein::distance::*;
+use liblevenshtein::prelude::*;
 use proptest::prelude::*;
 
 // ============================================================================

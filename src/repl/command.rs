@@ -1136,7 +1136,10 @@ impl Command {
                 Ok(CommandResult::Continue(help_text))
             }
 
-            Self::CacheEnable { strategy: _, max_size: _ } => {
+            Self::CacheEnable {
+                strategy: _,
+                max_size: _,
+            } => {
                 // NOTE: Cache functionality disabled - needs refactoring for new cache API
                 Err(anyhow::anyhow!(
                     "Cache feature temporarily disabled pending API refactoring"

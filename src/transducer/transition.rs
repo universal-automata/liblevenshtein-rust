@@ -353,12 +353,12 @@ fn transition_merge_split(
             } else {
                 // No match - add error operations including merge/split
                 next.push(Position::new(i, e + 1)); // insertion
-                // Split operation: one query char becomes two dict chars (only if we have 1 char available)
+                                                    // Split operation: one query char becomes two dict chars (only if we have 1 char available)
                 if i + 1 <= query_length {
                     next.push(Position::new_special(i, e + 1)); // split start
                 }
                 next.push(Position::new(i + 1, e + 1)); // substitution
-                // Merge operation: skip 2 query chars (only if we have 2 chars available)
+                                                        // Merge operation: skip 2 query chars (only if we have 2 chars available)
                 if i + 2 <= query_length {
                     next.push(Position::new(i + 2, e + 1));
                 }

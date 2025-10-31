@@ -11,7 +11,9 @@
 fn main() {
     println!("=== SIMD Prototype (Disabled) ===\n");
     println!("This example is currently disabled because it requires the `pulp` crate.");
-    println!("The liblevenshtein library has its own SIMD implementation using x86_64 intrinsics.\n");
+    println!(
+        "The liblevenshtein library has its own SIMD implementation using x86_64 intrinsics.\n"
+    );
     println!("To use SIMD in liblevenshtein:");
     println!("  1. Build with: cargo build --features simd");
     println!("  2. The SIMD code is in: src/transducer/simd.rs");

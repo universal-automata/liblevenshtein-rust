@@ -1,5 +1,5 @@
-use liblevenshtein::prelude::*;
 use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+use liblevenshtein::prelude::*;
 
 #[test]
 fn test_empty_query_with_unicode() {
