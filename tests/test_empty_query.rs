@@ -1,11 +1,12 @@
 use liblevenshtein::prelude::*;
+use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
 
 #[test]
 fn test_empty_query_with_unicode() {
     println!("\n=== Test Empty Query with Unicode ===\n");
 
-    // Failing case from proptest
-    let dict = DoubleArrayTrie::from_terms(vec!["¡".to_string()]);
+    // Failing case from proptest - use DoubleArrayTrieChar for character-level semantics
+    let dict = DoubleArrayTrieChar::from_terms(vec!["¡".to_string()]);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     println!("Dictionary: [\"¡\"]");

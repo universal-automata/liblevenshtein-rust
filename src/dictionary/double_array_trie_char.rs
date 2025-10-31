@@ -372,7 +372,7 @@ impl DATBuilderChar {
         }
 
         let char_code = label as u32;
-        let next_state = (base as u32).wrapping_add(char_code) as usize;
+        let mut next_state = (base as u32).wrapping_add(char_code) as usize;
 
         // Ensure next_state exists
         while next_state >= self.base.len() {
@@ -381,6 +381,84 @@ impl DATBuilderChar {
             self.is_final.push(false);
             self.edges.push(vec![]);
             self.used.push(false);
+        }
+
+        // CRITICAL: Check for conflict before overwriting
+        if self.used[next_state] && self.check[next_state] != from_state as i32 {
+            // Conflict! This slot is already used by a different parent.
+            // We need to relocate ALL existing children of from_state to a new base.
+
+            // Collect all existing children
+            let existing_labels = self.edges[from_state].clone();
+            let mut all_labels = existing_labels.clone();
+
+            // Add the new label if not already present
+            if !all_labels.contains(&label) {
+                all_labels.push(label);
+            }
+
+            // Find a new base that works for ALL labels
+            let new_base = self.find_base(&all_labels);
+
+            // Relocate existing transitions
+            for &existing_label in &existing_labels {
+                let old_char_code = existing_label as u32;
+                let old_next = (base as u32).wrapping_add(old_char_code) as usize;
+                let new_next = (new_base as u32).wrapping_add(old_char_code) as usize;
+
+                // Ensure space for new location
+                while new_next >= self.base.len() {
+                    self.base.push(0);
+                    self.check.push(0);
+                    self.is_final.push(false);
+                    self.edges.push(vec![]);
+                    self.used.push(false);
+                }
+
+                // Move the child's data
+                self.base[new_next] = self.base[old_next];
+                self.check[new_next] = from_state as i32;
+                self.is_final[new_next] = self.is_final[old_next];
+                self.edges[new_next] = self.edges[old_next].clone();
+                self.used[new_next] = true;
+
+                // Clear old location (only if it belongs to us)
+                if self.check[old_next] == from_state as i32 {
+                    self.check[old_next] = -1;
+                    self.used[old_next] = false;
+                    self.base[old_next] = 0;
+                    self.is_final[old_next] = false;
+                    self.edges[old_next].clear();
+                }
+
+                // Update any children of this relocated node
+                for &child_label in &self.edges[new_next] {
+                    let child_char_code = child_label as u32;
+                    let child_base = self.base[new_next];
+                    if child_base > 0 {
+                        let child_next = (child_base as u32).wrapping_add(child_char_code) as usize;
+                        if child_next < self.check.len() {
+                            self.check[child_next] = new_next as i32;
+                        }
+                    }
+                }
+            }
+
+            // Update the parent's base
+            self.base[from_state] = new_base;
+            base = new_base;
+
+            // Recalculate next_state with new base
+            next_state = (base as u32).wrapping_add(char_code) as usize;
+
+            // Ensure next_state exists
+            while next_state >= self.base.len() {
+                self.base.push(0);
+                self.check.push(0);
+                self.is_final.push(false);
+                self.edges.push(vec![]);
+                self.used.push(false);
+            }
         }
 
         // Set CHECK and mark as used
