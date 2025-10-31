@@ -19,6 +19,7 @@
 //! ```rust
 //! use liblevenshtein::prelude::*;
 //! use liblevenshtein::cache::eviction::Lfu;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([
 //!     ("foo", 42),
@@ -68,6 +69,7 @@ impl EntryMetadata {
 /// ```rust
 /// use liblevenshtein::prelude::*;
 /// use liblevenshtein::cache::eviction::Lfu;
+/// use liblevenshtein::dictionary::MappedDictionary;
 ///
 /// let dict = PathMapDictionary::from_terms_with_values([
 ///     ("hello", 1),

@@ -46,6 +46,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::Lru;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([
@@ -64,6 +65,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::{Lru, Ttl};
 //! use std::time::Duration;
 //!
@@ -83,6 +85,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::MemoryPressure;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([

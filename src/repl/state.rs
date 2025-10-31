@@ -16,18 +16,24 @@ use crate::transducer::Algorithm;
 use anyhow::Result;
 use std::path::Path;
 
-#[cfg(feature = "pathmap-backend")]
-use crate::cache::strategy::*;
-#[cfg(feature = "pathmap-backend")]
-use crate::cache::{FuzzyCache, FuzzyCacheBuilder};
+// NOTE: The old FuzzyCache API has been refactored. The REPL cache functionality
+// needs to be updated to use the new eviction wrapper API.
+// #[cfg(feature = "pathmap-backend")]
+// use crate::cache::strategy::*;
+// #[cfg(feature = "pathmap-backend")]
+// use crate::cache::{FuzzyCache, FuzzyCacheBuilder};
 
 /// Helper to extract all terms from any dictionary using DFS
-fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
+fn extract_terms<D>(dict: &D) -> Vec<String>
+where
+    D: Dictionary,
+    D::Node: DictionaryNode<Unit = u8>,
+{
     let est_size = dict.len().unwrap_or(100);
     let mut terms = Vec::with_capacity(est_size);
     let mut current_term = Vec::with_capacity(32);
 
-    fn dfs<N: DictionaryNode>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
+    fn dfs<N: DictionaryNode<Unit = u8>>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
         if node.is_final() {
             if let Ok(term) = String::from_utf8(current_term.clone()) {
                 terms.push(term);
@@ -281,22 +287,11 @@ impl DictContainer {
 }
 
 /// Cache container for different eviction strategies
-#[cfg(feature = "pathmap-backend")]
+/// TODO: Update to use new eviction wrapper API (cache::eviction module)
+#[cfg(all(feature = "pathmap-backend", not(feature = "pathmap-backend")))] // Disabled - needs refactor
 pub enum CacheContainer {
-    /// Least Recently Used (LRU) eviction strategy
-    Lru(FuzzyCache<String, LruStrategy<String>>),
-    /// Least Frequently Used (LFU) eviction strategy
-    Lfu(FuzzyCache<String, LfuStrategy>),
-    /// Time-To-Live (TTL) eviction strategy
-    Ttl(FuzzyCache<String, TtlStrategy>),
-    /// Age-based eviction strategy
-    Age(FuzzyCache<String, AgeStrategy>),
-    /// Cost-aware eviction strategy (balances age, size, hits)
-    CostAware(FuzzyCache<String, CostAwareStrategy>),
-    /// Memory pressure-based eviction strategy
-    MemoryPressure(FuzzyCache<String, MemoryPressureStrategy>),
-    /// Manual eviction strategy (FIFO when full)
-    Manual(FuzzyCache<String, ManualStrategy>),
+    /// Placeholder - old FuzzyCache API removed
+    _Disabled,
 }
 
 /// REPL state
@@ -323,8 +318,8 @@ pub struct ReplState {
     pub auto_sync_path: Option<std::path::PathBuf>,
     /// Custom config file path
     pub config_file_path: Option<std::path::PathBuf>,
-    /// Optional fuzzy cache
-    #[cfg(feature = "pathmap-backend")]
+    /// Optional fuzzy cache - DISABLED: needs refactor for new cache API
+    #[cfg(all(feature = "pathmap-backend", not(feature = "pathmap-backend")))]
     pub cache: Option<CacheContainer>,
 }
 
@@ -349,8 +344,6 @@ impl ReplState {
             auto_sync: false,
             auto_sync_path: None,
             config_file_path: None,
-            #[cfg(feature = "pathmap-backend")]
-            cache: None,
         }
     }
 
@@ -460,8 +453,8 @@ impl ReplState {
 
     /// Query the dictionary
     pub fn query(&self, term: &str) -> Vec<(String, usize)> {
-        // Try cache first (only works with PathMap backend)
-        #[cfg(feature = "pathmap-backend")]
+        // NOTE: Cache functionality disabled - needs refactoring for new cache API
+        #[cfg(all(feature = "pathmap-backend", not(feature = "pathmap-backend")))]
         if let (Some(cache), DictContainer::PathMap(_)) = (&self.cache, &self.dictionary) {
             // Use cache.query() which returns Vec<Candidate>
             let candidates = match cache {
@@ -529,7 +522,8 @@ impl ReplState {
     }
 
     /// Enable fuzzy cache with specified strategy
-    #[cfg(feature = "pathmap-backend")]
+    /// NOTE: Cache functionality disabled - needs refactoring for new cache API
+    #[cfg(all(feature = "pathmap-backend", not(feature = "pathmap-backend")))]
     pub fn enable_cache(&mut self, strategy: &str, max_size: Option<usize>) -> Result<()> {
         use std::time::Duration;
 
@@ -599,13 +593,15 @@ impl ReplState {
     }
 
     /// Disable fuzzy cache
-    #[cfg(feature = "pathmap-backend")]
+    /// NOTE: Cache functionality disabled - needs refactoring for new cache API
+    #[cfg(all(feature = "pathmap-backend", not(feature = "pathmap-backend")))]
     pub fn disable_cache(&mut self) {
         self.cache = None;
     }
 
     /// Get cache statistics
-    #[cfg(feature = "pathmap-backend")]
+    /// NOTE: Cache functionality disabled - needs refactoring for new cache API
+    #[cfg(all(feature = "pathmap-backend", not(feature = "pathmap-backend")))]
     pub fn cache_stats(&self) -> String {
         if let Some(cache) = &self.cache {
             let (capacity, size, metrics_report) = match cache {
@@ -628,7 +624,8 @@ impl ReplState {
     }
 
     /// Clear cache
-    #[cfg(feature = "pathmap-backend")]
+    /// NOTE: Cache functionality disabled - needs refactoring for new cache API
+    #[cfg(all(feature = "pathmap-backend", not(feature = "pathmap-backend")))]
     pub fn clear_cache(&mut self) -> Result<()> {
         if let Some(cache) = &mut self.cache {
             match cache {

@@ -1,6 +1,6 @@
 # Feature Documentation
 
-**Version**: 0.2.0
+**Version**: 0.4.0
 **Last Updated**: 2025-10-25
 
 This document describes all features available in liblevenshtein-rust.
@@ -95,7 +95,7 @@ for candidate in transducer.query_with_distance("test", 2) {
 }
 ```
 
-#### Ordered Query Iterator (v0.2.0)
+#### Ordered Query Iterator (v0.4.0)
 - **Distance-first ordering**: Results sorted by edit distance, then lexicographically
 - **Perfect for code completion**: Most relevant results first
 - **Usage**:
@@ -109,7 +109,7 @@ for candidate in transducer.query_ordered("aple", 1) {
 //   apply: 1
 ```
 
-#### Filtering and Prefix Matching (v0.2.0)
+#### Filtering and Prefix Matching (v0.4.0)
 - **Custom filters**: Apply arbitrary predicates to results
 - **Prefix mode**: Match only terms starting with query ± edits
 - **Optimized**: Bitmap masking for efficient context filtering
@@ -149,7 +149,7 @@ use liblevenshtein::prelude::*;
 use liblevenshtein::serialization::*;
 use std::fs::File;
 
-// Save dictionary with compression (v0.2.0)
+// Save dictionary with compression (v0.4.0)
 let dict = PathMapDictionary::from_iter(vec!["test", "testing"]);
 let file = File::create("dict.bin.gz")?;
 GzipSerializer::<BincodeSerializer>::serialize(&dict, file)?;
@@ -189,7 +189,7 @@ liblevenshtein query "aple" \\
     -s  # Show distances
 ```
 
-2. **Convert**: Between formats and backends (v0.2.0)
+2. **Convert**: Between formats and backends (v0.4.0)
 ```bash
 # Convert to compressed format
 liblevenshtein convert words.txt words.bin.gz \\
@@ -202,7 +202,7 @@ liblevenshtein convert dict.bin dict-dawg.bin \\
     --to-backend dawg
 ```
 
-3. **Insert/Delete**: Runtime dictionary updates (v0.2.0)
+3. **Insert/Delete**: Runtime dictionary updates (v0.4.0)
 ```bash
 # Insert terms
 liblevenshtein insert "newterm" --dict dict.bin
@@ -211,7 +211,7 @@ liblevenshtein insert "newterm" --dict dict.bin
 liblevenshtein delete "oldterm" --dict dict.bin
 ```
 
-4. **REPL**: Interactive exploration (v0.2.0)
+4. **REPL**: Interactive exploration (v0.4.0)
 ```bash
 liblevenshtein repl --dict words.bin.gz --format bincode-gz
 ```
@@ -221,7 +221,7 @@ liblevenshtein repl --dict words.bin.gz --format bincode-gz
 liblevenshtein info --dict words.txt --backend path-map
 ```
 
-**Format Support** (v0.2.0):
+**Format Support** (v0.4.0):
 - Text (`--format text` or `.txt`)
 - Bincode (`--format bincode` or `.bin`)
 - JSON (`--format json` or `.json`)
@@ -245,9 +245,9 @@ All examples can be run with `cargo run --example <name>`:
 1. **serialization**: Dictionary save/load demo
 2. **dawg_demo**: DAWG vs PathMap comparison
 3. **builder_demo**: TransducerBuilder usage
-4. **code_completion_demo** (v0.2.0): IDE-style autocomplete with filtering
-5. **advanced_contextual_filtering** (v0.2.0): Bitmap masking for context switching
-6. **contextual_filtering_optimization** (v0.2.0): Performance comparison of filtering strategies
+4. **code_completion_demo** (v0.4.0): IDE-style autocomplete with filtering
+5. **advanced_contextual_filtering** (v0.4.0): Bitmap masking for context switching
+6. **contextual_filtering_optimization** (v0.4.0): Performance comparison of filtering strategies
 7. **dynamic_dictionary**: Runtime dictionary updates with thread safety
 
 ## Performance

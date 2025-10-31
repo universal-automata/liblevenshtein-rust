@@ -1,38 +1,28 @@
-//! Simple prototype to test pulp SIMD functionality
+//! Simple prototype to demonstrate SIMD concepts
 //!
-//! This demonstrates basic pulp usage for vectorized operations.
-//! Run with: cargo run --example simd_prototype --features simd
-
-#[cfg(feature = "simd")]
-use pulp::Arch;
+//! NOTE: This example is disabled because it requires the `pulp` crate which is not
+//! currently a dependency. The liblevenshtein library has its own SIMD implementation
+//! in src/transducer/simd.rs that uses x86_64 intrinsics directly.
+//!
+//! To see the actual SIMD implementation, check:
+//! - src/transducer/simd.rs
+//! - Enable with: cargo build --features simd
 
 fn main() {
-    #[cfg(feature = "simd")]
-    {
-        println!("Testing pulp SIMD functionality...\n");
-
-        // Detect available CPU features
-        let arch = Arch::new();
-        println!("CPU Architecture detected: {:?}", arch);
-        println!("Available SIMD features:");
-        println!("  - Has AVX2: {}", cfg!(target_feature = "avx2"));
-        println!("  - Has SSE2: {}", cfg!(target_feature = "sse2"));
-        println!("\n");
-
-        // Test simple vectorized addition
-        test_vectorized_add();
-
-        // Test vectorized minimum (relevant for Levenshtein)
-        test_vectorized_min();
-    }
-
-    #[cfg(not(feature = "simd"))]
-    {
-        println!("SIMD feature not enabled!");
-        println!("Run with: cargo run --example simd_prototype --features simd");
-    }
+    println!("=== SIMD Prototype (Disabled) ===\n");
+    println!("This example is currently disabled because it requires the `pulp` crate.");
+    println!("The liblevenshtein library has its own SIMD implementation using x86_64 intrinsics.\n");
+    println!("To use SIMD in liblevenshtein:");
+    println!("  1. Build with: cargo build --features simd");
+    println!("  2. The SIMD code is in: src/transducer/simd.rs");
+    println!("  3. Run benchmarks with: cargo bench --features simd\n");
+    println!("If you want to enable this example, add `pulp` to Cargo.toml dependencies.");
 }
 
+// The code below is commented out because it requires the `pulp` crate
+// which is not currently a dependency. Uncomment if you add pulp to Cargo.toml.
+
+/*
 #[cfg(feature = "simd")]
 fn test_vectorized_add() {
     use pulp::{Arch, Simd, WithSimd};
@@ -125,3 +115,4 @@ fn test_vectorized_min() {
     let correct = min_result == expected;
     println!("Correct: {}\n", correct);
 }
+*/

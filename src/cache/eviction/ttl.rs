@@ -22,6 +22,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::Ttl;
 //! use std::time::Duration;
 //!
@@ -79,6 +80,7 @@ impl EntryMetadata {
 ///
 /// ```rust
 /// use liblevenshtein::prelude::*;
+/// use liblevenshtein::dictionary::MappedDictionary;
 /// use liblevenshtein::cache::eviction::Ttl;
 /// use std::time::Duration;
 ///

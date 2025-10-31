@@ -26,7 +26,7 @@
 
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{
-    CharUnit, Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy,
+    Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy,
 };
 use pathmap::utils::BitMask;
 use pathmap::zipper::{Zipper, ZipperMoving, ZipperValues};

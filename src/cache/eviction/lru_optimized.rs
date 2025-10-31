@@ -87,10 +87,23 @@ impl EntryMetadata {
             }
         }
 
-        #[cfg(feature = "eviction-compact-metadata")]
+        #[cfg(all(
+            feature = "eviction-compact-metadata",
+            not(feature = "eviction-coarse-timestamps")
+        ))]
         {
             Self {
                 last_accessed_ms: get_timestamp_ms(),
+            }
+        }
+
+        #[cfg(all(
+            feature = "eviction-compact-metadata",
+            feature = "eviction-coarse-timestamps"
+        ))]
+        {
+            Self {
+                last_accessed_ms: COARSE_TIMESTAMP_MS.load(Ordering::Relaxed),
             }
         }
     }

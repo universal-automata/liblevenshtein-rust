@@ -65,6 +65,7 @@ pub trait DictionarySerializer {
     fn serialize<D, W>(dict: &D, writer: W) -> Result<(), SerializationError>
     where
         D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
         W: Write;
 
     /// Deserialize a dictionary from a reader.
@@ -119,13 +120,17 @@ pub enum SerializationError {
 ///
 /// **Note**: For suffix automata, use `extract_suffix_automaton_texts()` instead,
 /// as this function would extract all possible substrings rather than source texts.
-pub fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {
+pub fn extract_terms<D>(dict: &D) -> Vec<String>
+where
+    D: Dictionary,
+    D::Node: DictionaryNode<Unit = u8>,
+{
     // Pre-allocate with estimated capacity
     let est_size = dict.len().unwrap_or(100);
     let mut terms = Vec::with_capacity(est_size);
     let mut current_term = Vec::with_capacity(32); // Most words < 32 bytes
 
-    fn dfs<N: DictionaryNode>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
+    fn dfs<N: DictionaryNode<Unit = u8>>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
         if node.is_final() {
             // SAFETY: Dictionary implementations maintain the invariant that
             // all terms are valid UTF-8. We avoid the clone by using

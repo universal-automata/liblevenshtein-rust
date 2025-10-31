@@ -35,7 +35,7 @@
 //! ```
 
 use super::{extract_terms, DictionaryFromTerms, DictionarySerializer, SerializationError};
-use crate::dictionary::Dictionary;
+use crate::dictionary::{Dictionary, DictionaryNode};
 use std::io::{BufRead, BufReader, Write};
 
 /// Plain text serializer using newline-delimited UTF-8.
@@ -45,6 +45,7 @@ impl DictionarySerializer for PlainTextSerializer {
     fn serialize<D, W>(dict: &D, mut writer: W) -> Result<(), SerializationError>
     where
         D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
         W: Write,
     {
         // Extract all terms from the dictionary

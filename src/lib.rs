@@ -13,6 +13,7 @@
 //!
 //! ```rust,ignore
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //!
 //! let terms = vec!["test", "testing", "tested"];
 //! let dict = PathMapDictionary::from_terms(terms);

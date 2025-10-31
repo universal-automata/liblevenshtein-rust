@@ -1,6 +1,6 @@
 # Performance Optimizations
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 **Last Updated:** 2025-10-26
 
 This document summarizes the key performance optimizations implemented in liblevenshtein-rust.
@@ -279,7 +279,7 @@ See [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md) for planned improvements.
 
 ## References
 
-- **Profiling Guide:** See [`BUILD.md`](../BUILD.md#profiling) for profiling instructions
+- **Profiling Guide:** See [`building.md`](../BUILD.md#profiling) for profiling instructions
 - **Benchmarks:** Run `cargo bench` to see current performance
 - **Examples:** See [`examples/`](../examples/) for real-world usage patterns
-- **Contributing:** See [`CONTRIBUTING.md`](../CONTRIBUTING.md) for optimization guidelines
+- **Contributing:** See [`contributing.md`](../CONTRIBUTING.md) for optimization guidelines

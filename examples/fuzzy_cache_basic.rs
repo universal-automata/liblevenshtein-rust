@@ -12,7 +12,7 @@ fn main() {
 
     // Create a dictionary with LRU eviction tracking
     println!("1. Creating PathMap dictionary with LRU wrapper...");
-    let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested", "hello", "world"]);
+    let dict: PathMapDictionary = PathMapDictionary::from_terms(vec!["test", "testing", "tested", "hello", "world"]);
     let lru_dict = Lru::new(dict);
 
     println!(

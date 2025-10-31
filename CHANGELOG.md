@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+#### Documentation Reorganization (2025-10-31)
+- **Comprehensive documentation restructure for improved discoverability**
+  - Moved 16+ files from project root to organized docs/ subdirectories
+  - Created intuitive directory structure: user-guide/, developer-guide/, design/, research/, bug-reports/, completion-reports/, implementation-status/, benchmarks/, archive/
+  - Clean project root with only essential files (README, CHANGELOG, LICENSE, Cargo.toml, .gitignore)
+
+- **11 new README.md navigation indexes**
+  - Each documentation directory has comprehensive README with file descriptions and navigation
+  - Clear entry points for users, contributors, and researchers
+
+- **4 new comprehensive user guides** (10,000+ lines total)
+  - `getting-started.md` - Installation, basic usage, backend/algorithm selection
+  - `algorithms.md` - Deep dive into Standard, Transposition, and MergeAndSplit algorithms
+  - `backends.md` - Complete backend comparison with performance characteristics
+  - `serialization.md` - Save/load dictionaries with format comparison and best practices
+
+- **Updated all cross-references and internal links**
+  - Fixed main README.md documentation section
+  - Rewrote docs/README.md as comprehensive documentation index
+  - Updated developer-guide references (CONTRIBUTING.md → contributing.md, BUILD.md → building.md)
+  - Corrected all version numbers from v0.2.0/v0.3.0 → v0.4.0
+
+- **Consolidated related documentation**
+  - 9 SIMD research files → research/simd-optimization/
+  - Distance optimization docs → research/distance-optimization/
+  - Bug analysis → bug-reports/
+  - Historical docs → archive/ (benchmarks/, implementation/, optimization/, performance/)
+
 ## [0.4.0] - 2025-10-30
 
 ### Added

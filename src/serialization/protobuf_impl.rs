@@ -43,7 +43,11 @@ impl ProtobufSerializer {
     /// we serialize as a trie structure where each unique path creates
     /// new nodes. For true DAWG serialization with node sharing, we'd
     /// need dictionary implementations to expose node IDs.
-    fn extract_graph<D: Dictionary>(dict: &D) -> proto::Dictionary {
+    fn extract_graph<D>(dict: &D) -> proto::Dictionary
+    where
+        D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
+    {
         // Pre-allocate vectors with estimated capacity
         let est_size = dict.len().unwrap_or(100);
         let mut node_ids = Vec::with_capacity(est_size * 2); // Estimate nodes
@@ -60,7 +64,8 @@ impl ProtobufSerializer {
         next_id += 1;
 
         // DFS to build graph
-        fn dfs<N: DictionaryNode>(
+        // Protobuf serialization only supports byte-level (u8) dictionaries
+        fn dfs<N: DictionaryNode<Unit = u8>>(
             node: &N,
             node_id: u64,
             next_id: &mut u64,
@@ -114,6 +119,7 @@ impl DictionarySerializer for ProtobufSerializer {
     fn serialize<D, W>(dict: &D, mut writer: W) -> Result<(), SerializationError>
     where
         D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
         W: Write,
     {
         use prost::Message;
@@ -231,7 +237,11 @@ pub struct OptimizedProtobufSerializer;
 #[cfg(feature = "protobuf")]
 impl OptimizedProtobufSerializer {
     /// Extract graph structure in optimized format.
-    fn extract_graph_v2<D: Dictionary>(dict: &D) -> proto::DictionaryV2 {
+    fn extract_graph_v2<D>(dict: &D) -> proto::DictionaryV2
+    where
+        D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
+    {
         // Pre-allocate vectors with estimated capacity
         let est_size = dict.len().unwrap_or(100);
         let mut final_node_ids = Vec::with_capacity(est_size); // Estimate final nodes
@@ -246,7 +256,8 @@ impl OptimizedProtobufSerializer {
         next_id += 1;
 
         // DFS to build graph
-        fn dfs<N: DictionaryNode>(
+        // Protobuf serialization only supports byte-level (u8) dictionaries
+        fn dfs<N: DictionaryNode<Unit = u8>>(
             node: &N,
             node_id: u64,
             next_id: &mut u64,
@@ -305,6 +316,7 @@ impl DictionarySerializer for OptimizedProtobufSerializer {
     fn serialize<D, W>(dict: &D, mut writer: W) -> Result<(), SerializationError>
     where
         D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
         W: Write,
     {
         use prost::Message;

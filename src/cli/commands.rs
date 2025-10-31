@@ -688,12 +688,13 @@ fn load_json_gzip_dict(path: &Path, backend: DictionaryBackend) -> Result<DictCo
 /// Extract terms from a dictionary
 fn extract_terms_from_dict<D: Dictionary>(dict: &D) -> Vec<String>
 where
-    D::Node: DictionaryNode,
+    D: Dictionary,
+    D::Node: DictionaryNode<Unit = u8>,
 {
     let mut terms = Vec::new();
     let mut current_term = Vec::new();
 
-    fn dfs<N: DictionaryNode>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
+    fn dfs<N: DictionaryNode<Unit = u8>>(node: &N, current_term: &mut Vec<u8>, terms: &mut Vec<String>) {
         if node.is_final() {
             if let Ok(term) = String::from_utf8(current_term.clone()) {
                 terms.push(term);

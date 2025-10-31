@@ -1,6 +1,6 @@
 //! JSON serializer for human-readable format.
 
-use crate::dictionary::Dictionary;
+use crate::dictionary::{Dictionary, DictionaryNode};
 use std::io::{Read, Write};
 
 use super::{extract_terms, DictionaryFromTerms, DictionarySerializer, SerializationError};
@@ -15,6 +15,7 @@ impl DictionarySerializer for JsonSerializer {
     fn serialize<D, W>(dict: &D, mut writer: W) -> Result<(), SerializationError>
     where
         D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
         W: Write,
     {
         let terms = extract_terms(dict);

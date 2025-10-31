@@ -1,6 +1,6 @@
 # liblevenshtein-rust Architecture
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 **Last Updated:** 2025-10-26
 
 This document describes the architecture and design principles of liblevenshtein-rust.
@@ -608,8 +608,8 @@ See [`docs/FUTURE_ENHANCEMENTS.md`](docs/FUTURE_ENHANCEMENTS.md) for details.
 
 - **Performance:** [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md)
 - **Features:** [`docs/FEATURES.md`](docs/FEATURES.md)
-- **Contributing:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- **Build Guide:** [`BUILD.md`](BUILD.md)
+- **Contributing:** [`contributing.md`](CONTRIBUTING.md)
+- **Build Guide:** [`building.md`](BUILD.md)
 
 ---
 

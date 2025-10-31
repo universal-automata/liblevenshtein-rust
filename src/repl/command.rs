@@ -1136,69 +1136,32 @@ impl Command {
                 Ok(CommandResult::Continue(help_text))
             }
 
-            Self::CacheEnable { strategy, max_size } => {
-                #[cfg(feature = "pathmap-backend")]
-                {
-                    state.enable_cache(strategy, *max_size)?;
-                    let msg = format!(
-                        "Cache enabled with {} strategy{}",
-                        strategy.green().bold(),
-                        max_size
-                            .map(|s| format!(" (max {} entries)", s))
-                            .unwrap_or_default()
-                    );
-                    Ok(CommandResult::Continue(msg))
-                }
-                #[cfg(not(feature = "pathmap-backend"))]
-                {
-                    Err(anyhow::anyhow!(
-                        "Cache feature requires 'pathmap-backend' feature to be enabled"
-                    ))
-                }
+            Self::CacheEnable { strategy: _, max_size: _ } => {
+                // NOTE: Cache functionality disabled - needs refactoring for new cache API
+                Err(anyhow::anyhow!(
+                    "Cache feature temporarily disabled pending API refactoring"
+                ))
             }
 
             Self::CacheDisable => {
-                #[cfg(feature = "pathmap-backend")]
-                {
-                    state.disable_cache();
-                    Ok(CommandResult::Continue(
-                        "Cache disabled".yellow().to_string(),
-                    ))
-                }
-                #[cfg(not(feature = "pathmap-backend"))]
-                {
-                    Err(anyhow::anyhow!(
-                        "Cache feature requires 'pathmap-backend' feature to be enabled"
-                    ))
-                }
+                // NOTE: Cache functionality disabled - needs refactoring for new cache API
+                Err(anyhow::anyhow!(
+                    "Cache feature temporarily disabled pending API refactoring"
+                ))
             }
 
             Self::CacheStats => {
-                #[cfg(feature = "pathmap-backend")]
-                {
-                    let stats = state.cache_stats();
-                    Ok(CommandResult::Continue(stats))
-                }
-                #[cfg(not(feature = "pathmap-backend"))]
-                {
-                    Err(anyhow::anyhow!(
-                        "Cache feature requires 'pathmap-backend' feature to be enabled"
-                    ))
-                }
+                // NOTE: Cache functionality disabled - needs refactoring for new cache API
+                Err(anyhow::anyhow!(
+                    "Cache feature temporarily disabled pending API refactoring"
+                ))
             }
 
             Self::CacheClear => {
-                #[cfg(feature = "pathmap-backend")]
-                {
-                    state.clear_cache()?;
-                    Ok(CommandResult::Continue("Cache cleared".green().to_string()))
-                }
-                #[cfg(not(feature = "pathmap-backend"))]
-                {
-                    Err(anyhow::anyhow!(
-                        "Cache feature requires 'pathmap-backend' feature to be enabled"
-                    ))
-                }
+                // NOTE: Cache functionality disabled - needs refactoring for new cache API
+                Err(anyhow::anyhow!(
+                    "Cache feature temporarily disabled pending API refactoring"
+                ))
             }
 
             Self::Exit => Ok(CommandResult::Exit),

@@ -10,19 +10,15 @@
 
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
+#[cfg(feature = "eviction-dashmap")]
+use dashmap::DashMap;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
 #[cfg(feature = "simd")]
 pub mod simd;
-
-#[cfg(feature = "eviction-dashmap")]
-use dashmap::DashMap;
-
-#[cfg(not(feature = "eviction-dashmap"))]
-use std::sync::RwLock;
 
 /// A symmetric pair of strings for use as cache keys.
 ///

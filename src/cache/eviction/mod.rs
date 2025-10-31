@@ -54,6 +54,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::Lru;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([
@@ -74,6 +75,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::{Lru, Ttl};
 //! use std::time::Duration;
 //!
@@ -93,6 +95,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::MemoryPressure;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([
@@ -114,6 +117,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::CostAware;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([
@@ -139,16 +143,20 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::LazyInit;
 //!
-//! // Dictionary is not created until first access
-//! let lazy = LazyInit::new(|| {
-//!     PathMapDictionary::from_terms_with_values([
-//!         ("deferred", 42),
-//!     ])
+//! // Create dictionary with lazy initializer for missing values
+//! let dict: PathMapDictionary<i32> = PathMapDictionary::from_terms_with_values([
+//!     ("deferred", 42),
+//! ]);
+//!
+//! // Wrap dictionary with lazy initializer
+//! let mut lazy = LazyInit::new(dict, || {
+//!     0i32  // Default value for missing terms
 //! });
 //!
-//! // First access triggers initialization
+//! // Access existing value
 //! assert_eq!(lazy.get_value("deferred"), Some(42));
 //! ```
 //!

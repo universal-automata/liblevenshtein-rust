@@ -317,7 +317,7 @@ where
     /// ]);
     ///
     /// let fuzzy = FuzzyMultiMap::new(dict, Algorithm::Standard);
-    /// assert_eq!(fuzzy.dictionary().len(), 1);
+    /// assert_eq!(fuzzy.dictionary().len(), Some(1));
     /// ```
     pub fn dictionary(&self) -> &D {
         &self.dictionary

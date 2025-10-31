@@ -1,6 +1,6 @@
 //! Gzip compression wrapper for serializers.
 
-use crate::dictionary::Dictionary;
+use crate::dictionary::{Dictionary, DictionaryNode};
 use std::io::{Read, Write};
 
 use super::{DictionaryFromTerms, DictionarySerializer, SerializationError};
@@ -36,6 +36,7 @@ impl<S: DictionarySerializer> DictionarySerializer for GzipSerializer<S> {
     fn serialize<D, W>(dict: &D, writer: W) -> Result<(), SerializationError>
     where
         D: Dictionary,
+        D::Node: DictionaryNode<Unit = u8>,
         W: Write,
     {
         use flate2::write::GzEncoder;

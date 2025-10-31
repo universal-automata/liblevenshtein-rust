@@ -23,6 +23,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::LazyInitDefault;
 //!
 //! let dict = PathMapDictionary::<i32>::from_terms(["foo", "bar"]);
@@ -36,6 +37,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::LazyInitFn;
 //!
 //! fn generate_id() -> u64 {
@@ -44,7 +46,7 @@
 //!     COUNTER.fetch_add(1, Ordering::Relaxed)
 //! }
 //!
-//! let dict = PathMapDictionary::from_terms(["foo", "bar"]);
+//! let dict: PathMapDictionary<u64> = PathMapDictionary::from_terms(["foo", "bar"]);
 //! let lazy = LazyInitFn::new(dict, generate_id);
 //!
 //! // Each access generates a new ID
@@ -55,10 +57,11 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::LazyInit;
 //!
 //! let user_id = "user_123";
-//! let dict = PathMapDictionary::from_terms(["setting1", "setting2"]);
+//! let dict: PathMapDictionary = PathMapDictionary::from_terms(["setting1", "setting2"]);
 //!
 //! let lazy = LazyInit::new(dict, || {
 //!     // Capture context in closure
@@ -231,7 +234,7 @@ impl<D, V> LazyInitFn<D, V> {
     ///
     /// fn zero() -> i32 { 0 }
     ///
-    /// let dict = PathMapDictionary::from_terms(["foo", "bar"]);
+    /// let dict: PathMapDictionary = PathMapDictionary::from_terms(["foo", "bar"]);
     /// let lazy = LazyInitFn::new(dict, zero);
     /// ```
     #[inline]
@@ -360,7 +363,7 @@ impl<D, F> LazyInit<D, F> {
     /// use liblevenshtein::cache::eviction::LazyInit;
     ///
     /// let context = "user_123";
-    /// let dict = PathMapDictionary::from_terms(["setting1", "setting2"]);
+    /// let dict: PathMapDictionary = PathMapDictionary::from_terms(["setting1", "setting2"]);
     ///
     /// let lazy = LazyInit::new(dict, || {
     ///     format!("default_for_{}", context)

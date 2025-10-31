@@ -18,6 +18,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::MemoryPressure;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([
@@ -88,6 +89,7 @@ impl EntryMetadata {
 ///
 /// ```rust
 /// use liblevenshtein::prelude::*;
+/// use liblevenshtein::dictionary::MappedDictionary;
 /// use liblevenshtein::cache::eviction::MemoryPressure;
 ///
 /// let dict = PathMapDictionary::from_terms_with_values([

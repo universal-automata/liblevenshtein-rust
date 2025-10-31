@@ -358,14 +358,16 @@ The CLI auto-detects formats from file extensions and supports:
 - **Backends**: path-map, dawg, dynamic-dawg
 - **Operations**: query, insert, delete, convert, save, info
 
-See [`docs/BUILD.md`](docs/BUILD.md) for comprehensive CLI documentation.
+See [`docs/developer-guide/building.md`](docs/developer-guide/building.md) for comprehensive CLI documentation.
 
 ## Documentation
 
-- **[Building and Testing](docs/BUILD.md)** - Comprehensive build instructions and CLI usage
-- **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to the project
-- **[Features Overview](docs/FEATURES.md)** - Detailed feature documentation
-- **[Publishing Guide](docs/PUBLISHING.md)** - Requirements for publishing to crates.io
+- **[User Guide](docs/user-guide/)** - Getting started, algorithms, backends, and features
+- **[Developer Guide](docs/developer-guide/)** - Architecture, building, contributing, and performance
+- **[Building and Testing](docs/developer-guide/building.md)** - Comprehensive build instructions and CLI usage
+- **[Contributing Guidelines](docs/developer-guide/contributing.md)** - How to contribute to the project
+- **[Features Overview](docs/user-guide/features.md)** - Detailed feature documentation
+- **[Publishing Guide](docs/developer-guide/publishing.md)** - Requirements for publishing to crates.io
 - **[Changelog](CHANGELOG.md)** - Version history and release notes
 
 ## Performance

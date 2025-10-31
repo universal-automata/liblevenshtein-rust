@@ -11,6 +11,7 @@
 //!
 //! ```rust
 //! use liblevenshtein::prelude::*;
+//! use liblevenshtein::dictionary::MappedDictionary;
 //! use liblevenshtein::cache::eviction::Noop;
 //!
 //! let dict = PathMapDictionary::from_terms_with_values([
@@ -53,7 +54,7 @@ impl<D> Noop<D> {
     /// use liblevenshtein::prelude::*;
     /// use liblevenshtein::cache::eviction::Noop;
     ///
-    /// let dict = PathMapDictionary::from_terms(["hello", "world"]);
+    /// let dict: PathMapDictionary = PathMapDictionary::from_terms(["hello", "world"]);
     /// let wrapped = Noop::new(dict);
     /// ```
     #[inline]
@@ -69,7 +70,7 @@ impl<D> Noop<D> {
     /// use liblevenshtein::prelude::*;
     /// use liblevenshtein::cache::eviction::Noop;
     ///
-    /// let dict = PathMapDictionary::from_terms(["hello", "world"]);
+    /// let dict: PathMapDictionary = PathMapDictionary::from_terms(["hello", "world"]);
     /// let wrapped = Noop::new(dict);
     /// let original = wrapped.into_inner();
     /// ```
