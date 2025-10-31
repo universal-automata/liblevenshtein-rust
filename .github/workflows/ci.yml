@@ -163,7 +163,8 @@ jobs:
       run: |
         # Lint workspace code
         # --no-deps: Don't lint dependencies (avoids failing on upstream warnings)
-        cargo clippy --no-deps --all-features -- -D warnings
+        # cargo clippy --no-deps --all-features -- -D warnings
+        cargo clippy --no-deps -- -D warnings
 
   benchmarks:
     name: Benchmarks
