@@ -610,6 +610,8 @@ pub struct DoubleArrayTrieNode {
 }
 
 impl DictionaryNode for DoubleArrayTrieNode {
+    type Unit = u8;
+
     fn is_final(&self) -> bool {
         self.state < self.shared.is_final.len() && self.shared.is_final[self.state]
     }

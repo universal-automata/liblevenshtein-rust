@@ -3,18 +3,23 @@
 //! This module provides traits that abstract over different dictionary
 //! implementations (tries, DAWGs, etc.) for use with Levenshtein automata.
 
+pub mod char_unit;
 pub mod compressed_suffix_automaton;
 pub mod dawg;
 pub mod dawg_optimized;
 pub mod dawg_query;
 pub mod double_array_trie;
+pub mod double_array_trie_char;
 pub mod dynamic_dawg;
 pub mod factory;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap;
+#[cfg(feature = "pathmap-backend")]
+pub mod pathmap_char;
 pub mod suffix_automaton;
 pub mod value;
 
+pub use char_unit::CharUnit;
 pub use value::DictionaryValue;
 
 /// Synchronization strategy for dictionary operations.
@@ -58,8 +63,8 @@ pub trait Dictionary {
     /// Check if a term exists in the dictionary
     fn contains(&self, term: &str) -> bool {
         let mut node = self.root();
-        for byte in term.as_bytes() {
-            match node.transition(*byte) {
+        for unit in <Self::Node as DictionaryNode>::Unit::iter_str(term) {
+            match node.transition(unit) {
                 Some(next) => node = next,
                 None => return false,
             }
@@ -104,21 +109,34 @@ pub trait Dictionary {
 /// Traversable dictionary node.
 ///
 /// Nodes form a graph structure representing the dictionary, where edges
-/// are labeled with bytes (characters) and final nodes mark valid terms.
+/// are labeled with character units (bytes or Unicode characters) and final
+/// nodes mark valid terms.
+///
+/// # Type Parameters
+///
+/// The node is generic over [`CharUnit`], which can be:
+/// - [`u8`] for byte-level matching (faster, ASCII-optimized)
+/// - [`char`] for character-level matching (correct Unicode semantics)
 pub trait DictionaryNode: Clone + Send + Sync {
+    /// The character unit type for edge labels.
+    ///
+    /// Use `u8` for byte-level (existing behavior, fastest).
+    /// Use `char` for character-level (proper Unicode support).
+    type Unit: CharUnit;
+
     /// Check if this node marks the end of a valid term
     fn is_final(&self) -> bool;
 
-    /// Transition to a child node via the given byte
+    /// Transition to a child node via the given character unit
     ///
     /// Returns `None` if no such transition exists
-    fn transition(&self, label: u8) -> Option<Self>;
+    fn transition(&self, label: Self::Unit) -> Option<Self>;
 
-    /// Iterate over all outgoing edges as (byte, child_node) pairs
-    fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_>;
+    /// Iterate over all outgoing edges as (unit, child_node) pairs
+    fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_>;
 
     /// Check if a specific edge exists
-    fn has_edge(&self, label: u8) -> bool {
+    fn has_edge(&self, label: Self::Unit) -> bool {
         self.transition(label).is_some()
     }
 

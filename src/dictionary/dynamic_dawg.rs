@@ -671,6 +671,8 @@ pub struct DynamicDawgNode {
 }
 
 impl DictionaryNode for DynamicDawgNode {
+    type Unit = u8;
+
     fn is_final(&self) -> bool {
         let inner = self.dawg.read().unwrap();
         inner.nodes[self.node_idx].is_final

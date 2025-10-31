@@ -5,7 +5,7 @@
 //! materializing term strings, which can improve performance when many results
 //! match the distance threshold but few match the value filter.
 
-use crate::dictionary::MappedDictionaryNode;
+use crate::dictionary::{CharUnit, MappedDictionaryNode};
 use crate::dictionary::value::DictionaryValue;
 use crate::transducer::{Algorithm, Candidate, Intersection, StatePool};
 use crate::transducer::intersection::PathNode;
@@ -76,8 +76,8 @@ where
     N: MappedDictionaryNode,
     F: Fn(&N::Value) -> bool,
 {
-    /// Query bytes
-    query: Vec<u8>,
+    /// Query units (bytes or chars)
+    query: Vec<N::Unit>,
     /// Maximum edit distance
     max_distance: usize,
     /// Algorithm (Standard or Transposition)
@@ -115,14 +115,14 @@ where
         algorithm: Algorithm,
         filter: F,
     ) -> Self {
-        let query_bytes = term.into_bytes();
-        let initial = initial_state(query_bytes.len(), max_distance, algorithm);
+        let query_units = N::Unit::from_str(&term);
+        let initial = initial_state(query_units.len(), max_distance, algorithm);
 
         let mut pending = VecDeque::new();
         pending.push_back(Box::new(Intersection::new(root, initial)));
 
         Self {
-            query: query_bytes,
+            query: query_units,
             max_distance,
             algorithm,
             filter,
@@ -264,8 +264,8 @@ where
     N: MappedDictionaryNode<Value = V>,
     V: DictionaryValue + Eq + std::hash::Hash,
 {
-    /// Query bytes
-    query: Vec<u8>,
+    /// Query units (bytes or chars)
+    query: Vec<N::Unit>,
     /// Maximum edit distance
     max_distance: usize,
     /// Algorithm (Standard or Transposition)
@@ -297,14 +297,14 @@ where
         algorithm: Algorithm,
         value_set: HashSet<V>,
     ) -> Self {
-        let query_bytes = term.into_bytes();
-        let initial = initial_state(query_bytes.len(), max_distance, algorithm);
+        let query_units = N::Unit::from_str(&term);
+        let initial = initial_state(query_units.len(), max_distance, algorithm);
 
         let mut pending = VecDeque::new();
         pending.push_back(Box::new(Intersection::new(root, initial)));
 
         Self {
-            query: query_bytes,
+            query: query_units,
             max_distance,
             algorithm,
             value_set,

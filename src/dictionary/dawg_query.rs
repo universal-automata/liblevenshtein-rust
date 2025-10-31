@@ -22,7 +22,7 @@ struct DawgIntersection {
     /// Current automaton state
     state: State,
     /// Parent path (for path reconstruction) - lightweight, no Arc
-    parent: Option<Box<PathNode>>,
+    parent: Option<Box<PathNode<u8>>>,
 }
 
 impl DawgIntersection {
@@ -41,7 +41,7 @@ impl DawgIntersection {
         label: u8,
         node_idx: usize,
         state: State,
-        parent: Option<Box<PathNode>>,
+        parent: Option<Box<PathNode<u8>>>,
     ) -> Self {
         Self {
             label: Some(label),

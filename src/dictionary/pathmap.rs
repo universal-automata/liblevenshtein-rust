@@ -350,6 +350,8 @@ impl<V: DictionaryValue> PathMapNode<V> {
 }
 
 impl<V: DictionaryValue> DictionaryNode for PathMapNode<V> {
+    type Unit = u8;
+
     #[inline]
     fn is_final(&self) -> bool {
         self.with_zipper(|z| z.is_val())

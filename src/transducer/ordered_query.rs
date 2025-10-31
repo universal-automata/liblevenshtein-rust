@@ -8,7 +8,7 @@
 
 use super::transition::{initial_state, transition_state_pooled};
 use super::{Algorithm, Intersection, PathNode, StatePool};
-use crate::dictionary::DictionaryNode;
+use crate::dictionary::{CharUnit, DictionaryNode};
 use std::collections::VecDeque;
 
 /// Query result containing term and distance.
@@ -68,8 +68,8 @@ pub struct OrderedQueryIterator<N: DictionaryNode> {
     current_distance: usize,
     /// Maximum distance to explore
     max_distance: usize,
-    /// Query bytes
-    query: Vec<u8>,
+    /// Query units (bytes or chars)
+    query: Vec<N::Unit>,
     /// Levenshtein algorithm
     algorithm: Algorithm,
     /// State pool for allocation reuse
@@ -96,8 +96,8 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
         algorithm: Algorithm,
         substring_mode: bool,
     ) -> Self {
-        let query_bytes = query.into_bytes();
-        let initial = initial_state(query_bytes.len(), max_distance, algorithm);
+        let query_units = N::Unit::from_str(&query);
+        let initial = initial_state(query_units.len(), max_distance, algorithm);
 
         // Create buckets for each distance level (0..=max_distance)
         // Pre-allocate capacity to reduce reallocations during traversal
@@ -112,7 +112,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             pending_by_distance,
             current_distance: 0,
             max_distance,
-            query: query_bytes,
+            query: query_units,
             algorithm,
             state_pool: StatePool::new(),
             substring_mode,
@@ -550,7 +550,7 @@ mod tests {
         let ordered =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
-        let unordered = QueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
+        let unordered: QueryIterator<_, String> = QueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
         let mut ordered_terms: Vec<_> = ordered.map(|c| c.term).collect();
         let mut unordered_terms: Vec<_> = unordered.collect();

@@ -11,6 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Unicode Support (2025-10-30)
+- **Character-level dictionary variants for correct Unicode Levenshtein distances**
+  - `DoubleArrayTrieChar` - Character-level Double-Array Trie implementation
+  - `PathMapDictionaryChar` - Character-level PathMap with dynamic updates (requires `pathmap-backend` feature)
+  - Proper handling of multi-byte UTF-8 sequences (accented characters, CJK, emoji)
+  - Generic `CharUnit` trait abstraction over `u8` (byte-level) and `char` (character-level)
+  - ~5% performance overhead for UTF-8 decoding, 4x memory for edge labels (char vs u8)
+
+- **Comprehensive Unicode test coverage**
+  - 19 PathMapChar integration tests (all passing)
+  - Tests for emoji (4-byte UTF-8), CJK (3-byte UTF-8), accented characters (2-byte UTF-8)
+  - Empty query, exact match, one-edit distance, transposition, various distance levels
+  - Dynamic operations (insert/remove), value mapping, value filtering
+  - Edge cases (empty dictionary, single characters, normalization)
+
+- **Fixed core Unicode issue**: "" → "¡" now correctly requires distance 1 (one character) instead of distance 2 (two bytes)
+
+- **Updated cache eviction nodes**
+  - All 8 cache wrapper nodes support generic `Unit` type
+  - Noop, LRU, LRU Optimized, LFU, TTL, Age, Cost-Aware, Memory Pressure
+
+- **Documentation**
+  - Updated README.md with Unicode support section and examples
+  - Character-level backends in dictionary comparison table
+  - Guidance on when to use byte-level vs character-level variants
+  - `UTF8_IMPLEMENTATION.md` - Complete technical design document (300+ lines)
+  - `UTF8_IMPLEMENTATION_STATUS.md` - Implementation status report (250+ lines)
+
+
 #### Phase 4: SIMD Optimization
 - **Comprehensive SIMD acceleration across critical performance paths**
   - 8 SIMD-optimized components with 20-64% real-world performance gains

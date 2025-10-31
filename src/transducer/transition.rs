@@ -1,6 +1,7 @@
 //! State transition logic for Levenshtein automata.
 
 use super::{Algorithm, Position, State, StatePool};
+use crate::dictionary::CharUnit;
 use smallvec::SmallVec;
 
 /// Compute the characteristic vector for a position in the query.
@@ -9,8 +10,8 @@ use smallvec::SmallVec;
 /// of the query term match the given dictionary character.
 ///
 /// # Arguments
-/// * `dict_char` - Character from the dictionary edge
-/// * `query` - Query term bytes
+/// * `dict_unit` - Character unit from the dictionary edge
+/// * `query` - Query term units (bytes or chars)
 /// * `window_size` - Size of the window (typically max_distance + 1)
 /// * `offset` - Base offset in query
 /// * `buffer` - Stack-allocated buffer to write results into
@@ -19,9 +20,9 @@ use smallvec::SmallVec;
 /// Slice of booleans indicating matches at each position in window.
 /// Uses stack-allocated array (max 8 elements) to avoid heap allocations.
 #[inline]
-fn characteristic_vector<'a>(
-    dict_char: u8,
-    query: &[u8],
+fn characteristic_vector<'a, U: CharUnit>(
+    dict_unit: U,
+    query: &[U],
     window_size: usize,
     offset: usize,
     buffer: &'a mut [bool; 8],
@@ -30,7 +31,7 @@ fn characteristic_vector<'a>(
     let len = window_size.min(8);
     for (i, item) in buffer.iter_mut().enumerate().take(len) {
         let query_idx = offset + i;
-        *item = query_idx < query.len() && query[query_idx] == dict_char;
+        *item = query_idx < query.len() && query[query_idx] == dict_unit;
     }
     &buffer[..len]
 }
@@ -495,14 +496,14 @@ fn epsilon_closure_into(
     epsilon_closure_mut(target, query_length, max_distance, algorithm);
 }
 
-/// Transition an entire state given a dictionary character.
+/// Transition an entire state given a dictionary character unit.
 ///
 /// Computes the next state by transitioning all positions in the
 /// current state and merging the results.
-pub fn transition_state(
+pub fn transition_state<U: CharUnit>(
     state: &State,
-    dict_char: u8,
-    query: &[u8],
+    dict_unit: U,
+    query: &[U],
     max_distance: usize,
     algorithm: Algorithm,
     prefix_mode: bool,
@@ -520,7 +521,7 @@ pub fn transition_state(
 
     for position in expanded_state.positions() {
         let offset = position.term_index;
-        let cv = characteristic_vector(dict_char, query, window_size, offset, &mut cv_buffer);
+        let cv = characteristic_vector(dict_unit, query, window_size, offset, &mut cv_buffer);
 
         let next_positions = transition_position(
             position,
@@ -559,8 +560,8 @@ pub fn transition_state(
 ///
 /// * `state` - Current automaton state
 /// * `pool` - State pool for allocation reuse
-/// * `dict_char` - Dictionary character to transition on
-/// * `query` - Query term bytes
+/// * `dict_unit` - Dictionary character unit to transition on
+/// * `query` - Query term units (bytes or chars)
 /// * `max_distance` - Maximum edit distance
 /// * `algorithm` - Algorithm variant (Standard, Transposition, MergeAndSplit)
 /// * `prefix_mode` - Enable prefix matching (characters beyond query treated as free matches)
@@ -570,11 +571,11 @@ pub fn transition_state(
 /// The next state after transitioning, or None if no valid transitions exist.
 /// The returned state is acquired from the pool (caller should release it when done).
 #[inline]
-pub fn transition_state_pooled(
+pub fn transition_state_pooled<U: CharUnit>(
     state: &State,
     pool: &mut StatePool,
-    dict_char: u8,
-    query: &[u8],
+    dict_unit: U,
+    query: &[U],
     max_distance: usize,
     algorithm: Algorithm,
     prefix_mode: bool,
@@ -602,7 +603,7 @@ pub fn transition_state_pooled(
 
     for position in expanded_state.positions() {
         let offset = position.term_index;
-        let cv = characteristic_vector(dict_char, query, window_size, offset, &mut cv_buffer);
+        let cv = characteristic_vector(dict_unit, query, window_size, offset, &mut cv_buffer);
 
         let next_positions = transition_position(
             position,

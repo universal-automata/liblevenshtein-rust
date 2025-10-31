@@ -847,6 +847,8 @@ pub struct SuffixNodeHandle {
 }
 
 impl DictionaryNode for SuffixNodeHandle {
+    type Unit = u8;
+
     fn is_final(&self) -> bool {
         let inner = self.automaton.read().unwrap();
         inner.nodes[self.state_id].is_final

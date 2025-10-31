@@ -259,20 +259,22 @@ impl<N> DictionaryNode for CostAwareNode<N>
 where
     N: DictionaryNode,
 {
+    type Unit = N::Unit;
+
     #[inline]
     fn is_final(&self) -> bool {
         self.inner.is_final()
     }
 
     #[inline]
-    fn transition(&self, label: u8) -> Option<Self> {
+    fn transition(&self, label: Self::Unit) -> Option<Self> {
         self.inner.transition(label).map(|node| {
             CostAwareNode::new(node, Arc::clone(&self.metadata))
         })
     }
 
     #[inline]
-    fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
+    fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         let metadata = Arc::clone(&self.metadata);
         Box::new(self.inner.edges().map(move |(label, node)| {
             (label, CostAwareNode::new(node, Arc::clone(&metadata)))

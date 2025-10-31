@@ -13,6 +13,11 @@ A Rust port of [liblevenshtein](https://github.com/universal-automata/liblevensh
 
 ### v0.4.0 (2025-10-30)
 
+- **Unicode Support** - Character-level dictionary variants for correct Unicode Levenshtein distances
+  - `DoubleArrayTrieChar` and `PathMapDictionaryChar` for character-level operations
+  - Proper handling of multi-byte UTF-8 sequences (accented chars, CJK, emoji)
+  - ~5% performance overhead, 4x memory for edge labels
+  - Full test coverage with 19 Unicode-specific tests
 - **Phase 4: SIMD Optimization** - Comprehensive SIMD acceleration with **20-64% performance gains**
   - 8 SIMD-optimized components across critical performance paths
   - Data-driven threshold tuning based on empirical benchmarking
@@ -41,7 +46,9 @@ This library provides efficient fuzzy string matching against large dictionaries
   - `MergeAndSplit`: adds merge and split operations
 - **Multiple dictionary backends**:
   - **DoubleArrayTrie** (recommended, default) - O(1) transitions with excellent cache locality and minimal memory footprint
+  - **DoubleArrayTrieChar** - Character-level variant for correct Unicode Levenshtein distances
   - **PathMap** (optional `pathmap-backend` feature) - high-performance trie with structural sharing, supports dynamic updates
+  - **PathMapChar** (optional `pathmap-backend` feature) - Character-level PathMap for Unicode fuzzy matching
   - **DAWG** - Directed Acyclic Word Graph for space-efficient storage
   - **OptimizedDawg** - Arena-based DAWG with 20-25% faster construction
   - **DynamicDawg** - DAWG with online insert/delete/minimize operations
@@ -136,6 +143,42 @@ Match: test (distance: 1)
 Match: tester (distance: 2)
 ```
 
+### Unicode Support
+
+For correct character-level Levenshtein distances with Unicode text, use the character-level dictionary variants:
+
+```rust
+use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+use liblevenshtein::prelude::*;
+
+// Create a character-level dictionary for Unicode content
+let terms = vec!["café", "naïve", "中文", "🎉"];
+let dict = DoubleArrayTrieChar::from_terms(terms);
+let transducer = Transducer::new(dict, Algorithm::Standard);
+
+// Character-level distance: "" → "¡" is distance 1 (one character)
+// Byte-level would incorrectly report distance 2 (two UTF-8 bytes)
+let results: Vec<_> = transducer.query("", 1).collect();
+// Results include single-character Unicode terms
+
+// Works with accented characters
+for candidate in transducer.query_with_distance("cafe", 1) {
+    println!("{}: {}", candidate.term, candidate.distance);
+    // Output: café: 1 (one character substitution: e→é)
+}
+```
+
+**Character-level backends**:
+- `DoubleArrayTrieChar` - Character-level Double-Array Trie
+- `PathMapDictionaryChar` (requires `pathmap-backend` feature) - Character-level PathMap with dynamic updates
+
+**When to use**:
+- ✅ Dictionaries containing non-ASCII Unicode (accented characters, CJK, emoji)
+- ✅ When edit distance must count characters, not bytes
+- ✅ Multi-language applications requiring correct Unicode semantics
+
+**Performance**: ~5% overhead for UTF-8 decoding, 4x memory for edge labels (char vs u8).
+
 ### Runtime Dictionary Updates
 
 The **DynamicDawg** backend supports **thread-safe runtime updates**:
@@ -228,7 +271,9 @@ The library provides multiple dictionary backends optimized for different use ca
 | Backend | Best For | Performance Highlights |
 |---------|----------|----------------------|
 | **DoubleArrayTrie** | **General use** (recommended) | 3x faster queries, 30x faster contains, 8 bytes/state |
+| **DoubleArrayTrieChar** | Unicode text, character-level distances | Correct Unicode semantics, ~5% overhead |
 | **PathMap** | Dynamic updates, runtime modifications | Thread-safe insert/delete, fastest dynamic backend |
+| **PathMapChar** | Unicode + dynamic updates | Character-level distances with runtime modifications |
 | **DAWG** | Static dictionaries, moderate size | Good balance of speed and memory |
 | **OptimizedDawg** | Static dictionaries, construction speed | 20-25% faster construction than DAWG |
 | **DynamicDawg** | Occasional modifications | Best fuzzy matching for dynamic use |
@@ -248,11 +293,13 @@ Memory/state:     DAT: ~8B     OptDawg: ~13B    DAWG: ~32B
 **Prefix Matching Support**: All backends except `SuffixAutomaton` support efficient prefix matching through the `.prefix()` method, making them ideal for code completion and autocomplete applications.
 
 **When to use each backend**:
-- **Static dictionaries** → `DoubleArrayTrie` (best overall performance, default choice)
-- **Frequent updates** → `DynamicDawg` (thread-safe runtime modifications)
+- **Static dictionaries (ASCII/Latin-1)** → `DoubleArrayTrie` (best overall performance, default choice)
+- **Static dictionaries (Unicode)** → `DoubleArrayTrieChar` (correct character-level distances)
+- **Dynamic updates (ASCII/Latin-1)** → `DynamicDawg` (thread-safe runtime modifications)
+- **Dynamic updates (Unicode)** → `PathMapChar` (character-level with insert/remove, requires `pathmap-backend`)
 - **Substring search** → `SuffixAutomaton` (finds patterns anywhere in text)
 - **Memory-constrained** → `DoubleArrayTrie` (8 bytes/state, most efficient)
-- **Need PathMap** → Enable `pathmap-backend` feature
+- **Multi-language apps** → Character-level variants (`*Char`) for correct Unicode semantics
 
 ### Serialization and Compression
 

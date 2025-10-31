@@ -3,7 +3,7 @@
 use super::query_result::QueryResult;
 use super::transition::{initial_state, transition_state_pooled};
 use super::{Algorithm, Intersection, StatePool};
-use crate::dictionary::DictionaryNode;
+use crate::dictionary::{CharUnit, DictionaryNode};
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 
@@ -66,7 +66,7 @@ pub struct Candidate {
 /// ```
 pub struct QueryIterator<N: DictionaryNode, R: QueryResult = String> {
     pending: VecDeque<Box<Intersection<N>>>,
-    query: Vec<u8>,
+    query: Vec<N::Unit>,
     max_distance: usize,
     algorithm: Algorithm,
     finished: bool,
@@ -89,8 +89,8 @@ impl<N: DictionaryNode, R: QueryResult> QueryIterator<N, R> {
         algorithm: Algorithm,
         substring_mode: bool,
     ) -> Self {
-        let query_bytes = query.into_bytes();
-        let initial = initial_state(query_bytes.len(), max_distance, algorithm);
+        let query_units = N::Unit::from_str(&query);
+        let initial = initial_state(query_units.len(), max_distance, algorithm);
 
         let mut pending = VecDeque::new();
 
@@ -100,7 +100,7 @@ impl<N: DictionaryNode, R: QueryResult> QueryIterator<N, R> {
 
         Self {
             pending,
-            query: query_bytes,
+            query: query_units,
             max_distance,
             algorithm,
             finished: false,
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn test_query_exact_match() {
         let dict = DoubleArrayTrie::from_terms(vec!["test"]);
-        let query = QueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
+        let query: QueryIterator<_, String> = QueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let result: Vec<_> = query.collect();
         assert_eq!(result, vec!["test"]);

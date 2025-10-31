@@ -149,18 +149,20 @@ impl<N> DictionaryNode for NoopNode<N>
 where
     N: DictionaryNode,
 {
+    type Unit = N::Unit;
+
     #[inline]
     fn is_final(&self) -> bool {
         self.inner.is_final()
     }
 
     #[inline]
-    fn transition(&self, label: u8) -> Option<Self> {
+    fn transition(&self, label: Self::Unit) -> Option<Self> {
         self.inner.transition(label).map(NoopNode::new)
     }
 
     #[inline]
-    fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
+    fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         Box::new(self.inner.edges().map(|(label, node)| (label, NoopNode::new(node))))
     }
 

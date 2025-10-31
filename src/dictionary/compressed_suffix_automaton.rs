@@ -400,6 +400,8 @@ pub struct CompressedSuffixNode {
 }
 
 impl DictionaryNode for CompressedSuffixNode {
+    type Unit = u8;
+
     fn is_final(&self) -> bool {
         let inner = self.inner.read().unwrap();
         self.state < inner.nodes.len() && inner.nodes[self.state].is_final()

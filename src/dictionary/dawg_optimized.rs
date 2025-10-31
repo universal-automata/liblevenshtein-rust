@@ -392,6 +392,8 @@ impl Clone for OptimizedDawgNodeRef {
 }
 
 impl DictionaryNode for OptimizedDawgNodeRef {
+    type Unit = u8;
+
     fn is_final(&self) -> bool {
         self.nodes[self.index].is_final
     }

@@ -1,7 +1,7 @@
 //! Intersection of dictionary traversal and automaton state.
 
 use super::state::State;
-use crate::dictionary::DictionaryNode;
+use crate::dictionary::{CharUnit, DictionaryNode};
 
 /// Lightweight representation of path history.
 ///
@@ -19,20 +19,24 @@ use crate::dictionary::DictionaryNode;
 /// by an estimated 15-25% for DAWG dictionaries.
 ///
 /// Depth is cached (O(1) access) vs recursive calculation (O(depth)).
+///
+/// # Type Parameters
+///
+/// - `U`: Character unit type ([`u8`] for bytes, [`char`] for Unicode characters)
 #[derive(Clone)]
-pub struct PathNode {
+pub struct PathNode<U: CharUnit> {
     /// Edge label from parent
-    label: u8,
+    label: U,
     /// Cached depth from root (enables O(1) depth queries and Vec preallocation)
     depth: u16,
     /// Parent in the path
-    parent: Option<Box<PathNode>>,
+    parent: Option<Box<PathNode<U>>>,
 }
 
-impl PathNode {
+impl<U: CharUnit> PathNode<U> {
     /// Create a new path node
     #[inline(always)]
-    pub fn new(label: u8, parent: Option<Box<PathNode>>) -> Self {
+    pub fn new(label: U, parent: Option<Box<PathNode<U>>>) -> Self {
         let depth = match &parent {
             Some(p) => p.depth + 1,
             None => 1,
@@ -48,7 +52,7 @@ impl PathNode {
     ///
     /// Uses iterative approach to avoid stack overflow on deep paths.
     /// Previous recursive implementation could overflow for paths > ~1000 levels.
-    pub fn collect_labels(&self, labels: &mut Vec<u8>) {
+    pub fn collect_labels(&self, labels: &mut Vec<U>) {
         // Iteratively walk the parent chain
         let mut current = Some(self);
         while let Some(node) = current {
@@ -79,8 +83,8 @@ impl PathNode {
 /// Arc cloning overhead. The parent chain only needs labels for path
 /// reconstruction, not the full dictionary node.
 pub struct Intersection<N: DictionaryNode> {
-    /// Edge label from parent (character)
-    pub label: Option<u8>,
+    /// Edge label from parent (character unit)
+    pub label: Option<N::Unit>,
 
     /// Current dictionary node
     pub node: N,
@@ -89,7 +93,7 @@ pub struct Intersection<N: DictionaryNode> {
     pub state: State,
 
     /// Parent path (for path reconstruction) - lightweight, no node cloning
-    pub parent: Option<Box<PathNode>>,
+    pub parent: Option<Box<PathNode<N::Unit>>>,
 }
 
 impl<N: DictionaryNode> Intersection<N> {
@@ -105,7 +109,12 @@ impl<N: DictionaryNode> Intersection<N> {
 
     /// Create a child intersection with a parent path
     #[inline]
-    pub fn with_parent(label: u8, node: N, state: State, parent: Option<Box<PathNode>>) -> Self {
+    pub fn with_parent(
+        label: N::Unit,
+        node: N,
+        state: State,
+        parent: Option<Box<PathNode<N::Unit>>>,
+    ) -> Self {
         Self {
             label: Some(label),
             node,
@@ -116,20 +125,20 @@ impl<N: DictionaryNode> Intersection<N> {
 
     /// Reconstruct the term (path) from root to this intersection
     pub fn term(&self) -> String {
-        let mut bytes = Vec::new();
+        let mut units = Vec::new();
 
         // Collect current label
         if let Some(label) = self.label {
-            bytes.push(label);
+            units.push(label);
         }
 
         // Collect parent labels
         if let Some(parent) = &self.parent {
-            parent.collect_labels(&mut bytes);
+            parent.collect_labels(&mut units);
         }
 
-        bytes.reverse();
-        String::from_utf8_lossy(&bytes).into_owned()
+        units.reverse();
+        N::Unit::to_string(&units)
     }
 
     /// Get the depth (length of path from root)

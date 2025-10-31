@@ -378,6 +378,8 @@ pub struct DawgDictionaryNode {
 }
 
 impl DictionaryNode for DawgDictionaryNode {
+    type Unit = u8;
+
     fn is_final(&self) -> bool {
         self.nodes[self.node_idx].is_final
     }

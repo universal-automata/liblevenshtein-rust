@@ -59,11 +59,13 @@ impl Dictionary for PersistentDictionary {
 }
 
 impl DictionaryNode for PersistentNode {
+    type Unit = u8;
+
     fn is_final(&self) -> bool {
         self.terms.iter().any(|t| t == &self.prefix)
     }
 
-    fn transition(&self, label: u8) -> Option<Self> {
+    fn transition(&self, label: Self::Unit) -> Option<Self> {
         let c = label as char;
         let mut new_prefix = self.prefix.clone();
         new_prefix.push(c);
@@ -80,7 +82,7 @@ impl DictionaryNode for PersistentNode {
         }
     }
 
-    fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
+    fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         // Collect all possible next characters
         let mut chars = std::collections::HashSet::new();
         let prefix_len = self.prefix.len();
