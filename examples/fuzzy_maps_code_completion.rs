@@ -103,7 +103,9 @@ fn main() {
     let mut manual_results = Vec::new();
 
     // Get all candidates
-    let all_candidates: Vec<_> = transducer.query_with_distance(query, max_distance).collect();
+    let all_candidates: Vec<_> = transducer
+        .query_with_distance(query, max_distance)
+        .collect();
 
     // Filter by scope
     for candidate in all_candidates {
@@ -139,7 +141,11 @@ fn main() {
     }
     println!();
 
-    println!("Filtered matches (scope {}): {}", current_scope, post_filtered_results.len());
+    println!(
+        "Filtered matches (scope {}): {}",
+        current_scope,
+        post_filtered_results.len()
+    );
     for (term, distance, scope) in &post_filtered_results {
         println!("  - {} (distance: {}, scope: {})", term, distance, scope);
     }
@@ -150,8 +156,10 @@ fn main() {
     // ========================================================================
     println!("=== Performance Analysis ===\n");
 
-    println!("Filtering reduces results by: {:.1}%",
-        (1.0 - (post_filtered_results.len() as f64 / all_matches.len() as f64)) * 100.0);
+    println!(
+        "Filtering reduces results by: {:.1}%",
+        (1.0 - (post_filtered_results.len() as f64 / all_matches.len() as f64)) * 100.0
+    );
 
     println!("\nFor large dictionaries (10k+ terms), fuzzy maps will provide:");
     println!("  - 10-100x speedup over post-filtering");
@@ -225,7 +233,10 @@ fn main() {
             3 => "imports",
             _ => "unknown",
         };
-        println!("  - {} (distance: {}, scope: {})", term, distance, scope_name);
+        println!(
+            "  - {} (distance: {}, scope: {})",
+            term, distance, scope_name
+        );
     }
 
     println!("\n=== Summary ===\n");

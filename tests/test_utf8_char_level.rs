@@ -15,7 +15,11 @@ fn test_unicode_empty_query_char_level() {
     println!("Max distance: 1");
     println!("Character '¡': {:?}", '¡');
     println!("Bytes: {:?} (length: {})", "¡".as_bytes(), "¡".len());
-    println!("Chars: {} (length: {})\n", "¡".chars().count(), "¡".chars().count());
+    println!(
+        "Chars: {} (length: {})\n",
+        "¡".chars().count(),
+        "¡".chars().count()
+    );
 
     let results: Vec<_> = transducer.query("", 1).collect();
     println!("Results: {:?}\n", results);
@@ -120,14 +124,8 @@ fn test_cjk_distance() {
 fn test_mixed_unicode_query() {
     println!("\n=== UTF-8 Char-Level: Mixed Unicode Query ===\n");
 
-    let dict = DoubleArrayTrieChar::from_terms(vec![
-        "café",
-        "cafe",
-        "naïve",
-        "naive",
-        "résumé",
-        "resume",
-    ]);
+    let dict =
+        DoubleArrayTrieChar::from_terms(vec!["café", "cafe", "naïve", "naive", "résumé", "resume"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Dictionary contains accented and non-accented variants\n");

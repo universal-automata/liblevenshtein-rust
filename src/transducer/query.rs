@@ -70,8 +70,8 @@ pub struct QueryIterator<N: DictionaryNode, R: QueryResult = String> {
     max_distance: usize,
     algorithm: Algorithm,
     finished: bool,
-    state_pool: StatePool, // Pool for State allocation reuse
-    substring_mode: bool,  // Enable substring matching (for suffix automata)
+    state_pool: StatePool,        // Pool for State allocation reuse
+    substring_mode: bool,         // Enable substring matching (for suffix automata)
     _result_type: PhantomData<R>, // Zero-sized marker for result type
 }
 
@@ -219,7 +219,8 @@ mod tests {
     #[test]
     fn test_query_exact_match() {
         let dict = DoubleArrayTrie::from_terms(vec!["test"]);
-        let query: QueryIterator<_, String> = QueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
+        let query: QueryIterator<_, String> =
+            QueryIterator::new(dict.root(), "test".to_string(), 0, Algorithm::Standard);
 
         let result: Vec<_> = query.collect();
         assert_eq!(result, vec!["test"]);

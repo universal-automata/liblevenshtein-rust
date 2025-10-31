@@ -53,7 +53,10 @@ fn manual_trace_ab_to_ba() {
     println!("    Inserted (0,1,true)");
     println!("      State now: {:?}", state1.positions());
 
-    let has_special = state1.positions().iter().any(|p| p.is_special && p.term_index == 0 && p.num_errors == 1);
+    let has_special = state1
+        .positions()
+        .iter()
+        .any(|p| p.is_special && p.term_index == 0 && p.num_errors == 1);
     if has_special {
         println!("      ✓ (0,1,true) survived!");
     } else {
@@ -79,8 +82,10 @@ fn manual_trace_ab_to_ba() {
 
     for pos in state1.positions() {
         println!("  From position {:?}:", pos);
-        println!("    term_index={}, num_errors={}, is_special={}",
-                 pos.term_index, pos.num_errors, pos.is_special);
+        println!(
+            "    term_index={}, num_errors={}, is_special={}",
+            pos.term_index, pos.num_errors, pos.is_special
+        );
 
         if pos.is_special && pos.term_index == 0 && pos.num_errors == 1 {
             println!("    This is the special transposition position!");

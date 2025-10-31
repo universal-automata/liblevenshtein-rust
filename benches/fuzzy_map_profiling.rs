@@ -25,9 +25,7 @@ fn profile_unfiltered(c: &mut Criterion) {
 
     c.bench_function("unfiltered_query", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer
-                .query(black_box("term"), black_box(2))
-                .collect();
+            let results: Vec<_> = transducer.query(black_box("term"), black_box(2)).collect();
             black_box(results)
         })
     });
@@ -58,9 +56,7 @@ fn profile_post_filtered(c: &mut Criterion) {
             let dict_ref = transducer.dictionary();
             let results: Vec<_> = transducer
                 .query(black_box("term"), black_box(2))
-                .filter(|term| {
-                    dict_ref.get_value(term) == Some(5)
-                })
+                .filter(|term| dict_ref.get_value(term) == Some(5))
                 .collect();
             black_box(results)
         })
@@ -92,9 +88,7 @@ fn profile_post_filtered_high_selectivity(c: &mut Criterion) {
             let dict_ref = transducer.dictionary();
             let results: Vec<_> = transducer
                 .query(black_box("term"), black_box(2))
-                .filter(|term| {
-                    dict_ref.get_value(term) == Some(0)
-                })
+                .filter(|term| dict_ref.get_value(term) == Some(0))
                 .collect();
             black_box(results)
         })

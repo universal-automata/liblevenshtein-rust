@@ -1,7 +1,9 @@
 //! PathMap-backed dictionary implementation.
 
-use crate::dictionary::{Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy};
 use crate::dictionary::value::DictionaryValue;
+use crate::dictionary::{
+    Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy,
+};
 #[cfg(feature = "serialization")]
 use crate::serialization::DictionaryFromTerms;
 use pathmap::utils::BitMask;
@@ -448,7 +450,8 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_creation() {
-        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["hello", "world", "test"]);
+        let dict: PathMapDictionary<()> =
+            PathMapDictionary::from_terms(vec!["hello", "world", "test"]);
         assert_eq!(dict.len(), Some(3));
     }
 
@@ -508,7 +511,8 @@ mod tests {
 
     #[test]
     fn test_pathmap_dictionary_remove() {
-        let dict: PathMapDictionary<()> = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
+        let dict: PathMapDictionary<()> =
+            PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
         assert_eq!(dict.term_count(), 3);
 
         // Remove existing term
@@ -562,12 +566,9 @@ mod tests {
     #[test]
     fn test_pathmap_dictionary_with_values() {
         // Test dictionary with u32 values (scope IDs)
-        let terms_with_values = vec![
-            ("hello", 1u32),
-            ("world", 2u32),
-            ("test", 3u32),
-        ];
-        let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(terms_with_values);
+        let terms_with_values = vec![("hello", 1u32), ("world", 2u32), ("test", 3u32)];
+        let dict: PathMapDictionary<u32> =
+            PathMapDictionary::from_terms_with_values(terms_with_values);
 
         assert_eq!(dict.len(), Some(3));
         assert!(dict.contains("hello"));
@@ -593,11 +594,9 @@ mod tests {
 
     #[test]
     fn test_pathmap_node_value() {
-        let terms_with_values = vec![
-            ("hello", 10u32),
-            ("world", 20u32),
-        ];
-        let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(terms_with_values);
+        let terms_with_values = vec![("hello", 10u32), ("world", 20u32)];
+        let dict: PathMapDictionary<u32> =
+            PathMapDictionary::from_terms_with_values(terms_with_values);
         let root = dict.root();
 
         // Navigate to "hello"

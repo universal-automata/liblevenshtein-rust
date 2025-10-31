@@ -5,20 +5,17 @@
 
 #[cfg(feature = "pathmap-backend")]
 mod wrapper_composition {
-    use liblevenshtein::prelude::*;
+    use liblevenshtein::cache::eviction::{Age, CostAware, Lfu, Lru, MemoryPressure, Noop, Ttl};
     use liblevenshtein::dictionary::MappedDictionary;
-    use liblevenshtein::cache::eviction::{Lru, Lfu, Ttl, Age, CostAware, MemoryPressure, Noop};
-    use std::time::Duration;
+    use liblevenshtein::prelude::*;
     use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_lru_ttl_composition() {
         // TTL filters expired entries, LRU tracks recency of remaining entries
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let ttl = Ttl::new(dict, Duration::from_secs(1));
         let lru = Lru::new(ttl);
@@ -44,11 +41,8 @@ mod wrapper_composition {
     #[test]
     fn test_lfu_age_composition() {
         // Age tracks insertion time, LFU tracks access frequency
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("first", 1),
-            ("second", 2),
-            ("third", 3),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("first", 1), ("second", 2), ("third", 3)]);
 
         let age = Age::new(dict);
         let lfu = Lfu::new(age);
@@ -107,11 +101,8 @@ mod wrapper_composition {
     #[test]
     fn test_triple_wrapper_composition() {
         // Stack three wrappers: Lru -> Ttl -> Age
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("alpha", 1),
-            ("beta", 2),
-            ("gamma", 3),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("alpha", 1), ("beta", 2), ("gamma", 3)]);
 
         let age = Age::new(dict);
         let ttl = Ttl::new(age, Duration::from_secs(2));
@@ -140,9 +131,7 @@ mod wrapper_composition {
     #[test]
     fn test_noop_passthrough() {
         // Noop should not affect behavior
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("test", 42),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("test", 42)]);
 
         let noop = Noop::new(dict);
         let lru = Lru::new(noop);
@@ -157,9 +146,7 @@ mod wrapper_composition {
     #[test]
     fn test_into_inner_unwrapping() {
         // Test unwrapping composed wrappers
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("data", 100),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("data", 100)]);
 
         let lfu = Lfu::new(dict);
         let lru = Lru::new(lfu);
@@ -179,9 +166,7 @@ mod wrapper_composition {
     #[test]
     fn test_metadata_independence() {
         // Each wrapper maintains independent metadata
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("item", 50),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("item", 50)]);
 
         let lfu = Lfu::new(dict);
         let lru = Lru::new(lfu);
@@ -209,10 +194,7 @@ mod wrapper_composition {
     #[test]
     fn test_eviction_coordination() {
         // Test that eviction works correctly with composed wrappers
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("keep", 1),
-            ("evict", 2),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("keep", 1), ("evict", 2)]);
 
         let lru = Lru::new(dict);
 
@@ -243,9 +225,7 @@ mod wrapper_composition {
     #[test]
     fn test_clear_metadata_composition() {
         // Test clearing metadata in composed wrappers
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("data", 42),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("data", 42)]);
 
         let lfu = Lfu::new(dict);
         let lru = Lru::new(lfu);

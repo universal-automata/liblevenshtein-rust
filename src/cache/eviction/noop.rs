@@ -25,7 +25,10 @@
 //! assert!(wrapped.contains("world"));
 //! ```
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 
 /// Identity wrapper that provides no eviction behavior.
 ///
@@ -163,7 +166,11 @@ where
 
     #[inline]
     fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
-        Box::new(self.inner.edges().map(|(label, node)| (label, NoopNode::new(node))))
+        Box::new(
+            self.inner
+                .edges()
+                .map(|(label, node)| (label, NoopNode::new(node))),
+        )
     }
 
     #[inline]
@@ -206,11 +213,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_noop_with_values() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("hello", 1),
-            ("world", 2),
-            ("test", 3),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("hello", 1), ("world", 2), ("test", 3)]);
         let wrapped = Noop::new(dict);
 
         assert_eq!(wrapped.get_value("hello"), Some(1));

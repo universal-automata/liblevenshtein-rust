@@ -17,9 +17,9 @@ use anyhow::Result;
 use std::path::Path;
 
 #[cfg(feature = "pathmap-backend")]
-use crate::cache::{FuzzyCacheBuilder, FuzzyCache};
-#[cfg(feature = "pathmap-backend")]
 use crate::cache::strategy::*;
+#[cfg(feature = "pathmap-backend")]
+use crate::cache::{FuzzyCache, FuzzyCacheBuilder};
 
 /// Helper to extract all terms from any dictionary using DFS
 fn extract_terms<D: Dictionary>(dict: &D) -> Vec<String> {

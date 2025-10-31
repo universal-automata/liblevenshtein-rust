@@ -35,7 +35,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_exact_match() {
         println!("\n=== PathMapChar: Exact Match ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "naïve", "résumé"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "naïve", "résumé"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary: [\"café\", \"naïve\", \"résumé\"]");
@@ -56,7 +57,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_one_edit_distance() {
         println!("\n=== PathMapChar: One Edit Distance ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "cafe"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "cafe"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary: [\"café\", \"cafe\"]");
@@ -100,7 +102,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_emoji_with_text() {
         println!("\n=== PathMapChar: Emoji with Text ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["hello🎉", "world🌍"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["hello🎉", "world🌍"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary: [\"hello🎉\", \"world🌍\"]");
@@ -117,7 +120,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_cjk_distance() {
         println!("\n=== PathMapChar: CJK Character Distances ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["中", "中文", "中文字"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["中", "中文", "中文字"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary: [\"中\", \"中文\", \"中文字\"]");
@@ -147,23 +151,30 @@ mod pathmap_char_tests {
     fn test_pathmap_char_mixed_unicode() {
         println!("\n=== PathMapChar: Mixed Unicode Characters ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec![
-            "hello",
-            "café",
-            "中文",
-            "🎉",
-            "test123",
-        ]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["hello", "café", "中文", "🎉", "test123"]);
 
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary contains: ASCII, accented, CJK, emoji, alphanumeric\n");
 
         // Query each with exact match
-        assert!(transducer.query("hello", 0).collect::<Vec<_>>().contains(&"hello".to_string()));
-        assert!(transducer.query("café", 0).collect::<Vec<_>>().contains(&"café".to_string()));
-        assert!(transducer.query("中文", 0).collect::<Vec<_>>().contains(&"中文".to_string()));
-        assert!(transducer.query("🎉", 0).collect::<Vec<_>>().contains(&"🎉".to_string()));
+        assert!(transducer
+            .query("hello", 0)
+            .collect::<Vec<_>>()
+            .contains(&"hello".to_string()));
+        assert!(transducer
+            .query("café", 0)
+            .collect::<Vec<_>>()
+            .contains(&"café".to_string()));
+        assert!(transducer
+            .query("中文", 0)
+            .collect::<Vec<_>>()
+            .contains(&"中文".to_string()));
+        assert!(transducer
+            .query("🎉", 0)
+            .collect::<Vec<_>>()
+            .contains(&"🎉".to_string()));
 
         println!("✅ SUCCESS: Mixed Unicode content works correctly");
     }
@@ -174,7 +185,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_transposition_unicode() {
         println!("\n=== PathMapChar: Transposition with Unicode ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "éfac"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "éfac"]);
         let transducer = Transducer::new(dict, Algorithm::Transposition);
 
         println!("Dictionary: [\"café\", \"éfac\"]");
@@ -196,7 +208,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_query_with_distance() {
         println!("\n=== PathMapChar: Query with Distance (Unicode) ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "naïve"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "naïve"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         // Query and get distances
@@ -221,7 +234,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_various_distances() {
         println!("\n=== PathMapChar: Various Distances ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["é", "ée", "éée"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["é", "ée", "éée"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary: [\"é\", \"ée\", \"éée\"]");
@@ -279,7 +293,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_remove_unicode() {
         println!("\n=== PathMapChar: Remove Unicode Terms ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "中文", "🎉"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "中文", "🎉"]);
         assert_eq!(dict.term_count(), 3);
 
         // Remove Unicode terms
@@ -300,7 +315,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_clear() {
         println!("\n=== PathMapChar: Clear Dictionary ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "中文", "🎉"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "中文", "🎉"]);
         assert_eq!(dict.term_count(), 3);
 
         dict.clear();
@@ -317,12 +333,9 @@ mod pathmap_char_tests {
     fn test_pathmap_char_with_values() {
         println!("\n=== PathMapChar: Value Mapping ===\n");
 
-        let terms_with_values = vec![
-            ("café", 1u32),
-            ("中文", 2u32),
-            ("🎉", 3u32),
-        ];
-        let dict: PathMapDictionaryChar<u32> = PathMapDictionaryChar::from_terms_with_values(terms_with_values);
+        let terms_with_values = vec![("café", 1u32), ("中文", 2u32), ("🎉", 3u32)];
+        let dict: PathMapDictionaryChar<u32> =
+            PathMapDictionaryChar::from_terms_with_values(terms_with_values);
 
         println!("Dictionary with scope IDs:");
         println!("  \"café\" -> 1");
@@ -342,12 +355,13 @@ mod pathmap_char_tests {
         println!("\n=== PathMapChar: Value-Filtered Query ===\n");
 
         let terms_with_scopes = vec![
-            ("café", 1u32),    // scope 1
-            ("cafe", 1u32),    // scope 1
-            ("中文", 2u32),     // scope 2
-            ("汉字", 2u32),     // scope 2
+            ("café", 1u32), // scope 1
+            ("cafe", 1u32), // scope 1
+            ("中文", 2u32), // scope 2
+            ("汉字", 2u32), // scope 2
         ];
-        let dict: PathMapDictionaryChar<u32> = PathMapDictionaryChar::from_terms_with_values(terms_with_scopes);
+        let dict: PathMapDictionaryChar<u32> =
+            PathMapDictionaryChar::from_terms_with_values(terms_with_scopes);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary with scopes:");
@@ -380,7 +394,8 @@ mod pathmap_char_tests {
             ("中文", 2u32),
             ("日本語", 3u32),
         ];
-        let dict: PathMapDictionaryChar<u32> = PathMapDictionaryChar::from_terms_with_values(terms_with_scopes);
+        let dict: PathMapDictionaryChar<u32> =
+            PathMapDictionaryChar::from_terms_with_values(terms_with_scopes);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary with scopes:");
@@ -390,13 +405,16 @@ mod pathmap_char_tests {
 
         // Query with scope set {1, 2}
         let scopes: HashSet<u32> = [1u32, 2u32].iter().copied().collect();
-        let results: Vec<_> = transducer
-            .query_by_value_set("cafe", 1, &scopes)
-            .collect();
+        let results: Vec<_> = transducer.query_by_value_set("cafe", 1, &scopes).collect();
 
-        println!("Query \"cafe\" at distance 1, scopes {{1, 2}}: {:?}", results);
+        println!(
+            "Query \"cafe\" at distance 1, scopes {{1, 2}}: {:?}",
+            results
+        );
         let result_terms: Vec<_> = results.iter().map(|c| c.term.as_str()).collect();
-        assert!(result_terms.iter().any(|&s| s == "café" || s == "naïve" || s == "中文"));
+        assert!(result_terms
+            .iter()
+            .any(|&s| s == "café" || s == "naïve" || s == "中文"));
         assert!(!result_terms.contains(&"日本語")); // scope 3 excluded
 
         println!("\n✅ SUCCESS: Value set filtering works with Unicode");
@@ -422,7 +440,8 @@ mod pathmap_char_tests {
     fn test_pathmap_char_single_character_terms() {
         println!("\n=== PathMapChar: Single Character Terms ===\n");
 
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["a", "é", "中", "🎉"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["a", "é", "中", "🎉"]);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         println!("Dictionary: [\"a\", \"é\", \"中\", \"🎉\"]");

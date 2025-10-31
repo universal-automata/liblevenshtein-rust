@@ -23,43 +23,50 @@ fn generate_test_pairs() -> Vec<(&'static str, &'static str, &'static str)> {
         ("short_1edit", "test", "best"),
         ("short_2edit", "test", "cast"),
         ("short_different", "abc", "xyz"),
-
         // Medium strings (10-50 chars)
         ("medium_identical", "programming", "programming"),
-        ("medium_similar", "programming", "programing"),  // 1 deletion
+        ("medium_similar", "programming", "programing"), // 1 deletion
         ("medium_prefix", "commonprefix_abc", "commonprefix_xyz"),
         ("medium_different", "completely", "different"),
-
         // Long strings (50-200 chars)
-        ("long_identical",
+        (
+            "long_identical",
             "The quick brown fox jumps over the lazy dog",
-            "The quick brown fox jumps over the lazy dog"),
-        ("long_similar",
             "The quick brown fox jumps over the lazy dog",
-            "The quick brown fox jumped over the lazy dog"),
-        ("long_prefix",
+        ),
+        (
+            "long_similar",
+            "The quick brown fox jumps over the lazy dog",
+            "The quick brown fox jumped over the lazy dog",
+        ),
+        (
+            "long_prefix",
             "In the beginning was the Word and the Word was with God",
-            "In the beginning was the Word and the Word was with Bob"),
-        ("long_different",
+            "In the beginning was the Word and the Word was with Bob",
+        ),
+        (
+            "long_different",
             "Pack my box with five dozen liquor jugs",
-            "How vexingly quick daft zebras jump"),
-
+            "How vexingly quick daft zebras jump",
+        ),
         // Unicode strings
         ("unicode_short", "café", "cafe"),
         ("unicode_japanese", "日本語", "日本語"),
         ("unicode_mixed", "Hello 世界", "Hello World"),
-
         // Transposition cases
         ("transposition_simple", "ab", "ba"),
         ("transposition_word", "test", "tset"),
-
         // Common prefix/suffix scenarios
-        ("long_common_prefix",
+        (
+            "long_common_prefix",
             "this_is_a_very_long_common_prefix_abc",
-            "this_is_a_very_long_common_prefix_xyz"),
-        ("long_common_suffix",
+            "this_is_a_very_long_common_prefix_xyz",
+        ),
+        (
+            "long_common_suffix",
             "abc_this_is_a_very_long_common_suffix",
-            "xyz_this_is_a_very_long_common_suffix"),
+            "xyz_this_is_a_very_long_common_suffix",
+        ),
     ]
 }
 
@@ -78,9 +85,7 @@ fn bench_standard_distance_iterative(c: &mut Criterion) {
             BenchmarkId::from_parameter(name),
             &(source, target),
             |b, &(s, t)| {
-                b.iter(|| {
-                    standard_distance(black_box(s), black_box(t))
-                });
+                b.iter(|| standard_distance(black_box(s), black_box(t)));
             },
         );
     }
@@ -100,9 +105,7 @@ fn bench_standard_distance_recursive(c: &mut Criterion) {
             &(source, target),
             |b, &(s, t)| {
                 let cache = create_memo_cache();
-                b.iter(|| {
-                    standard_distance_recursive(black_box(s), black_box(t), &cache)
-                });
+                b.iter(|| standard_distance_recursive(black_box(s), black_box(t), &cache));
             },
         );
     }
@@ -125,9 +128,7 @@ fn bench_standard_distance_recursive_warm_cache(c: &mut Criterion) {
                 // Warm up the cache
                 let _ = standard_distance_recursive(s, t, &cache);
 
-                b.iter(|| {
-                    standard_distance_recursive(black_box(s), black_box(t), &cache)
-                });
+                b.iter(|| standard_distance_recursive(black_box(s), black_box(t), &cache));
             },
         );
     }
@@ -150,9 +151,7 @@ fn bench_transposition_distance_iterative(c: &mut Criterion) {
             BenchmarkId::from_parameter(name),
             &(source, target),
             |b, &(s, t)| {
-                b.iter(|| {
-                    transposition_distance(black_box(s), black_box(t))
-                });
+                b.iter(|| transposition_distance(black_box(s), black_box(t)));
             },
         );
     }
@@ -172,9 +171,7 @@ fn bench_transposition_distance_recursive(c: &mut Criterion) {
             &(source, target),
             |b, &(s, t)| {
                 let cache = create_memo_cache();
-                b.iter(|| {
-                    transposition_distance_recursive(black_box(s), black_box(t), &cache)
-                });
+                b.iter(|| transposition_distance_recursive(black_box(s), black_box(t), &cache));
             },
         );
     }
@@ -198,9 +195,7 @@ fn bench_merge_split_distance(c: &mut Criterion) {
             &(source, target),
             |b, &(s, t)| {
                 let cache = create_memo_cache();
-                b.iter(|| {
-                    merge_and_split_distance(black_box(s), black_box(t), &cache)
-                });
+                b.iter(|| merge_and_split_distance(black_box(s), black_box(t), &cache));
             },
         );
     }
@@ -218,8 +213,11 @@ fn bench_algorithm_comparison(c: &mut Criterion) {
     let test_cases = vec![
         ("short", "test", "best"),
         ("medium", "programming", "programing"),
-        ("long", "The quick brown fox jumps over the lazy dog",
-                 "The quick brown fox jumped over the lazy dog"),
+        (
+            "long",
+            "The quick brown fox jumps over the lazy dog",
+            "The quick brown fox jumped over the lazy dog",
+        ),
     ];
 
     for (name, source, target) in test_cases {
@@ -238,7 +236,9 @@ fn bench_algorithm_comparison(c: &mut Criterion) {
 
         group.bench_function(format!("{}/transposition_recursive", name), |b| {
             let cache = create_memo_cache();
-            b.iter(|| transposition_distance_recursive(black_box(source), black_box(target), &cache));
+            b.iter(|| {
+                transposition_distance_recursive(black_box(source), black_box(target), &cache)
+            });
         });
 
         group.bench_function(format!("{}/merge_split", name), |b| {

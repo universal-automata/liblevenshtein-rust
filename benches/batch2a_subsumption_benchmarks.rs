@@ -176,27 +176,21 @@ fn bench_minimum_distance_simd(c: &mut Criterion) {
         let errors_2 = vec![2, 1];
 
         group.bench_function("2_values", |b| {
-            b.iter(|| {
-                black_box(find_minimum_simd(black_box(&errors_2), black_box(2)))
-            });
+            b.iter(|| black_box(find_minimum_simd(black_box(&errors_2), black_box(2))));
         });
 
         // Test case 2: Medium state (4 positions - SSE4.1 threshold)
         let errors_4 = vec![3, 1, 2, 4];
 
         group.bench_function("4_values", |b| {
-            b.iter(|| {
-                black_box(find_minimum_simd(black_box(&errors_4), black_box(4)))
-            });
+            b.iter(|| black_box(find_minimum_simd(black_box(&errors_4), black_box(4))));
         });
 
         // Test case 3: Large state (8 positions - AVX2 full)
         let errors_8 = vec![5, 2, 7, 1, 3, 6, 4, 8];
 
         group.bench_function("8_values", |b| {
-            b.iter(|| {
-                black_box(find_minimum_simd(black_box(&errors_8), black_box(8)))
-            });
+            b.iter(|| black_box(find_minimum_simd(black_box(&errors_8), black_box(8))));
         });
 
         // Test case 4: Realistic workload (many states, varying sizes)

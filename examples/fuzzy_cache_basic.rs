@@ -5,8 +5,8 @@
 
 #[cfg(feature = "pathmap-backend")]
 fn main() {
-    use liblevenshtein::prelude::*;
     use liblevenshtein::cache::eviction::Lru;
+    use liblevenshtein::prelude::*;
 
     println!("=== Cache Eviction Wrapper Example ===\n");
 
@@ -15,7 +15,10 @@ fn main() {
     let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested", "hello", "world"]);
     let lru_dict = Lru::new(dict);
 
-    println!("   Dictionary created with {} terms\n", lru_dict.len().unwrap_or(0));
+    println!(
+        "   Dictionary created with {} terms\n",
+        lru_dict.len().unwrap_or(0)
+    );
 
     // Create transducer with LRU-wrapped dictionary
     let transducer = Transducer::new(lru_dict, Algorithm::Standard);

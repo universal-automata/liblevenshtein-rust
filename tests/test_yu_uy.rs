@@ -1,5 +1,5 @@
-use liblevenshtein::prelude::*;
 use liblevenshtein::distance::transposition_distance;
+use liblevenshtein::prelude::*;
 
 #[test]
 fn test_yu_to_uy() {
@@ -26,7 +26,10 @@ fn test_yu_to_uy() {
         panic!("Automaton should find 'uy' at distance 1");
     }
 
-    let candidate = results.iter().find(|c| c.term == "uy").expect("Should find 'uy'");
+    let candidate = results
+        .iter()
+        .find(|c| c.term == "uy")
+        .expect("Should find 'uy'");
     println!("Found 'uy' at distance: {}", candidate.distance);
 
     if candidate.distance != 1 {

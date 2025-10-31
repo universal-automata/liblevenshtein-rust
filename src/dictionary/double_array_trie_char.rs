@@ -469,13 +469,7 @@ mod tests {
 
     #[test]
     fn test_mixed_unicode() {
-        let dict = DoubleArrayTrieChar::from_terms(vec![
-            "hello",
-            "café",
-            "中文",
-            "🎉",
-            "test123",
-        ]);
+        let dict = DoubleArrayTrieChar::from_terms(vec!["hello", "café", "中文", "🎉", "test123"]);
 
         assert!(dict.contains("hello"));
         assert!(dict.contains("café"));

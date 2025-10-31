@@ -24,8 +24,10 @@
 //! - Fuzzy matching requires correct Unicode semantics
 //! - Value-based filtering is needed with Unicode content
 
-use crate::dictionary::{CharUnit, Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy};
 use crate::dictionary::value::DictionaryValue;
+use crate::dictionary::{
+    CharUnit, Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy,
+};
 use pathmap::utils::BitMask;
 use pathmap::zipper::{Zipper, ZipperMoving, ZipperValues};
 use pathmap::PathMap;
@@ -422,7 +424,9 @@ impl<V: DictionaryValue> DictionaryNode for PathMapNodeChar<V> {
 
                             // Find a continuation byte (starts with 10)
                             if let Some(&cont_byte) = (0..=255u8)
-                                .filter(|b| child_mask.test_bit(*b) && (*b & 0b1100_0000) == 0b1000_0000)
+                                .filter(|b| {
+                                    child_mask.test_bit(*b) && (*b & 0b1100_0000) == 0b1000_0000
+                                })
                                 .next()
                                 .as_ref()
                             {
@@ -470,10 +474,13 @@ impl<V: DictionaryValue> DictionaryNode for PathMapNodeChar<V> {
             new_path.extend_from_slice(&base_path);
             new_path.extend_from_slice(&utf8_bytes);
 
-            (c, PathMapNodeChar {
-                map: Arc::clone(&map),
-                byte_path: Arc::new(new_path),
-            })
+            (
+                c,
+                PathMapNodeChar {
+                    map: Arc::clone(&map),
+                    byte_path: Arc::new(new_path),
+                },
+            )
         }))
     }
 
@@ -499,13 +506,15 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_creation() {
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "中文", "🎉"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "中文", "🎉"]);
         assert_eq!(dict.len(), Some(3));
     }
 
     #[test]
     fn test_pathmap_char_contains() {
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "naïve"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "naïve"]);
         assert!(dict.contains("café"));
         assert!(dict.contains("naïve"));
         assert!(!dict.contains("cafe")); // Without accent
@@ -513,13 +522,8 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_unicode_terms() {
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec![
-            "hello",
-            "café",
-            "中文",
-            "🎉",
-            "test123",
-        ]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["hello", "café", "中文", "🎉", "test123"]);
 
         assert!(dict.contains("hello"));
         assert!(dict.contains("café"));
@@ -546,7 +550,8 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_node_edges() {
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "car", "cart"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "car", "cart"]);
         let root = dict.root();
         let c = root.transition('c').expect("should have 'c'");
         let a = c.transition('a').expect("should have 'a'");
@@ -573,7 +578,8 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_remove() {
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["café", "中文", "test"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["café", "中文", "test"]);
         assert_eq!(dict.term_count(), 3);
 
         // Remove Unicode term
@@ -590,12 +596,9 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_with_values() {
-        let terms_with_values = vec![
-            ("café", 1u32),
-            ("中文", 2u32),
-            ("🎉", 3u32),
-        ];
-        let dict: PathMapDictionaryChar<u32> = PathMapDictionaryChar::from_terms_with_values(terms_with_values);
+        let terms_with_values = vec![("café", 1u32), ("中文", 2u32), ("🎉", 3u32)];
+        let dict: PathMapDictionaryChar<u32> =
+            PathMapDictionaryChar::from_terms_with_values(terms_with_values);
 
         assert_eq!(dict.len(), Some(3));
         assert_eq!(dict.get_value("café"), Some(1));
@@ -606,11 +609,9 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_node_value() {
-        let terms_with_values = vec![
-            ("café", 10u32),
-            ("中文", 20u32),
-        ];
-        let dict: PathMapDictionaryChar<u32> = PathMapDictionaryChar::from_terms_with_values(terms_with_values);
+        let terms_with_values = vec![("café", 10u32), ("中文", 20u32)];
+        let dict: PathMapDictionaryChar<u32> =
+            PathMapDictionaryChar::from_terms_with_values(terms_with_values);
         let root = dict.root();
 
         // Navigate to "café"
@@ -629,7 +630,8 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_emoji() {
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["hello🎉", "world🌍"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["hello🎉", "world🌍"]);
 
         assert!(dict.contains("hello🎉"));
         assert!(dict.contains("world🌍"));
@@ -647,7 +649,8 @@ mod tests {
 
     #[test]
     fn test_pathmap_char_cjk() {
-        let dict: PathMapDictionaryChar<()> = PathMapDictionaryChar::from_terms(vec!["中文", "日本語"]);
+        let dict: PathMapDictionaryChar<()> =
+            PathMapDictionaryChar::from_terms(vec!["中文", "日本語"]);
 
         assert!(dict.contains("中文"));
         assert!(dict.contains("日本語"));

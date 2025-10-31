@@ -9,7 +9,10 @@ use liblevenshtein::prelude::*;
 use std::collections::HashSet;
 
 /// Create a large dictionary with HashSet values for profiling
-fn create_fuzzy_multimap_dict(size: usize, values_per_set: usize) -> PathMapDictionary<HashSet<i32>> {
+fn create_fuzzy_multimap_dict(
+    size: usize,
+    values_per_set: usize,
+) -> PathMapDictionary<HashSet<i32>> {
     let terms: Vec<(String, HashSet<i32>)> = (0..size)
         .map(|i| {
             let term = format!("term{:04}", i);
@@ -76,9 +79,7 @@ fn profile_transducer_query_baseline(c: &mut Criterion) {
 
     c.bench_function("transducer_query_baseline", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer
-                .query(black_box("term"), black_box(2))
-                .collect();
+            let results: Vec<_> = transducer.query(black_box("term"), black_box(2)).collect();
             black_box(results)
         })
     });
@@ -105,11 +106,7 @@ fn profile_hashset_aggregation(c: &mut Criterion) {
     use liblevenshtein::cache::multimap::CollectionAggregate;
 
     // Create sample data
-    let sets: Vec<HashSet<i32>> = (0..50)
-        .map(|i| {
-            (i..i+10).collect()
-        })
-        .collect();
+    let sets: Vec<HashSet<i32>> = (0..50).map(|i| (i..i + 10).collect()).collect();
 
     c.bench_function("hashset_aggregation", |b| {
         b.iter(|| {

@@ -550,7 +550,8 @@ mod tests {
         let ordered =
             OrderedQueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
-        let unordered: QueryIterator<_, String> = QueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
+        let unordered: QueryIterator<_, String> =
+            QueryIterator::new(dict.root(), "test".to_string(), 2, Algorithm::Standard);
 
         let mut ordered_terms: Vec<_> = ordered.map(|c| c.term).collect();
         let mut unordered_terms: Vec<_> = unordered.collect();

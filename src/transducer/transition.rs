@@ -715,7 +715,14 @@ mod tests {
         let mut state = State::new();
         state.insert(Position::new(0, 0), Algorithm::Standard, max_distance);
 
-        let next = transition_state(&state, b't', query, max_distance, Algorithm::Standard, false);
+        let next = transition_state(
+            &state,
+            b't',
+            query,
+            max_distance,
+            Algorithm::Standard,
+            false,
+        );
         assert!(next.is_some());
 
         let next_state = next.unwrap();

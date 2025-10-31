@@ -13,68 +13,47 @@ fn bench_edge_lookup_simd_vs_scalar(c: &mut Criterion) {
         let mut group = c.benchmark_group("edge_lookup_simd_vs_scalar");
 
         // Test case 1: 4 edges (SSE4.1 threshold)
-        let edges_4: Vec<(u8, usize)> = vec![
-            (b'a', 1),
-            (b'e', 2),
-            (b'i', 3),
-            (b'o', 4),
-        ];
+        let edges_4: Vec<(u8, usize)> = vec![(b'a', 1), (b'e', 2), (b'i', 3), (b'o', 4)];
 
         group.bench_function(BenchmarkId::new("SIMD", "4_edges"), |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_4), black_box(b'i')))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_4), black_box(b'i'))));
         });
 
         group.bench_function(BenchmarkId::new("Scalar", "4_edges"), |b| {
-            b.iter(|| {
-                black_box(edges_4.iter().position(|(l, _)| *l == black_box(b'i')))
-            });
+            b.iter(|| black_box(edges_4.iter().position(|(l, _)| *l == black_box(b'i'))));
         });
 
         // Test case 2: 8 edges (SSE4.1 optimal)
         let edges_8: Vec<(u8, usize)> = (0..8).map(|i| (b'a' + i, i as usize)).collect();
 
         group.bench_function(BenchmarkId::new("SIMD", "8_edges"), |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_8), black_box(b'e')))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_8), black_box(b'e'))));
         });
 
         group.bench_function(BenchmarkId::new("Scalar", "8_edges"), |b| {
-            b.iter(|| {
-                black_box(edges_8.iter().position(|(l, _)| *l == black_box(b'e')))
-            });
+            b.iter(|| black_box(edges_8.iter().position(|(l, _)| *l == black_box(b'e'))));
         });
 
         // Test case 3: 16 edges (AVX2 threshold)
         let edges_16: Vec<(u8, usize)> = (0..16).map(|i| (b'a' + i, i as usize)).collect();
 
         group.bench_function(BenchmarkId::new("SIMD", "16_edges"), |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'h')))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'h'))));
         });
 
         group.bench_function(BenchmarkId::new("Scalar", "16_edges"), |b| {
-            b.iter(|| {
-                black_box(edges_16.iter().position(|(l, _)| *l == black_box(b'h')))
-            });
+            b.iter(|| black_box(edges_16.iter().position(|(l, _)| *l == black_box(b'h'))));
         });
 
         // Test case 4: 32 edges (AVX2 full)
         let edges_32: Vec<(u8, usize)> = (0..32).map(|i| (i as u8, i as usize)).collect();
 
         group.bench_function(BenchmarkId::new("SIMD", "32_edges"), |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_32), black_box(16)))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_32), black_box(16))));
         });
 
         group.bench_function(BenchmarkId::new("Scalar", "32_edges"), |b| {
-            b.iter(|| {
-                black_box(edges_32.iter().position(|(l, _)| *l == black_box(16)))
-            });
+            b.iter(|| black_box(edges_32.iter().position(|(l, _)| *l == black_box(16))));
         });
 
         group.finish();
@@ -99,30 +78,22 @@ fn bench_edge_lookup_position_variance(c: &mut Criterion) {
 
         // First position (index 0)
         group.bench_function("first", |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'a')))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'a'))));
         });
 
         // Middle position (index 8)
         group.bench_function("middle", |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'i')))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'i'))));
         });
 
         // Last position (index 15)
         group.bench_function("last", |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'p')))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'p'))));
         });
 
         // Not found
         group.bench_function("not_found", |b| {
-            b.iter(|| {
-                black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'z')))
-            });
+            b.iter(|| black_box(find_edge_label_simd(black_box(&edges_16), black_box(b'z'))));
         });
 
         group.finish();
@@ -148,7 +119,10 @@ fn bench_edge_lookup_realistic_workload(c: &mut Criterion) {
             // 3 edges (common)
             (vec![(b'a', 1), (b'e', 2), (b'i', 3)], b'i'),
             // 5 edges (common vowels + consonants)
-            (vec![(b'a', 1), (b'e', 2), (b'i', 3), (b'o', 4), (b'u', 5)], b'o'),
+            (
+                vec![(b'a', 1), (b'e', 2), (b'i', 3), (b'o', 4), (b'u', 5)],
+                b'o',
+            ),
             // 8 edges (high-branching node)
             ((0..8).map(|i| (b'a' + i, i as usize)).collect(), b'e'),
             // 12 edges (rare but exists)
@@ -178,29 +152,75 @@ fn bench_dawg_dictionary_integration(c: &mut Criterion) {
 
     // Create a dictionary with realistic English words
     let terms = vec![
-        "the", "be", "to", "of", "and", "a", "in", "that", "have", "I",
-        "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-        "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-        "or", "an", "will", "my", "one", "all", "would", "there", "their", "what",
-        "test", "testing", "tester", "tests", "tested",
-        "hello", "world", "help", "helper", "helping",
-        "program", "programming", "programmer", "programs",
-        "computer", "computing", "computation", "compute",
+        "the",
+        "be",
+        "to",
+        "of",
+        "and",
+        "a",
+        "in",
+        "that",
+        "have",
+        "I",
+        "it",
+        "for",
+        "not",
+        "on",
+        "with",
+        "he",
+        "as",
+        "you",
+        "do",
+        "at",
+        "this",
+        "but",
+        "his",
+        "by",
+        "from",
+        "they",
+        "we",
+        "say",
+        "her",
+        "she",
+        "or",
+        "an",
+        "will",
+        "my",
+        "one",
+        "all",
+        "would",
+        "there",
+        "their",
+        "what",
+        "test",
+        "testing",
+        "tester",
+        "tests",
+        "tested",
+        "hello",
+        "world",
+        "help",
+        "helper",
+        "helping",
+        "program",
+        "programming",
+        "programmer",
+        "programs",
+        "computer",
+        "computing",
+        "computation",
+        "compute",
     ];
 
     let dict = DawgDictionary::from_iter(terms.clone());
 
     // Benchmark: Dictionary contains() (uses transition() internally)
     group.bench_function("contains_existing", |b| {
-        b.iter(|| {
-            black_box(dict.contains(black_box("programming")))
-        });
+        b.iter(|| black_box(dict.contains(black_box("programming"))));
     });
 
     group.bench_function("contains_missing", |b| {
-        b.iter(|| {
-            black_box(dict.contains(black_box("nonexistent")))
-        });
+        b.iter(|| black_box(dict.contains(black_box("nonexistent"))));
     });
 
     // Benchmark: Multiple lookups (realistic workload)
@@ -228,12 +248,34 @@ fn bench_transducer_query_integration(c: &mut Criterion) {
 
     // Create dictionary and transducer
     let terms = vec![
-        "test", "testing", "tester", "tests", "tested",
-        "best", "rest", "west", "pest", "nest",
-        "hello", "help", "helper", "helping", "helped",
-        "world", "word", "work", "working", "worker",
-        "program", "programming", "programmer", "programs",
-        "compute", "computer", "computing", "computation",
+        "test",
+        "testing",
+        "tester",
+        "tests",
+        "tested",
+        "best",
+        "rest",
+        "west",
+        "pest",
+        "nest",
+        "hello",
+        "help",
+        "helper",
+        "helping",
+        "helped",
+        "world",
+        "word",
+        "work",
+        "working",
+        "worker",
+        "program",
+        "programming",
+        "programmer",
+        "programs",
+        "compute",
+        "computer",
+        "computing",
+        "computation",
     ];
 
     let dict = DawgDictionary::from_iter(terms);
@@ -242,9 +284,7 @@ fn bench_transducer_query_integration(c: &mut Criterion) {
     // Query with distance 1 (typical autocorrect)
     group.bench_function("query_distance_1", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer
-                .query(black_box("tset"), black_box(1))
-                .collect();
+            let results: Vec<_> = transducer.query(black_box("tset"), black_box(1)).collect();
             black_box(results)
         });
     });

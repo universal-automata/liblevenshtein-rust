@@ -187,26 +187,26 @@
 //!  └─ Recency tracking
 //! ```
 
-mod noop;
 mod lazy_init;
+mod noop;
 
-pub use noop::Noop;
 pub use lazy_init::{LazyInit, LazyInitDefault, LazyInitFn};
+pub use noop::Noop;
 
 // Placeholder modules for other eviction strategies
 // These will be implemented in subsequent steps
-pub mod lru;
-pub mod lru_optimized;
-pub mod lfu;
-pub mod ttl;
 pub mod age;
 pub mod cost_aware;
+pub mod lfu;
+pub mod lru;
+pub mod lru_optimized;
 pub mod memory_pressure;
+pub mod ttl;
 
-pub use lru::Lru;
-pub use lru_optimized::LruOptimized;
-pub use lfu::Lfu;
-pub use ttl::Ttl;
 pub use age::Age;
 pub use cost_aware::CostAware;
+pub use lfu::Lfu;
+pub use lru::Lru;
+pub use lru_optimized::LruOptimized;
 pub use memory_pressure::MemoryPressure;
+pub use ttl::Ttl;

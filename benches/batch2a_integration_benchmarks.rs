@@ -8,14 +8,64 @@ use liblevenshtein::prelude::*;
 fn bench_query_integration(c: &mut Criterion) {
     // Create a test dictionary with common English words
     let terms = vec![
-        "the", "be", "to", "of", "and", "a", "in", "that", "have", "I",
-        "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-        "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-        "or", "an", "will", "my", "one", "all", "would", "there", "their", "what",
-        "test", "testing", "tester", "tests", "tested",
-        "hello", "world", "help", "helper", "helping",
-        "program", "programming", "programmer", "programs",
-        "computer", "computing", "computation", "compute",
+        "the",
+        "be",
+        "to",
+        "of",
+        "and",
+        "a",
+        "in",
+        "that",
+        "have",
+        "I",
+        "it",
+        "for",
+        "not",
+        "on",
+        "with",
+        "he",
+        "as",
+        "you",
+        "do",
+        "at",
+        "this",
+        "but",
+        "his",
+        "by",
+        "from",
+        "they",
+        "we",
+        "say",
+        "her",
+        "she",
+        "or",
+        "an",
+        "will",
+        "my",
+        "one",
+        "all",
+        "would",
+        "there",
+        "their",
+        "what",
+        "test",
+        "testing",
+        "tester",
+        "tests",
+        "tested",
+        "hello",
+        "world",
+        "help",
+        "helper",
+        "helping",
+        "program",
+        "programming",
+        "programmer",
+        "programs",
+        "computer",
+        "computing",
+        "computation",
+        "compute",
     ];
 
     let dict = DawgDictionary::from_iter(terms);
@@ -26,9 +76,7 @@ fn bench_query_integration(c: &mut Criterion) {
     // Test 1: Short query with exact match
     group.bench_function("exact_match", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer
-                .query(black_box("test"), black_box(0))
-                .collect();
+            let results: Vec<_> = transducer.query(black_box("test"), black_box(0)).collect();
             black_box(results)
         });
     });
@@ -36,9 +84,7 @@ fn bench_query_integration(c: &mut Criterion) {
     // Test 2: Query with distance 1 (typical autocorrect)
     group.bench_function("distance_1", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer
-                .query(black_box("tset"), black_box(1))
-                .collect();
+            let results: Vec<_> = transducer.query(black_box("tset"), black_box(1)).collect();
             black_box(results)
         });
     });
@@ -46,9 +92,7 @@ fn bench_query_integration(c: &mut Criterion) {
     // Test 3: Query with distance 2 (fuzzy search)
     group.bench_function("distance_2", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer
-                .query(black_box("tset"), black_box(2))
-                .collect();
+            let results: Vec<_> = transducer.query(black_box("tset"), black_box(2)).collect();
             black_box(results)
         });
     });
@@ -102,9 +146,7 @@ fn bench_min_distance_integration(c: &mut Criterion) {
         }
 
         group.bench_function(&format!("{}_positions", size), |b| {
-            b.iter(|| {
-                black_box(state.min_distance())
-            });
+            b.iter(|| black_box(state.min_distance()));
         });
     }
 

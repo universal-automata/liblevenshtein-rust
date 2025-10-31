@@ -34,8 +34,13 @@ fn debug_unicode_vs_ascii_empty_query() {
         let dict = DoubleArrayTrie::from_terms(vec![term.to_string()]);
         let trans = Transducer::new(dict, Algorithm::Standard);
         let results: Vec<_> = trans.query("", 1).collect();
-        println!("  \"{}\": bytes={}, chars={}, results={:?}",
-                 term, term.len(), term.chars().count(), results);
+        println!(
+            "  \"{}\": bytes={}, chars={}, results={:?}",
+            term,
+            term.len(),
+            term.chars().count(),
+            results
+        );
     }
 
     println!("\n--- Analysis ---");

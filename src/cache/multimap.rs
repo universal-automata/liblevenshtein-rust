@@ -38,7 +38,7 @@
 
 use crate::dictionary::{DictionaryValue, MappedDictionary};
 use crate::transducer::{Algorithm, Transducer};
-use std::collections::{HashSet, BTreeSet};
+use std::collections::{BTreeSet, HashSet};
 use std::hash::Hash;
 
 /// Trait for types that can aggregate multiple values into one.
@@ -92,8 +92,9 @@ where
         let mut values = values.peekable();
 
         // Estimate capacity from first set's size
-        let initial_capacity = values.peek()
-            .map(|first_set| first_set.len() * 2)  // Heuristic: 2x first set size
+        let initial_capacity = values
+            .peek()
+            .map(|first_set| first_set.len() * 2) // Heuristic: 2x first set size
             .unwrap_or(0);
 
         let mut acc = HashSet::with_capacity(initial_capacity);
@@ -139,8 +140,9 @@ where
         let mut values = values.peekable();
 
         // Estimate capacity from first vec's size
-        let initial_capacity = values.peek()
-            .map(|first_vec| first_vec.len() * 2)  // Heuristic: 2x first vec size
+        let initial_capacity = values
+            .peek()
+            .map(|first_vec| first_vec.len() * 2) // Heuristic: 2x first vec size
             .unwrap_or(0);
 
         let mut acc = Vec::with_capacity(initial_capacity);
@@ -286,7 +288,8 @@ where
     pub fn query(&self, query_term: &str, max_distance: usize) -> Option<C> {
         // Optimization: Single-pass collection - avoid double Vec allocation
         // Instead of collecting candidates then mapping to values, we fuse the operations
-        let mut values = self.transducer
+        let mut values = self
+            .transducer
             .query(query_term, max_distance)
             .filter_map(|term| self.dictionary.get_value(&term))
             .peekable();
@@ -409,9 +412,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_fuzzy_multimap_exact_match() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("hello", HashSet::from([1, 2, 3])),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("hello", HashSet::from([1, 2, 3]))]);
 
         let fuzzy = FuzzyMultiMap::new(dict, Algorithm::Standard);
 
@@ -442,7 +443,7 @@ mod tests {
     fn test_fuzzy_multimap_with_transposition() {
         let dict = PathMapDictionary::from_terms_with_values([
             ("hello", HashSet::from([1])),
-            ("ehllo", HashSet::from([2])),  // Adjacent transposition of "hello"
+            ("ehllo", HashSet::from([2])), // Adjacent transposition of "hello"
         ]);
 
         let fuzzy = FuzzyMultiMap::new(dict, Algorithm::Transposition);

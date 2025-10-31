@@ -124,12 +124,12 @@ unsafe fn standard_distance_avx2(source: &str, target: &str) -> usize {
             // Process first element with dependency, then vectorize the rest
             if j == 1 {
                 // First element: full scalar calculation
-                let cost = if source_char == target_chars[0] as u32 { 0 } else { 1 };
-                curr_row[1] = min3_scalar(
-                    prev_row[1] + 1,
-                    curr_row[0] + 1,
-                    prev_row[0] + cost,
-                );
+                let cost = if source_char == target_chars[0] as u32 {
+                    0
+                } else {
+                    1
+                };
+                curr_row[1] = min3_scalar(prev_row[1] + 1, curr_row[0] + 1, prev_row[0] + cost);
                 j += 1;
                 continue;
             }
@@ -153,12 +153,12 @@ unsafe fn standard_distance_avx2(source: &str, target: &str) -> usize {
 
         // Process remaining columns with scalar code
         for j in j..=n {
-            let cost = if source_char == target_chars[j - 1] as u32 { 0 } else { 1 };
-            curr_row[j] = min3_scalar(
-                prev_row[j] + 1,
-                curr_row[j - 1] + 1,
-                prev_row[j - 1] + cost,
-            );
+            let cost = if source_char == target_chars[j - 1] as u32 {
+                0
+            } else {
+                1
+            };
+            curr_row[j] = min3_scalar(prev_row[j] + 1, curr_row[j - 1] + 1, prev_row[j - 1] + cost);
         }
 
         // Swap rows
@@ -302,12 +302,12 @@ unsafe fn standard_distance_sse41(source: &str, target: &str) -> usize {
             // Process first element with dependency, then vectorize the rest
             if j == 1 {
                 // First element: full scalar calculation
-                let cost = if source_char == target_chars[0] as u32 { 0 } else { 1 };
-                curr_row[1] = min3_scalar(
-                    prev_row[1] + 1,
-                    curr_row[0] + 1,
-                    prev_row[0] + cost,
-                );
+                let cost = if source_char == target_chars[0] as u32 {
+                    0
+                } else {
+                    1
+                };
+                curr_row[1] = min3_scalar(prev_row[1] + 1, curr_row[0] + 1, prev_row[0] + cost);
                 j += 1;
                 continue;
             }
@@ -331,12 +331,12 @@ unsafe fn standard_distance_sse41(source: &str, target: &str) -> usize {
 
         // Process remaining columns with scalar code
         for j in j..=n {
-            let cost = if source_char == target_chars[j - 1] as u32 { 0 } else { 1 };
-            curr_row[j] = min3_scalar(
-                prev_row[j] + 1,
-                curr_row[j - 1] + 1,
-                prev_row[j - 1] + cost,
-            );
+            let cost = if source_char == target_chars[j - 1] as u32 {
+                0
+            } else {
+                1
+            };
+            curr_row[j] = min3_scalar(prev_row[j] + 1, curr_row[j - 1] + 1, prev_row[j - 1] + cost);
         }
 
         // Swap rows
@@ -691,7 +691,7 @@ mod tests {
             ("", "", (0, 0, 0)),
             ("abc", "", (0, 3, 0)),
             ("", "abc", (0, 0, 3)),
-            ("abc", "abc", (3, 0, 0)), // fully identical
+            ("abc", "abc", (3, 0, 0)),    // fully identical
             ("abcdef", "abc", (3, 3, 0)), // a is prefix of b
             ("abc", "abcdef", (3, 0, 3)), // b is prefix of a
             ("prefix_middle_suffix", "prefix_other_suffix", (7, 6, 5)), // common prefix and suffix

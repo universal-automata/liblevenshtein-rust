@@ -12,7 +12,10 @@ fn debug_yu_uy_all_results() {
 
     println!("All results within distance 2:");
     for (i, candidate) in results.iter().enumerate() {
-        println!("  {}: term='{}', distance={}", i, candidate.term, candidate.distance);
+        println!(
+            "  {}: term='{}', distance={}",
+            i, candidate.term, candidate.distance
+        );
     }
     println!();
 
@@ -20,7 +23,10 @@ fn debug_yu_uy_all_results() {
     let results_d1: Vec<_> = transducer.query_with_distance("yu", 1).collect();
     println!("Results within distance 1:");
     for (i, candidate) in results_d1.iter().enumerate() {
-        println!("  {}: term='{}', distance={}", i, candidate.term, candidate.distance);
+        println!(
+            "  {}: term='{}', distance={}",
+            i, candidate.term, candidate.distance
+        );
     }
     println!();
 

@@ -236,7 +236,10 @@ impl<D, V> LazyInitFn<D, V> {
     /// ```
     #[inline]
     pub fn new(dict: D, initializer: fn() -> V) -> Self {
-        Self { inner: dict, initializer }
+        Self {
+            inner: dict,
+            initializer,
+        }
     }
 
     /// Unwraps the inner dictionary.
@@ -365,7 +368,10 @@ impl<D, F> LazyInit<D, F> {
     /// ```
     #[inline]
     pub fn new(dict: D, initializer: F) -> Self {
-        Self { inner: dict, initializer }
+        Self {
+            inner: dict,
+            initializer,
+        }
     }
 
     /// Unwraps the inner dictionary.
@@ -478,7 +484,7 @@ mod tests {
     fn test_lazy_init_default_with_some_values() {
         let dict = PathMapDictionary::from_terms_with_values([
             ("foo", 42),
-            ("bar", 0),  // Explicit zero
+            ("bar", 0), // Explicit zero
         ]);
         // Add term without value
         dict.insert("baz");
@@ -508,10 +514,7 @@ mod tests {
         }
 
         // Create dictionary with explicit values - some entries, some without values
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
         let lazy = LazyInitFn::new(dict, increment_counter);
 
         // Terms with values should return those values (not call initializer)
@@ -549,13 +552,8 @@ mod tests {
         let counter_clone = Arc::clone(&counter);
 
         // Create dictionary with explicit values
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 10),
-            ("bar", 20),
-        ]);
-        let lazy = LazyInit::new(dict, move || {
-            counter_clone.fetch_add(1, Ordering::SeqCst)
-        });
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 10), ("bar", 20)]);
+        let lazy = LazyInit::new(dict, move || counter_clone.fetch_add(1, Ordering::SeqCst));
 
         let val1 = lazy.get_value("foo").unwrap();
         let val2 = lazy.get_value("bar").unwrap();

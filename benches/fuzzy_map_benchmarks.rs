@@ -13,9 +13,7 @@ use std::collections::HashSet;
 
 /// Create a dictionary without values (baseline)
 fn create_dict_no_values(size: usize) -> PathMapDictionary<()> {
-    let words: Vec<String> = (0..size)
-        .map(|i| format!("term{:04}", i))
-        .collect();
+    let words: Vec<String> = (0..size).map(|i| format!("term{:04}", i)).collect();
     PathMapDictionary::from_terms(words)
 }
 
@@ -49,40 +47,28 @@ fn bench_memory_overhead(c: &mut Criterion) {
 
     for size in [100, 500, 1000].iter() {
         // Baseline: no values
-        group.bench_with_input(
-            BenchmarkId::new("no_values", size),
-            size,
-            |b, &s| {
-                b.iter(|| {
-                    let dict = create_dict_no_values(s);
-                    black_box(dict)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("no_values", size), size, |b, &s| {
+            b.iter(|| {
+                let dict = create_dict_no_values(s);
+                black_box(dict)
+            })
+        });
 
         // With u32 values
-        group.bench_with_input(
-            BenchmarkId::new("u32_values", size),
-            size,
-            |b, &s| {
-                b.iter(|| {
-                    let dict = create_dict_with_scopes(s, 10);
-                    black_box(dict)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("u32_values", size), size, |b, &s| {
+            b.iter(|| {
+                let dict = create_dict_with_scopes(s, 10);
+                black_box(dict)
+            })
+        });
 
         // With Vec<u32> metadata
-        group.bench_with_input(
-            BenchmarkId::new("vec_metadata", size),
-            size,
-            |b, &s| {
-                b.iter(|| {
-                    let dict = create_dict_with_metadata(s);
-                    black_box(dict)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("vec_metadata", size), size, |b, &s| {
+            b.iter(|| {
+                let dict = create_dict_with_metadata(s);
+                black_box(dict)
+            })
+        });
     }
 
     group.finish();
@@ -97,9 +83,7 @@ fn bench_filtered_vs_postfiltered(c: &mut Criterion) {
     // Unfiltered baseline (all results)
     group.bench_function("unfiltered", |b| {
         b.iter(|| {
-            let results: Vec<_> = transducer
-                .query(black_box("term"), black_box(2))
-                .collect();
+            let results: Vec<_> = transducer.query(black_box("term"), black_box(2)).collect();
             black_box(results)
         })
     });
@@ -120,9 +104,7 @@ fn bench_filtered_vs_postfiltered(c: &mut Criterion) {
             let dict_ref = transducer.dictionary();
             let results: Vec<_> = transducer
                 .query(black_box("term"), black_box(2))
-                .filter(|term| {
-                    dict_ref.get_value(term) == Some(5)
-                })
+                .filter(|term| dict_ref.get_value(term) == Some(5))
                 .collect();
             black_box(results)
         })
@@ -137,11 +119,13 @@ fn bench_filter_selectivity(c: &mut Criterion) {
 
     // Test different selectivity levels
     for (selectivity, num_scopes) in [
-        ("1_percent", 100),   // 1% of terms match
-        ("10_percent", 10),   // 10% of terms match
-        ("50_percent", 2),    // 50% of terms match
-        ("100_percent", 1),   // 100% of terms match
-    ].iter() {
+        ("1_percent", 100), // 1% of terms match
+        ("10_percent", 10), // 10% of terms match
+        ("50_percent", 2),  // 50% of terms match
+        ("100_percent", 1), // 100% of terms match
+    ]
+    .iter()
+    {
         let dict = create_dict_with_scopes(1000, *num_scopes);
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
@@ -166,9 +150,7 @@ fn bench_filter_selectivity(c: &mut Criterion) {
                     let dict_ref = transducer.dictionary();
                     let results: Vec<_> = transducer
                         .query(black_box("term"), black_box(2))
-                        .filter(|term| {
-                            dict_ref.get_value(term) == Some(0)
-                        })
+                        .filter(|term| dict_ref.get_value(term) == Some(0))
                         .collect();
                     black_box(results)
                 })
@@ -189,18 +171,14 @@ fn bench_value_set_filtering(c: &mut Criterion) {
     for set_size in [1, 5, 10, 20].iter() {
         let value_set: HashSet<u32> = (0..*set_size).collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("value_set", set_size),
-            set_size,
-            |b, _| {
-                b.iter(|| {
-                    let results: Vec<_> = transducer
-                        .query_by_value_set(black_box("term"), black_box(2), &value_set)
-                        .collect();
-                    black_box(results)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("value_set", set_size), set_size, |b, _| {
+            b.iter(|| {
+                let results: Vec<_> = transducer
+                    .query_by_value_set(black_box("term"), black_box(2), &value_set)
+                    .collect();
+                black_box(results)
+            })
+        });
     }
 
     group.finish();
@@ -225,7 +203,10 @@ fn bench_dict_operations_with_values(c: &mut Criterion) {
         let dict: PathMapDictionary<Vec<u32>> = PathMapDictionary::new();
         let mut counter = 0;
         b.iter(|| {
-            dict.insert_with_value(&format!("term{}", counter), black_box(vec![counter, counter * 2]));
+            dict.insert_with_value(
+                &format!("term{}", counter),
+                black_box(vec![counter, counter * 2]),
+            );
             counter += 1;
         })
     });
@@ -312,18 +293,14 @@ fn bench_dict_size_with_filtering(c: &mut Criterion) {
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         group.throughput(Throughput::Elements(*size as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    let results: Vec<_> = transducer
-                        .query_filtered(black_box("term"), black_box(2), |scope| *scope == 5)
-                        .collect();
-                    black_box(results)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
+            b.iter(|| {
+                let results: Vec<_> = transducer
+                    .query_filtered(black_box("term"), black_box(2), |scope| *scope == 5)
+                    .collect();
+                black_box(results)
+            })
+        });
     }
 
     group.finish();
@@ -336,18 +313,14 @@ fn bench_distance_with_filtering(c: &mut Criterion) {
     let mut group = c.benchmark_group("distance_with_filtering");
 
     for distance in [0, 1, 2, 3].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(distance),
-            distance,
-            |b, &d| {
-                b.iter(|| {
-                    let results: Vec<_> = transducer
-                        .query_filtered(black_box("term"), black_box(d), |scope| *scope == 5)
-                        .collect();
-                    black_box(results)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(distance), distance, |b, &d| {
+            b.iter(|| {
+                let results: Vec<_> = transducer
+                    .query_filtered(black_box("term"), black_box(d), |scope| *scope == 5)
+                    .collect();
+                black_box(results)
+            })
+        });
     }
 
     group.finish();

@@ -1,5 +1,5 @@
-use liblevenshtein::prelude::*;
 use liblevenshtein::distance::merge_and_split_distance;
+use liblevenshtein::prelude::*;
 
 #[test]
 fn debug_merge_split_b_to_aaa() {
@@ -84,9 +84,7 @@ fn test_merge_split_various_cases() {
         let func_dist = merge_and_split_distance(query, term, &cache);
         let results: Vec<_> = transducer.query_with_distance(query, 5).collect();
 
-        let auto_dist = results.iter()
-            .find(|c| c.term == term)
-            .map(|c| c.distance);
+        let auto_dist = results.iter().find(|c| c.term == term).map(|c| c.distance);
 
         let status = match auto_dist {
             Some(d) if d == func_dist => "✓",
@@ -105,15 +103,30 @@ fn test_merge_split_operations() {
     let cache = liblevenshtein::distance::create_memo_cache();
 
     println!("Merge operation (two chars → one):");
-    println!("  \"ab\" → \"c\": {}", merge_and_split_distance("ab", "c", &cache));
-    println!("  \"xy\" → \"a\": {}", merge_and_split_distance("xy", "a", &cache));
+    println!(
+        "  \"ab\" → \"c\": {}",
+        merge_and_split_distance("ab", "c", &cache)
+    );
+    println!(
+        "  \"xy\" → \"a\": {}",
+        merge_and_split_distance("xy", "a", &cache)
+    );
 
     println!("\nSplit operation (one char → two):");
-    println!("  \"a\" → \"bc\": {}", merge_and_split_distance("a", "bc", &cache));
-    println!("  \"x\" → \"yz\": {}", merge_and_split_distance("x", "yz", &cache));
+    println!(
+        "  \"a\" → \"bc\": {}",
+        merge_and_split_distance("a", "bc", &cache)
+    );
+    println!(
+        "  \"x\" → \"yz\": {}",
+        merge_and_split_distance("x", "yz", &cache)
+    );
 
     println!("\nCombined:");
-    println!("  \"b\" → \"aaa\": {}", merge_and_split_distance("b", "aaa", &cache));
+    println!(
+        "  \"b\" → \"aaa\": {}",
+        merge_and_split_distance("b", "aaa", &cache)
+    );
     println!("    Possible: substitute b→a, then split a→aa (2 ops)");
     println!("    Or: delete b, insert a, split a→aa (3 ops)");
 }

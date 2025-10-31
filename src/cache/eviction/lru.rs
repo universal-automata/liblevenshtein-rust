@@ -30,7 +30,10 @@
 //! assert_eq!(lru.get_value("foo"), Some(42));
 //! ```
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -128,7 +131,8 @@ impl<D> Lru<D> {
     /// Records an entry access (updates metadata).
     fn record_access(&self, term: &str) {
         let mut metadata = self.metadata.write().unwrap();
-        metadata.entry(term.to_string())
+        metadata
+            .entry(term.to_string())
             .and_modify(|m| m.update_access())
             .or_insert_with(EntryMetadata::new);
     }
@@ -146,10 +150,9 @@ impl<D> Lru<D> {
     /// Returns the term with the longest time since last access.
     pub fn find_lru(&self, terms: &[&str]) -> Option<String> {
         let metadata = self.metadata.read().unwrap();
-        terms.iter()
-            .filter_map(|&term| {
-                metadata.get(term).map(|m| (term, m.recency()))
-            })
+        terms
+            .iter()
+            .filter_map(|&term| metadata.get(term).map(|m| (term, m.recency())))
             .max_by_key(|(_, recency)| *recency)
             .map(|(term, _)| term.to_string())
     }
@@ -252,17 +255,19 @@ where
 
     #[inline]
     fn transition(&self, label: Self::Unit) -> Option<Self> {
-        self.inner.transition(label).map(|node| {
-            LruNode::new(node, Arc::clone(&self.metadata))
-        })
+        self.inner
+            .transition(label)
+            .map(|node| LruNode::new(node, Arc::clone(&self.metadata)))
     }
 
     #[inline]
     fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         let metadata = Arc::clone(&self.metadata);
-        Box::new(self.inner.edges().map(move |(label, node)| {
-            (label, LruNode::new(node, Arc::clone(&metadata)))
-        }))
+        Box::new(
+            self.inner
+                .edges()
+                .map(move |(label, node)| (label, LruNode::new(node, Arc::clone(&metadata)))),
+        )
     }
 
     #[inline]
@@ -295,10 +300,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lru_wrapper_basic() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lru = Lru::new(dict);
 
@@ -311,10 +313,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lru_access_tracking() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lru = Lru::new(dict);
 
@@ -337,11 +336,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lru_find_lru() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let lru = Lru::new(dict);
 
@@ -360,11 +356,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lru_eviction() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let lru = Lru::new(dict);
 
@@ -386,10 +379,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lru_update_on_access() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lru = Lru::new(dict);
 
@@ -414,10 +404,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lru_clear_metadata() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lru = Lru::new(dict);
 

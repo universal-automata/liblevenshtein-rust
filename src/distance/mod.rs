@@ -12,8 +12,8 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use smallvec::SmallVec;
 use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
 
 #[cfg(feature = "simd")]
 pub mod simd;
@@ -394,7 +394,8 @@ pub fn standard_distance_recursive(source: &str, target: &str, cache: &MemoCache
     }
 
     // Strip common prefix and suffix (major optimization)
-    let (prefix_len, adjusted_source_len, adjusted_target_len) = strip_common_affixes(source, target);
+    let (prefix_len, adjusted_source_len, adjusted_target_len) =
+        strip_common_affixes(source, target);
 
     // If strings are identical after stripping, distance is 0
     if adjusted_source_len == 0 && adjusted_target_len == 0 {
@@ -418,8 +419,12 @@ pub fn standard_distance_recursive(source: &str, target: &str, cache: &MemoCache
     let source_chars: SmallVec<[char; 32]> = source.chars().collect();
     let target_chars: SmallVec<[char; 32]> = target.chars().collect();
 
-    let s_remaining: String = source_chars[prefix_len..prefix_len + adjusted_source_len].iter().collect();
-    let t_remaining: String = target_chars[prefix_len..prefix_len + adjusted_target_len].iter().collect();
+    let s_remaining: String = source_chars[prefix_len..prefix_len + adjusted_source_len]
+        .iter()
+        .collect();
+    let t_remaining: String = target_chars[prefix_len..prefix_len + adjusted_target_len]
+        .iter()
+        .collect();
 
     let a = source_chars[prefix_len];
     let b = target_chars[prefix_len];
@@ -502,7 +507,8 @@ pub fn transposition_distance_recursive(source: &str, target: &str, cache: &Memo
     }
 
     // Strip common prefix and suffix (major optimization)
-    let (prefix_len, adjusted_source_len, adjusted_target_len) = strip_common_affixes(source, target);
+    let (prefix_len, adjusted_source_len, adjusted_target_len) =
+        strip_common_affixes(source, target);
 
     // If strings are identical after stripping, distance is 0
     if adjusted_source_len == 0 && adjusted_target_len == 0 {
@@ -526,8 +532,12 @@ pub fn transposition_distance_recursive(source: &str, target: &str, cache: &Memo
     let source_chars: SmallVec<[char; 32]> = source.chars().collect();
     let target_chars: SmallVec<[char; 32]> = target.chars().collect();
 
-    let s_remaining: String = source_chars[prefix_len..prefix_len + adjusted_source_len].iter().collect();
-    let t_remaining: String = target_chars[prefix_len..prefix_len + adjusted_target_len].iter().collect();
+    let s_remaining: String = source_chars[prefix_len..prefix_len + adjusted_source_len]
+        .iter()
+        .collect();
+    let t_remaining: String = target_chars[prefix_len..prefix_len + adjusted_target_len]
+        .iter()
+        .collect();
 
     let a = source_chars[prefix_len];
     let b = target_chars[prefix_len];
@@ -625,7 +635,8 @@ pub fn merge_and_split_distance(source: &str, target: &str, cache: &MemoCache) -
     }
 
     // Strip common prefix and suffix (major optimization)
-    let (prefix_len, adjusted_source_len, adjusted_target_len) = strip_common_affixes(source, target);
+    let (prefix_len, adjusted_source_len, adjusted_target_len) =
+        strip_common_affixes(source, target);
 
     // If strings are identical after stripping, distance is 0
     if adjusted_source_len == 0 && adjusted_target_len == 0 {
@@ -649,8 +660,12 @@ pub fn merge_and_split_distance(source: &str, target: &str, cache: &MemoCache) -
     let source_chars: SmallVec<[char; 32]> = source.chars().collect();
     let target_chars: SmallVec<[char; 32]> = target.chars().collect();
 
-    let s_remaining: String = source_chars[prefix_len..prefix_len + adjusted_source_len].iter().collect();
-    let t_remaining: String = target_chars[prefix_len..prefix_len + adjusted_target_len].iter().collect();
+    let s_remaining: String = source_chars[prefix_len..prefix_len + adjusted_source_len]
+        .iter()
+        .collect();
+    let t_remaining: String = target_chars[prefix_len..prefix_len + adjusted_target_len]
+        .iter()
+        .collect();
 
     let a = source_chars[prefix_len];
     let b = target_chars[prefix_len];
@@ -931,9 +946,17 @@ mod tests {
         let iterative = standard_distance(a, b);
         let recursive = standard_distance_recursive(a, b, &cache);
 
-        eprintln!("String b: '{}', bytes: {}, chars: {}", b, b.len(), b.chars().count());
+        eprintln!(
+            "String b: '{}', bytes: {}, chars: {}",
+            b,
+            b.len(),
+            b.chars().count()
+        );
         eprintln!("Iterative: {}, Recursive: {}", iterative, recursive);
 
-        assert_eq!(recursive, iterative, "Unicode distance mismatch for empty string");
+        assert_eq!(
+            recursive, iterative,
+            "Unicode distance mismatch for empty string"
+        );
     }
 }

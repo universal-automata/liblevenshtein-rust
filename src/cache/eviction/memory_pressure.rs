@@ -29,7 +29,10 @@
 //! assert_eq!(memory_pressure.get_value("foo"), Some(42));
 //! ```
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -143,7 +146,8 @@ impl<D> MemoryPressure<D> {
     fn record_access<V: DictionaryValue>(&self, term: &str, _value: &V) {
         let size = std::mem::size_of::<V>();
         let mut metadata = self.metadata.write().unwrap();
-        metadata.entry(term.to_string())
+        metadata
+            .entry(term.to_string())
             .and_modify(|m| m.increment())
             .or_insert_with(|| EntryMetadata::new(size));
     }
@@ -161,12 +165,17 @@ impl<D> MemoryPressure<D> {
     /// Returns the term with the highest pressure score (most likely to evict).
     pub fn find_highest_pressure(&self, terms: &[&str]) -> Option<String> {
         let metadata = self.metadata.read().unwrap();
-        terms.iter()
+        terms
+            .iter()
             .filter_map(|&term| {
-                metadata.get(term).map(|m| (term, m.memory_pressure_score()))
+                metadata
+                    .get(term)
+                    .map(|m| (term, m.memory_pressure_score()))
             })
             .max_by(|(_, score1), (_, score2)| {
-                score1.partial_cmp(score2).unwrap_or(std::cmp::Ordering::Equal)
+                score1
+                    .partial_cmp(score2)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(term, _)| term.to_string())
     }
@@ -271,9 +280,9 @@ where
 
     #[inline]
     fn transition(&self, label: Self::Unit) -> Option<Self> {
-        self.inner.transition(label).map(|node| {
-            MemoryPressureNode::new(node, Arc::clone(&self.metadata))
-        })
+        self.inner
+            .transition(label)
+            .map(|node| MemoryPressureNode::new(node, Arc::clone(&self.metadata)))
     }
 
     #[inline]
@@ -312,10 +321,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_memory_pressure_wrapper_basic() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let memory_pressure = MemoryPressure::new(dict);
 
@@ -328,10 +334,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_memory_pressure_scoring() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let memory_pressure = MemoryPressure::new(dict);
 
@@ -352,11 +355,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_memory_pressure_find_highest() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let memory_pressure = MemoryPressure::new(dict);
 
@@ -383,10 +383,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_memory_pressure_eviction() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let memory_pressure = MemoryPressure::new(dict);
 
@@ -399,16 +396,16 @@ mod tests {
         assert!(evicted.is_some());
 
         // Evicted term should have no metadata
-        assert_eq!(memory_pressure.memory_pressure_score(&evicted.unwrap()), None);
+        assert_eq!(
+            memory_pressure.memory_pressure_score(&evicted.unwrap()),
+            None
+        );
     }
 
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_memory_pressure_clear_metadata() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let memory_pressure = MemoryPressure::new(dict);
 

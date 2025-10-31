@@ -187,8 +187,8 @@ fn approach2_bitmask(
 
 #[derive(Clone, Debug)]
 enum HybridScopeData {
-    Mask(u64),                  // For scopes 0-63
-    Set(HashSet<u32>),         // For overflow or when >64 scopes exist
+    Mask(u64),         // For scopes 0-63
+    Set(HashSet<u32>), // For overflow or when >64 scopes exist
 }
 
 // Implement DictionaryValue trait for HybridScopeData
@@ -370,16 +370,7 @@ fn bench_approach1_hashset(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(scenario.name),
             scenario,
-            |b, _scenario| {
-                b.iter(|| {
-                    approach1_hashset(
-                        &transducer,
-                        "term",
-                        2,
-                        &query_scopes,
-                    )
-                })
-            },
+            |b, _scenario| b.iter(|| approach1_hashset(&transducer, "term", 2, &query_scopes)),
         );
     }
 
@@ -405,16 +396,7 @@ fn bench_approach2_bitmask(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(scenario.name),
             scenario,
-            |b, _scenario| {
-                b.iter(|| {
-                    approach2_bitmask(
-                        &transducer,
-                        "term",
-                        2,
-                        query_mask,
-                    )
-                })
-            },
+            |b, _scenario| b.iter(|| approach2_bitmask(&transducer, "term", 2, query_mask)),
         );
     }
 
@@ -440,15 +422,7 @@ fn bench_approach3_hybrid(c: &mut Criterion) {
             BenchmarkId::from_parameter(scenario.name),
             scenario,
             |b, _scenario| {
-                b.iter(|| {
-                    approach3_hybrid(
-                        &transducer,
-                        "term",
-                        2,
-                        &query_scopes,
-                        query_mask,
-                    )
-                })
+                b.iter(|| approach3_hybrid(&transducer, "term", 2, &query_scopes, query_mask))
             },
         );
     }
@@ -476,14 +450,7 @@ fn bench_approach4_sorted_vec(c: &mut Criterion) {
             BenchmarkId::from_parameter(scenario.name),
             scenario,
             |b, _scenario| {
-                b.iter(|| {
-                    approach4_sorted_vec(
-                        &transducer,
-                        "term",
-                        2,
-                        &query_scopes_vec,
-                    )
-                })
+                b.iter(|| approach4_sorted_vec(&transducer, "term", 2, &query_scopes_vec))
             },
         );
     }
@@ -508,16 +475,7 @@ fn bench_approach5_post_filter(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(scenario.name),
             scenario,
-            |b, _scenario| {
-                b.iter(|| {
-                    approach5_post_filter(
-                        &transducer,
-                        "term",
-                        2,
-                        &query_scopes,
-                    )
-                })
-            },
+            |b, _scenario| b.iter(|| approach5_post_filter(&transducer, "term", 2, &query_scopes)),
         );
     }
 

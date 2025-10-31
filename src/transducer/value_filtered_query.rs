@@ -5,11 +5,11 @@
 //! materializing term strings, which can improve performance when many results
 //! match the distance threshold but few match the value filter.
 
-use crate::dictionary::{CharUnit, MappedDictionaryNode};
 use crate::dictionary::value::DictionaryValue;
-use crate::transducer::{Algorithm, Candidate, Intersection, StatePool};
+use crate::dictionary::{CharUnit, MappedDictionaryNode};
 use crate::transducer::intersection::PathNode;
 use crate::transducer::transition::{initial_state, transition_state_pooled};
+use crate::transducer::{Algorithm, Candidate, Intersection, StatePool};
 use std::collections::{HashSet, VecDeque};
 
 /// Iterator that yields candidates filtered by their associated values.
@@ -414,7 +414,7 @@ where
 #[cfg(feature = "pathmap-backend")]
 mod tests {
     use super::*;
-    use crate::dictionary::{Dictionary, pathmap::PathMapDictionary};
+    use crate::dictionary::{pathmap::PathMapDictionary, Dictionary};
     use crate::transducer::Transducer;
 
     #[test]
@@ -455,12 +455,12 @@ mod tests {
     fn test_value_set_filtered_query() {
         // Create dictionary with scope IDs
         let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(vec![
-            ("println", 1),    // std
-            ("format", 1),     // std
-            ("func", 2),       // local - exact match
-            ("funcs", 2),      // local - distance 1
-            ("my_func", 2),    // local - distance 3, out of range
-            ("your_func", 3),  // other - wrong scope
+            ("println", 1),   // std
+            ("format", 1),    // std
+            ("func", 2),      // local - exact match
+            ("funcs", 2),     // local - distance 1
+            ("my_func", 2),   // local - distance 3, out of range
+            ("your_func", 3), // other - wrong scope
         ]);
 
         let transducer = Transducer::new(dict, Algorithm::Standard);
@@ -488,10 +488,8 @@ mod tests {
 
     #[test]
     fn test_value_filtered_query_empty_result() {
-        let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(vec![
-            ("test", 1),
-            ("testing", 1),
-        ]);
+        let dict: PathMapDictionary<u32> =
+            PathMapDictionary::from_terms_with_values(vec![("test", 1), ("testing", 1)]);
 
         let transducer = Transducer::new(dict, Algorithm::Standard);
 

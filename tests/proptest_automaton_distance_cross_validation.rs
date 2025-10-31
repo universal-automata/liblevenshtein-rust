@@ -9,8 +9,8 @@
 //! 2. Distance computations by automaton match distance function results
 //! 3. Both implementations handle edge cases consistently
 
-use liblevenshtein::prelude::*;
 use liblevenshtein::distance::*;
+use liblevenshtein::prelude::*;
 use proptest::prelude::*;
 use std::collections::HashSet;
 
@@ -25,8 +25,11 @@ fn ascii_word_strategy() -> impl Strategy<Value = String> {
 
 /// Strategy for generating Unicode words (comprehensive testing)
 fn unicode_word_strategy() -> impl Strategy<Value = String> {
-    prop::collection::vec(any::<char>().prop_filter("Valid unicode", |c| !c.is_control()), 0..15)
-        .prop_map(|chars| chars.into_iter().collect())
+    prop::collection::vec(
+        any::<char>().prop_filter("Valid unicode", |c| !c.is_control()),
+        0..15,
+    )
+    .prop_map(|chars| chars.into_iter().collect())
 }
 
 /// Strategy for generating a small dictionary (for quick tests)
@@ -518,7 +521,8 @@ mod regression_tests {
         let max_dist = 1;
 
         let linear_results = linear_scan_transposition(&dict_words, query, max_dist);
-        let automaton_results = automaton_query(&dict_words, query, max_dist, Algorithm::Transposition);
+        let automaton_results =
+            automaton_query(&dict_words, query, max_dist, Algorithm::Transposition);
 
         assert_eq!(
             automaton_results, linear_results,
@@ -534,7 +538,8 @@ mod regression_tests {
         let max_dist = 1;
 
         let linear_results = linear_scan_merge_split(&dict_words, query, max_dist);
-        let automaton_results = automaton_query(&dict_words, query, max_dist, Algorithm::MergeAndSplit);
+        let automaton_results =
+            automaton_query(&dict_words, query, max_dist, Algorithm::MergeAndSplit);
 
         assert_eq!(
             automaton_results, linear_results,

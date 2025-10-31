@@ -144,10 +144,12 @@ fn main() {
 
     // Debug: Check what terms are in the dictionary
     println!("Debug: Testing basic query without scope filtering");
-    let all_results: Vec<_> = engine.transducer
-        .query("helper", 2)
-        .collect();
-    println!("Found {} terms matching 'helper' (distance ≤2): {:?}\n", all_results.len(), all_results);
+    let all_results: Vec<_> = engine.transducer.query("helper", 2).collect();
+    println!(
+        "Found {} terms matching 'helper' (distance ≤2): {:?}\n",
+        all_results.len(),
+        all_results
+    );
 
     // Scenario 1: Completion from inner scope (can see scopes 0, 1, 2)
     println!("Scenario 1: Typing 'he' from inner scope (visible: {{0, 1, 2}})");

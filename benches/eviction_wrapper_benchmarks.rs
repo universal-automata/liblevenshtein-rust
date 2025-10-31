@@ -4,7 +4,9 @@
 //! unwrapped dictionaries, and compare performance across wrapper types.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use liblevenshtein::cache::eviction::{Age, CostAware, Lfu, Lru, LruOptimized, MemoryPressure, Noop, Ttl};
+use liblevenshtein::cache::eviction::{
+    Age, CostAware, Lfu, Lru, LruOptimized, MemoryPressure, Noop, Ttl,
+};
 use liblevenshtein::dictionary::pathmap::PathMapDictionary;
 use liblevenshtein::dictionary::MappedDictionary;
 use std::sync::Arc;
@@ -13,9 +15,7 @@ use std::time::Duration;
 
 // Sample dictionary data
 fn create_test_dict() -> PathMapDictionary<i32> {
-    let terms: Vec<_> = (0..1000)
-        .map(|i| (format!("term_{:04}", i), i))
-        .collect();
+    let terms: Vec<_> = (0..1000).map(|i| (format!("term_{:04}", i), i)).collect();
     PathMapDictionary::from_terms_with_values(terms)
 }
 
@@ -203,9 +203,7 @@ fn bench_lru_eviction(c: &mut Criterion) {
     }
 
     c.bench_function("lru/find_lru", |b| {
-        let terms: Vec<_> = (0..100)
-            .map(|i| format!("term_{:04}", i))
-            .collect();
+        let terms: Vec<_> = (0..100).map(|i| format!("term_{:04}", i)).collect();
         let term_refs: Vec<&str> = terms.iter().map(|s| s.as_str()).collect();
 
         b.iter(|| {
@@ -220,7 +218,7 @@ fn bench_lru_metadata_operations(c: &mut Criterion) {
 
     for size in [100, 1000, 10000] {
         let dict: PathMapDictionary<i32> = PathMapDictionary::from_terms_with_values(
-            (0..size).map(|i| (format!("term_{:04}", i), i))
+            (0..size).map(|i| (format!("term_{:04}", i), i)),
         );
         let lru = Lru::new(dict);
 
@@ -230,15 +228,11 @@ fn bench_lru_metadata_operations(c: &mut Criterion) {
             lru.get_value(&term);
         }
 
-        group.bench_with_input(
-            BenchmarkId::new("clear", size),
-            &lru,
-            |b, lru| {
-                b.iter(|| {
-                    lru.clear_metadata();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("clear", size), &lru, |b, lru| {
+            b.iter(|| {
+                lru.clear_metadata();
+            });
+        });
     }
 
     group.finish();
@@ -252,9 +246,7 @@ fn bench_string_allocation_overhead(c: &mut Criterion) {
     let mut group = c.benchmark_group("string_allocation");
 
     // Pre-allocate strings (best case)
-    let terms: Vec<String> = (0..100)
-        .map(|i| format!("term_{:04}", i))
-        .collect();
+    let terms: Vec<String> = (0..100).map(|i| format!("term_{:04}", i)).collect();
 
     group.bench_function("preallocated", |b| {
         b.iter(|| {

@@ -29,7 +29,10 @@
 //! assert_eq!(age.get_value("foo"), Some(42));
 //! ```
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -122,7 +125,8 @@ impl<D> Age<D> {
     /// Records an entry access (updates metadata).
     fn record_access(&self, term: &str) {
         let mut metadata = self.metadata.write().unwrap();
-        metadata.entry(term.to_string())
+        metadata
+            .entry(term.to_string())
             .or_insert_with(EntryMetadata::new);
     }
 
@@ -139,10 +143,9 @@ impl<D> Age<D> {
     /// Returns the term with the longest time since insertion.
     pub fn find_oldest(&self, terms: &[&str]) -> Option<String> {
         let metadata = self.metadata.read().unwrap();
-        terms.iter()
-            .filter_map(|&term| {
-                metadata.get(term).map(|m| (term, m.age()))
-            })
+        terms
+            .iter()
+            .filter_map(|&term| metadata.get(term).map(|m| (term, m.age())))
             .max_by_key(|(_, age)| *age)
             .map(|(term, _)| term.to_string())
     }
@@ -245,17 +248,19 @@ where
 
     #[inline]
     fn transition(&self, label: Self::Unit) -> Option<Self> {
-        self.inner.transition(label).map(|node| {
-            AgeNode::new(node, Arc::clone(&self.metadata))
-        })
+        self.inner
+            .transition(label)
+            .map(|node| AgeNode::new(node, Arc::clone(&self.metadata)))
     }
 
     #[inline]
     fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         let metadata = Arc::clone(&self.metadata);
-        Box::new(self.inner.edges().map(move |(label, node)| {
-            (label, AgeNode::new(node, Arc::clone(&metadata)))
-        }))
+        Box::new(
+            self.inner
+                .edges()
+                .map(move |(label, node)| (label, AgeNode::new(node, Arc::clone(&metadata)))),
+        )
     }
 
     #[inline]
@@ -288,10 +293,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_age_wrapper_basic() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let age = Age::new(dict);
 
@@ -304,10 +306,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_age_tracking() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let age_wrapper = Age::new(dict);
 
@@ -330,11 +329,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_age_find_oldest() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let age_wrapper = Age::new(dict);
 
@@ -353,11 +349,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_age_eviction() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let age_wrapper = Age::new(dict);
 
@@ -379,10 +372,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_age_no_update_on_access() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let age_wrapper = Age::new(dict);
 
@@ -405,16 +395,16 @@ mod tests {
         assert!(foo_age_2 > foo_age_1);
 
         // foo is still oldest
-        assert_eq!(age_wrapper.find_oldest(&["foo", "bar"]), Some("foo".to_string()));
+        assert_eq!(
+            age_wrapper.find_oldest(&["foo", "bar"]),
+            Some("foo".to_string())
+        );
     }
 
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_age_clear_metadata() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let age_wrapper = Age::new(dict);
 

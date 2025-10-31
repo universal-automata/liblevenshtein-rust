@@ -25,35 +25,43 @@ fn populate_lru_metadata(lru: &Lru<PathMapDictionary<i32>>, size: usize) {
 }
 
 // Sequential batch recency query
-fn sequential_batch_recency(lru: &Lru<PathMapDictionary<i32>>, terms: &[String]) -> Vec<(String, std::time::Duration)> {
-    terms.iter()
-        .filter_map(|term| {
-            lru.recency(term).map(|recency| (term.clone(), recency))
-        })
+fn sequential_batch_recency(
+    lru: &Lru<PathMapDictionary<i32>>,
+    terms: &[String],
+) -> Vec<(String, std::time::Duration)> {
+    terms
+        .iter()
+        .filter_map(|term| lru.recency(term).map(|recency| (term.clone(), recency)))
         .collect()
 }
 
 // Parallel batch recency query (simulated - we'll implement this if justified)
 #[cfg(feature = "rayon")]
-fn parallel_batch_recency(lru: &Lru<PathMapDictionary<i32>>, terms: &[String]) -> Vec<(String, std::time::Duration)> {
+fn parallel_batch_recency(
+    lru: &Lru<PathMapDictionary<i32>>,
+    terms: &[String],
+) -> Vec<(String, std::time::Duration)> {
     use rayon::prelude::*;
-    terms.par_iter()
-        .filter_map(|term| {
-            lru.recency(term).map(|recency| (term.clone(), recency))
-        })
+    terms
+        .par_iter()
+        .filter_map(|term| lru.recency(term).map(|recency| (term.clone(), recency)))
         .collect()
 }
 
 // Sequential find N least recently used
-fn sequential_find_n_lru(lru: &Lru<PathMapDictionary<i32>>, terms: &[&str], n: usize) -> Vec<String> {
-    let mut candidates: Vec<_> = terms.iter()
-        .filter_map(|&term| {
-            lru.recency(term).map(|recency| (term, recency))
-        })
+fn sequential_find_n_lru(
+    lru: &Lru<PathMapDictionary<i32>>,
+    terms: &[&str],
+    n: usize,
+) -> Vec<String> {
+    let mut candidates: Vec<_> = terms
+        .iter()
+        .filter_map(|&term| lru.recency(term).map(|recency| (term, recency)))
         .collect();
 
     candidates.sort_by_key(|(_, recency)| std::cmp::Reverse(*recency));
-    candidates.into_iter()
+    candidates
+        .into_iter()
         .take(n)
         .map(|(term, _)| term.to_string())
         .collect()
@@ -63,14 +71,14 @@ fn sequential_find_n_lru(lru: &Lru<PathMapDictionary<i32>>, terms: &[&str], n: u
 #[cfg(feature = "rayon")]
 fn parallel_find_n_lru(lru: &Lru<PathMapDictionary<i32>>, terms: &[&str], n: usize) -> Vec<String> {
     use rayon::prelude::*;
-    let mut candidates: Vec<_> = terms.par_iter()
-        .filter_map(|&term| {
-            lru.recency(term).map(|recency| (term, recency))
-        })
+    let mut candidates: Vec<_> = terms
+        .par_iter()
+        .filter_map(|&term| lru.recency(term).map(|recency| (term, recency)))
         .collect();
 
     candidates.sort_by_key(|(_, recency)| std::cmp::Reverse(*recency));
-    candidates.into_iter()
+    candidates
+        .into_iter()
         .take(n)
         .map(|(term, _)| term.to_string())
         .collect()
@@ -85,20 +93,14 @@ fn bench_sequential_batch_recency(c: &mut Criterion) {
         let lru = Lru::new(dict);
         populate_lru_metadata(&lru, size);
 
-        let terms: Vec<String> = (0..size)
-            .map(|i| format!("term_{:06}", i))
-            .collect();
+        let terms: Vec<String> = (0..size).map(|i| format!("term_{:06}", i)).collect();
 
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &terms,
-            |b, terms| {
-                b.iter(|| {
-                    black_box(sequential_batch_recency(&lru, terms));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), &terms, |b, terms| {
+            b.iter(|| {
+                black_box(sequential_batch_recency(&lru, terms));
+            });
+        });
     }
 
     group.finish();
@@ -114,20 +116,14 @@ fn bench_parallel_batch_recency(c: &mut Criterion) {
         let lru = Lru::new(dict);
         populate_lru_metadata(&lru, size);
 
-        let terms: Vec<String> = (0..size)
-            .map(|i| format!("term_{:06}", i))
-            .collect();
+        let terms: Vec<String> = (0..size).map(|i| format!("term_{:06}", i)).collect();
 
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &terms,
-            |b, terms| {
-                b.iter(|| {
-                    black_box(parallel_batch_recency(&lru, terms));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), &terms, |b, terms| {
+            b.iter(|| {
+                black_box(parallel_batch_recency(&lru, terms));
+            });
+        });
     }
 
     group.finish();
@@ -142,9 +138,7 @@ fn bench_sequential_find_n_lru(c: &mut Criterion) {
         let lru = Lru::new(dict);
         populate_lru_metadata(&lru, size);
 
-        let terms: Vec<String> = (0..size)
-            .map(|i| format!("term_{:06}", i))
-            .collect();
+        let terms: Vec<String> = (0..size).map(|i| format!("term_{:06}", i)).collect();
         let term_refs: Vec<&str> = terms.iter().map(|s| s.as_str()).collect();
 
         let n = size / 10; // Find 10% LRU entries
@@ -174,9 +168,7 @@ fn bench_parallel_find_n_lru(c: &mut Criterion) {
         let lru = Lru::new(dict);
         populate_lru_metadata(&lru, size);
 
-        let terms: Vec<String> = (0..size)
-            .map(|i| format!("term_{:06}", i))
-            .collect();
+        let terms: Vec<String> = (0..size).map(|i| format!("term_{:06}", i)).collect();
         let term_refs: Vec<&str> = terms.iter().map(|s| s.as_str()).collect();
 
         let n = size / 10; // Find 10% LRU entries
@@ -205,34 +197,24 @@ fn bench_comparison_by_size(c: &mut Criterion) {
         let lru = Lru::new(dict);
         populate_lru_metadata(&lru, size);
 
-        let terms: Vec<String> = (0..size)
-            .map(|i| format!("term_{:06}", i))
-            .collect();
+        let terms: Vec<String> = (0..size).map(|i| format!("term_{:06}", i)).collect();
 
         group.throughput(Throughput::Elements(size as u64));
 
         // Sequential version
-        group.bench_with_input(
-            BenchmarkId::new("sequential", size),
-            &terms,
-            |b, terms| {
-                b.iter(|| {
-                    black_box(sequential_batch_recency(&lru, terms));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("sequential", size), &terms, |b, terms| {
+            b.iter(|| {
+                black_box(sequential_batch_recency(&lru, terms));
+            });
+        });
 
         // Parallel version (if available)
         #[cfg(feature = "rayon")]
-        group.bench_with_input(
-            BenchmarkId::new("parallel", size),
-            &terms,
-            |b, terms| {
-                b.iter(|| {
-                    black_box(parallel_batch_recency(&lru, terms));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("parallel", size), &terms, |b, terms| {
+            b.iter(|| {
+                black_box(parallel_batch_recency(&lru, terms));
+            });
+        });
     }
 
     group.finish();

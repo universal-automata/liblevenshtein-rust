@@ -29,7 +29,10 @@
 //! assert_eq!(lfu.get_value("foo"), Some(42));
 //! ```
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -121,7 +124,8 @@ impl<D> Lfu<D> {
     /// Records an entry access (updates metadata).
     fn record_access(&self, term: &str) {
         let mut metadata = self.metadata.write().unwrap();
-        metadata.entry(term.to_string())
+        metadata
+            .entry(term.to_string())
             .and_modify(|m| m.increment())
             .or_insert_with(EntryMetadata::new);
     }
@@ -139,10 +143,9 @@ impl<D> Lfu<D> {
     /// Returns the term with the lowest access count.
     pub fn find_lfu(&self, terms: &[&str]) -> Option<String> {
         let metadata = self.metadata.read().unwrap();
-        terms.iter()
-            .filter_map(|&term| {
-                metadata.get(term).map(|m| (term, m.access_count))
-            })
+        terms
+            .iter()
+            .filter_map(|&term| metadata.get(term).map(|m| (term, m.access_count)))
             .min_by_key(|(_, count)| *count)
             .map(|(term, _)| term.to_string())
     }
@@ -245,17 +248,19 @@ where
 
     #[inline]
     fn transition(&self, label: Self::Unit) -> Option<Self> {
-        self.inner.transition(label).map(|node| {
-            LfuNode::new(node, Arc::clone(&self.metadata))
-        })
+        self.inner
+            .transition(label)
+            .map(|node| LfuNode::new(node, Arc::clone(&self.metadata)))
     }
 
     #[inline]
     fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         let metadata = Arc::clone(&self.metadata);
-        Box::new(self.inner.edges().map(move |(label, node)| {
-            (label, LfuNode::new(node, Arc::clone(&metadata)))
-        }))
+        Box::new(
+            self.inner
+                .edges()
+                .map(move |(label, node)| (label, LfuNode::new(node, Arc::clone(&metadata)))),
+        )
     }
 
     #[inline]
@@ -286,10 +291,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lfu_wrapper_basic() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lfu = Lfu::new(dict);
 
@@ -302,10 +304,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lfu_access_tracking() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lfu = Lfu::new(dict);
 
@@ -326,11 +325,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lfu_find_lfu() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let lfu = Lfu::new(dict);
 
@@ -352,11 +348,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lfu_eviction() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let lfu = Lfu::new(dict);
 
@@ -381,10 +374,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lfu_increment_on_access() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lfu = Lfu::new(dict);
 
@@ -410,10 +400,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_lfu_clear_metadata() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let lfu = Lfu::new(dict);
 

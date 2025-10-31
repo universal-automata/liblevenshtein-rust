@@ -21,8 +21,7 @@ fn arb_string() -> impl Strategy<Value = String> {
 }
 
 fn arb_unicode_string() -> impl Strategy<Value = String> {
-    prop::collection::vec(any::<char>(), 0..20)
-        .prop_map(|chars| chars.into_iter().collect())
+    prop::collection::vec(any::<char>(), 0..20).prop_map(|chars| chars.into_iter().collect())
 }
 
 // ============================================================================

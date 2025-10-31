@@ -32,7 +32,11 @@ fn test_empty_query_with_unicode() {
     // Test with other algorithms
     println!("\n--- Testing other algorithms ---\n");
 
-    for algo in [Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
+    for algo in [
+        Algorithm::Standard,
+        Algorithm::Transposition,
+        Algorithm::MergeAndSplit,
+    ] {
         let trans = Transducer::new(dict.clone(), algo);
         let results: Vec<_> = trans.query("", 1).collect();
         println!("{:?}: {:?}", algo, results);
@@ -43,7 +47,10 @@ fn test_empty_query_with_unicode() {
     let dict_ascii = DoubleArrayTrie::from_terms(vec!["a".to_string()]);
     let trans_ascii = Transducer::new(dict_ascii, Algorithm::Standard);
     let results_ascii: Vec<_> = trans_ascii.query("", 1).collect();
-    println!("Dictionary: [\"a\"], Query: \"\", Results: {:?}", results_ascii);
+    println!(
+        "Dictionary: [\"a\"], Query: \"\", Results: {:?}",
+        results_ascii
+    );
 
     assert!(
         results.contains(&"¡".to_string()),
@@ -55,7 +62,8 @@ fn test_empty_query_with_unicode() {
 fn test_empty_query_various_distances() {
     println!("\n=== Test Empty Query with Various Distances ===\n");
 
-    let dict = DoubleArrayTrie::from_terms(vec!["a".to_string(), "ab".to_string(), "abc".to_string()]);
+    let dict =
+        DoubleArrayTrie::from_terms(vec!["a".to_string(), "ab".to_string(), "abc".to_string()]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     for max_dist in 0..=3 {
@@ -80,5 +88,8 @@ fn test_empty_dictionary_with_query() {
     let results: Vec<_> = transducer.query("test", 5).collect();
     println!("Empty dict, query \"test\": {:?}", results);
 
-    assert!(results.is_empty(), "Empty dictionary should return no results");
+    assert!(
+        results.is_empty(),
+        "Empty dictionary should return no results"
+    );
 }

@@ -177,21 +177,50 @@ mod tests {
         let test_cases = vec![
             // (dict_char, query, window_size, offset, expected)
             (b'a', b"aaaaaaa".as_slice(), 7, 0, vec![true; 7]),
-            (b'a', b"abcdefg".as_slice(), 7, 0, vec![true, false, false, false, false, false, false]),
+            (
+                b'a',
+                b"abcdefg".as_slice(),
+                7,
+                0,
+                vec![true, false, false, false, false, false, false],
+            ),
             (b'x', b"abcdefg".as_slice(), 7, 0, vec![false; 7]),
-            (b'a', b"abc".as_slice(), 5, 0, vec![true, false, false, false, false]), // Out of bounds
-            (b'c', b"abcdefg".as_slice(), 5, 2, vec![true, false, false, false, false]), // Offset
-            (b'a', b"aaa".as_slice(), 8, 0, vec![true, true, true, false, false, false, false, false]), // Full 8
+            (
+                b'a',
+                b"abc".as_slice(),
+                5,
+                0,
+                vec![true, false, false, false, false],
+            ), // Out of bounds
+            (
+                b'c',
+                b"abcdefg".as_slice(),
+                5,
+                2,
+                vec![true, false, false, false, false],
+            ), // Offset
+            (
+                b'a',
+                b"aaa".as_slice(),
+                8,
+                0,
+                vec![true, true, true, false, false, false, false, false],
+            ), // Full 8
         ];
 
         for (dict_char, query, window_size, offset, expected) in test_cases {
             let mut buffer = [false; 8];
-            let result = characteristic_vector_simd(dict_char, query, window_size, offset, &mut buffer);
+            let result =
+                characteristic_vector_simd(dict_char, query, window_size, offset, &mut buffer);
 
             assert_eq!(
-                result, &expected[..],
+                result,
+                &expected[..],
                 "SIMD result mismatch for dict_char={}, query={:?}, window_size={}, offset={}",
-                dict_char as char, query, window_size, offset
+                dict_char as char,
+                query,
+                window_size,
+                offset
             );
 
             // Compare against scalar
@@ -620,7 +649,8 @@ mod subsumption_tests {
         );
 
         assert_eq!(
-            result, &scalar_results[..8],
+            result,
+            &scalar_results[..8],
             "SIMD vs scalar mismatch on large indices"
         );
 
@@ -884,8 +914,8 @@ mod minimum_tests {
         let test_cases = vec![
             vec![5, 2, 8, 1, 15, 3, 9, 6],
             vec![100, 200, 50, 300, 25, 400, 150, 75],
-            vec![10, 10, 10, 10, 10, 10, 10, 10], // All same
-            vec![0, 1, 2, 3, 4, 5, 6, 7],          // Sequential
+            vec![10, 10, 10, 10, 10, 10, 10, 10],     // All same
+            vec![0, 1, 2, 3, 4, 5, 6, 7],             // Sequential
             vec![1000, 500, 250, 125, 62, 31, 15, 7], // Decreasing
         ];
 
@@ -911,7 +941,9 @@ mod minimum_tests {
         assert_eq!(find_minimum_simd(&values, 8), 42);
 
         // Edge case: Large values (but fit in u32)
-        let values = vec![1000000, 2000000, 500000, 3000000, 250000, 4000000, 1500000, 750000];
+        let values = vec![
+            1000000, 2000000, 500000, 3000000, 250000, 4000000, 1500000, 750000,
+        ];
         assert_eq!(find_minimum_simd(&values, 8), 250000);
 
         // Edge case: Zero minimum
@@ -1136,9 +1168,7 @@ pub fn find_edge_label_simd<T>(edges: &[(u8, T)], target_label: u8) -> Option<us
 /// or when SIMD instructions are unavailable.
 #[inline]
 fn find_edge_label_scalar<T>(edges: &[(u8, T)], target_label: u8) -> Option<usize> {
-    edges
-        .iter()
-        .position(|(label, _)| *label == target_label)
+    edges.iter().position(|(label, _)| *label == target_label)
 }
 
 /// SSE4.1 implementation: Compare 16 edge labels simultaneously.
@@ -1265,9 +1295,7 @@ unsafe fn find_edge_label_avx2<T>(
 // Provide a non-SIMD version for when the simd feature is disabled
 #[cfg(not(all(target_arch = "x86_64", feature = "simd")))]
 pub fn find_edge_label_simd<T>(edges: &[(u8, T)], target_label: u8) -> Option<usize> {
-    edges
-        .iter()
-        .position(|(label, _)| *label == target_label)
+    edges.iter().position(|(label, _)| *label == target_label)
 }
 
 #[cfg(test)]

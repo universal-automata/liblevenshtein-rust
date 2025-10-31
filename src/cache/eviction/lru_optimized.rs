@@ -7,7 +7,10 @@
 //! - `eviction-compact-metadata`: Compact metadata representation
 //! - `eviction-coarse-timestamps`: Coarse-grained timestamps (reduce syscalls)
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 use std::sync::Arc;
 
 // Conditional imports based on feature flags
@@ -21,10 +24,10 @@ use dashmap::DashMap;
 #[cfg(not(feature = "eviction-dashmap"))]
 use std::collections::HashMap;
 
-#[cfg(not(feature = "eviction-coarse-timestamps"))]
-use std::time::Instant;
 #[cfg(feature = "eviction-coarse-timestamps")]
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(not(feature = "eviction-coarse-timestamps"))]
+use std::time::Instant;
 
 // Coarse timestamp management
 #[cfg(feature = "eviction-coarse-timestamps")]
@@ -35,15 +38,13 @@ pub(crate) fn init_coarse_timestamp_thread() {
     use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    thread::spawn(|| {
-        loop {
-            let now_ms = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
-            COARSE_TIMESTAMP_MS.store(now_ms, Ordering::Relaxed);
-            thread::sleep(Duration::from_millis(100));
-        }
+    thread::spawn(|| loop {
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        COARSE_TIMESTAMP_MS.store(now_ms, Ordering::Relaxed);
+        thread::sleep(Duration::from_millis(100));
     });
 }
 
@@ -66,14 +67,20 @@ struct EntryMetadata {
 
 impl EntryMetadata {
     fn new() -> Self {
-        #[cfg(all(not(feature = "eviction-compact-metadata"), not(feature = "eviction-coarse-timestamps")))]
+        #[cfg(all(
+            not(feature = "eviction-compact-metadata"),
+            not(feature = "eviction-coarse-timestamps")
+        ))]
         {
             Self {
                 last_accessed: Instant::now(),
             }
         }
 
-        #[cfg(all(not(feature = "eviction-compact-metadata"), feature = "eviction-coarse-timestamps"))]
+        #[cfg(all(
+            not(feature = "eviction-compact-metadata"),
+            feature = "eviction-coarse-timestamps"
+        ))]
         {
             Self {
                 last_accessed_ms: COARSE_TIMESTAMP_MS.load(Ordering::Relaxed),
@@ -89,7 +96,10 @@ impl EntryMetadata {
     }
 
     fn update_access(&mut self) {
-        #[cfg(all(not(feature = "eviction-compact-metadata"), not(feature = "eviction-coarse-timestamps")))]
+        #[cfg(all(
+            not(feature = "eviction-compact-metadata"),
+            not(feature = "eviction-coarse-timestamps")
+        ))]
         {
             self.last_accessed = Instant::now();
         }
@@ -99,14 +109,20 @@ impl EntryMetadata {
             self.last_accessed_ms = COARSE_TIMESTAMP_MS.load(Ordering::Relaxed);
         }
 
-        #[cfg(all(feature = "eviction-compact-metadata", not(feature = "eviction-coarse-timestamps")))]
+        #[cfg(all(
+            feature = "eviction-compact-metadata",
+            not(feature = "eviction-coarse-timestamps")
+        ))]
         {
             self.last_accessed_ms = get_timestamp_ms();
         }
     }
 
     fn recency_score(&self) -> u64 {
-        #[cfg(all(not(feature = "eviction-compact-metadata"), not(feature = "eviction-coarse-timestamps")))]
+        #[cfg(all(
+            not(feature = "eviction-compact-metadata"),
+            not(feature = "eviction-coarse-timestamps")
+        ))]
         {
             self.last_accessed.elapsed().as_millis() as u64
         }
@@ -117,7 +133,10 @@ impl EntryMetadata {
             now.saturating_sub(self.last_accessed_ms)
         }
 
-        #[cfg(all(feature = "eviction-compact-metadata", not(feature = "eviction-coarse-timestamps")))]
+        #[cfg(all(
+            feature = "eviction-compact-metadata",
+            not(feature = "eviction-coarse-timestamps")
+        ))]
         {
             let now = get_timestamp_ms();
             now.saturating_sub(self.last_accessed_ms)
@@ -125,7 +144,10 @@ impl EntryMetadata {
     }
 }
 
-#[cfg(all(feature = "eviction-compact-metadata", not(feature = "eviction-coarse-timestamps")))]
+#[cfg(all(
+    feature = "eviction-compact-metadata",
+    not(feature = "eviction-coarse-timestamps")
+))]
 fn get_timestamp_ms() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -207,7 +229,8 @@ impl<D> LruOptimized<D> {
             #[cfg(not(feature = "eviction-parking-lot"))]
             let mut metadata = self.metadata.write().unwrap();
 
-            metadata.entry(make_key(term))
+            metadata
+                .entry(make_key(term))
                 .and_modify(|m| m.update_access())
                 .or_insert_with(EntryMetadata::new);
         }
@@ -233,10 +256,9 @@ impl<D> LruOptimized<D> {
     pub fn find_lru(&self, terms: &[&str]) -> Option<String> {
         #[cfg(feature = "eviction-dashmap")]
         {
-            terms.iter()
-                .filter_map(|&term| {
-                    self.metadata.get(term).map(|m| (term, m.recency_score()))
-                })
+            terms
+                .iter()
+                .filter_map(|&term| self.metadata.get(term).map(|m| (term, m.recency_score())))
                 .max_by_key(|(_, recency)| *recency)
                 .map(|(term, _)| term.to_string())
         }
@@ -248,10 +270,9 @@ impl<D> LruOptimized<D> {
             #[cfg(not(feature = "eviction-parking-lot"))]
             let metadata = self.metadata.read().unwrap();
 
-            terms.iter()
-                .filter_map(|&term| {
-                    metadata.get(term).map(|m| (term, m.recency_score()))
-                })
+            terms
+                .iter()
+                .filter_map(|&term| metadata.get(term).map(|m| (term, m.recency_score())))
                 .max_by_key(|(_, recency)| *recency)
                 .map(|(term, _)| term.to_string())
         }
@@ -372,17 +393,19 @@ where
 
     #[inline]
     fn transition(&self, label: Self::Unit) -> Option<Self> {
-        self.inner.transition(label).map(|node| {
-            LruOptimizedNode::new(node, Arc::clone(&self.metadata))
-        })
+        self.inner
+            .transition(label)
+            .map(|node| LruOptimizedNode::new(node, Arc::clone(&self.metadata)))
     }
 
     #[inline]
     fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         let metadata = Arc::clone(&self.metadata);
-        Box::new(self.inner.edges().map(move |(label, node)| {
-            (label, LruOptimizedNode::new(node, Arc::clone(&metadata)))
-        }))
+        Box::new(
+            self.inner.edges().map(move |(label, node)| {
+                (label, LruOptimizedNode::new(node, Arc::clone(&metadata)))
+            }),
+        )
     }
 
     #[inline]

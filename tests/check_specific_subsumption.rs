@@ -8,11 +8,17 @@ fn check_1_1_false_subsumes_0_1_true() {
     let algorithm = Algorithm::Transposition;
     let query_length = 2;
 
-    let p_1_1 = Position::new(1, 1);  // (1,1,false)
-    let p_0_1_special = Position::new_special(0, 1);  // (0,1,true)
+    let p_1_1 = Position::new(1, 1); // (1,1,false)
+    let p_0_1_special = Position::new_special(0, 1); // (0,1,true)
 
-    println!("p_1_1:          ({}, {}, false)", p_1_1.term_index, p_1_1.num_errors);
-    println!("p_0_1_special:  ({}, {}, true)", p_0_1_special.term_index, p_0_1_special.num_errors);
+    println!(
+        "p_1_1:          ({}, {}, false)",
+        p_1_1.term_index, p_1_1.num_errors
+    );
+    println!(
+        "p_0_1_special:  ({}, {}, true)",
+        p_0_1_special.term_index, p_0_1_special.num_errors
+    );
     println!();
 
     let subsumes = p_1_1.subsumes(&p_0_1_special, algorithm, query_length);
@@ -27,13 +33,24 @@ fn check_1_1_false_subsumes_0_1_true() {
         println!("  From position.rs line 82-145 (subsumes function):");
         println!();
         println!("  Input:");
-        println!("    self (lhs): i={}, e={}, s={}", p_1_1.term_index, p_1_1.num_errors, p_1_1.is_special);
-        println!("    other (rhs): j={}, f={}, t={}", p_0_1_special.term_index, p_0_1_special.num_errors, p_0_1_special.is_special);
+        println!(
+            "    self (lhs): i={}, e={}, s={}",
+            p_1_1.term_index, p_1_1.num_errors, p_1_1.is_special
+        );
+        println!(
+            "    other (rhs): j={}, f={}, t={}",
+            p_0_1_special.term_index, p_0_1_special.num_errors, p_0_1_special.is_special
+        );
         println!("    algorithm: Transposition");
         println!("    query_length: {}", query_length);
         println!();
         println!("  Step 1: Check e > f?");
-        println!("    {} > {} = {}", p_1_1.num_errors, p_0_1_special.num_errors, p_1_1.num_errors > p_0_1_special.num_errors);
+        println!(
+            "    {} > {} = {}",
+            p_1_1.num_errors,
+            p_0_1_special.num_errors,
+            p_1_1.num_errors > p_0_1_special.num_errors
+        );
         println!("    If true, return false (cannot subsume with more errors)");
         println!();
         println!("  Step 2: Transposition algorithm logic");
@@ -55,16 +72,42 @@ fn check_1_1_false_subsumes_0_1_true() {
         println!("        return adjusted_diff <= (f - e);");
         println!("      }}");
         println!();
-        println!("    Applying with i={}, j={}, e={}, f={}:", p_1_1.term_index, p_0_1_special.term_index, p_1_1.num_errors, p_0_1_special.num_errors);
-        println!("      j < i? {} < {} = {}", p_0_1_special.term_index, p_1_1.term_index, p_0_1_special.term_index < p_1_1.term_index);
+        println!(
+            "    Applying with i={}, j={}, e={}, f={}:",
+            p_1_1.term_index, p_0_1_special.term_index, p_1_1.num_errors, p_0_1_special.num_errors
+        );
+        println!(
+            "      j < i? {} < {} = {}",
+            p_0_1_special.term_index,
+            p_1_1.term_index,
+            p_0_1_special.term_index < p_1_1.term_index
+        );
         println!("      → YES, so adjusted_diff = i.saturating_sub(j).saturating_sub(1)");
-        println!("      adjusted_diff = {}.saturating_sub({}).saturating_sub(1)", p_1_1.term_index, p_0_1_special.term_index);
-        println!("      adjusted_diff = {}.saturating_sub(1)", p_1_1.term_index - p_0_1_special.term_index);
-        println!("      adjusted_diff = {}", (p_1_1.term_index - p_0_1_special.term_index).saturating_sub(1));
+        println!(
+            "      adjusted_diff = {}.saturating_sub({}).saturating_sub(1)",
+            p_1_1.term_index, p_0_1_special.term_index
+        );
+        println!(
+            "      adjusted_diff = {}.saturating_sub(1)",
+            p_1_1.term_index - p_0_1_special.term_index
+        );
+        println!(
+            "      adjusted_diff = {}",
+            (p_1_1.term_index - p_0_1_special.term_index).saturating_sub(1)
+        );
         println!();
         println!("      Check: adjusted_diff <= (f - e)?");
-        println!("      {} <= ({} - {})", (p_1_1.term_index - p_0_1_special.term_index).saturating_sub(1), p_0_1_special.num_errors, p_1_1.num_errors);
-        println!("      {} <= {}", (p_1_1.term_index - p_0_1_special.term_index).saturating_sub(1), p_0_1_special.num_errors - p_1_1.num_errors);
+        println!(
+            "      {} <= ({} - {})",
+            (p_1_1.term_index - p_0_1_special.term_index).saturating_sub(1),
+            p_0_1_special.num_errors,
+            p_1_1.num_errors
+        );
+        println!(
+            "      {} <= {}",
+            (p_1_1.term_index - p_0_1_special.term_index).saturating_sub(1),
+            p_0_1_special.num_errors - p_1_1.num_errors
+        );
         println!("      0 <= 0");
         println!("      → TRUE!");
         println!();

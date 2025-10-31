@@ -7,8 +7,8 @@
 //! space, while linear scan must compute distance for every word.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use liblevenshtein::prelude::*;
 use liblevenshtein::distance::*;
+use liblevenshtein::prelude::*;
 
 // ============================================================================
 // Test Data Setup
@@ -17,10 +17,8 @@ use liblevenshtein::distance::*;
 /// Load a small dictionary for benchmarking
 fn load_small_dict() -> Vec<String> {
     vec![
-        "test", "testing", "tested", "tester", "tests",
-        "best", "rest", "nest", "quest", "fest",
-        "apple", "apply", "ample", "maple", "staple",
-        "code", "coder", "decode", "encode", "node",
+        "test", "testing", "tested", "tester", "tests", "best", "rest", "nest", "quest", "fest",
+        "apple", "apply", "ample", "maple", "staple", "code", "coder", "decode", "encode", "node",
         "data", "date", "gate", "rate", "state",
     ]
     .into_iter()
@@ -31,10 +29,26 @@ fn load_small_dict() -> Vec<String> {
 /// Load a medium dictionary (100 words)
 fn load_medium_dict() -> Vec<String> {
     let base_words = vec![
-        "algorithm", "structure", "computer", "science", "program",
-        "function", "variable", "constant", "iterator", "reference",
-        "pattern", "matching", "distance", "levenshtein", "automaton",
-        "transducer", "dictionary", "benchmark", "performance", "optimization",
+        "algorithm",
+        "structure",
+        "computer",
+        "science",
+        "program",
+        "function",
+        "variable",
+        "constant",
+        "iterator",
+        "reference",
+        "pattern",
+        "matching",
+        "distance",
+        "levenshtein",
+        "automaton",
+        "transducer",
+        "dictionary",
+        "benchmark",
+        "performance",
+        "optimization",
     ];
 
     let mut dict = Vec::new();
@@ -53,7 +67,8 @@ fn load_medium_dict() -> Vec<String> {
 fn load_large_dict() -> Vec<String> {
     // Read from system dictionary if available, otherwise generate
     if let Ok(contents) = std::fs::read_to_string("/usr/share/dict/words") {
-        contents.lines()
+        contents
+            .lines()
             .take(1000)
             .map(|s| s.trim().to_lowercase())
             .filter(|s| s.len() >= 3 && s.len() <= 15)
@@ -376,9 +391,7 @@ fn bench_construction_overhead(c: &mut Criterion) {
 
     // Benchmark just the dictionary construction
     group.bench_function("double_array_trie", |b| {
-        b.iter(|| {
-            black_box(DoubleArrayTrie::from_terms(black_box(dict.clone())))
-        })
+        b.iter(|| black_box(DoubleArrayTrie::from_terms(black_box(dict.clone()))))
     });
 
     // Benchmark construction + transducer creation
@@ -402,9 +415,9 @@ fn bench_query_length_impact(c: &mut Criterion) {
     let transducer = Transducer::new(dat, Algorithm::Standard);
 
     let queries = vec![
-        ("sh", "short"),      // 2 chars
-        ("test", "medium"),   // 4 chars
-        ("algorithm", "long"), // 9 chars
+        ("sh", "short"),                  // 2 chars
+        ("test", "medium"),               // 4 chars
+        ("algorithm", "long"),            // 9 chars
         ("implementations", "very_long"), // 15 chars
     ];
 
@@ -413,33 +426,25 @@ fn bench_query_length_impact(c: &mut Criterion) {
     let mut group = c.benchmark_group("query_length");
 
     for (query, label) in queries {
-        group.bench_with_input(
-            BenchmarkId::new("linear_scan", label),
-            &query,
-            |b, &q| {
-                b.iter(|| {
-                    black_box(linear_scan_standard(
-                        black_box(&dict),
-                        black_box(q),
-                        black_box(max_distance),
-                    ))
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("linear_scan", label), &query, |b, &q| {
+            b.iter(|| {
+                black_box(linear_scan_standard(
+                    black_box(&dict),
+                    black_box(q),
+                    black_box(max_distance),
+                ))
+            })
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("automaton", label),
-            &query,
-            |b, &q| {
-                b.iter(|| {
-                    black_box(automaton_query_standard(
-                        black_box(&transducer),
-                        black_box(q),
-                        black_box(max_distance),
-                    ))
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("automaton", label), &query, |b, &q| {
+            b.iter(|| {
+                black_box(automaton_query_standard(
+                    black_box(&transducer),
+                    black_box(q),
+                    black_box(max_distance),
+                ))
+            })
+        });
     }
 
     group.finish();
@@ -524,15 +529,9 @@ criterion_group!(
     bench_transposition_large_dict,
 );
 
-criterion_group!(
-    merge_split_benches,
-    bench_merge_split_medium_dict,
-);
+criterion_group!(merge_split_benches, bench_merge_split_medium_dict,);
 
-criterion_group!(
-    overhead_benches,
-    bench_construction_overhead,
-);
+criterion_group!(overhead_benches, bench_construction_overhead,);
 
 criterion_group!(
     variation_benches,

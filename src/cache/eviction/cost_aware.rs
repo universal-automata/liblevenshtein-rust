@@ -29,7 +29,10 @@
 //! assert_eq!(cost_aware.get_value("foo"), Some(42));
 //! ```
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -140,7 +143,8 @@ impl<D> CostAware<D> {
     fn record_access<V: DictionaryValue>(&self, term: &str, _value: &V) {
         let size = std::mem::size_of::<V>();
         let mut metadata = self.metadata.write().unwrap();
-        metadata.entry(term.to_string())
+        metadata
+            .entry(term.to_string())
             .and_modify(|m| m.increment())
             .or_insert_with(|| EntryMetadata::new(size));
     }
@@ -158,12 +162,13 @@ impl<D> CostAware<D> {
     /// Returns the term with the highest cost score (most likely to evict).
     pub fn find_highest_cost(&self, terms: &[&str]) -> Option<String> {
         let metadata = self.metadata.read().unwrap();
-        terms.iter()
-            .filter_map(|&term| {
-                metadata.get(term).map(|m| (term, m.cost_score()))
-            })
+        terms
+            .iter()
+            .filter_map(|&term| metadata.get(term).map(|m| (term, m.cost_score())))
             .max_by(|(_, score1), (_, score2)| {
-                score1.partial_cmp(score2).unwrap_or(std::cmp::Ordering::Equal)
+                score1
+                    .partial_cmp(score2)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(term, _)| term.to_string())
     }
@@ -268,17 +273,19 @@ where
 
     #[inline]
     fn transition(&self, label: Self::Unit) -> Option<Self> {
-        self.inner.transition(label).map(|node| {
-            CostAwareNode::new(node, Arc::clone(&self.metadata))
-        })
+        self.inner
+            .transition(label)
+            .map(|node| CostAwareNode::new(node, Arc::clone(&self.metadata)))
     }
 
     #[inline]
     fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         let metadata = Arc::clone(&self.metadata);
-        Box::new(self.inner.edges().map(move |(label, node)| {
-            (label, CostAwareNode::new(node, Arc::clone(&metadata)))
-        }))
+        Box::new(
+            self.inner
+                .edges()
+                .map(move |(label, node)| (label, CostAwareNode::new(node, Arc::clone(&metadata)))),
+        )
     }
 
     #[inline]
@@ -311,10 +318,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_cost_aware_wrapper_basic() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let cost_aware = CostAware::new(dict);
 
@@ -327,10 +331,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_cost_aware_scoring() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let cost_aware = CostAware::new(dict);
 
@@ -349,9 +350,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_cost_aware_hits_lower_score() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42)]);
 
         let cost_aware = CostAware::new(dict);
 
@@ -373,11 +372,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_cost_aware_find_highest_cost() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let cost_aware = CostAware::new(dict);
 
@@ -405,10 +401,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_cost_aware_eviction() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let cost_aware = CostAware::new(dict);
 
@@ -427,10 +420,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_cost_aware_clear_metadata() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let cost_aware = CostAware::new(dict);
 

@@ -1143,7 +1143,9 @@ impl Command {
                     let msg = format!(
                         "Cache enabled with {} strategy{}",
                         strategy.green().bold(),
-                        max_size.map(|s| format!(" (max {} entries)", s)).unwrap_or_default()
+                        max_size
+                            .map(|s| format!(" (max {} entries)", s))
+                            .unwrap_or_default()
                     );
                     Ok(CommandResult::Continue(msg))
                 }
@@ -1159,7 +1161,9 @@ impl Command {
                 #[cfg(feature = "pathmap-backend")]
                 {
                     state.disable_cache();
-                    Ok(CommandResult::Continue("Cache disabled".yellow().to_string()))
+                    Ok(CommandResult::Continue(
+                        "Cache disabled".yellow().to_string(),
+                    ))
                 }
                 #[cfg(not(feature = "pathmap-backend"))]
                 {

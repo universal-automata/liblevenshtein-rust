@@ -1,5 +1,5 @@
-use liblevenshtein::prelude::*;
 use liblevenshtein::distance::transposition_distance;
+use liblevenshtein::prelude::*;
 
 #[test]
 fn trace_ab_to_ba() {

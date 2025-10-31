@@ -164,11 +164,7 @@ macro_rules! impl_primitive_value {
     };
 }
 
-impl_primitive_value!(
-    u8, u16, u32, u64, usize,
-    i8, i16, i32, i64, isize,
-    bool, char
-);
+impl_primitive_value!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, bool, char);
 
 // =============================================================================
 // Implementations for string types
@@ -264,9 +260,8 @@ impl<T: FilterableValue + Eq + Hash> FilterableValue for HashSet<T> {
 // Implementations for SmallVec<A>
 // =============================================================================
 
-impl<A: smallvec::Array + Send + Sync + Unpin + 'static> DictionaryValue for smallvec::SmallVec<A>
-where
-    A::Item: DictionaryValue,
+impl<A: smallvec::Array + Send + Sync + Unpin + 'static> DictionaryValue for smallvec::SmallVec<A> where
+    A::Item: DictionaryValue
 {
 }
 

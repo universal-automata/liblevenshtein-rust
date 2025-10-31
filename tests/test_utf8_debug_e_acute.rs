@@ -10,7 +10,11 @@ fn test_e_acute_dict_creation() {
 
     println!("Created dictionary with: [\"é\"]");
     println!("Character 'é': {:?} (U+{:04X})", 'é', 'é' as u32);
-    println!("String \"é\": {} bytes, {} chars", "é".len(), "é".chars().count());
+    println!(
+        "String \"é\": {} bytes, {} chars",
+        "é".len(),
+        "é".chars().count()
+    );
 
     // Test contains
     let contains = dict.contains("é");
@@ -21,7 +25,13 @@ fn test_e_acute_dict_creation() {
     let root = dict.root();
     let edges: Vec<char> = root.edges().map(|(c, _)| c).collect();
     println!("Root edges: {:?}", edges);
-    println!("Root edges as U+: {:?}", edges.iter().map(|&c| format!("U+{:04X}", c as u32)).collect::<Vec<_>>());
+    println!(
+        "Root edges as U+: {:?}",
+        edges
+            .iter()
+            .map(|&c| format!("U+{:04X}", c as u32))
+            .collect::<Vec<_>>()
+    );
 
     assert!(edges.contains(&'é'), "Root should have edge for 'é'");
 

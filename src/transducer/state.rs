@@ -88,7 +88,8 @@ impl State {
         }
 
         // Remove any positions that this new position subsumes
-        self.positions.retain(|p| !position.subsumes(p, algorithm, query_length));
+        self.positions
+            .retain(|p| !position.subsumes(p, algorithm, query_length));
 
         // Insert in sorted position
         let insert_pos = self

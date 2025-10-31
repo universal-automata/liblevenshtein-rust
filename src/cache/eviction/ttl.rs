@@ -36,7 +36,10 @@
 //! assert_eq!(ttl_dict.get_value("foo"), Some(42));
 //! ```
 
-use crate::dictionary::{Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode, SyncStrategy};
+use crate::dictionary::{
+    Dictionary, DictionaryNode, DictionaryValue, MappedDictionary, MappedDictionaryNode,
+    SyncStrategy,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -155,7 +158,8 @@ impl<D> Ttl<D> {
     /// Records an entry access (updates metadata).
     fn record_access(&self, term: &str) {
         let mut metadata = self.metadata.write().unwrap();
-        metadata.entry(term.to_string())
+        metadata
+            .entry(term.to_string())
             .or_insert_with(EntryMetadata::new);
     }
 
@@ -241,7 +245,11 @@ pub struct TtlNode<N> {
 
 impl<N> TtlNode<N> {
     fn new(inner: N, ttl: Duration, metadata: Arc<RwLock<HashMap<String, EntryMetadata>>>) -> Self {
-        Self { inner, ttl, metadata }
+        Self {
+            inner,
+            ttl,
+            metadata,
+        }
     }
 }
 
@@ -258,18 +266,20 @@ where
 
     #[inline]
     fn transition(&self, label: Self::Unit) -> Option<Self> {
-        self.inner.transition(label).map(|node| {
-            TtlNode::new(node, self.ttl, Arc::clone(&self.metadata))
-        })
+        self.inner
+            .transition(label)
+            .map(|node| TtlNode::new(node, self.ttl, Arc::clone(&self.metadata)))
     }
 
     #[inline]
     fn edges(&self) -> Box<dyn Iterator<Item = (Self::Unit, Self)> + '_> {
         let ttl = self.ttl;
         let metadata = Arc::clone(&self.metadata);
-        Box::new(self.inner.edges().map(move |(label, node)| {
-            (label, TtlNode::new(node, ttl, Arc::clone(&metadata)))
-        }))
+        Box::new(
+            self.inner
+                .edges()
+                .map(move |(label, node)| (label, TtlNode::new(node, ttl, Arc::clone(&metadata)))),
+        )
     }
 
     #[inline]
@@ -301,10 +311,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_ttl_wrapper_basic() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let ttl = Ttl::new(dict, Duration::from_secs(300));
 
@@ -317,10 +324,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_ttl_expiration() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let ttl = Ttl::new(dict, Duration::from_millis(50));
 
@@ -338,10 +342,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_ttl_unaccessed_entries() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let ttl = Ttl::new(dict, Duration::from_millis(50));
 
@@ -356,11 +357,8 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_ttl_cleanup() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-            ("baz", 123),
-        ]);
+        let dict =
+            PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99), ("baz", 123)]);
 
         let ttl = Ttl::new(dict, Duration::from_millis(50));
 
@@ -406,10 +404,7 @@ mod tests {
     #[test]
     #[cfg(feature = "pathmap-backend")]
     fn test_ttl_contains_with_value() {
-        let dict = PathMapDictionary::from_terms_with_values([
-            ("foo", 42),
-            ("bar", 99),
-        ]);
+        let dict = PathMapDictionary::from_terms_with_values([("foo", 42), ("bar", 99)]);
 
         let ttl = Ttl::new(dict, Duration::from_millis(50));
 

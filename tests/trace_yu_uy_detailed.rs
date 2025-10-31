@@ -1,6 +1,6 @@
+use liblevenshtein::distance::transposition_distance;
 use liblevenshtein::prelude::*;
 use liblevenshtein::transducer::{Position, State};
-use liblevenshtein::distance::transposition_distance;
 
 #[test]
 fn trace_yu_to_uy_detailed() {
@@ -57,7 +57,9 @@ fn trace_yu_to_uy_detailed() {
     state1.insert(Position::new(1, 1), algorithm, query_length);
     state1.insert(Position::new(2, 1), algorithm, query_length);
 
-    let has_special = state1.positions().iter()
+    let has_special = state1
+        .positions()
+        .iter()
         .any(|p| p.is_special && p.term_index == 0 && p.num_errors == 1);
 
     if has_special {
@@ -102,7 +104,9 @@ fn trace_yu_to_uy_detailed() {
     // Now test actual automaton
     println!("=== Actual Automaton Results ===\n");
     let transducer = Transducer::new(dict, algorithm);
-    let results: Vec<_> = transducer.query_with_distance(query, max_distance).collect();
+    let results: Vec<_> = transducer
+        .query_with_distance(query, max_distance)
+        .collect();
 
     println!("Results: {:?}", results);
     println!();
@@ -112,7 +116,10 @@ fn trace_yu_to_uy_detailed() {
         panic!("Should find 'uy'");
     }
 
-    let candidate = results.iter().find(|c| c.term == "uy").expect("Should find 'uy'");
+    let candidate = results
+        .iter()
+        .find(|c| c.term == "uy")
+        .expect("Should find 'uy'");
     println!("Found 'uy' at distance: {}", candidate.distance);
     println!();
 
