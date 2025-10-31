@@ -150,20 +150,28 @@ impl Position {
             }
 
             Algorithm::MergeAndSplit => {
-                // From C++ subsumes.cpp lines 41-56, with critical fix:
-                // The C++/Java implementations have a bug where non-special positions
-                // can subsume special positions, preventing split/merge from working.
+                // Based on formal definition from Schulz & Mihov paper:
+                // 1. (i,e,false) subsumes (j,f,false) iff e < f and |j-i| <= f-e
+                // 2. (i,e,false) subsumes (j,f,true) iff e < f and |j-i| <= f-e
+                // 3. (i,e,true) subsumes (j,f,true) iff e < f and |j-i| <= f-e
+                // 4. (i,e,true) cannot subsume (j,f,false) [not in paper, but implied]
                 //
-                // Correct logic: Special and non-special positions represent different
-                // computational paths and should not subsume each other.
-                if s != t {
-                    // One is special, the other is not: cannot subsume
-                    // This prevents (i, e, false) from subsuming (i, e, true)
-                    // which would block split/merge operations from being explored
+                // Key: Must have STRICTLY FEWER errors (e < f), not equal!
+                // The C++/Java implementations incorrectly allow e == f.
+
+                // Special position cannot subsume non-special
+                if s && !t {
                     return false;
                 }
 
-                // Both special or both non-special: standard formula
+                // Must have strictly fewer errors to subsume (critical for merge/split!)
+                // When e == f, positions at same index should NOT subsume each other
+                // This allows (i,e,false) and (i,e,true) to coexist
+                if e >= f {
+                    return false;
+                }
+
+                // Standard distance-based formula
                 let index_diff = i.abs_diff(j);
                 let error_diff = f - e;
                 index_diff <= error_diff
