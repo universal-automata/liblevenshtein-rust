@@ -114,7 +114,7 @@ impl Position {
                 }
 
                 if t {
-                    // CRITICAL FIX: Special positions (transposition-in-progress) represent
+                    // CRITICAL: Special positions (transposition-in-progress) represent
                     // fundamentally different computational paths than normal positions.
                     // A normal position should NEVER subsume a special position, as this
                     // would prematurely terminate exploration of valid transposition paths.
@@ -123,15 +123,17 @@ impl Position {
                     //   (1,1,false) was incorrectly subsuming (0,1,true)
                     //   The special position is needed to complete the transposition!
                     //
-                    // This appears to be a bug in the original Java/C++ implementations
-                    // that was not caught by their test suites.
+                    // NOTE: The C++ implementation has a bug at line 24 of subsumes.cpp:
+                    //   bool t = lhs->is_special();  // Should be rhs->is_special()
+                    // This bug causes s and t to always have the same value, so the
+                    // C++ code never reaches this branch when !s. This accidentally
+                    // avoids the subsumption bug, but for the wrong reason.
                     if !s {
                         // lhs is normal, rhs is special → cannot subsume
                         return false;
                     }
 
-                    // Both are special: use adjusted formula
-                    // rhs is special: adjusted formula
+                    // Both special: use adjusted formula
                     // ((j < i) ? (i - j - 1) : (j - i + 1)) <= (f - e)
                     let adjusted_diff = if j < i {
                         i.saturating_sub(j).saturating_sub(1)
@@ -270,19 +272,19 @@ mod tests {
             "special(5,2) should subsume normal(5,3) when f==max_distance"
         );
 
-        // rhs special: adjusted formula - ((j < i) ? (i - j - 1) : (j - i + 1)) <= (f - e)
+        // lhs normal, rhs special: normal cannot subsume special (transposition-in-progress)
         let p7 = Position::new(5, 2);
-        let p8 = Position::new_special(4, 3); // j=4, i=5: (5-4-1)=0 <= (3-2)=1 ✓
+        let p8 = Position::new_special(4, 3);
         assert!(
-            p7.subsumes(&p8, Algorithm::Transposition, max_distance),
-            "normal(5,2) should subsume special(4,3)"
+            !p7.subsumes(&p8, Algorithm::Transposition, max_distance),
+            "normal(5,2) should NOT subsume special(4,3) - special positions are transposition-in-progress"
         );
 
         let p9 = Position::new(5, 2);
-        let p10 = Position::new_special(6, 3); // j=6, i=5: (6-5+1)=2 > (3-2)=1 ✗
+        let p10 = Position::new_special(6, 3);
         assert!(
             !p9.subsumes(&p10, Algorithm::Transposition, max_distance),
-            "normal(5,2) should NOT subsume special(6,3)"
+            "normal(5,2) should NOT subsume special(6,3) - special positions are transposition-in-progress"
         );
 
         // Neither special: standard formula
