@@ -45,6 +45,7 @@ pub struct Candidate {
 ///
 /// ```
 /// use liblevenshtein::prelude::*;
+/// use liblevenshtein::transducer::{QueryIterator, Candidate};
 ///
 /// let dict = DoubleArrayTrie::from_terms(vec!["test"]);
 ///

@@ -23,17 +23,31 @@ use super::query::Candidate;
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// use liblevenshtein::prelude::*;
 /// use liblevenshtein::transducer::{QueryIterator, Candidate};
 ///
+/// let dict = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
+/// let root = dict.root();
+///
 /// // Iterator that returns just strings
-/// let iter: QueryIterator<_, String> = QueryIterator::new(...);
+/// let iter: QueryIterator<_, String> = QueryIterator::new(
+///     root.clone(),
+///     "tset".to_string(),
+///     2,
+///     Algorithm::Standard
+/// );
 /// for term in iter {
 ///     println!("{}", term);
 /// }
 ///
 /// // Iterator that returns Candidate (term + distance)
-/// let iter: QueryIterator<_, Candidate> = QueryIterator::new(...);
+/// let iter: QueryIterator<_, Candidate> = QueryIterator::new(
+///     root,
+///     "tset".to_string(),
+///     2,
+///     Algorithm::Standard
+/// );
 /// for candidate in iter {
 ///     println!("{}: distance {}", candidate.term, candidate.distance);
 /// }
