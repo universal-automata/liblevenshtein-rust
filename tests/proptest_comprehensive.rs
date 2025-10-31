@@ -7,6 +7,7 @@
 //! - Edge cases and special characters
 
 use liblevenshtein::prelude::*;
+use liblevenshtein::distance::*;
 use proptest::prelude::*;
 
 // ============================================================================
@@ -503,27 +504,24 @@ proptest! {
         query in ascii_word_strategy(),
         max_dist in 0usize..=2,
     ) {
+        let cache = create_memo_cache();
         for algorithm in &[Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
             let dict = DoubleArrayTrie::from_terms(dict_words.clone());
             let transducer = Transducer::new(dict, *algorithm);
             let results: Vec<_> = transducer.query(&query, max_dist).collect();
 
-            // Only verify with naive distance for Standard/Transposition
-            // MergeAndSplit has different distance semantics (merge/split operations)
-            if *algorithm != Algorithm::MergeAndSplit {
-                for result in &results {
-                    let dist = naive_levenshtein(&query, result);
-                    prop_assert!(
-                        dist <= max_dist,
-                        "DoubleArrayTrie with {:?} returned '{}' with distance {} > {}",
-                        algorithm, result, dist, max_dist
-                    );
-                }
-            } else {
-                // For MergeAndSplit, just verify results are valid (not empty)
-                for result in &results {
-                    prop_assert!(!result.is_empty() || query.is_empty());
-                }
+            // Verify with algorithm-specific distance function
+            for result in &results {
+                let dist = match algorithm {
+                    Algorithm::Standard => standard_distance(&query, result),
+                    Algorithm::Transposition => transposition_distance(&query, result),
+                    Algorithm::MergeAndSplit => merge_and_split_distance(&query, result, &cache),
+                };
+                prop_assert!(
+                    dist <= max_dist,
+                    "DoubleArrayTrie with {:?} returned '{}' with distance {} > {}",
+                    algorithm, result, dist, max_dist
+                );
             }
         }
     }
@@ -535,27 +533,24 @@ proptest! {
         query in ascii_word_strategy(),
         max_dist in 0usize..=2,
     ) {
+        let cache = create_memo_cache();
         for algorithm in &[Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
             let dict = DawgDictionary::from_iter(dict_words.clone());
             let transducer = Transducer::new(dict, *algorithm);
             let results: Vec<_> = transducer.query(&query, max_dist).collect();
 
-            // Only verify with naive distance for Standard/Transposition
-            // MergeAndSplit has different distance semantics (merge/split operations)
-            if *algorithm != Algorithm::MergeAndSplit {
-                for result in &results {
-                    let dist = naive_levenshtein(&query, result);
-                    prop_assert!(
-                        dist <= max_dist,
-                        "DawgDictionary with {:?} returned '{}' with distance {} > {}",
-                        algorithm, result, dist, max_dist
-                    );
-                }
-            } else {
-                // For MergeAndSplit, just verify results are valid (not empty)
-                for result in &results {
-                    prop_assert!(!result.is_empty() || query.is_empty());
-                }
+            // Verify with algorithm-specific distance function
+            for result in &results {
+                let dist = match algorithm {
+                    Algorithm::Standard => standard_distance(&query, result),
+                    Algorithm::Transposition => transposition_distance(&query, result),
+                    Algorithm::MergeAndSplit => merge_and_split_distance(&query, result, &cache),
+                };
+                prop_assert!(
+                    dist <= max_dist,
+                    "DawgDictionary with {:?} returned '{}' with distance {} > {}",
+                    algorithm, result, dist, max_dist
+                );
             }
         }
     }
@@ -567,27 +562,24 @@ proptest! {
         query in ascii_word_strategy(),
         max_dist in 0usize..=2,
     ) {
+        let cache = create_memo_cache();
         for algorithm in &[Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
             let dict = DynamicDawg::from_terms(dict_words.clone());
             let transducer = Transducer::new(dict, *algorithm);
             let results: Vec<_> = transducer.query(&query, max_dist).collect();
 
-            // Only verify with naive distance for Standard/Transposition
-            // MergeAndSplit has different distance semantics (merge/split operations)
-            if *algorithm != Algorithm::MergeAndSplit {
-                for result in &results {
-                    let dist = naive_levenshtein(&query, result);
-                    prop_assert!(
-                        dist <= max_dist,
-                        "DynamicDawg with {:?} returned '{}' with distance {} > {}",
-                        algorithm, result, dist, max_dist
-                    );
-                }
-            } else {
-                // For MergeAndSplit, just verify results are valid (not empty)
-                for result in &results {
-                    prop_assert!(!result.is_empty() || query.is_empty());
-                }
+            // Verify with algorithm-specific distance function
+            for result in &results {
+                let dist = match algorithm {
+                    Algorithm::Standard => standard_distance(&query, result),
+                    Algorithm::Transposition => transposition_distance(&query, result),
+                    Algorithm::MergeAndSplit => merge_and_split_distance(&query, result, &cache),
+                };
+                prop_assert!(
+                    dist <= max_dist,
+                    "DynamicDawg with {:?} returned '{}' with distance {} > {}",
+                    algorithm, result, dist, max_dist
+                );
             }
         }
     }
@@ -599,27 +591,24 @@ proptest! {
         query in ascii_word_strategy(),
         max_dist in 0usize..=2,
     ) {
+        let cache = create_memo_cache();
         for algorithm in &[Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
             let dict = OptimizedDawg::from_terms(dict_words.clone());
             let transducer = Transducer::new(dict, *algorithm);
             let results: Vec<_> = transducer.query(&query, max_dist).collect();
 
-            // Only verify with naive distance for Standard/Transposition
-            // MergeAndSplit has different distance semantics (merge/split operations)
-            if *algorithm != Algorithm::MergeAndSplit {
-                for result in &results {
-                    let dist = naive_levenshtein(&query, result);
-                    prop_assert!(
-                        dist <= max_dist,
-                        "OptimizedDawg with {:?} returned '{}' with distance {} > {}",
-                        algorithm, result, dist, max_dist
-                    );
-                }
-            } else {
-                // For MergeAndSplit, just verify results are valid (not empty)
-                for result in &results {
-                    prop_assert!(!result.is_empty() || query.is_empty());
-                }
+            // Verify with algorithm-specific distance function
+            for result in &results {
+                let dist = match algorithm {
+                    Algorithm::Standard => standard_distance(&query, result),
+                    Algorithm::Transposition => transposition_distance(&query, result),
+                    Algorithm::MergeAndSplit => merge_and_split_distance(&query, result, &cache),
+                };
+                prop_assert!(
+                    dist <= max_dist,
+                    "OptimizedDawg with {:?} returned '{}' with distance {} > {}",
+                    algorithm, result, dist, max_dist
+                );
             }
         }
     }
