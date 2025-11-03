@@ -41,7 +41,7 @@ use std::sync::{Arc, RwLock};
 /// ```
 #[derive(Clone, Debug)]
 pub struct PathMapDictionary<V: DictionaryValue = ()> {
-    map: Arc<RwLock<PathMap<V>>>,
+    pub(crate) map: Arc<RwLock<PathMap<V>>>,
     term_count: Arc<RwLock<usize>>,
 }
 

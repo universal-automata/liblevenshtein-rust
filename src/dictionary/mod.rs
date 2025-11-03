@@ -2,6 +2,97 @@
 //!
 //! This module provides traits that abstract over different dictionary
 //! implementations (tries, DAWGs, etc.) for use with Levenshtein automata.
+//!
+//! # Choosing a Dictionary Backend
+//!
+//! The library provides multiple dictionary backends optimized for different use cases.
+//! Here's a quick decision guide:
+//!
+//! ## Quick Start (Pick One)
+//!
+//! - **Just getting started?** Use [`DoubleArrayTrie`](double_array_trie::DoubleArrayTrie)
+//!   - Best overall performance (3x faster queries, 30x faster contains checks)
+//!   - Lowest memory footprint (~8 bytes/state)
+//!   - Supports runtime insertions (append-only)
+//!   - Default choice for most applications
+//!
+//! - **Working with Unicode text?** Use [`DoubleArrayTrieChar`](double_array_trie_char::DoubleArrayTrieChar)
+//!   - Correct character-level Levenshtein distances
+//!   - Handles accented characters, CJK, emoji correctly
+//!   - Supports runtime insertions (append-only)
+//!   - ~5% performance overhead, 4x memory for edge labels
+//!
+//! - **Need to remove terms?** Use [`DynamicDawg`](dynamic_dawg::DynamicDawg)
+//!   - Thread-safe insert AND remove operations
+//!   - Good fuzzy matching performance for fully dynamic use
+//!   - Active queries see updates immediately
+//!
+//! - **Need substring/infix search?** Use [`SuffixAutomaton`](suffix_automaton::SuffixAutomaton)
+//!   - Find patterns anywhere in text (not just prefixes)
+//!   - Specialized for suffix-based matching
+//!
+//! ## Detailed Comparison
+//!
+//! | Backend | Best For | Performance | Memory | Dynamic Updates | Unicode |
+//! |---------|----------|-------------|--------|-----------------|---------|
+//! | **[DoubleArrayTrie]** | General use (recommended) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ✅ Insert-only | Byte-level |
+//! | **[DoubleArrayTrieChar]** | Unicode text | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ✅ Insert-only | ✅ Character-level |
+//! | **[DynamicDawg]** | Insert + Remove | ⭐⭐⭐ | ⭐⭐⭐ | ✅ Thread-safe | Byte-level |
+//! | **[PathMapDictionary]** | Frequent updates (requires `pathmap-backend` feature) | ⭐⭐ | ⭐⭐ | ✅ Thread-safe | Byte-level |
+//! | **[PathMapDictionaryChar]** | Unicode + updates (requires `pathmap-backend` feature) | ⭐⭐ | ⭐⭐ | ✅ Thread-safe | ✅ Character-level |
+//! | **[DawgDictionary]** | Static dictionaries | ⭐⭐⭐ | ⭐⭐⭐ | ❌ | Byte-level |
+//! | **[OptimizedDawg]** | Fast construction | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ❌ | Byte-level |
+//! | **[SuffixAutomaton]** | Substring search | ⭐⭐⭐ | ⭐⭐ | ✅ Insert + Remove | Byte-level |
+//!
+//! [DoubleArrayTrie]: double_array_trie::DoubleArrayTrie
+//! [DoubleArrayTrieChar]: double_array_trie_char::DoubleArrayTrieChar
+//! [DynamicDawg]: dynamic_dawg::DynamicDawg
+//! [PathMapDictionary]: pathmap::PathMapDictionary
+//! [PathMapDictionaryChar]: pathmap_char::PathMapDictionaryChar
+//! [DawgDictionary]: dawg::DawgDictionary
+//! [OptimizedDawg]: dawg_optimized::OptimizedDawg
+//! [SuffixAutomaton]: suffix_automaton::SuffixAutomaton
+//!
+//! ## Performance Benchmarks (10,000 words)
+//!
+//! ```text
+//! Construction:  DAT: 3.2ms    PathMap: 3.5ms    DAWG: 7.2ms
+//! Exact Match:   DAT: 6.6µs    DAWG: 19.8µs      PathMap: 71.1µs
+//! Contains (100):DAT: 0.22µs   DAWG: 6.7µs       PathMap: 132µs
+//! Distance 1:    DAT: 12.9µs   DAWG: 319µs       PathMap: 888µs
+//! Distance 2:    DAT: 16.3µs   DAWG: 2,150µs     PathMap: 5,919µs
+//! ```
+//!
+//! ## Common Scenarios
+//!
+//! **Static or append-only dictionary, ASCII/Latin-1 text:**
+//! ```rust,ignore
+//! use liblevenshtein::dictionary::double_array_trie::DoubleArrayTrie;
+//! let mut dict = DoubleArrayTrie::from_terms(vec!["test", "testing", "tested"]);
+//! dict.insert("new_term");  // Can add terms at runtime
+//! ```
+//!
+//! **Multi-language application with Unicode:**
+//! ```rust,ignore
+//! use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+//! let mut dict = DoubleArrayTrieChar::from_terms(vec!["café", "naïve", "中文", "🎉"]);
+//! dict.insert("新しい");  // Can add Unicode terms at runtime
+//! ```
+//!
+//! **Application that needs to add AND remove terms at runtime:**
+//! ```rust,ignore
+//! use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+//! let dict = DynamicDawg::from_terms(vec!["initial", "terms"]);
+//! dict.insert("new_term");  // Thread-safe
+//! dict.remove("old_term");  // Also supports removal
+//! ```
+//!
+//! **Finding patterns anywhere in text (not just as prefixes):**
+//! ```rust,ignore
+//! use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+//! let dict = SuffixAutomaton::from_source_text("the quick brown fox");
+//! // Can find "quick" even though it's not a prefix
+//! ```
 
 pub mod char_unit;
 pub mod compressed_suffix_automaton;
@@ -16,11 +107,15 @@ pub mod factory;
 pub mod pathmap;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap_char;
+#[cfg(feature = "pathmap-backend")]
+pub mod pathmap_zipper;
 pub mod suffix_automaton;
 pub mod value;
+pub mod zipper;
 
 pub use char_unit::CharUnit;
 pub use value::DictionaryValue;
+pub use zipper::{DictZipper, ValuedDictZipper};
 
 /// Synchronization strategy for dictionary operations.
 ///

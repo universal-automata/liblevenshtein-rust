@@ -89,19 +89,30 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
 
     /// Enable or disable prefix matching mode
     ///
-    /// When enabled, matches terms that start with the query term
-    /// (within the specified edit distance).
+    /// **DEPRECATED**: This method is non-functional and will be removed in a future version.
     ///
-    /// # Example
+    /// # Migration Guide
+    ///
+    /// Use `.ordered().prefix()` instead for prefix matching:
     ///
     /// ```rust,ignore
-    /// // Find all terms starting with "te" (within 1 edit)
+    /// // OLD (doesn't work):
     /// let results = transducer
     ///     .query_builder("te")
     ///     .prefix_mode(true)
-    ///     .max_distance(1)
     ///     .execute();
+    ///
+    /// // NEW (works correctly):
+    /// let results = transducer
+    ///     .query_builder("te")
+    ///     .ordered()
+    ///     .prefix()  // Enable prefix matching
+    ///     .collect();
     /// ```
+    #[deprecated(
+        since = "0.4.1",
+        note = "This method is non-functional. Use `.ordered().prefix()` instead for prefix matching."
+    )]
     pub fn prefix_mode(mut self, enabled: bool) -> Self {
         self.prefix = enabled;
         self
@@ -111,13 +122,10 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
     ///
     /// Returns terms in arbitrary order as they are found during traversal.
     ///
-    /// Note: Prefix mode is not yet implemented in the underlying query iterator.
-    /// The `prefix` field will be used when prefix support is added.
+    /// # Note
+    ///
+    /// For prefix matching, use `.ordered().prefix()` instead of `.prefix_mode()`.
     pub fn execute(self) -> QueryIterator<D::Node> {
-        if self.prefix {
-            // TODO: Once prefix mode is implemented in QueryIterator, pass it here
-            eprintln!("Warning: prefix mode not yet implemented, ignoring");
-        }
         QueryIterator::new(
             self.dictionary.root(),
             self.term,
@@ -143,12 +151,18 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
     ///     .collect();
     /// ```
     ///
-    /// Note: Prefix mode is not yet implemented in the underlying query iterator.
+    /// # Prefix Matching
+    ///
+    /// For prefix matching, chain `.prefix()` after this method:
+    ///
+    /// ```rust,ignore
+    /// let results: Vec<_> = transducer
+    ///     .query_builder("te")
+    ///     .ordered()
+    ///     .prefix()  // Match terms starting with query
+    ///     .collect();
+    /// ```
     pub fn ordered(self) -> OrderedQueryIterator<D::Node> {
-        if self.prefix {
-            // TODO: Once prefix mode is implemented in OrderedQueryIterator, pass it here
-            eprintln!("Warning: prefix mode not yet implemented, ignoring");
-        }
         OrderedQueryIterator::new(
             self.dictionary.root(),
             self.term,

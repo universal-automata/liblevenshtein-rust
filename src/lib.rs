@@ -28,6 +28,8 @@
 #![warn(clippy::all)]
 
 pub mod commands;
+#[cfg(feature = "pathmap-backend")]
+pub mod contextual;
 pub mod dictionary;
 pub mod distance;
 pub mod transducer;

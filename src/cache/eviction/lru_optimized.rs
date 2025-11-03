@@ -201,6 +201,15 @@ pub struct LruOptimized<D> {
 }
 
 impl<D> LruOptimized<D> {
+    /// Creates a new LRU-optimized wrapper around the given dictionary.
+    ///
+    /// # Arguments
+    ///
+    /// * `dict` - The dictionary to wrap with LRU tracking
+    ///
+    /// # Returns
+    ///
+    /// A new `LruOptimized` instance
     pub fn new(dict: D) -> Self {
         #[cfg(feature = "eviction-coarse-timestamps")]
         {
@@ -219,11 +228,21 @@ impl<D> LruOptimized<D> {
         }
     }
 
+    /// Consumes the wrapper and returns the inner dictionary.
+    ///
+    /// # Returns
+    ///
+    /// The wrapped dictionary
     #[inline]
     pub fn into_inner(self) -> D {
         self.inner
     }
 
+    /// Returns a reference to the inner dictionary.
+    ///
+    /// # Returns
+    ///
+    /// Reference to the wrapped dictionary
     #[inline]
     pub fn inner(&self) -> &D {
         &self.inner
@@ -252,6 +271,15 @@ impl<D> LruOptimized<D> {
         }
     }
 
+    /// Gets the recency score for a term (lower is more recent).
+    ///
+    /// # Arguments
+    ///
+    /// * `term` - The term to query
+    ///
+    /// # Returns
+    ///
+    /// The recency score if the term exists, `None` otherwise
     pub fn recency(&self, term: &str) -> Option<u64> {
         #[cfg(feature = "eviction-dashmap")]
         {
@@ -269,6 +297,15 @@ impl<D> LruOptimized<D> {
         }
     }
 
+    /// Finds the least recently used term from a list of candidates.
+    ///
+    /// # Arguments
+    ///
+    /// * `terms` - Slice of term candidates to check
+    ///
+    /// # Returns
+    ///
+    /// The LRU term if any have metadata, `None` if none are tracked
     pub fn find_lru(&self, terms: &[&str]) -> Option<String> {
         #[cfg(feature = "eviction-dashmap")]
         {
@@ -294,6 +331,17 @@ impl<D> LruOptimized<D> {
         }
     }
 
+    /// Evicts the least recently used term from a list of candidates.
+    ///
+    /// Removes the LRU term's metadata from tracking.
+    ///
+    /// # Arguments
+    ///
+    /// * `terms` - Slice of term candidates to check
+    ///
+    /// # Returns
+    ///
+    /// The evicted term if any were tracked, `None` otherwise
     pub fn evict_lru(&self, terms: &[&str]) -> Option<String> {
         if let Some(lru_term) = self.find_lru(terms) {
             #[cfg(feature = "eviction-dashmap")]
@@ -317,6 +365,9 @@ impl<D> LruOptimized<D> {
         }
     }
 
+    /// Clears all LRU metadata, resetting tracking state.
+    ///
+    /// This removes all recency information for all terms.
     pub fn clear_metadata(&self) {
         #[cfg(feature = "eviction-dashmap")]
         {
@@ -384,6 +435,9 @@ where
     }
 }
 
+/// Dictionary node wrapper that tracks LRU metadata.
+///
+/// Wraps a dictionary node and maintains shared access to LRU tracking metadata.
 #[derive(Clone)]
 pub struct LruOptimizedNode<N> {
     inner: N,

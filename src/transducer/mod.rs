@@ -4,10 +4,12 @@
 //! fuzzy string matching against dictionaries.
 
 mod algorithm;
+mod automaton_zipper;
 pub mod builder;
 mod builder_api;
 pub mod helpers;
 mod intersection;
+pub mod intersection_zipper;
 mod ordered_query;
 mod pool;
 mod position;
@@ -16,14 +18,17 @@ mod query_result;
 mod state;
 pub mod transition;
 mod value_filtered_query;
+mod zipper_query_iterator;
 
 #[cfg(feature = "simd")]
 pub mod simd;
 
 pub use algorithm::Algorithm;
+pub use automaton_zipper::AutomatonZipper;
 pub use builder::{BuilderError, TransducerBuilder};
 pub use builder_api::QueryBuilder;
 pub use intersection::{Intersection, PathNode};
+pub use intersection_zipper::IntersectionZipper;
 pub use ordered_query::{OrderedCandidate, OrderedQueryIterator};
 pub use pool::StatePool;
 pub use position::Position;
@@ -31,6 +36,7 @@ pub use query::{Candidate, CandidateIterator, QueryIterator, StringQueryIterator
 pub use query_result::QueryResult;
 pub use state::State;
 pub use value_filtered_query::{ValueFilteredQueryIterator, ValueSetFilteredQueryIterator};
+pub use zipper_query_iterator::ZipperQueryIterator;
 
 use crate::dictionary::{Dictionary, MappedDictionary, MappedDictionaryNode};
 use std::collections::HashSet;
@@ -65,6 +71,60 @@ impl<D: Dictionary> Transducer<D> {
             dictionary,
             algorithm,
         }
+    }
+
+    /// Create a transducer with the Standard algorithm.
+    ///
+    /// This is a convenience constructor for the most common use case.
+    /// The Standard algorithm supports insert, delete, and substitute operations.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::prelude::*;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
+    /// let transducer = Transducer::standard(dict);
+    /// // Equivalent to: Transducer::new(dict, Algorithm::Standard)
+    /// ```
+    pub fn standard(dictionary: D) -> Self {
+        Self::new(dictionary, Algorithm::Standard)
+    }
+
+    /// Create a transducer with the Transposition algorithm.
+    ///
+    /// The Transposition algorithm adds support for swapping adjacent characters,
+    /// useful for catching common typos like "teh" → "the".
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::prelude::*;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms(vec!["the", "quick"]);
+    /// let transducer = Transducer::with_transposition(dict);
+    /// // Will match "teh" to "the" with distance 1
+    /// ```
+    pub fn with_transposition(dictionary: D) -> Self {
+        Self::new(dictionary, Algorithm::Transposition)
+    }
+
+    /// Create a transducer with the MergeAndSplit algorithm.
+    ///
+    /// The MergeAndSplit algorithm adds support for merge and split operations,
+    /// useful for catching spacing errors like "every one" ↔ "everyone".
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::prelude::*;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms(vec!["everyone", "someone"]);
+    /// let transducer = Transducer::with_merge_split(dict);
+    /// // Will match "every one" to "everyone" with distance 1
+    /// ```
+    pub fn with_merge_split(dictionary: D) -> Self {
+        Self::new(dictionary, Algorithm::MergeAndSplit)
     }
 
     /// Query for terms within `max_distance` edits of `term`
@@ -177,6 +237,73 @@ impl<D: Dictionary> Transducer<D> {
     /// ```
     pub fn query_builder(&self, term: impl Into<String>) -> QueryBuilder<'_, D> {
         QueryBuilder::new(&self.dictionary, term, 2, self.algorithm)
+    }
+
+    /// Alias for [`query`](Self::query) - returns matching term strings.
+    ///
+    /// This is a more descriptive name that makes it clear the method returns
+    /// just the term strings without distance information.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::prelude::*;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
+    /// let transducer = Transducer::standard(dict);
+    ///
+    /// for term in transducer.query_terms("tset", 2) {
+    ///     println!("Match: {}", term);
+    /// }
+    /// ```
+    pub fn query_terms(&self, term: &str, max_distance: usize) -> QueryIterator<D::Node, String> {
+        self.query(term, max_distance)
+    }
+
+    /// Alias for [`query_with_distance`](Self::query_with_distance) - returns candidates with distances.
+    ///
+    /// This is a more concise name for getting both terms and their edit distances.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::prelude::*;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms(vec!["test", "best", "rest"]);
+    /// let transducer = Transducer::standard(dict);
+    ///
+    /// for candidate in transducer.query_candidates("test", 1) {
+    ///     println!("{}: distance {}", candidate.term, candidate.distance);
+    /// }
+    /// ```
+    pub fn query_candidates(
+        &self,
+        term: &str,
+        max_distance: usize,
+    ) -> QueryIterator<D::Node, Candidate> {
+        self.query_with_distance(term, max_distance)
+    }
+
+    /// Alias for [`query_ordered`](Self::query_ordered) - returns ranked results by distance.
+    ///
+    /// This name emphasizes that results are returned in ranked order
+    /// (closest matches first).
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::prelude::*;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms(vec!["test", "best", "rest"]);
+    /// let transducer = Transducer::standard(dict);
+    ///
+    /// // Get top 5 closest matches
+    /// for candidate in transducer.query_ranked("test", 2).take(5) {
+    ///     println!("{}: distance {}", candidate.term, candidate.distance);
+    /// }
+    /// ```
+    pub fn query_ranked(&self, term: &str, max_distance: usize) -> OrderedQueryIterator<D::Node> {
+        self.query_ordered(term, max_distance)
     }
 }
 

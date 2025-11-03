@@ -1,0 +1,1725 @@
+//! Contextual completion engine for incremental fuzzy matching with hierarchical scopes.
+//!
+//! This module provides the main `ContextualCompletionEngine` that combines:
+//! - Draft buffer management per context
+//! - Hierarchical context tree for visibility
+//! - Checkpoint-based undo/redo
+//! - Query fusion (drafts + finalized terms)
+//! - Thread-safe concurrent access
+
+use super::error::{ContextError, Result};
+use super::{CheckpointStack, Completion, ContextId, ContextTree, DraftBuffer};
+use crate::dictionary::pathmap::PathMapDictionary;
+use crate::dictionary::Dictionary;
+use crate::transducer::{Algorithm, Transducer};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
+
+/// Engine for contextual code completion with hierarchical scopes.
+///
+/// The engine manages:
+/// - **Drafts**: In-progress text buffers per context
+/// - **Contexts**: Hierarchical tree of lexical scopes
+/// - **Checkpoints**: Undo history per draft
+/// - **Dictionary**: Finalized terms with context associations
+///
+/// # Thread Safety
+///
+/// The engine uses interior mutability with `Mutex` and `RwLock` for
+/// thread-safe concurrent access. Multiple threads can query and modify
+/// different contexts simultaneously.
+///
+/// # Examples
+///
+/// ```
+/// use liblevenshtein::contextual::ContextualCompletionEngine;
+/// use liblevenshtein::transducer::Algorithm;
+///
+/// // Create engine
+/// let engine = ContextualCompletionEngine::new();
+///
+/// // Create global context
+/// let global = engine.create_root_context(0);
+///
+/// // Insert draft text
+/// engine.insert_str(global, "hello");
+///
+/// // Query completions
+/// let completions = engine.complete(global, "helo", 1);
+/// assert!(completions.iter().any(|c| c.term == "hello"));
+/// ```
+pub struct ContextualCompletionEngine {
+    /// Draft buffers per context (context_id -> buffer)
+    drafts: Arc<Mutex<HashMap<ContextId, DraftBuffer>>>,
+
+    /// Checkpoint stacks per context (context_id -> stack)
+    checkpoints: Arc<Mutex<HashMap<ContextId, CheckpointStack>>>,
+
+    /// Hierarchical context tree
+    context_tree: Arc<RwLock<ContextTree>>,
+
+    /// Transducer for fuzzy matching against finalized dictionary
+    /// Maps terms to the contexts where they're defined
+    transducer: Arc<RwLock<Transducer<PathMapDictionary<Vec<ContextId>>>>>,
+}
+
+impl ContextualCompletionEngine {
+    /// Create a new engine with default configuration (Standard algorithm).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// ```
+    pub fn new() -> Self {
+        Self::with_algorithm(Algorithm::Standard)
+    }
+
+    /// Create an engine with a specific Levenshtein algorithm variant.
+    ///
+    /// # Arguments
+    ///
+    /// * `algorithm` - Levenshtein algorithm to use for fuzzy matching
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::transducer::Algorithm;
+    ///
+    /// let engine = ContextualCompletionEngine::with_algorithm(Algorithm::Transposition);
+    /// ```
+    pub fn with_algorithm(algorithm: Algorithm) -> Self {
+        let dictionary = PathMapDictionary::<Vec<ContextId>>::new();
+        let transducer = Transducer::new(dictionary, algorithm);
+
+        Self {
+            drafts: Arc::new(Mutex::new(HashMap::new())),
+            checkpoints: Arc::new(Mutex::new(HashMap::new())),
+            context_tree: Arc::new(RwLock::new(ContextTree::new())),
+            transducer: Arc::new(RwLock::new(transducer)),
+        }
+    }
+
+    /// Create a root context.
+    ///
+    /// Root contexts have no parent and serve as top-level scopes
+    /// (e.g., global scope, module scope).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique identifier for the context
+    ///
+    /// # Returns
+    ///
+    /// The context ID on success.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the context ID is already in use.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let global = engine.create_root_context(0);
+    /// assert_eq!(global, 0);
+    /// ```
+    pub fn create_root_context(&self, id: ContextId) -> ContextId {
+        let mut tree = self.context_tree.write().unwrap();
+        tree.create_root(id);
+
+        // Initialize empty draft and checkpoint stack
+        let mut drafts = self.drafts.lock().unwrap();
+        drafts.insert(id, DraftBuffer::new());
+
+        let mut checkpoints = self.checkpoints.lock().unwrap();
+        checkpoints.insert(id, CheckpointStack::new());
+
+        id
+    }
+
+    /// Create a child context.
+    ///
+    /// Child contexts inherit visibility from their parent, forming
+    /// a hierarchy of lexical scopes.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique identifier for the new context
+    /// * `parent_id` - Parent context ID
+    ///
+    /// # Returns
+    ///
+    /// `Ok(context_id)` on success, `Err(ContextError)` if parent doesn't exist
+    /// or ID is already in use.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let global = engine.create_root_context(0);
+    /// let func = engine.create_child_context(1, global).unwrap();
+    /// assert_eq!(func, 1);
+    /// ```
+    pub fn create_child_context(
+        &self,
+        id: ContextId,
+        parent_id: ContextId,
+    ) -> Result<ContextId> {
+        let mut tree = self.context_tree.write().unwrap();
+        tree.create_child(id, parent_id)?;
+
+        // Initialize empty draft and checkpoint stack
+        let mut drafts = self.drafts.lock().unwrap();
+        drafts.insert(id, DraftBuffer::new());
+
+        let mut checkpoints = self.checkpoints.lock().unwrap();
+        checkpoints.insert(id, CheckpointStack::new());
+
+        Ok(id)
+    }
+
+    /// Remove a context and all its descendants.
+    ///
+    /// This also cleans up associated drafts and checkpoints.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Context ID to remove
+    ///
+    /// # Returns
+    ///
+    /// `true` if the context was removed, `false` if it didn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let global = engine.create_root_context(0);
+    /// let func = engine.create_child_context(1, global).unwrap();
+    ///
+    /// assert!(engine.remove_context(func));
+    /// assert!(!engine.remove_context(func)); // Already removed
+    /// ```
+    pub fn remove_context(&self, id: ContextId) -> bool {
+        let mut tree = self.context_tree.write().unwrap();
+        let removed = tree.remove(id);
+
+        if removed {
+            // Clean up drafts and checkpoints for removed context
+            let mut drafts = self.drafts.lock().unwrap();
+            drafts.retain(|ctx_id, _| tree.depth(*ctx_id).is_some());
+
+            let mut checkpoints = self.checkpoints.lock().unwrap();
+            checkpoints.retain(|ctx_id, _| tree.depth(*ctx_id).is_some());
+        }
+
+        removed
+    }
+
+    /// Get all contexts visible from a given context (including itself).
+    ///
+    /// Returns contexts in order: self, parent, grandparent, ..., root.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Context ID to query from
+    ///
+    /// # Returns
+    ///
+    /// Vector of visible context IDs (empty if context doesn't exist).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let global = engine.create_root_context(0);
+    /// let module = engine.create_child_context(1, global).unwrap();
+    /// let func = engine.create_child_context(2, module).unwrap();
+    ///
+    /// let visible = engine.get_visible_contexts(func);
+    /// assert_eq!(visible, vec![func, module, global]);
+    /// ```
+    pub fn get_visible_contexts(&self, id: ContextId) -> Vec<ContextId> {
+        let tree = self.context_tree.read().unwrap();
+        tree.visible_contexts(id)
+    }
+
+    /// Check if a context exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Context ID to check
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// assert!(!engine.context_exists(0));
+    ///
+    /// let global = engine.create_root_context(0);
+    /// assert!(engine.context_exists(0));
+    /// ```
+    pub fn context_exists(&self, id: ContextId) -> bool {
+        let tree = self.context_tree.read().unwrap();
+        tree.depth(id).is_some()
+    }
+
+    /// Get the current draft text for a context.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Some(draft_text)` if context exists and has a draft, `None` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// assert_eq!(engine.get_draft(ctx), Some(String::new()));
+    ///
+    /// engine.insert_str(ctx, "hello");
+    /// assert_eq!(engine.get_draft(ctx), Some("hello".to_string()));
+    /// ```
+    pub fn get_draft(&self, context: ContextId) -> Option<String> {
+        let drafts = self.drafts.lock().unwrap();
+        drafts.get(&context).map(|buf| buf.as_str())
+    }
+
+    /// Check if a context has any draft text.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `true` if the context has non-empty draft text.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// assert!(!engine.has_draft(ctx));
+    ///
+    /// engine.insert_str(ctx, "hello");
+    /// assert!(engine.has_draft(ctx));
+    /// ```
+    pub fn has_draft(&self, context: ContextId) -> bool {
+        let drafts = self.drafts.lock().unwrap();
+        drafts
+            .get(&context)
+            .map(|buf| !buf.is_empty())
+            .unwrap_or(false)
+    }
+
+    /// Insert a single character into the draft buffer for a context.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    /// * `ch` - Character to insert
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_char(ctx, 'h').unwrap();
+    /// engine.insert_char(ctx, 'i').unwrap();
+    /// assert_eq!(engine.get_draft(ctx), Some("hi".to_string()));
+    /// ```
+    pub fn insert_char(&self, context: ContextId, ch: char) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        let mut drafts = self.drafts.lock().unwrap();
+        if let Some(buffer) = drafts.get_mut(&context) {
+            buffer.insert(ch);
+            Ok(())
+        } else {
+            Err(ContextError::NoDraftBuffer(context))
+        }
+    }
+
+    /// Insert a string into the draft buffer for a context.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    /// * `s` - String to insert
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_str(ctx, "hello").unwrap();
+    /// engine.insert_str(ctx, " world").unwrap();
+    /// assert_eq!(engine.get_draft(ctx), Some("hello world".to_string()));
+    /// ```
+    pub fn insert_str(&self, context: ContextId, s: &str) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        for ch in s.chars() {
+            self.insert_char(context, ch)?;
+        }
+        Ok(())
+    }
+
+    /// Delete the last character from the draft buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Some(char)` if a character was deleted, `None` if buffer was empty
+    /// or context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_str(ctx, "hello").unwrap();
+    /// assert_eq!(engine.delete_char(ctx), Some('o'));
+    /// assert_eq!(engine.get_draft(ctx), Some("hell".to_string()));
+    /// ```
+    pub fn delete_char(&self, context: ContextId) -> Option<char> {
+        let mut drafts = self.drafts.lock().unwrap();
+        drafts.get_mut(&context).and_then(|buf| buf.delete())
+    }
+
+    /// Clear the draft buffer for a context.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_str(ctx, "hello").unwrap();
+    /// assert!(engine.has_draft(ctx));
+    ///
+    /// engine.clear_draft(ctx).unwrap();
+    /// assert!(!engine.has_draft(ctx));
+    /// ```
+    pub fn clear_draft(&self, context: ContextId) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        let mut drafts = self.drafts.lock().unwrap();
+        if let Some(buffer) = drafts.get_mut(&context) {
+            buffer.clear();
+            Ok(())
+        } else {
+            Err(ContextError::NoDraftBuffer(context))
+        }
+    }
+
+    /// Create a checkpoint of the current draft state.
+    ///
+    /// Checkpoints enable undo functionality by saving the buffer position.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_str(ctx, "hello").unwrap();
+    /// engine.checkpoint(ctx).unwrap();
+    ///
+    /// engine.insert_str(ctx, " world").unwrap();
+    /// assert_eq!(engine.get_draft(ctx), Some("hello world".to_string()));
+    ///
+    /// // Undo to checkpoint
+    /// engine.undo(ctx).unwrap();
+    /// assert_eq!(engine.get_draft(ctx), Some("hello".to_string()));
+    /// ```
+    pub fn checkpoint(&self, context: ContextId) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        let drafts = self.drafts.lock().unwrap();
+        let buffer = drafts
+            .get(&context)
+            .ok_or(ContextError::NoDraftBuffer(context))?;
+
+        let mut checkpoints = self.checkpoints.lock().unwrap();
+        let stack = checkpoints
+            .get_mut(&context)
+            .ok_or(ContextError::NoCheckpointStack(context))?;
+
+        stack.push_from_buffer(buffer);
+        Ok(())
+    }
+
+    /// Undo to the last checkpoint.
+    ///
+    /// Pops the most recent checkpoint and restores the buffer to the
+    /// previous checkpoint position.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist or
+    /// no checkpoints available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.checkpoint(ctx).unwrap(); // Empty checkpoint
+    /// engine.insert_str(ctx, "hello").unwrap();
+    /// engine.checkpoint(ctx).unwrap(); // "hello" checkpoint
+    ///
+    /// engine.insert_str(ctx, " world").unwrap();
+    /// assert_eq!(engine.get_draft(ctx), Some("hello world".to_string()));
+    ///
+    /// engine.undo(ctx).unwrap(); // Restore to "hello"
+    /// assert_eq!(engine.get_draft(ctx), Some("hello".to_string()));
+    /// ```
+    pub fn undo(&self, context: ContextId) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        let mut checkpoints = self.checkpoints.lock().unwrap();
+        let stack = checkpoints
+            .get_mut(&context)
+            .ok_or(ContextError::NoCheckpointStack(context))?;
+
+        // We need at least one checkpoint to restore to
+        if stack.is_empty() {
+            return Err(ContextError::NoCheckpoints(context));
+        }
+
+        // Peek at the top checkpoint (the one to restore to)
+        let checkpoint = stack.peek().ok_or(ContextError::NoCheckpoints(context))?;
+
+        // Restore buffer
+        let mut drafts = self.drafts.lock().unwrap();
+        let buffer = drafts
+            .get_mut(&context)
+            .ok_or(ContextError::NoDraftBuffer(context))?;
+
+        checkpoint.restore(buffer);
+
+        // Now pop the checkpoint after successful restore
+        drop(drafts); // Release lock before re-acquiring checkpoints
+        stack.pop();
+
+        Ok(())
+    }
+
+    /// Get the number of available checkpoints for a context.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// Number of checkpoints (0 if context doesn't exist).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// assert_eq!(engine.checkpoint_count(ctx), 0);
+    ///
+    /// engine.checkpoint(ctx).unwrap();
+    /// assert_eq!(engine.checkpoint_count(ctx), 1);
+    ///
+    /// engine.checkpoint(ctx).unwrap();
+    /// assert_eq!(engine.checkpoint_count(ctx), 2);
+    /// ```
+    pub fn checkpoint_count(&self, context: ContextId) -> usize {
+        let checkpoints = self.checkpoints.lock().unwrap();
+        checkpoints.get(&context).map(|s| s.len()).unwrap_or(0)
+    }
+
+    /// Clear all checkpoints for a context.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.checkpoint(ctx).unwrap();
+    /// engine.checkpoint(ctx).unwrap();
+    /// assert_eq!(engine.checkpoint_count(ctx), 2);
+    ///
+    /// engine.clear_checkpoints(ctx).unwrap();
+    /// assert_eq!(engine.checkpoint_count(ctx), 0);
+    /// ```
+    pub fn clear_checkpoints(&self, context: ContextId) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        let mut checkpoints = self.checkpoints.lock().unwrap();
+        if let Some(stack) = checkpoints.get_mut(&context) {
+            stack.clear();
+            Ok(())
+        } else {
+            Err(ContextError::NoCheckpointStack(context))
+        }
+    }
+
+    /// Finalize the current draft into the dictionary.
+    ///
+    /// Moves the draft text from the buffer into the finalized dictionary,
+    /// associating it with the current context. The draft buffer is then
+    /// cleared, and all checkpoints are removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Ok(term)` with the finalized term on success, `Err(ContextError)` if
+    /// context doesn't exist or has no draft text.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_str(ctx, "hello").unwrap();
+    /// let term = engine.finalize(ctx).unwrap();
+    /// assert_eq!(term, "hello");
+    ///
+    /// // Draft is cleared after finalization
+    /// assert!(!engine.has_draft(ctx));
+    /// ```
+    pub fn finalize(&self, context: ContextId) -> Result<String> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        // Get and validate draft
+        let mut drafts = self.drafts.lock().unwrap();
+        let buffer = drafts
+            .get_mut(&context)
+            .ok_or(ContextError::NoDraftBuffer(context))?;
+
+        let term = buffer.as_str();
+        if term.is_empty() {
+            return Err(ContextError::EmptyDraft(context));
+        }
+
+        let term_owned = term.clone();
+
+        // Clear draft
+        buffer.clear();
+        drop(drafts);
+
+        // Add to dictionary
+        let transducer = self.transducer.read().unwrap();
+        let dictionary = transducer.dictionary();
+
+        // Get existing contexts for this term (if any) and append the new context
+        let mut contexts = dictionary.get_value(&term_owned).unwrap_or_default();
+        if !contexts.contains(&context) {
+            contexts.push(context);
+        }
+        dictionary.insert_with_value(&term_owned, contexts);
+        drop(transducer);
+
+        // Clear checkpoints
+        let mut checkpoints = self.checkpoints.lock().unwrap();
+        if let Some(stack) = checkpoints.get_mut(&context) {
+            stack.clear();
+        }
+
+        Ok(term_owned)
+    }
+
+    /// Finalize a term directly into the dictionary without a draft.
+    ///
+    /// Inserts a term into the dictionary associated with a context,
+    /// bypassing the draft buffer entirely.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    /// * `term` - Term to insert
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.finalize_direct(ctx, "function").unwrap();
+    /// engine.finalize_direct(ctx, "variable").unwrap();
+    /// ```
+    pub fn finalize_direct(
+        &self,
+        context: ContextId,
+        term: &str,
+    ) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        if term.is_empty() {
+            return Err(ContextError::EmptyTerm);
+        }
+
+        let transducer = self.transducer.read().unwrap();
+        let dictionary = transducer.dictionary();
+
+        // Get existing contexts for this term (if any) and append the new context
+        let mut contexts = dictionary.get_value(term).unwrap_or_default();
+        if !contexts.contains(&context) {
+            contexts.push(context);
+        }
+        dictionary.insert_with_value(term, contexts);
+
+        Ok(())
+    }
+
+    /// Discard the current draft without finalizing.
+    ///
+    /// Clears the draft buffer and all checkpoints without adding the
+    /// draft to the dictionary.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, `Err(ContextError)` if context doesn't exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_str(ctx, "mistake").unwrap();
+    /// engine.discard(ctx).unwrap();
+    ///
+    /// // Draft is cleared
+    /// assert!(!engine.has_draft(ctx));
+    /// ```
+    pub fn discard(&self, context: ContextId) -> Result<()> {
+        if !self.context_exists(context) {
+            return Err(ContextError::ContextNotFound(context));
+        }
+
+        // Clear draft
+        self.clear_draft(context)?;
+
+        // Clear checkpoints
+        self.clear_checkpoints(context)?;
+
+        Ok(())
+    }
+
+    /// Check if a term exists in the dictionary.
+    ///
+    /// # Arguments
+    ///
+    /// * `term` - Term to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if the term exists in the dictionary.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// assert!(!engine.has_term("hello"));
+    ///
+    /// engine.finalize_direct(ctx, "hello").unwrap();
+    /// assert!(engine.has_term("hello"));
+    /// ```
+    pub fn has_term(&self, term: &str) -> bool {
+        let transducer = self.transducer.read().unwrap();
+        transducer.dictionary().contains(term)
+    }
+
+    /// Get all contexts where a term is defined.
+    ///
+    /// # Arguments
+    ///
+    /// * `term` - Term to look up
+    ///
+    /// # Returns
+    ///
+    /// Vector of context IDs where the term is defined (empty if not found).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let global = engine.create_root_context(0);
+    /// let func = engine.create_child_context(1, global).unwrap();
+    ///
+    /// engine.finalize_direct(global, "global_var").unwrap();
+    /// engine.finalize_direct(func, "local_var").unwrap();
+    ///
+    /// assert_eq!(engine.term_contexts("global_var"), vec![global]);
+    /// assert_eq!(engine.term_contexts("local_var"), vec![func]);
+    /// assert!(engine.term_contexts("unknown").is_empty());
+    /// ```
+    pub fn term_contexts(&self, term: &str) -> Vec<ContextId> {
+        let transducer = self.transducer.read().unwrap();
+        transducer.dictionary().get_value(term).unwrap_or_default()
+    }
+
+    /// Query for completions from both drafts and finalized terms.
+    ///
+    /// Performs fuzzy matching against:
+    /// 1. The current context's draft (if any)
+    /// 2. All finalized terms visible from the current context
+    ///
+    /// Results are deduplicated (draft overrides finalized with same term)
+    /// and sorted by distance.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID to query from
+    /// * `query` - Query string
+    /// * `max_distance` - Maximum edit distance threshold
+    ///
+    /// # Returns
+    ///
+    /// Vector of completions sorted by distance, draft status, and term.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// // Add finalized terms
+    /// engine.finalize_direct(ctx, "hello").unwrap();
+    /// engine.finalize_direct(ctx, "help").unwrap();
+    ///
+    /// // Add draft
+    /// engine.insert_str(ctx, "hero").unwrap();
+    ///
+    /// // Query
+    /// let results = engine.complete(ctx, "hel", 2);
+    /// assert!(!results.is_empty());
+    /// ```
+    pub fn complete(
+        &self,
+        context: ContextId,
+        query: &str,
+        max_distance: usize,
+    ) -> Vec<Completion> {
+        let mut results = Vec::new();
+
+        // Query drafts
+        results.extend(self.complete_drafts(context, query, max_distance));
+
+        // Query finalized terms
+        results.extend(self.complete_finalized(context, query, max_distance));
+
+        // Deduplicate (draft overrides finalized)
+        let mut seen = std::collections::HashSet::new();
+        results.retain(|c| {
+            if seen.contains(&c.term) {
+                false
+            } else {
+                seen.insert(c.term.clone());
+                true
+            }
+        });
+
+        // Sort
+        results.sort();
+
+        results
+    }
+
+    /// Query only draft terms.
+    ///
+    /// Returns completions from visible draft buffers only.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID to query from
+    /// * `query` - Query string
+    /// * `max_distance` - Maximum edit distance threshold
+    ///
+    /// # Returns
+    ///
+    /// Vector of draft completions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.insert_str(ctx, "hello").unwrap();
+    ///
+    /// let results = engine.complete_drafts(ctx, "helo", 1);
+    /// assert_eq!(results.len(), 1);
+    /// assert!(results[0].is_draft);
+    /// ```
+    pub fn complete_drafts(
+        &self,
+        context: ContextId,
+        query: &str,
+        max_distance: usize,
+    ) -> Vec<Completion> {
+        let mut results = Vec::new();
+
+        // Get visible contexts
+        let visible = self.get_visible_contexts(context);
+
+        // Check each visible context's draft
+        let drafts = self.drafts.lock().unwrap();
+        for ctx_id in visible {
+            if let Some(buffer) = drafts.get(&ctx_id) {
+                let term = buffer.as_str();
+                if !term.is_empty() {
+                    let distance = Self::levenshtein_distance(query, &term);
+                    if distance <= max_distance {
+                        results.push(Completion::draft(term, distance, ctx_id));
+                    }
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Query only finalized terms.
+    ///
+    /// Returns completions from the dictionary, filtered by visibility.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Context ID to query from
+    /// * `query` - Query string
+    /// * `max_distance` - Maximum edit distance threshold
+    ///
+    /// # Returns
+    ///
+    /// Vector of finalized completions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    ///
+    /// let engine = ContextualCompletionEngine::new();
+    /// let ctx = engine.create_root_context(0);
+    ///
+    /// engine.finalize_direct(ctx, "hello").unwrap();
+    /// engine.finalize_direct(ctx, "help").unwrap();
+    ///
+    /// let results = engine.complete_finalized(ctx, "helo", 1);
+    /// assert!(results.len() >= 2);
+    /// assert!(!results[0].is_draft);
+    /// ```
+    pub fn complete_finalized(
+        &self,
+        context: ContextId,
+        query: &str,
+        max_distance: usize,
+    ) -> Vec<Completion> {
+        let mut results = Vec::new();
+
+        // Get visible contexts
+        let visible = self.get_visible_contexts(context);
+
+        // Query dictionary using transducer
+        let transducer = self.transducer.read().unwrap();
+        for candidate in transducer.query_with_distance(query, max_distance) {
+            // Get the contexts for this term
+            if let Some(contexts) = transducer.dictionary().get_value(&candidate.term) {
+                // Filter to only visible contexts
+                let visible_contexts: Vec<ContextId> = contexts
+                    .iter()
+                    .filter(|ctx_id| visible.contains(ctx_id))
+                    .copied()
+                    .collect();
+
+                if !visible_contexts.is_empty() {
+                    results.push(Completion::finalized(
+                        candidate.term,
+                        candidate.distance,
+                        visible_contexts,
+                    ));
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Simple Levenshtein distance calculation for draft matching.
+    ///
+    /// This is a naive O(n*m) implementation used only for matching against
+    /// in-memory draft buffers. Finalized terms use the transducer for
+    /// efficient automaton-based matching.
+    fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+        let len1 = s1.chars().count();
+        let len2 = s2.chars().count();
+
+        if len1 == 0 {
+            return len2;
+        }
+        if len2 == 0 {
+            return len1;
+        }
+
+        let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
+
+        for (i, row) in matrix.iter_mut().enumerate() {
+            row[0] = i;
+        }
+        for j in 0..=len2 {
+            matrix[0][j] = j;
+        }
+
+        let s1_chars: Vec<char> = s1.chars().collect();
+        let s2_chars: Vec<char> = s2.chars().collect();
+
+        for i in 1..=len1 {
+            for j in 1..=len2 {
+                let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                    0
+                } else {
+                    1
+                };
+
+                matrix[i][j] = std::cmp::min(
+                    std::cmp::min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1),
+                    matrix[i - 1][j - 1] + cost,
+                );
+            }
+        }
+
+        matrix[len1][len2]
+    }
+}
+
+impl Default for ContextualCompletionEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        let engine = ContextualCompletionEngine::new();
+        assert!(!engine.context_exists(0));
+    }
+
+    #[test]
+    fn test_with_algorithm() {
+        let engine = ContextualCompletionEngine::with_algorithm(Algorithm::Transposition);
+        assert!(!engine.context_exists(0));
+    }
+
+    #[test]
+    fn test_create_root_context() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+        assert_eq!(ctx, 0);
+        assert!(engine.context_exists(0));
+    }
+
+    #[test]
+    fn test_create_child_context() {
+        let engine = ContextualCompletionEngine::new();
+        let root = engine.create_root_context(0);
+        let child = engine.create_child_context(1, root).unwrap();
+
+        assert_eq!(child, 1);
+        assert!(engine.context_exists(1));
+    }
+
+    #[test]
+    fn test_create_child_invalid_parent() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.create_child_context(1, 999);
+
+        assert!(result.is_err());
+        assert!(!engine.context_exists(1));
+    }
+
+    #[test]
+    fn test_remove_context() {
+        let engine = ContextualCompletionEngine::new();
+        let root = engine.create_root_context(0);
+        let child = engine.create_child_context(1, root).unwrap();
+
+        assert!(engine.remove_context(child));
+        assert!(!engine.context_exists(child));
+        assert!(engine.context_exists(root));
+
+        // Removing again returns false
+        assert!(!engine.remove_context(child));
+    }
+
+    #[test]
+    fn test_remove_context_with_descendants() {
+        let engine = ContextualCompletionEngine::new();
+        let root = engine.create_root_context(0);
+        let child1 = engine.create_child_context(1, root).unwrap();
+        let child2 = engine.create_child_context(2, child1).unwrap();
+
+        // Remove child1 (should also remove child2)
+        assert!(engine.remove_context(child1));
+        assert!(!engine.context_exists(child1));
+        assert!(!engine.context_exists(child2));
+        assert!(engine.context_exists(root));
+    }
+
+    #[test]
+    fn test_get_visible_contexts() {
+        let engine = ContextualCompletionEngine::new();
+        let global = engine.create_root_context(0);
+        let module = engine.create_child_context(1, global).unwrap();
+        let func = engine.create_child_context(2, module).unwrap();
+
+        let visible = engine.get_visible_contexts(func);
+        assert_eq!(visible, vec![func, module, global]);
+
+        let visible_module = engine.get_visible_contexts(module);
+        assert_eq!(visible_module, vec![module, global]);
+
+        let visible_global = engine.get_visible_contexts(global);
+        assert_eq!(visible_global, vec![global]);
+    }
+
+    #[test]
+    fn test_get_draft_empty() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        assert_eq!(engine.get_draft(ctx), Some(String::new()));
+        assert!(!engine.has_draft(ctx));
+    }
+
+    #[test]
+    fn test_get_draft_nonexistent() {
+        let engine = ContextualCompletionEngine::new();
+        assert_eq!(engine.get_draft(999), None);
+        assert!(!engine.has_draft(999));
+    }
+
+    #[test]
+    fn test_insert_char() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_char(ctx, 'h').unwrap();
+        engine.insert_char(ctx, 'i').unwrap();
+        assert_eq!(engine.get_draft(ctx), Some("hi".to_string()));
+        assert!(engine.has_draft(ctx));
+    }
+
+    #[test]
+    fn test_insert_char_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.insert_char(999, 'x');
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_insert_str() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_str(ctx, "hello").unwrap();
+        assert_eq!(engine.get_draft(ctx), Some("hello".to_string()));
+
+        engine.insert_str(ctx, " world").unwrap();
+        assert_eq!(engine.get_draft(ctx), Some("hello world".to_string()));
+    }
+
+    #[test]
+    fn test_insert_str_unicode() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_str(ctx, "Hello 世界").unwrap();
+        assert_eq!(engine.get_draft(ctx), Some("Hello 世界".to_string()));
+
+        engine.insert_str(ctx, " 🌍").unwrap();
+        assert_eq!(engine.get_draft(ctx), Some("Hello 世界 🌍".to_string()));
+    }
+
+    #[test]
+    fn test_delete_char() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_str(ctx, "hello").unwrap();
+        assert_eq!(engine.delete_char(ctx), Some('o'));
+        assert_eq!(engine.get_draft(ctx), Some("hell".to_string()));
+
+        assert_eq!(engine.delete_char(ctx), Some('l'));
+        assert_eq!(engine.get_draft(ctx), Some("hel".to_string()));
+    }
+
+    #[test]
+    fn test_delete_char_empty() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        assert_eq!(engine.delete_char(ctx), None);
+    }
+
+    #[test]
+    fn test_delete_char_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        assert_eq!(engine.delete_char(999), None);
+    }
+
+    #[test]
+    fn test_clear_draft() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_str(ctx, "hello").unwrap();
+        assert!(engine.has_draft(ctx));
+
+        engine.clear_draft(ctx).unwrap();
+        assert!(!engine.has_draft(ctx));
+        assert_eq!(engine.get_draft(ctx), Some(String::new()));
+    }
+
+    #[test]
+    fn test_clear_draft_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.clear_draft(999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_checkpoint_and_undo() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        // Create initial checkpoint (empty)
+        engine.checkpoint(ctx).unwrap();
+        assert_eq!(engine.checkpoint_count(ctx), 1);
+
+        // Type "hello"
+        engine.insert_str(ctx, "hello").unwrap();
+        engine.checkpoint(ctx).unwrap();
+        assert_eq!(engine.checkpoint_count(ctx), 2);
+
+        // Type " world"
+        engine.insert_str(ctx, " world").unwrap();
+        assert_eq!(engine.get_draft(ctx), Some("hello world".to_string()));
+
+        // Undo to "hello" (restore to stack top, then pop)
+        engine.undo(ctx).unwrap();
+        assert_eq!(engine.get_draft(ctx), Some("hello".to_string()));
+        assert_eq!(engine.checkpoint_count(ctx), 1); // empty still on stack
+
+        // Undo to empty
+        engine.undo(ctx).unwrap();
+        assert_eq!(engine.get_draft(ctx), Some(String::new()));
+        assert_eq!(engine.checkpoint_count(ctx), 0); // stack now empty
+    }
+
+    #[test]
+    fn test_undo_no_checkpoints() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        let result = engine.undo(ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_checkpoint_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.checkpoint(999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_undo_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.undo(999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_checkpoint_count() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        assert_eq!(engine.checkpoint_count(ctx), 0);
+
+        engine.checkpoint(ctx).unwrap();
+        assert_eq!(engine.checkpoint_count(ctx), 1);
+
+        engine.checkpoint(ctx).unwrap();
+        assert_eq!(engine.checkpoint_count(ctx), 2);
+
+        engine.checkpoint(ctx).unwrap();
+        assert_eq!(engine.checkpoint_count(ctx), 3);
+    }
+
+    #[test]
+    fn test_checkpoint_count_nonexistent() {
+        let engine = ContextualCompletionEngine::new();
+        assert_eq!(engine.checkpoint_count(999), 0);
+    }
+
+    #[test]
+    fn test_clear_checkpoints() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.checkpoint(ctx).unwrap();
+        engine.checkpoint(ctx).unwrap();
+        assert_eq!(engine.checkpoint_count(ctx), 2);
+
+        engine.clear_checkpoints(ctx).unwrap();
+        assert_eq!(engine.checkpoint_count(ctx), 0);
+    }
+
+    #[test]
+    fn test_clear_checkpoints_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.clear_checkpoints(999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multiple_undo_steps() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        // Build up checkpoints
+        engine.checkpoint(ctx).unwrap(); // ""
+        engine.insert_char(ctx, 'a').unwrap();
+        engine.checkpoint(ctx).unwrap(); // "a"
+        engine.insert_char(ctx, 'b').unwrap();
+        engine.checkpoint(ctx).unwrap(); // "ab"
+        engine.insert_char(ctx, 'c').unwrap();
+        // Don't checkpoint after 'c', so undo will go back to "ab"
+
+        assert_eq!(engine.get_draft(ctx), Some("abc".to_string()));
+        assert_eq!(engine.checkpoint_count(ctx), 3);
+
+        // Undo step by step - restores to stack top, then pops
+        engine.undo(ctx).unwrap(); // Restore to "ab", pop
+        assert_eq!(engine.get_draft(ctx), Some("ab".to_string()));
+        assert_eq!(engine.checkpoint_count(ctx), 2);
+
+        engine.undo(ctx).unwrap(); // Restore to "a", pop
+        assert_eq!(engine.get_draft(ctx), Some("a".to_string()));
+        assert_eq!(engine.checkpoint_count(ctx), 1);
+
+        engine.undo(ctx).unwrap(); // Restore to empty, pop
+        assert_eq!(engine.get_draft(ctx), Some(String::new()));
+        assert_eq!(engine.checkpoint_count(ctx), 0);
+    }
+
+    #[test]
+    fn test_finalize() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_str(ctx, "hello").unwrap();
+        engine.checkpoint(ctx).unwrap();
+
+        let term = engine.finalize(ctx).unwrap();
+        assert_eq!(term, "hello");
+
+        // Draft cleared
+        assert!(!engine.has_draft(ctx));
+
+        // Checkpoints cleared
+        assert_eq!(engine.checkpoint_count(ctx), 0);
+
+        // Term in dictionary
+        assert!(engine.has_term("hello"));
+        assert_eq!(engine.term_contexts("hello"), vec![ctx]);
+    }
+
+    #[test]
+    fn test_finalize_empty_draft() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        let result = engine.finalize(ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_finalize_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.finalize(999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_finalize_direct() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.finalize_direct(ctx, "function").unwrap();
+        engine.finalize_direct(ctx, "variable").unwrap();
+
+        assert!(engine.has_term("function"));
+        assert!(engine.has_term("variable"));
+        assert_eq!(engine.term_contexts("function"), vec![ctx]);
+    }
+
+    #[test]
+    fn test_finalize_direct_empty_term() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        let result = engine.finalize_direct(ctx, "");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_finalize_direct_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.finalize_direct(999, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_discard() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_str(ctx, "mistake").unwrap();
+        engine.checkpoint(ctx).unwrap();
+        assert!(engine.has_draft(ctx));
+        assert_eq!(engine.checkpoint_count(ctx), 1);
+
+        engine.discard(ctx).unwrap();
+
+        // Draft and checkpoints cleared
+        assert!(!engine.has_draft(ctx));
+        assert_eq!(engine.checkpoint_count(ctx), 0);
+
+        // Not in dictionary
+        assert!(!engine.has_term("mistake"));
+    }
+
+    #[test]
+    fn test_discard_nonexistent_context() {
+        let engine = ContextualCompletionEngine::new();
+        let result = engine.discard(999);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_has_term() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        assert!(!engine.has_term("test"));
+
+        engine.finalize_direct(ctx, "test").unwrap();
+        assert!(engine.has_term("test"));
+    }
+
+    #[test]
+    fn test_term_contexts() {
+        let engine = ContextualCompletionEngine::new();
+        let global = engine.create_root_context(0);
+        let func = engine.create_child_context(1, global).unwrap();
+
+        engine.finalize_direct(global, "global_var").unwrap();
+        engine.finalize_direct(func, "local_var").unwrap();
+
+        // Same term in multiple contexts
+        engine.finalize_direct(func, "shared").unwrap();
+        engine.finalize_direct(global, "shared").unwrap();
+
+        assert_eq!(engine.term_contexts("global_var"), vec![global]);
+        assert_eq!(engine.term_contexts("local_var"), vec![func]);
+        assert_eq!(engine.term_contexts("shared"), vec![func, global]);
+        assert!(engine.term_contexts("unknown").is_empty());
+    }
+
+    #[test]
+    fn test_term_contexts_unknown() {
+        let engine = ContextualCompletionEngine::new();
+        assert!(engine.term_contexts("unknown").is_empty());
+    }
+
+    #[test]
+    fn test_complete_drafts() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.insert_str(ctx, "hello").unwrap();
+
+        let results = engine.complete_drafts(ctx, "hel", 2);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].term, "hello");
+        assert!(results[0].is_draft);
+        assert_eq!(results[0].distance, 2); // "hel" -> "hello" = 2 insertions
+    }
+
+    #[test]
+    fn test_complete_finalized() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.finalize_direct(ctx, "hello").unwrap();
+        engine.finalize_direct(ctx, "help").unwrap();
+
+        let results = engine.complete_finalized(ctx, "hel", 2);
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|c| c.term == "hello"));
+        assert!(results.iter().any(|c| c.term == "help"));
+        assert!(results.iter().all(|c| !c.is_draft));
+    }
+
+    #[test]
+    fn test_complete_fusion() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        // Finalized terms
+        engine.finalize_direct(ctx, "hello").unwrap();
+        engine.finalize_direct(ctx, "help").unwrap();
+
+        // Draft
+        engine.insert_str(ctx, "hero").unwrap();
+
+        let results = engine.complete(ctx, "hel", 2);
+
+        // Should have hello, help, hero
+        assert!(results.len() >= 3);
+        assert!(results.iter().any(|c| c.term == "hello"));
+        assert!(results.iter().any(|c| c.term == "help"));
+        assert!(results.iter().any(|c| c.term == "hero"));
+    }
+
+    #[test]
+    fn test_complete_deduplication() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        // Finalized term
+        engine.finalize_direct(ctx, "test").unwrap();
+
+        // Draft with same term (should override)
+        engine.insert_str(ctx, "test").unwrap();
+
+        let results = engine.complete(ctx, "test", 0);
+
+        // Should only have one "test" (draft version)
+        let test_results: Vec<_> = results.iter().filter(|c| c.term == "test").collect();
+        assert_eq!(test_results.len(), 1);
+        assert!(test_results[0].is_draft);
+    }
+
+    #[test]
+    fn test_complete_hierarchical_visibility() {
+        let engine = ContextualCompletionEngine::new();
+        let global = engine.create_root_context(0);
+        let func = engine.create_child_context(1, global).unwrap();
+
+        // Global term
+        engine.finalize_direct(global, "global_var").unwrap();
+
+        // Local term
+        engine.finalize_direct(func, "local_var").unwrap();
+
+        // Query from func - should see both
+        let results = engine.complete_finalized(func, "var", 10);
+        assert!(results.iter().any(|c| c.term == "global_var"));
+        assert!(results.iter().any(|c| c.term == "local_var"));
+
+        // Query from global - should NOT see local_var
+        let results = engine.complete_finalized(global, "var", 10);
+        assert!(results.iter().any(|c| c.term == "global_var"));
+        assert!(!results.iter().any(|c| c.term == "local_var"));
+    }
+
+    #[test]
+    fn test_complete_sorting() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.finalize_direct(ctx, "test").unwrap(); // distance 0
+        engine.finalize_direct(ctx, "text").unwrap(); // distance 1
+        engine.finalize_direct(ctx, "best").unwrap(); // distance 1
+
+        let mut results = engine.complete_finalized(ctx, "test", 1);
+        results.sort();
+
+        // Should be sorted by distance, then term
+        assert!(results.len() >= 2);
+        assert!(results[0].distance <= results[1].distance);
+        if results.len() >= 2 && results[0].distance == results[1].distance {
+            assert!(results[0].term <= results[1].term);
+        }
+    }
+
+    #[test]
+    fn test_complete_empty_query() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.finalize_direct(ctx, "test").unwrap();
+
+        // Empty query should match with distance = term length
+        let results = engine.complete_finalized(ctx, "", 10);
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_complete_no_matches() {
+        let engine = ContextualCompletionEngine::new();
+        let ctx = engine.create_root_context(0);
+
+        engine.finalize_direct(ctx, "hello").unwrap();
+
+        // Query too far away
+        let results = engine.complete_finalized(ctx, "xyz", 1);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_levenshtein_distance() {
+        use ContextualCompletionEngine as Engine;
+
+        assert_eq!(Engine::levenshtein_distance("", ""), 0);
+        assert_eq!(Engine::levenshtein_distance("abc", ""), 3);
+        assert_eq!(Engine::levenshtein_distance("", "abc"), 3);
+        assert_eq!(Engine::levenshtein_distance("abc", "abc"), 0);
+        assert_eq!(Engine::levenshtein_distance("abc", "abd"), 1);
+        assert_eq!(Engine::levenshtein_distance("abc", "abcd"), 1);
+        assert_eq!(Engine::levenshtein_distance("kitten", "sitting"), 3);
+    }
+}

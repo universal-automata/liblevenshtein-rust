@@ -377,6 +377,199 @@ The CLI auto-detects formats from file extensions and supports:
 
 See [`docs/developer-guide/building.md`](docs/developer-guide/building.md) for comprehensive CLI documentation.
 
+### FuzzyMultiMap - Aggregating Values
+
+The `FuzzyMultiMap` enables fuzzy lookup of associated values, aggregating results from all matching terms:
+
+```rust
+use liblevenshtein::prelude::*;
+use liblevenshtein::cache::multimap::FuzzyMultiMap;
+use std::collections::HashSet;
+
+// Create a dictionary with values (e.g., user IDs for each name)
+let dict = PathMapDictionary::from_terms_with_values([
+    ("alice", HashSet::from([101, 102])),
+    ("alicia", HashSet::from([103])),
+    ("bob", HashSet::from([201])),
+    ("robert", HashSet::from([202, 203])),
+]);
+
+// Create fuzzy multimap
+let fuzzy_map = FuzzyMultiMap::new(dict, Algorithm::Standard);
+
+// Query "alise" - matches both "alice" and "alicia" at distance 1
+let user_ids = fuzzy_map.query("alise", 1).unwrap();
+// Returns: HashSet {101, 102, 103} - union of all matching values
+
+// Practical use case: find all IDs for fuzzy name search
+let ids = fuzzy_map.query("rob", 2).unwrap();
+// Returns IDs for both "bob" (distance 1) and "robert" (distance 2)
+```
+
+**Supported collection types**:
+- `HashSet<T>` - Union of all matching sets
+- `BTreeSet<T>` - Union of all matching sets
+- `Vec<T>` - Concatenation of all matching vectors
+
+**Use cases**:
+- User ID lookup with fuzzy name matching
+- Tag aggregation across similar terms
+- Multi-valued dictionary queries with error tolerance
+
+### Contextual Code Completion (Zipper-Based)
+
+The `ContextualCompletionEngine` provides hierarchical scope-aware code completion with draft state management:
+
+```rust
+use liblevenshtein::contextual::ContextualCompletionEngine;
+use liblevenshtein::transducer::Algorithm;
+
+// Create engine (thread-safe, shareable with Arc)
+let engine = ContextualCompletionEngine::with_algorithm(Algorithm::Standard);
+
+// Create hierarchical scopes (global → function → block)
+let global = engine.create_root_context(0);
+let function = engine.create_child_context(1, global).unwrap();
+let block = engine.create_child_context(2, function).unwrap();
+
+// Add finalized terms to each scope
+engine.finalize_direct(global, "std::vector").unwrap();
+engine.finalize_direct(global, "std::string").unwrap();
+engine.finalize_direct(function, "parameter").unwrap();
+engine.finalize_direct(function, "result").unwrap();
+
+// Incremental typing in block scope (draft state)
+engine.insert_str(block, "local_var").unwrap();
+
+// Query completions - sees all visible scopes (block + function + global)
+let completions = engine.complete(block, "par", 1);
+for comp in completions {
+    println!("{} (distance: {}, draft: {}, from context: {:?})",
+             comp.term, comp.distance, comp.is_draft, comp.contexts);
+}
+// Output: parameter (distance: 0, draft: false, from context: [1])
+
+// Checkpoint/undo support for editor integration
+engine.checkpoint(block).unwrap();
+engine.insert_str(block, "iable").unwrap();  // Now: "local_variable"
+engine.undo(block).unwrap();  // Restore to: "local_var"
+
+// Finalize draft to add to dictionary
+let term = engine.finalize(block).unwrap();  // Returns "local_var"
+assert!(engine.has_term("local_var"));
+
+// Query now sees finalized term
+let results = engine.complete(block, "loc", 1);
+// Returns: local_var (now finalized, visible in this context)
+```
+
+**Features**:
+- **Hierarchical visibility**: Child contexts see parent terms (global → function → block)
+- **Draft state**: Incremental typing without polluting finalized dictionary
+- **Checkpoint/undo**: Editor-friendly state management
+- **Thread-safe**: Share engine across threads with `Arc`
+- **Mixed queries**: Search both drafts and finalized terms simultaneously
+
+**Performance** (sub-millisecond for interactive use):
+- Insert character: ~4 µs
+- Checkpoint: ~116 ns
+- Query (500 terms, distance 1): ~11.5 µs
+- Query (distance 2): ~309 µs
+
+**Use cases**:
+- LSP servers with multi-file scope awareness
+- Code editors with context-sensitive completion
+- REPL environments with session-scoped symbols
+- Any application requiring hierarchical fuzzy matching
+
+See [`examples/contextual_completion.rs`](examples/contextual_completion.rs) for a complete example.
+
+### Advanced: Direct Zipper API
+
+For fine-grained control over traversal, use the zipper API directly:
+
+```rust
+use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+use liblevenshtein::dictionary::pathmap_zipper::PathMapZipper;
+use liblevenshtein::transducer::{AutomatonZipper, Algorithm, StatePool};
+use liblevenshtein::transducer::intersection_zipper::IntersectionZipper;
+
+// Create dictionary
+let dict = PathMapDictionary::<()>::new();
+dict.insert("cat");
+dict.insert("cats");
+dict.insert("dog");
+
+// Create zippers
+let dict_zipper = PathMapZipper::new_from_dict(&dict);
+let auto_zipper = AutomatonZipper::new("cot".as_bytes(), 1, Algorithm::Standard);
+
+// Intersect dictionary and automaton
+let intersection = IntersectionZipper::new(dict_zipper, auto_zipper);
+
+// Manual traversal
+let mut pool = StatePool::new();
+for (label, child) in intersection.children(&mut pool) {
+    if child.is_match() {
+        println!("Match: {} (distance: {})",
+                 child.term(),
+                 child.distance().unwrap());
+    }
+
+    // Recurse into child for custom traversal algorithms
+    for (_, grandchild) in child.children(&mut pool) {
+        // Custom logic here...
+    }
+}
+```
+
+**When to use**:
+- Custom traversal algorithms (DFS, A*, beam search)
+- Early termination with custom heuristics
+- Integration with external data structures
+- Research and experimentation
+
+**Note**: Most users should use `Transducer::query()` or `ContextualCompletionEngine` instead. The zipper API is lower-level and requires manual state management.
+
+### Value-Filtered Queries
+
+For performance optimization when querying dictionaries with scoped values:
+
+```rust
+use liblevenshtein::prelude::*;
+use std::collections::HashSet;
+
+// Dictionary with scope IDs
+let dict = PathMapDictionary::from_terms_with_values([
+    ("global_var", 0),      // Scope 0 (global)
+    ("function_param", 1),  // Scope 1 (function)
+    ("local_var", 2),       // Scope 2 (block)
+]);
+
+let transducer = Transducer::new(dict, Algorithm::Standard);
+
+// Query only specific scopes (e.g., visible from scope 1)
+let visible_scopes = HashSet::from([0, 1]);  // global + function
+for term in transducer.query_by_value_set("param", 1, &visible_scopes) {
+    println!("{}", term);
+}
+// Output: function_param (scope 1 is visible)
+// Does NOT return: local_var (scope 2 not in visible set)
+
+// Or use custom predicate
+for term in transducer.query_filtered("var", 1, |scope_id| *scope_id <= 1) {
+    println!("{}", term);
+}
+// Returns: global_var, function_param (scopes 0, 1)
+```
+
+**Performance benefit**: Filtering by value during traversal is **significantly faster** than post-filtering results, especially for large dictionaries with many out-of-scope matches.
+
+**Use cases**:
+- Scope-based code completion (only show visible symbols)
+- Access control (filter by user permissions)
+- Multi-tenancy (filter by tenant ID)
+
 ## Documentation
 
 - **[User Guide](docs/user-guide/)** - Getting started, algorithms, backends, and features
