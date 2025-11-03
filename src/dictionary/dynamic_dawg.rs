@@ -151,31 +151,37 @@ impl DynamicDawg {
 
         // Build remaining suffix with sharing
         let start_byte_idx = path.len();
+
+        // Phase 2.1: Try to reuse existing suffix chains
+        if start_byte_idx < bytes.len() {
+            let remaining_suffix = &bytes[start_byte_idx + 1..];
+
+            // If we have a suffix to share (at least one more byte after current)
+            if !remaining_suffix.is_empty() {
+                let is_suffix_final = true; // The suffix chain should end in a final state
+
+                if let Some(suffix_entry_idx) =
+                    inner.find_or_create_suffix(remaining_suffix, true, is_suffix_final)
+                {
+                    // Add edge from current node to the suffix chain
+                    let byte = bytes[start_byte_idx];
+                    inner.insert_edge_sorted(node_idx, byte, suffix_entry_idx);
+                    inner.nodes[suffix_entry_idx].ref_count += 1;
+                    inner.term_count += 1;
+                    return true;
+                }
+            }
+        }
+
+        // Fall back to creating nodes one by one (no suffix sharing available)
         for i in start_byte_idx..bytes.len() {
             let byte = bytes[i];
-
-            // Try to find existing suffix for characters AFTER this one
-            // Note: Suffix sharing is intentionally disabled for now as the implementation
-            // needs more careful handling of the caching logic
-            // TODO: Re-enable suffix sharing after fixing cache key generation
-            let existing_idx = None; // inner.find_or_create_suffix(&bytes[i+1..], true, i == bytes.len() - 1);
-
-            if let Some(child_idx) = existing_idx {
-                // Add edge to existing suffix using binary insertion
-                inner.insert_edge_sorted(node_idx, byte, child_idx);
-                inner.nodes[child_idx].ref_count += 1;
-                inner.term_count += 1;
-                return true;
-            }
-
-            // Create new node
             let new_idx = inner.nodes.len();
             let is_final = i == bytes.len() - 1;
             let mut new_node = DawgNode::new(is_final);
             new_node.ref_count = 1;
 
             inner.nodes.push(new_node);
-            // Add edge using binary insertion
             inner.insert_edge_sorted(node_idx, byte, new_idx);
 
             node_idx = new_idx;
@@ -449,6 +455,7 @@ impl DynamicDawgInner {
     /// Verify that a cached node actually matches the requested suffix.
     ///
     /// Phase 2.1: Handles hash collisions by checking structural equality.
+    /// The node_idx points to the entry node that should have edges to traverse the suffix.
     fn verify_suffix_match(&self, node_idx: usize, suffix: &[u8], is_final: bool) -> bool {
         if suffix.is_empty() {
             return false;
@@ -456,25 +463,25 @@ impl DynamicDawgInner {
 
         let mut current_idx = node_idx;
 
-        for (i, &_byte) in suffix.iter().enumerate() {
+        // Traverse the suffix: for each byte, follow the edge
+        for (i, &byte) in suffix.iter().enumerate() {
             let node = &self.nodes[current_idx];
-            let is_last = i == suffix.len() - 1;
 
-            // Check is_final on last character
-            if is_last && node.is_final != is_final {
-                return false;
-            }
+            // Find the edge for this byte
+            if let Some(&next_idx) = node.edges.iter()
+                .find(|(l, _)| *l == byte)
+                .map(|(_, idx)| idx)
+            {
+                current_idx = next_idx;
 
-            // If not the last character, find the edge for next byte
-            if !is_last {
-                if let Some(&next_idx) = node.edges.iter()
-                    .find(|(l, _)| *l == suffix[i + 1])
-                    .map(|(_, idx)| idx)
-                {
-                    current_idx = next_idx;
-                } else {
-                    return false;
+                // If this was the last byte, check if final state matches
+                if i == suffix.len() - 1 {
+                    if self.nodes[current_idx].is_final != is_final {
+                        return false;
+                    }
                 }
+            } else {
+                return false; // Missing edge
             }
         }
 
@@ -483,36 +490,48 @@ impl DynamicDawgInner {
 
     /// Create a linear chain of nodes for a suffix.
     ///
-    /// Phase 2.1: Builds suffix[0] -> suffix[1] -> ... -> suffix[n-1]
-    /// where the last node is marked as final if is_final is true.
+    /// Phase 2.1: For suffix "abc", creates chain:
+    /// node_0 --'a'--> node_1 --'b'--> node_2 --'c'--> node_3(final)
+    /// Returns index of node_0 (the entry point to traverse the suffix).
+    ///
+    /// Example: create_suffix_chain("est", true) creates:
+    /// node_0 --'e'--> node_1 --'s'--> node_2 --'t'--> node_3(final)
     fn create_suffix_chain(&mut self, suffix: &[u8], is_final: bool) -> usize {
         if suffix.is_empty() {
             return 0; // Should not happen
         }
 
-        // Create nodes from the end backwards
+        // We need (suffix.len() + 1) nodes total:
+        // - 1 entry node (before consuming any suffix bytes)
+        // - 1 node for each byte in the suffix
         let mut nodes_to_add = Vec::new();
 
-        for (i, &_byte) in suffix.iter().enumerate() {
+        // Entry node (not final, will have edge for suffix[0])
+        nodes_to_add.push(DawgNode {
+            edges: SmallVec::new(),
+            is_final: false,
+            ref_count: 1,
+        });
+
+        // Intermediate nodes (one per suffix byte)
+        for i in 0..suffix.len() {
             let is_last = i == suffix.len() - 1;
-            let node = DawgNode {
+            nodes_to_add.push(DawgNode {
                 edges: SmallVec::new(),
                 is_final: is_last && is_final,
                 ref_count: 1,
-            };
-            nodes_to_add.push(node);
+            });
         }
 
-        // Add all nodes and link them together
+        // Add all nodes
         let start_idx = self.nodes.len();
         self.nodes.extend(nodes_to_add);
 
-        // Link the chain: nodes[i] -> (suffix[i+1], nodes[i+1])
-        for i in 0..suffix.len() - 1 {
-            let node_idx = start_idx + i;
-            let next_idx = start_idx + i + 1;
-            let label = suffix[i + 1];
-            self.nodes[node_idx].edges.push((label, next_idx));
+        // Link the chain: node[i] --suffix[i]--> node[i+1]
+        for (i, &byte) in suffix.iter().enumerate() {
+            let from_idx = start_idx + i;
+            let to_idx = start_idx + i + 1;
+            self.nodes[from_idx].edges.push((byte, to_idx));
         }
 
         start_idx
