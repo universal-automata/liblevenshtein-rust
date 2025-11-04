@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### DynamicDawg Performance Optimizations (2025-11-03)
+- **Bloom Filter for fast negative lookups** (88-93% improvement)
+  - Probabilistic data structure with 3 hash functions and 10 bits per element
+  - Accelerates `contains()` operations by rejecting non-existent terms early
+  - Zero false negatives, <1% false positive rate with default configuration
+  - Configurable via `with_config()` API: `DynamicDawg::with_config(f32::INFINITY, Some(10000))`
+  - Benchmarks: contains() operations improved from ~38µs to ~3µs (10-12x faster)
+  - Minimal memory overhead: ~1.25 bytes per term
+
+- **Lazy Auto-Minimization** (30% improvement for large datasets)
+  - Automatic minimize() triggering based on configurable growth threshold
+  - Default: disabled (threshold = f32::INFINITY), opt-in via `with_config()`
+  - Configurable threshold: `DynamicDawg::with_config(1.5, None)` minimizes at 50% growth
+  - Benchmark results: 30% faster insertions for 1000+ term datasets
+  - Prevents unbounded memory growth during bulk insertions
+  - Trade-off: adds ~5-10% overhead for small datasets (<100 terms)
+
+- **Sorted Batch Insertion** (4-8% improvement)
+  - `from_terms()` now pre-sorts input before insertion
+  - Better prefix/suffix sharing leads to more compact DAWG structure
+  - Benchmark results: 4-8% faster construction for typical workloads
+  - No API changes required - optimization is transparent
+
+- **Comprehensive optimization analysis**
+  - Evaluated 7 optimization candidates with scientific methodology
+  - 3 optimizations implemented and kept (sorted insertion, auto-minimize, Bloom filter)
+  - 1 optimization rejected after analysis: RCU/Atomic Swapping (-1400% write regression)
+  - 3 optimizations skipped with rationale: LRU suffix cache (low ROI), Adaptive edge storage (SmallVec sufficient), Incremental compaction (minimize() already provides this)
+  - Full documentation: `docs/optimizations/all_optimizations_final_report.md`
+
+- **New benchmarks for optimization validation**
+  - `benches/auto_minimize_benchmark.rs` - Auto-minimization threshold tuning
+  - `benches/bloom_filter_benchmark.rs` - Bloom filter performance analysis
+  - `benches/compact_benchmark.rs` - Compaction strategy comparison
+
+- **Documentation**
+  - `docs/optimizations/all_optimizations_final_report.md` - Comprehensive optimization results (7 candidates analyzed)
+  - `docs/optimizations/rcu_assessment.md` - Detailed RCU trade-off analysis
+  - `docs/optimizations/dynamic_dawg_optimization_results.md` - Benchmark data and decision log
+
 #### Contextual Code Completion Engine (2025-11-03)
 - **Hierarchical scope-aware code completion with zipper-based navigation**
   - Complete 6-phase implementation (Phases 1-6) as documented in roadmap

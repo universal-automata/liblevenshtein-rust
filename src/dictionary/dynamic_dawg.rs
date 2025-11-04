@@ -49,6 +49,26 @@ struct DynamicDawgInner {
     // Enables reusing common suffixes to reduce DAWG size by 20-40%
     #[cfg_attr(feature = "serialization", serde(skip))]
     suffix_cache: FxHashMap<u64, usize>,
+    // Lazy minimization tracking
+    #[cfg_attr(feature = "serialization", serde(skip))]
+    last_minimized_node_count: usize,
+    #[cfg_attr(feature = "serialization", serde(skip))]
+    auto_minimize_threshold: f32,  // Trigger minimize when nodes > last * threshold
+    // Bloom filter for fast negative lookup rejection (Opt #4)
+    #[cfg_attr(feature = "serialization", serde(skip))]
+    bloom_filter: Option<BloomFilter>,
+}
+
+/// Simple Bloom filter for fast negative lookup rejection.
+///
+/// Uses 3 hash functions and a bit vector to probabilistically test membership.
+/// - False positives: Possible (requires full DAWG traversal)
+/// - False negatives: Never (guaranteed correct rejection)
+#[derive(Debug, Clone)]
+struct BloomFilter {
+    bits: Vec<u64>,  // Bit vector (64-bit chunks for efficiency)
+    bit_count: usize,
+    hash_count: usize,
 }
 
 /// Hash-based node signature for efficient minimization.
@@ -85,10 +105,127 @@ impl DawgNode {
     }
 }
 
+impl BloomFilter {
+    /// Create a new Bloom filter with specified capacity.
+    ///
+    /// Uses ~1.2 bytes per expected element with 3 hash functions.
+    /// Target false positive rate: ~1%
+    fn new(expected_elements: usize) -> Self {
+        // Use 10 bits per element for ~1% false positive rate with 3 hash functions
+        let bit_count = expected_elements * 10;
+        let chunk_count = (bit_count + 63) / 64; // Round up to nearest u64
+
+        BloomFilter {
+            bits: vec![0u64; chunk_count],
+            bit_count: chunk_count * 64,
+            hash_count: 3,
+        }
+    }
+
+    /// Add an element to the Bloom filter.
+    fn insert(&mut self, term: &str) {
+        let bytes = term.as_bytes();
+        for i in 0..self.hash_count {
+            let hash = self.hash_with_seed(bytes, i as u64);
+            let bit_index = (hash % self.bit_count as u64) as usize;
+            let chunk_index = bit_index / 64;
+            let bit_offset = bit_index % 64;
+            self.bits[chunk_index] |= 1u64 << bit_offset;
+        }
+    }
+
+    /// Check if an element might be in the set.
+    ///
+    /// Returns:
+    /// - false: Definitely NOT in set (fast rejection)
+    /// - true: Might be in set (requires full check)
+    #[inline]
+    fn might_contain(&self, term: &str) -> bool {
+        let bytes = term.as_bytes();
+        for i in 0..self.hash_count {
+            let hash = self.hash_with_seed(bytes, i as u64);
+            let bit_index = (hash % self.bit_count as u64) as usize;
+            let chunk_index = bit_index / 64;
+            let bit_offset = bit_index % 64;
+            if (self.bits[chunk_index] & (1u64 << bit_offset)) == 0 {
+                return false; // Definitely not in set
+            }
+        }
+        true // Might be in set
+    }
+
+    /// Hash with a seed using FxHash.
+    #[inline]
+    fn hash_with_seed(&self, bytes: &[u8], seed: u64) -> u64 {
+        use rustc_hash::FxHasher;
+        use std::hash::Hasher;
+
+        let mut hasher = FxHasher::default();
+        seed.hash(&mut hasher);
+        bytes.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    /// Clear the Bloom filter.
+    fn clear(&mut self) {
+        self.bits.fill(0);
+    }
+}
+
 impl DynamicDawg {
     /// Create a new empty dynamic DAWG.
+    ///
+    /// By default, auto-minimization is disabled. Use `with_auto_minimize_threshold()`
+    /// to enable automatic minimization.
     pub fn new() -> Self {
+        Self::with_auto_minimize_threshold(f32::INFINITY)
+    }
+
+    /// Create a new empty dynamic DAWG with custom auto-minimize threshold.
+    ///
+    /// The auto-minimize threshold determines when the DAWG automatically
+    /// triggers minimization. A value of 1.5 means minimize when node count
+    /// grows to 1.5x the last minimized size (50% bloat).
+    ///
+    /// # Parameters
+    ///
+    /// - `threshold`: Bloat ratio to trigger minimization (e.g., 1.5 = 50% bloat).
+    ///   Use `f32::INFINITY` to disable auto-minimization.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Auto-minimize at 50% bloat (default)
+    /// let dawg = DynamicDawg::with_auto_minimize_threshold(1.5);
+    ///
+    /// // Disable auto-minimization (manual minimize() calls only)
+    /// let dawg = DynamicDawg::with_auto_minimize_threshold(f32::INFINITY);
+    /// ```
+    pub fn with_auto_minimize_threshold(threshold: f32) -> Self {
+        Self::with_config(threshold, None)
+    }
+
+    /// Create a new empty dynamic DAWG with full configuration.
+    ///
+    /// # Parameters
+    ///
+    /// - `auto_minimize_threshold`: Bloat ratio to trigger minimization. Use `f32::INFINITY` to disable.
+    /// - `bloom_filter_capacity`: Optional Bloom filter capacity for negative lookup optimization.
+    ///   Use `Some(expected_size)` to enable, `None` to disable.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // With Bloom filter for 10000 expected terms
+    /// let dawg = DynamicDawg::with_config(f32::INFINITY, Some(10000));
+    ///
+    /// // Without Bloom filter
+    /// let dawg = DynamicDawg::with_config(1.5, None);
+    /// ```
+    pub fn with_config(auto_minimize_threshold: f32, bloom_filter_capacity: Option<usize>) -> Self {
         let nodes = vec![DawgNode::new(false)]; // Root at index 0
+
+        let bloom_filter = bloom_filter_capacity.map(BloomFilter::new);
 
         DynamicDawg {
             inner: Arc::new(RwLock::new(DynamicDawgInner {
@@ -96,12 +233,48 @@ impl DynamicDawg {
                 term_count: 0,
                 needs_compaction: false,
                 suffix_cache: FxHashMap::default(),
+                last_minimized_node_count: 1,  // Start with root node
+                auto_minimize_threshold,
+                bloom_filter,
             })),
         }
     }
 
     /// Create from an iterator of terms (optimized batch insert).
+    ///
+    /// This method sorts terms before insertion for better prefix/suffix sharing.
     pub fn from_terms<I, S>(terms: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut term_vec: Vec<String> = terms.into_iter()
+            .map(|s| s.as_ref().to_string())
+            .collect();
+        term_vec.sort_unstable();
+
+        let dawg = Self::new();
+        for term in term_vec {
+            dawg.insert(&term);
+        }
+        dawg
+    }
+
+    /// Create from sorted terms (assumes pre-sorted input).
+    ///
+    /// # Performance
+    ///
+    /// This is faster than `from_terms()` if your input is already sorted,
+    /// as it skips the sorting step and takes advantage of better prefix sharing.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let mut terms = vec!["apple", "banana", "cherry"];
+    /// terms.sort();  // Already sorted
+    /// let dawg = DynamicDawg::from_sorted_terms(terms);
+    /// ```
+    pub fn from_sorted_terms<I, S>(terms: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -193,6 +366,15 @@ impl DynamicDawg {
         }
 
         inner.term_count += 1;
+
+        // Add to Bloom filter if enabled (Opt #4)
+        if let Some(ref mut bloom) = inner.bloom_filter {
+            bloom.insert(term);
+        }
+
+        // Auto-minimize if bloat threshold exceeded
+        inner.check_and_auto_minimize();
+
         true
     }
 
@@ -279,21 +461,33 @@ impl DynamicDawg {
         let terms = inner.extract_all_terms();
         let old_node_count = inner.nodes.len();
 
+        // Preserve settings
+        let auto_minimize_threshold = inner.auto_minimize_threshold;
+        let bloom_capacity = inner.bloom_filter.as_ref().map(|b| b.bit_count / 10);
+
         // Rebuild from scratch
         *inner = DynamicDawgInner {
             nodes: vec![DawgNode::new(false)],
             term_count: 0,
             needs_compaction: false,
             suffix_cache: FxHashMap::default(),
+            last_minimized_node_count: 1,
+            auto_minimize_threshold,
+            bloom_filter: bloom_capacity.map(BloomFilter::new),
         };
 
         // Re-insert sorted terms for optimal prefix sharing
         let mut sorted_terms = terms;
         sorted_terms.sort();
 
-        for term in sorted_terms {
+        for term in &sorted_terms {
             // Direct insertion without locking (we already have write lock)
-            inner.insert_direct(&term);
+            inner.insert_direct(term);
+
+            // Rebuild Bloom filter
+            if let Some(ref mut bloom) = inner.bloom_filter {
+                bloom.insert(term);
+            }
         }
 
         // Now minimize to merge equivalent suffixes (DAWG minimization)
@@ -336,7 +530,7 @@ impl DynamicDawg {
     /// Batch insert multiple terms, then compact.
     ///
     /// This is more efficient than calling `insert()` followed by `compact()`
-    /// separately, as it only rebuilds once.
+    /// separately, as it sorts terms for better prefix sharing and only rebuilds once.
     ///
     /// Returns the number of new terms added.
     pub fn extend<I, S>(&self, terms: I) -> usize
@@ -344,9 +538,15 @@ impl DynamicDawg {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
+        // Collect and sort for optimal prefix sharing
+        let mut term_vec: Vec<String> = terms.into_iter()
+            .map(|s| s.as_ref().to_string())
+            .collect();
+        term_vec.sort_unstable();
+
         let mut added = 0;
-        for term in terms {
-            if self.insert(term.as_ref()) {
+        for term in term_vec {
+            if self.insert(&term) {
                 added += 1;
             }
         }
@@ -399,9 +599,51 @@ impl DynamicDawg {
     pub fn needs_compaction(&self) -> bool {
         self.inner.read().needs_compaction
     }
+
+    /// Check if a term is in the DAWG.
+    ///
+    /// This method is optimized with a Bloom filter (if enabled) for fast negative lookup rejection.
+    pub fn contains(&self, term: &str) -> bool {
+        let inner = self.inner.read();
+
+        // Fast path: Bloom filter check (if enabled)
+        if let Some(ref bloom) = inner.bloom_filter {
+            if !bloom.might_contain(term) {
+                return false; // Definitely not in DAWG
+            }
+            // Might be in DAWG, need full check
+        }
+
+        // Full check: traverse DAWG
+        drop(inner); // Release lock before traversal
+        let mut node = self.root();
+        for byte in term.as_bytes() {
+            if let Some(next_node) = node.transition(*byte) {
+                node = next_node;
+            } else {
+                return false;
+            }
+        }
+        node.is_final()
+    }
 }
 
 impl DynamicDawgInner {
+    /// Check if auto-minimization should be triggered based on bloat threshold.
+    ///
+    /// This is called after each insertion to maintain the DAWG in a near-minimal
+    /// state without the overhead of minimizing after every single operation.
+    fn check_and_auto_minimize(&mut self) {
+        let current_nodes = self.nodes.len();
+        let threshold_nodes = (self.last_minimized_node_count as f32
+            * self.auto_minimize_threshold) as usize;
+
+        if current_nodes > threshold_nodes && !self.auto_minimize_threshold.is_infinite() {
+            // Trigger automatic minimization
+            self.minimize_incremental();
+        }
+    }
+
     /// Phase 2.1: Find or create a suffix chain, using cache for common suffixes.
     ///
     /// This is a key optimization that reuses common suffix chains like "ing", "tion", etc.
@@ -627,6 +869,10 @@ impl DynamicDawgInner {
         // Phase 2.1: Invalidate suffix cache since nodes were merged
         self.suffix_cache.clear();
         self.needs_compaction = false;
+
+        // Update last minimized count for auto-minimize threshold tracking
+        self.last_minimized_node_count = self.nodes.len();
+
         initial_count - self.nodes.len()
     }
 

@@ -291,3 +291,15 @@ glibc = "*"
 #
 # [patch.'https://github.com/Adam-Vandervorst/PathMap.git']
 # pathmap = { path = "../PathMap" }
+
+[[bench]]
+name = "auto_minimize_benchmark"
+harness = false
+
+[[bench]]
+name = "bloom_filter_benchmark"
+harness = false
+
+[[bench]]
+name = "compact_benchmark"
+harness = false
