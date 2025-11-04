@@ -102,7 +102,10 @@ impl CommandHighlighter {
             } else if part.parse::<usize>().is_ok() {
                 // Highlight numbers in magenta
                 result.push_str(&part.magenta().to_string());
-            } else if matches!(part.to_lowercase().as_str(), "on" | "off" | "true" | "false") {
+            } else if matches!(
+                part.to_lowercase().as_str(),
+                "on" | "off" | "true" | "false"
+            ) {
                 // Highlight boolean keywords in green
                 result.push_str(&part.green().to_string());
             } else if Self::is_backend_name(part) || Self::is_algorithm_name(part) {

@@ -142,7 +142,7 @@ impl<V: DictionaryValue> DictZipper for DynamicDawgZipper<V> {
         self.path.clone()
     }
 
-    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> + '_ {
+    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> {
         // Collect edges to avoid holding lock during iteration
         let edges: Vec<(u8, usize)> = {
             let inner = self.inner.read();
@@ -307,7 +307,11 @@ mod tests {
 
         // Navigate to 'c' (non-final)
         let c_zipper = zipper.descend(b'c').expect("Should descend to 'c'");
-        assert_eq!(c_zipper.value(), None, "Non-final node should have no value");
+        assert_eq!(
+            c_zipper.value(),
+            None,
+            "Non-final node should have no value"
+        );
     }
 
     #[test]

@@ -442,7 +442,7 @@ impl<V: DictionaryValue> SuffixAutomatonChar<V> {
                 node.max_length,
                 node.edges
                     .iter()
-                    .map(|(b, t)| (char::from(*b), t))
+                    .map(|(b, t)| ((*b), t))
                     .collect::<Vec<_>>(),
                 node.suffix_link
             );
@@ -832,7 +832,9 @@ impl<V: DictionaryValue + serde::Serialize> serde::Serialize for SuffixAutomaton
 }
 
 #[cfg(feature = "serialization")]
-impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de> for SuffixAutomatonChar<V> {
+impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de>
+    for SuffixAutomatonChar<V>
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -961,7 +963,10 @@ impl<V: DictionaryValue> MappedDictionaryNode for SuffixNodeCharHandle<V> {
 
     fn value(&self) -> Option<Self::Value> {
         let inner = self.automaton.read().unwrap();
-        inner.nodes.get(self.state_id).and_then(|node| node.value.clone())
+        inner
+            .nodes
+            .get(self.state_id)
+            .and_then(|node| node.value.clone())
     }
 }
 
@@ -1262,10 +1267,10 @@ mod tests {
         let dict = SuffixAutomatonChar::<()>::from_text("café");
 
         // All suffixes should be present
-        assert!(dict.contains("café"));  // 4 chars, 5 bytes
-        assert!(dict.contains("afé"));   // 3 chars, 4 bytes
-        assert!(dict.contains("fé"));    // 2 chars, 3 bytes
-        assert!(dict.contains("é"));     // 1 char, 2 bytes
+        assert!(dict.contains("café")); // 4 chars, 5 bytes
+        assert!(dict.contains("afé")); // 3 chars, 4 bytes
+        assert!(dict.contains("fé")); // 2 chars, 3 bytes
+        assert!(dict.contains("é")); // 1 char, 2 bytes
 
         // Prefixes should also be found
         assert!(dict.contains("caf"));
@@ -1300,11 +1305,7 @@ mod tests {
     #[test]
     fn test_unicode_mixed() {
         // Test with mixed Unicode content
-        let dict = SuffixAutomatonChar::<String>::from_texts(vec![
-            "café☕",
-            "naïve🌟",
-            "中文test"
-        ]);
+        let dict = SuffixAutomatonChar::<String>::from_texts(vec!["café☕", "naïve🌟", "中文test"]);
 
         assert_eq!(dict.string_count(), 3);
         assert!(dict.contains("café"));

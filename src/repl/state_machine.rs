@@ -48,12 +48,25 @@ pub enum ReplPhase {
 impl ReplPhase {
     /// Check if the phase is terminal (requires exit)
     pub fn is_terminal(&self) -> bool {
-        matches!(self, Self::Exiting | Self::Error { recoverable: false, .. })
+        matches!(
+            self,
+            Self::Exiting
+                | Self::Error {
+                    recoverable: false,
+                    ..
+                }
+        )
     }
 
     /// Check if the phase is recoverable from error
     pub fn is_recoverable(&self) -> bool {
-        !matches!(self, Self::Error { recoverable: false, .. })
+        !matches!(
+            self,
+            Self::Error {
+                recoverable: false,
+                ..
+            }
+        )
     }
 
     /// Get a status indicator string for display
@@ -63,8 +76,12 @@ impl ReplPhase {
             Self::Continuation { .. } => "🟡".to_string(),
             Self::Executing { .. } => "🟢".to_string(),
             Self::DisplayingResults { .. } => "✓".green().to_string(),
-            Self::Error { recoverable: true, .. } => "⚠".yellow().to_string(),
-            Self::Error { recoverable: false, .. } => "✗".red().to_string(),
+            Self::Error {
+                recoverable: true, ..
+            } => "⚠".yellow().to_string(),
+            Self::Error {
+                recoverable: false, ..
+            } => "✗".red().to_string(),
             Self::Exiting => "👋".to_string(),
         }
     }
@@ -220,28 +237,24 @@ impl ReplStateMachine {
                 } else {
                     // Try to parse command
                     match Command::parse(line) {
-                        Ok(command) => {
-                            Transition::to_with_follow_up(
-                                ReplPhase::Executing { command: command.clone() },
-                                ReplEvent::CommandParsed { command },
-                            )
-                        }
-                        Err(e) => {
-                            Transition::to_with_output(
-                                ReplPhase::Ready,
-                                format!("{}: {}", "Parse error".red().bold(), e),
-                            )
-                        }
+                        Ok(command) => Transition::to_with_follow_up(
+                            ReplPhase::Executing {
+                                command: command.clone(),
+                            },
+                            ReplEvent::CommandParsed { command },
+                        ),
+                        Err(e) => Transition::to_with_output(
+                            ReplPhase::Ready,
+                            format!("{}: {}", "Parse error".red().bold(), e),
+                        ),
                     }
                 }
             }
 
-            (ReplPhase::Ready, ReplEvent::Interrupted) => {
-                Transition::to_with_output(
-                    ReplPhase::Ready,
-                    "^C (Use 'exit' or Ctrl+D to quit)".yellow().to_string(),
-                )
-            }
+            (ReplPhase::Ready, ReplEvent::Interrupted) => Transition::to_with_output(
+                ReplPhase::Ready,
+                "^C (Use 'exit' or Ctrl+D to quit)".yellow().to_string(),
+            ),
 
             (ReplPhase::Ready, ReplEvent::Eof) => {
                 Transition::to_with_output(ReplPhase::Exiting, "Goodbye!".green().to_string())
@@ -260,47 +273,47 @@ impl ReplStateMachine {
                 } else {
                     // Try to parse complete command
                     match Command::parse(&new_buffer) {
-                        Ok(command) => {
-                            Transition::to_with_follow_up(
-                                ReplPhase::Executing { command: command.clone() },
-                                ReplEvent::CommandParsed { command },
-                            )
-                        }
-                        Err(e) => {
-                            Transition::to_with_output(
-                                ReplPhase::Ready,
-                                format!("{}: {}", "Parse error".red().bold(), e),
-                            )
-                        }
+                        Ok(command) => Transition::to_with_follow_up(
+                            ReplPhase::Executing {
+                                command: command.clone(),
+                            },
+                            ReplEvent::CommandParsed { command },
+                        ),
+                        Err(e) => Transition::to_with_output(
+                            ReplPhase::Ready,
+                            format!("{}: {}", "Parse error".red().bold(), e),
+                        ),
                     }
                 }
             }
 
-            (ReplPhase::Continuation { .. }, ReplEvent::Interrupted) => {
-                Transition::to_with_output(
-                    ReplPhase::Ready,
-                    "Continuation cancelled".yellow().to_string(),
-                )
-            }
+            (ReplPhase::Continuation { .. }, ReplEvent::Interrupted) => Transition::to_with_output(
+                ReplPhase::Ready,
+                "Continuation cancelled".yellow().to_string(),
+            ),
 
             // Executing state transitions
-            (ReplPhase::Executing { .. }, ReplEvent::CommandExecuted { result }) => {
-                match result {
-                    CommandResult::Continue(output) => {
-                        if output.is_empty() {
-                            Transition::to(ReplPhase::Ready)
-                        } else {
-                            Transition::to_with_output(ReplPhase::Ready, output.clone())
-                        }
+            (ReplPhase::Executing { .. }, ReplEvent::CommandExecuted { result }) => match result {
+                CommandResult::Continue(output) => {
+                    if output.is_empty() {
+                        Transition::to(ReplPhase::Ready)
+                    } else {
+                        Transition::to_with_output(ReplPhase::Ready, output.clone())
                     }
-                    CommandResult::Exit => {
-                        Transition::to_with_output(ReplPhase::Exiting, "Goodbye!".green().to_string())
-                    }
-                    CommandResult::Silent => Transition::to(ReplPhase::Ready),
                 }
-            }
+                CommandResult::Exit => {
+                    Transition::to_with_output(ReplPhase::Exiting, "Goodbye!".green().to_string())
+                }
+                CommandResult::Silent => Transition::to(ReplPhase::Ready),
+            },
 
-            (ReplPhase::Executing { .. }, ReplEvent::ExecutionError { message, recoverable }) => {
+            (
+                ReplPhase::Executing { .. },
+                ReplEvent::ExecutionError {
+                    message,
+                    recoverable,
+                },
+            ) => {
                 if *recoverable {
                     Transition::to_with_output(
                         ReplPhase::Ready,
@@ -315,7 +328,12 @@ impl ReplStateMachine {
             }
 
             // Error state transitions
-            (ReplPhase::Error { recoverable: true, .. }, ReplEvent::LineSubmitted { .. }) => {
+            (
+                ReplPhase::Error {
+                    recoverable: true, ..
+                },
+                ReplEvent::LineSubmitted { .. },
+            ) => {
                 // Recoverable error, go back to Ready
                 Transition::to(ReplPhase::Ready)
             }

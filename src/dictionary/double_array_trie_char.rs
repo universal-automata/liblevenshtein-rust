@@ -457,6 +457,15 @@ struct DATBuilderChar<V: DictionaryValue = ()> {
     used: Vec<bool>,
 }
 
+/// Type alias for the built Double-Array Trie components.
+type DATCharComponents<V> = (
+    Vec<i32>,       // base
+    Vec<i32>,       // check
+    Vec<bool>,      // is_final
+    Vec<Vec<char>>, // edges
+    Vec<Option<V>>, // values
+);
+
 impl<V: DictionaryValue> DATBuilderChar<V> {
     fn new() -> Self {
         Self {
@@ -636,8 +645,14 @@ impl<V: DictionaryValue> DATBuilderChar<V> {
         1
     }
 
-    fn build(self) -> (Vec<i32>, Vec<i32>, Vec<bool>, Vec<Vec<char>>, Vec<Option<V>>) {
-        (self.base, self.check, self.is_final, self.edges, self.values)
+    fn build(self) -> DATCharComponents<V> {
+        (
+            self.base,
+            self.check,
+            self.is_final,
+            self.edges,
+            self.values,
+        )
     }
 }
 
@@ -757,12 +772,7 @@ mod tests {
     // MappedDictionary tests with UTF-8
     #[test]
     fn test_mapped_dictionary_with_unicode_values() {
-        let terms = vec![
-            ("café", 1),
-            ("中文", 2),
-            ("🎉", 3),
-            ("naïve", 4),
-        ];
+        let terms = vec![("café", 1), ("中文", 2), ("🎉", 3), ("naïve", 4)];
 
         let dict = DoubleArrayTrieChar::from_terms_with_values(terms);
 
@@ -775,10 +785,7 @@ mod tests {
 
     #[test]
     fn test_mapped_dictionary_contains_with_value() {
-        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
-            ("café", 42),
-            ("résumé", 100),
-        ]);
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![("café", 42), ("résumé", 100)]);
 
         assert!(dict.contains_with_value("café", |v| *v == 42));
         assert!(dict.contains_with_value("résumé", |v| *v > 50));
@@ -790,9 +797,7 @@ mod tests {
     fn test_mapped_dictionary_node_value() {
         use crate::dictionary::{Dictionary, MappedDictionaryNode};
 
-        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
-            ("test", 123),
-        ]);
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![("test", 123)]);
 
         let root = dict.root();
         let t_node = root.transition('t').unwrap();
@@ -817,10 +822,7 @@ mod tests {
 
     #[test]
     fn test_empty_string_with_value() {
-        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
-            ("", 1),
-            ("test", 2),
-        ]);
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![("", 1), ("test", 2)]);
 
         assert_eq!(dict.get_value(""), Some(1));
         assert_eq!(dict.get_value("test"), Some(2));

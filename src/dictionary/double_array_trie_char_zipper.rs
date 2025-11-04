@@ -112,7 +112,7 @@ impl<V: DictionaryValue> DictZipper for DoubleArrayTrieCharZipper<V> {
         })
     }
 
-    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> + '_ {
+    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> {
         // Use precomputed edge list for efficiency
         let edges: &[char] = if self.state < self.shared.edges.len() {
             &self.shared.edges[self.state]
@@ -120,9 +120,9 @@ impl<V: DictionaryValue> DictZipper for DoubleArrayTrieCharZipper<V> {
             &[]
         };
 
-        edges.iter().filter_map(move |&c| {
-            self.descend(c).map(|child| (c, child))
-        })
+        edges
+            .iter()
+            .filter_map(move |&c| self.descend(c).map(|child| (c, child)))
     }
 
     fn path(&self) -> Vec<Self::Unit> {
@@ -162,7 +162,8 @@ mod tests {
         let zipper = DoubleArrayTrieCharZipper::new_from_dict(&dict);
 
         // Navigate to "café"
-        let z = zipper.descend('c')
+        let z = zipper
+            .descend('c')
             .and_then(|z| z.descend('a'))
             .and_then(|z| z.descend('f'))
             .and_then(|z| z.descend('é'))
@@ -171,9 +172,7 @@ mod tests {
         assert!(z.is_final());
 
         // Navigate to "中文"
-        let z = zipper.descend('中')
-            .and_then(|z| z.descend('文'))
-            .unwrap();
+        let z = zipper.descend('中').and_then(|z| z.descend('文')).unwrap();
 
         assert!(z.is_final());
     }
@@ -189,15 +188,13 @@ mod tests {
 
     #[test]
     fn test_zipper_with_unicode_values() {
-        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
-            ("café", 1),
-            ("中文", 2),
-        ]);
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![("café", 1), ("中文", 2)]);
 
         let zipper = DoubleArrayTrieCharZipper::new_from_dict(&dict);
 
         // Navigate to "café"
-        let z = zipper.descend('c')
+        let z = zipper
+            .descend('c')
             .and_then(|z| z.descend('a'))
             .and_then(|z| z.descend('f'))
             .and_then(|z| z.descend('é'))
@@ -207,9 +204,7 @@ mod tests {
         assert_eq!(z.value(), Some(1));
 
         // Navigate to "中文"
-        let z = zipper.descend('中')
-            .and_then(|z| z.descend('文'))
-            .unwrap();
+        let z = zipper.descend('中').and_then(|z| z.descend('文')).unwrap();
 
         assert!(z.is_final());
         assert_eq!(z.value(), Some(2));
@@ -234,16 +229,12 @@ mod tests {
 
     #[test]
     fn test_zipper_value_at_non_final() {
-        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
-            ("test", 42),
-        ]);
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![("test", 42)]);
 
         let zipper = DoubleArrayTrieCharZipper::new_from_dict(&dict);
 
         // Navigate to "te" (not final)
-        let z = zipper.descend('t')
-            .and_then(|z| z.descend('e'))
-            .unwrap();
+        let z = zipper.descend('t').and_then(|z| z.descend('e')).unwrap();
 
         assert!(!z.is_final());
         assert_eq!(z.value(), None); // No value at non-final state
@@ -268,7 +259,8 @@ mod tests {
         let zipper = DoubleArrayTrieCharZipper::new_from_dict(&dict);
 
         // Navigate to "hello"
-        let z = zipper.descend('h')
+        let z = zipper
+            .descend('h')
             .and_then(|z| z.descend('e'))
             .and_then(|z| z.descend('l'))
             .and_then(|z| z.descend('l'))
@@ -281,10 +273,8 @@ mod tests {
 
     #[test]
     fn test_zipper_emoji() {
-        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
-            ("🎉", "party"),
-            ("🌍", "earth"),
-        ]);
+        let dict =
+            DoubleArrayTrieChar::from_terms_with_values(vec![("🎉", "party"), ("🌍", "earth")]);
 
         let zipper = DoubleArrayTrieCharZipper::new_from_dict(&dict);
 
@@ -300,7 +290,8 @@ mod tests {
         let dict = DoubleArrayTrieChar::from_terms(vec!["café"]);
         let zipper = DoubleArrayTrieCharZipper::new_from_dict(&dict);
 
-        let z = zipper.descend('c')
+        let z = zipper
+            .descend('c')
             .and_then(|z| z.descend('a'))
             .and_then(|z| z.descend('f'))
             .and_then(|z| z.descend('é'))

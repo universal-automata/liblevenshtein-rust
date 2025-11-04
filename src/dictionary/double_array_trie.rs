@@ -983,11 +983,7 @@ mod tests {
     // MappedDictionary tests
     #[test]
     fn test_mapped_dictionary_with_values() {
-        let terms = vec![
-            ("apple", 1),
-            ("application", 2),
-            ("apply", 3),
-        ];
+        let terms = vec![("apple", 1), ("application", 2), ("apply", 3)];
 
         let dict = DoubleArrayTrie::from_terms_with_values(terms);
 
@@ -999,10 +995,7 @@ mod tests {
 
     #[test]
     fn test_mapped_dictionary_contains_with_value() {
-        let dict = DoubleArrayTrie::from_terms_with_values(vec![
-            ("test", 42),
-            ("testing", 100),
-        ]);
+        let dict = DoubleArrayTrie::from_terms_with_values(vec![("test", 42), ("testing", 100)]);
 
         assert!(dict.contains_with_value("test", |v| *v == 42));
         assert!(dict.contains_with_value("testing", |v| *v > 50));
@@ -1014,10 +1007,7 @@ mod tests {
     fn test_mapped_dictionary_node_value() {
         use crate::dictionary::MappedDictionaryNode;
 
-        let dict = DoubleArrayTrie::from_terms_with_values(vec![
-            ("cat", 1),
-            ("catch", 2),
-        ]);
+        let dict = DoubleArrayTrie::from_terms_with_values(vec![("cat", 1), ("catch", 2)]);
 
         let root = dict.root();
         // Navigate to "cat"

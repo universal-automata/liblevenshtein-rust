@@ -831,7 +831,9 @@ impl<V: DictionaryValue + serde::Serialize> serde::Serialize for SuffixAutomaton
 }
 
 #[cfg(feature = "serialization")]
-impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de> for SuffixAutomaton<V> {
+impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de>
+    for SuffixAutomaton<V>
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -960,7 +962,10 @@ impl<V: DictionaryValue> MappedDictionaryNode for SuffixNodeHandle<V> {
 
     fn value(&self) -> Option<Self::Value> {
         let inner = self.automaton.read().unwrap();
-        inner.nodes.get(self.state_id).and_then(|node| node.value.clone())
+        inner
+            .nodes
+            .get(self.state_id)
+            .and_then(|node| node.value.clone())
     }
 }
 

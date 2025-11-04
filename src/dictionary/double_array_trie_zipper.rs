@@ -109,7 +109,7 @@ impl<V: DictionaryValue> DictZipper for DoubleArrayTrieZipper<V> {
         })
     }
 
-    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> + '_ {
+    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> {
         // Use precomputed edge list for efficiency
         let edges: &[u8] = if self.state < self.shared.edges.len() {
             &self.shared.edges[self.state]
@@ -117,9 +117,9 @@ impl<V: DictionaryValue> DictZipper for DoubleArrayTrieZipper<V> {
             &[]
         };
 
-        edges.iter().filter_map(move |&byte| {
-            self.descend(byte).map(|child| (byte, child))
-        })
+        edges
+            .iter()
+            .filter_map(move |&byte| self.descend(byte).map(|child| (byte, child)))
     }
 
     fn path(&self) -> Vec<Self::Unit> {
@@ -159,7 +159,8 @@ mod tests {
         let zipper = DoubleArrayTrieZipper::new_from_dict(&dict);
 
         // Navigate to "cat"
-        let z = zipper.descend(b'c')
+        let z = zipper
+            .descend(b'c')
             .and_then(|z| z.descend(b'a'))
             .and_then(|z| z.descend(b't'))
             .unwrap();
@@ -167,9 +168,7 @@ mod tests {
         assert!(z.is_final());
 
         // Continue to "catch"
-        let z = z.descend(b'c')
-            .and_then(|z| z.descend(b'h'))
-            .unwrap();
+        let z = z.descend(b'c').and_then(|z| z.descend(b'h')).unwrap();
 
         assert!(z.is_final());
     }
@@ -185,15 +184,13 @@ mod tests {
 
     #[test]
     fn test_zipper_with_values() {
-        let dict = DoubleArrayTrie::from_terms_with_values(vec![
-            ("cat", 1),
-            ("catch", 2),
-        ]);
+        let dict = DoubleArrayTrie::from_terms_with_values(vec![("cat", 1), ("catch", 2)]);
 
         let zipper = DoubleArrayTrieZipper::new_from_dict(&dict);
 
         // Navigate to "cat"
-        let z = zipper.descend(b'c')
+        let z = zipper
+            .descend(b'c')
             .and_then(|z| z.descend(b'a'))
             .and_then(|z| z.descend(b't'))
             .unwrap();
@@ -202,9 +199,7 @@ mod tests {
         assert_eq!(z.value(), Some(1));
 
         // Continue to "catch"
-        let z = z.descend(b'c')
-            .and_then(|z| z.descend(b'h'))
-            .unwrap();
+        let z = z.descend(b'c').and_then(|z| z.descend(b'h')).unwrap();
 
         assert!(z.is_final());
         assert_eq!(z.value(), Some(2));
@@ -229,16 +224,12 @@ mod tests {
 
     #[test]
     fn test_zipper_value_at_non_final() {
-        let dict = DoubleArrayTrie::from_terms_with_values(vec![
-            ("test", 42),
-        ]);
+        let dict = DoubleArrayTrie::from_terms_with_values(vec![("test", 42)]);
 
         let zipper = DoubleArrayTrieZipper::new_from_dict(&dict);
 
         // Navigate to "te" (not final)
-        let z = zipper.descend(b't')
-            .and_then(|z| z.descend(b'e'))
-            .unwrap();
+        let z = zipper.descend(b't').and_then(|z| z.descend(b'e')).unwrap();
 
         assert!(!z.is_final());
         assert_eq!(z.value(), None); // No value at non-final state
@@ -255,15 +246,14 @@ mod tests {
 
     #[test]
     fn test_zipper_string_values() {
-        let dict = DoubleArrayTrie::from_terms_with_values(vec![
-            ("hello", "greeting"),
-            ("world", "noun"),
-        ]);
+        let dict =
+            DoubleArrayTrie::from_terms_with_values(vec![("hello", "greeting"), ("world", "noun")]);
 
         let zipper = DoubleArrayTrieZipper::new_from_dict(&dict);
 
         // Navigate to "hello"
-        let z = zipper.descend(b'h')
+        let z = zipper
+            .descend(b'h')
             .and_then(|z| z.descend(b'e'))
             .and_then(|z| z.descend(b'l'))
             .and_then(|z| z.descend(b'l'))

@@ -1329,8 +1329,8 @@ impl Command {
                 .bold()
                 .underline(),
             "Understanding the Prompt:".bold(),
-            "🔵".to_string(),
-            "🟡".to_string(),
+            "🔵",
+            "🟡",
             "✓".green(),
             "⚠".yellow(),
             "Keyboard Shortcuts:".bold(),

@@ -150,7 +150,7 @@ impl<V: DictionaryValue> DictZipper for SuffixAutomatonCharZipper<V> {
         self.path.clone()
     }
 
-    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> + '_ {
+    fn children(&self) -> impl Iterator<Item = (Self::Unit, Self)> {
         // Collect edges to avoid holding lock during iteration
         let edges: Vec<(char, usize)> = {
             let inner = self.inner.read().unwrap();
