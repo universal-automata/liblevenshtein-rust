@@ -490,7 +490,7 @@ jobs:
 
       - name: Install library from crates.io
         run: |
-          cargo install liblevenshtein --version ${{ steps.version.outputs.version }} --verbose
+          cargo install liblevenshtein --version ${{ steps.version.outputs.version }} --features cli --verbose
 
       - name: Test CLI functionality
         run: |
