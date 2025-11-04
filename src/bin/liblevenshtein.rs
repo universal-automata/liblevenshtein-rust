@@ -9,7 +9,7 @@ use std::process;
 use liblevenshtein::cli::commands;
 use liblevenshtein::cli::paths::PersistentConfig;
 use liblevenshtein::cli::{Cli, Commands};
-use liblevenshtein::repl::{Command, CommandResult, LevenshteinHelper, ReplConfig, ReplState};
+use liblevenshtein::repl::{Command, LevenshteinHelper, ReplConfig, ReplState};
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor};
 
@@ -181,85 +181,118 @@ fn run_repl(
         }
     }
 
-    // Main REPL loop
+    // Initialize state machine
+    use liblevenshtein::repl::{ReplEvent, ReplStateMachine};
+    let mut state_machine = ReplStateMachine::new();
+
+    // Main REPL loop with state machine
     let mut line_num = 0;
     loop {
+        // Check if state machine is in terminal state
+        if state_machine.is_terminal() {
+            break;
+        }
+
         line_num += 1;
 
-        // Generate prompt with line number
-        let prompt = format!("{}[{}]> ", "liblevenshtein".bright_cyan().bold(), line_num);
+        // Generate prompt based on current phase
+        let prompt = match state_machine.phase() {
+            liblevenshtein::repl::ReplPhase::Continuation { .. } => {
+                format!("{}[{}]...> ", "liblevenshtein".bright_cyan().bold(), line_num)
+            }
+            _ => format!("{}[{}]> ", "liblevenshtein".bright_cyan().bold(), line_num),
+        };
 
         // Read input
         let readline = editor.readline(&prompt);
 
-        match readline {
+        // Convert readline result to event
+        let event = match readline {
             Ok(line) => {
-                let line = line.trim();
-
-                // Skip empty lines
-                if line.is_empty() {
-                    continue;
-                }
-
-                // Parse and execute command
-                match Command::parse(line) {
-                    Ok(command) => {
-                        // Check if command modifies dictionary (before execution)
-                        let modifies_dict = matches!(
-                            command,
-                            Command::Insert { .. }
-                                | Command::Delete { .. }
-                                | Command::Clear
-                                | Command::Load { .. }
-                        );
-
-                        match command.execute(&mut state) {
-                            Ok(CommandResult::Continue(output)) => {
-                                if !output.is_empty() {
-                                    println!("{}", output);
-                                }
-
-                                // Auto-sync if enabled and command modified dictionary
-                                if modifies_dict && state.auto_sync {
-                                    if let Some(ref path) = state.auto_sync_path {
-                                        if let Err(e) = state.save_to_file(path) {
-                                            eprintln!(
-                                                "{}: Failed to auto-save dictionary: {}",
-                                                "Warning".yellow(),
-                                                e
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            Ok(CommandResult::Exit) => {
-                                println!("{}", "Goodbye!".green());
-                                break;
-                            }
-                            Ok(CommandResult::Silent) => {}
-                            Err(e) => {
-                                eprintln!("{}: {}", "Error".red().bold(), e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("{}: {}", "Parse error".red().bold(), e);
-                    }
-                }
+                let line = line.trim().to_string();
+                ReplEvent::LineSubmitted { line }
             }
-            Err(ReadlineError::Interrupted) => {
-                // Ctrl+C - cancel current line
-                println!("{}", "^C (Use 'exit' or Ctrl+D to quit)".yellow());
-                continue;
-            }
-            Err(ReadlineError::Eof) => {
-                // Ctrl+D - exit
-                println!("{}", "Goodbye!".green());
-                break;
-            }
+            Err(ReadlineError::Interrupted) => ReplEvent::Interrupted,
+            Err(ReadlineError::Eof) => ReplEvent::Eof,
             Err(err) => {
                 eprintln!("{}: {:?}", "Readline error".red().bold(), err);
                 break;
+            }
+        };
+
+        // Process event through state machine
+        match state_machine.process_event(event.clone()) {
+            Ok(transition) => {
+                // Display output if any
+                if let Some(output) = transition.output {
+                    println!("{}", output);
+                }
+
+                // Handle command execution if in Executing phase
+                if let liblevenshtein::repl::ReplPhase::Executing { ref command } =
+                    state_machine.phase()
+                {
+                    // Check if command modifies dictionary
+                    let modifies_dict = matches!(
+                        command,
+                        Command::Insert { .. }
+                            | Command::Delete { .. }
+                            | Command::Clear
+                            | Command::Load { .. }
+                    );
+
+                    // Execute command
+                    match command.execute(&mut state) {
+                        Ok(result) => {
+                            // Process execution result
+                            let exec_event = ReplEvent::CommandExecuted { result };
+                            if let Ok(exec_transition) = state_machine.process_event(exec_event) {
+                                if let Some(exec_output) = exec_transition.output {
+                                    println!("{}", exec_output);
+                                }
+                            }
+
+                            // Auto-sync if enabled and command modified dictionary
+                            if modifies_dict && state.auto_sync {
+                                if let Some(ref path) = state.auto_sync_path {
+                                    if let Err(e) = state.save_to_file(path) {
+                                        eprintln!(
+                                            "{}: Failed to auto-save dictionary: {}",
+                                            "Warning".yellow(),
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            // Handle execution error
+                            let error_event = ReplEvent::ExecutionError {
+                                message: e.to_string(),
+                                recoverable: true,
+                            };
+                            if let Ok(error_transition) = state_machine.process_event(error_event) {
+                                if let Some(error_output) = error_transition.output {
+                                    println!("{}", error_output);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Process follow-up event if any
+                if let Some(follow_up) = transition.follow_up {
+                    // Follow-up events will be processed in next loop iteration
+                    // For now, we'll handle them inline for CommandParsed events
+                    if matches!(follow_up, ReplEvent::CommandParsed { .. }) {
+                        // Continue to command execution in next iteration
+                        continue;
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("{}: State machine error: {}", "Error".red().bold(), e);
+                state_machine.reset();
             }
         }
     }

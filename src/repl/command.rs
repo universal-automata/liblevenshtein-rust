@@ -11,7 +11,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 /// REPL command
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// Query the dictionary: query <term> [distance] [--prefix] [--limit N]
     Query {
@@ -147,6 +147,7 @@ pub enum Command {
 }
 
 /// Command result
+#[derive(Debug, Clone)]
 pub enum CommandResult {
     /// Continue REPL
     Continue(String),

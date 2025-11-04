@@ -7,10 +7,12 @@ pub mod command;
 pub mod helper;
 pub mod highlighter;
 pub mod state;
+pub mod state_machine;
 
 pub use command::{Command, CommandResult};
 pub use helper::LevenshteinHelper;
 pub use state::ReplState;
+pub use state_machine::{ReplEvent, ReplPhase, ReplStateMachine, Transition};
 
 /// REPL configuration
 #[derive(Debug, Clone)]
