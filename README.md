@@ -11,6 +11,14 @@ A Rust port of [liblevenshtein](https://github.com/universal-automata/liblevensh
 
 ## What's New
 
+### v0.5.0 (2025-11-04)
+
+- **DynamicDawgChar** - Unicode support for Dynamic DAWG with character-level operations
+- **Contextual Code Completion** - Hierarchical scope-aware completion engine with zipper-based navigation
+- **Performance Optimizations** - DynamicDawg with Bloom filters, auto-minimization, and sorted batch insertion
+- **UTF-8 Optimization Analysis** - Comprehensive documentation of Unicode performance characteristics
+- **Bug Fixes** - Fixed suffix sharing bug, test compilation, GitHub Actions workflow, and all clippy warnings
+
 ### v0.4.0 (2025-10-30)
 
 - **Unicode Support** - Character-level dictionary variants for correct Unicode Levenshtein distances
@@ -89,10 +97,10 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-liblevenshtein = "0.4"
+liblevenshtein = "0.5"
 
 # Or with SIMD acceleration (x86_64 only, requires SSE4.1/AVX2):
-liblevenshtein = { version = "0.4", features = ["simd"] }
+liblevenshtein = { version = "0.5", features = ["simd"] }
 ```
 
 Or install the CLI tool:
@@ -109,13 +117,13 @@ To use the PathMap backend, install from source:
 
 ```toml
 [dependencies]
-liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", tag = "v0.4.0", features = ["pathmap-backend"] }
+liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", tag = "v0.5.0", features = ["pathmap-backend"] }
 ```
 
 Or install the CLI with PathMap:
 
 ```bash
-cargo install --git https://github.com/universal-automata/liblevenshtein-rust --tag v0.4.0 \
+cargo install --git https://github.com/universal-automata/liblevenshtein-rust --tag v0.5.0 \
   --features cli,pathmap-backend,compression,protobuf liblevenshtein
 ```
 

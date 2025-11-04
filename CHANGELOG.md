@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-11-04
+
 ### Added
 
 #### DynamicDawgChar - Unicode Support for Dynamic DAWG (2025-11-04)
@@ -208,6 +210,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Zipper overhead acceptable for contextual use cases (1.66-1.97× vs node-based)
   - Thread-safe: share engine across threads with Arc
   - Memory: ~1KB overhead per active context (within design targets)
+
+#### UTF-8 Optimization Documentation (2025-11-04)
+- **Comprehensive UTF-8 performance analysis**
+  - Documented current state of UTF-8/Unicode optimization in `docs/optimization/UTF8_OPTIMIZATION_STATUS.md`
+  - Identified ~5-10% UTF-8 overhead as inherent to character-level operations (acceptable trade-off)
+  - Catalogued already-optimized components: SIMD distance computation (20-64% gains), arena allocation, state pooling, adaptive search
+  - Ranked top 3 optimization opportunities by impact and risk:
+    1. Fix DynamicDawgChar suffix sharing bug (20-40% memory savings, HIGH RISK)
+    2. PathMapChar batch validation (5-10% speedup, LOW RISK)
+    3. SSE4.1 fallback (1.5-2x on older CPUs, LOW RISK)
+  - Updated `docs/optimization/README.md` index with UTF-8 section and reading guides
+  - Recommendation: Focus on correctness over micro-optimization given diminishing returns
+
+### Fixed
+
+#### Test Compilation (2025-11-04)
+- **Fixed feature-gated test compilation error**
+  - Added `#[cfg(feature = "pathmap-backend")]` to `test_dynamic_dawg_char_value_filtered_query()` in tests/test_dynamic_dawg_char.rs
+  - Test uses `FuzzyMultiMap` from `cache` module which requires `pathmap-backend` feature
+  - Ensures tests compile successfully both with and without optional features
+  - Resolves: `error[E0433]: failed to resolve: could not find 'cache' in 'liblevenshtein'`
+
+#### GitHub Actions Workflow (2025-11-04)
+- **Fixed crates.io publishing workflow failure**
+  - Added sed command to convert `pathmap-backend = ["pathmap"]` to empty marker feature `pathmap-backend = []`
+  - Release workflow comments out PathMap git dependency for crates.io compatibility
+  - After commenting dependency, feature definition must also be updated to avoid Cargo validation error
+  - Resolves: `feature 'pathmap-backend' includes 'pathmap' which is neither a dependency nor another feature`
+  - File: `.github/workflows/release.yml` line 454-456
+
+#### Code Quality (2025-11-04)
+- **Resolved all clippy warnings with -D warnings enabled**
+  - Fixed `multiple_bound_locations`: Removed duplicate `D: Dictionary` bound (src/cli/commands.rs:689)
+  - Fixed `unused_imports`: Removed unused `Dictionary` import (src/contextual/engine.rs:13)
+  - Fixed `should_implement_trait`: Renamed `DraftBuffer::from_str()` to `from_string()` to avoid confusion with `std::str::FromStr::from_str()` (src/contextual/draft_buffer.rs:107)
+  - Fixed `filter_next`: Replaced `.filter().next()` with `.find()` (src/dictionary/pathmap_char.rs:432)
+  - Fixed `needless_range_loop` (4 instances): Converted index-based loops to idiomatic iterator patterns with `enumerate()` (src/transducer/simd.rs:150, 400, 461, 861)
+  - All 168 tests pass with strict clippy checks
 
 ## [0.4.0] - 2025-10-31
 
