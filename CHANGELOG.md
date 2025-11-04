@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### DynamicDawgChar - Unicode Support for Dynamic DAWG (2025-11-04)
+- **New DynamicDawgChar dictionary backend**
+  - Character-level variant of DynamicDawg for correct Unicode Levenshtein distances
+  - Operates on Unicode scalar values (`char`) instead of bytes (`u8`)
+  - Correct character-level distances for multi-byte UTF-8 sequences
+  - Example: "" → "¡" = distance 1 (not 2 bytes), "café" → "cafe" = distance 1 (not 2)
+  - Supports all Unicode: accented characters, CJK, emoji, Cyrillic, etc.
+
+- **Full dynamic operations with Unicode**
+  - Thread-safe insert and remove operations (same as DynamicDawg)
+  - Compaction to restore minimality after removals
+  - Generic over value types: `DynamicDawgChar<V: DictionaryValue = ()>`
+  - Bloom filter and auto-minimization support
+
+- **Performance characteristics**
+  - ~5-10% slower than byte-level due to UTF-8 decoding
+  - ~4x memory for edge labels (4 bytes per `char` vs 1 byte per `u8`)
+  - Significantly better fuzzy matching performance than PathMapChar
+  - Recommended for Unicode applications requiring dynamic updates
+
+- **Comprehensive testing and documentation**
+  - 28 new tests in `tests/test_dynamic_dawg_char.rs` covering Unicode scenarios
+  - Tests for accented characters, CJK, emoji, transposition, value mapping
+  - New example: `examples/dynamic_dawg_unicode.rs` demonstrating Unicode handling
+  - Added to serialization tests (bincode and JSON round-trip)
+  - Updated README.md with DynamicDawgChar recommendations
+  - Updated src/dictionary/mod.rs documentation with comparison table
+
+- **Use cases**
+  - Multi-language applications (any non-ASCII text)
+  - Dynamic dictionaries with Unicode terms
+  - Code completion for international programming
+  - Spell checkers for non-English languages
+  - Any application requiring correct Unicode edit distances with runtime updates
+
 #### Generic DynamicDawg with Value Support (2025-11-04)
 - **Made DynamicDawg generic over value types**
   - Changed from `DynamicDawg` to `DynamicDawg<V: DictionaryValue = ()>` with default type parameter

@@ -52,6 +52,7 @@ This library provides efficient fuzzy string matching against large dictionaries
   - **DAWG** - Directed Acyclic Word Graph for space-efficient storage
   - **OptimizedDawg** - Arena-based DAWG with 20-25% faster construction
   - **DynamicDawg** - DAWG with online insert/delete/minimize operations
+  - **DynamicDawgChar** - Character-level DAWG with Unicode support and online updates
   - **SuffixAutomaton** - For substring/infix matching
   - **CompressedSuffixAutomaton** ⚠️ (experimental, incomplete) - Compressed suffix automaton (single-text only)
   - Extensible trait-based design for custom backends
@@ -286,6 +287,7 @@ dict.insert_with_value("test", HashSet::from([1, 2, 3]));
 
 **Supported backends**:
 - `DynamicDawg<V>` - Dynamic dictionary with values of type `V`
+- `DynamicDawgChar<V>` - Character-level dynamic dictionary with Unicode support
 - `PathMapDictionary<V>` - PathMap with values (requires `pathmap-backend`)
 - `PathMapDictionaryChar<V>` - Character-level PathMap with values
 
@@ -377,6 +379,7 @@ The library provides multiple dictionary backends optimized for different use ca
 | **DAWG** | Static dictionaries, moderate size | Good balance of speed and memory |
 | **OptimizedDawg** | Static dictionaries, construction speed | 20-25% faster construction than DAWG |
 | **DynamicDawg** | Occasional modifications | Best fuzzy matching for dynamic use |
+| **DynamicDawgChar** | Unicode + occasional modifications | Character-level with insert/remove, ~5% overhead |
 | **SuffixAutomaton** | Substring/infix matching | Find patterns anywhere in text |
 
 **Performance Comparison** (10,000 words):
@@ -396,7 +399,8 @@ Memory/state:     DAT: ~8B     OptDawg: ~13B    DAWG: ~32B
 - **Static dictionaries (ASCII/Latin-1)** → `DoubleArrayTrie` (best overall performance, default choice)
 - **Static dictionaries (Unicode)** → `DoubleArrayTrieChar` (correct character-level distances)
 - **Dynamic updates (ASCII/Latin-1)** → `DynamicDawg` (thread-safe runtime modifications)
-- **Dynamic updates (Unicode)** → `PathMapChar` (character-level with insert/remove, requires `pathmap-backend`)
+- **Dynamic updates (Unicode)** → `DynamicDawgChar` (character-level with insert/remove, best fuzzy matching)
+- **Dynamic updates (Unicode, frequent)** → `PathMapChar` (alternative, requires `pathmap-backend`)
 - **Substring search** → `SuffixAutomaton` (finds patterns anywhere in text)
 - **Memory-constrained** → `DoubleArrayTrie` (8 bytes/state, most efficient)
 - **Multi-language apps** → Character-level variants (`*Char`) for correct Unicode semantics

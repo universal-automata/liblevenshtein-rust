@@ -27,6 +27,11 @@
 //!   - Good fuzzy matching performance for fully dynamic use
 //!   - Active queries see updates immediately
 //!
+//! - **Need Unicode + remove terms?** Use [`DynamicDawgChar`](dynamic_dawg_char::DynamicDawgChar)
+//!   - Correct character-level Levenshtein distances for Unicode
+//!   - Thread-safe insert AND remove operations
+//!   - ~5% performance overhead vs byte-level, 4x memory for edges
+//!
 //! - **Need substring/infix search?** Use [`SuffixAutomaton`](suffix_automaton::SuffixAutomaton)
 //!   - Find patterns anywhere in text (not just prefixes)
 //!   - Specialized for suffix-based matching
@@ -38,6 +43,7 @@
 //! | **[DoubleArrayTrie]** | General use (recommended) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ✅ Insert-only | Byte-level |
 //! | **[DoubleArrayTrieChar]** | Unicode text | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ✅ Insert-only | ✅ Character-level |
 //! | **[DynamicDawg]** | Insert + Remove | ⭐⭐⭐ | ⭐⭐⭐ | ✅ Thread-safe | Byte-level |
+//! | **[DynamicDawgChar]** | Unicode + Insert + Remove | ⭐⭐⭐ | ⭐⭐⭐ | ✅ Thread-safe | ✅ Character-level |
 //! | **[PathMapDictionary]** | Frequent updates (requires `pathmap-backend` feature) | ⭐⭐ | ⭐⭐ | ✅ Thread-safe | Byte-level |
 //! | **[PathMapDictionaryChar]** | Unicode + updates (requires `pathmap-backend` feature) | ⭐⭐ | ⭐⭐ | ✅ Thread-safe | ✅ Character-level |
 //! | **[DawgDictionary]** | Static dictionaries | ⭐⭐⭐ | ⭐⭐⭐ | ❌ | Byte-level |
@@ -47,6 +53,7 @@
 //! [DoubleArrayTrie]: double_array_trie::DoubleArrayTrie
 //! [DoubleArrayTrieChar]: double_array_trie_char::DoubleArrayTrieChar
 //! [DynamicDawg]: dynamic_dawg::DynamicDawg
+//! [DynamicDawgChar]: dynamic_dawg_char::DynamicDawgChar
 //! [PathMapDictionary]: pathmap::PathMapDictionary
 //! [PathMapDictionaryChar]: pathmap_char::PathMapDictionaryChar
 //! [DawgDictionary]: dawg::DawgDictionary
@@ -87,6 +94,14 @@
 //! dict.remove("old_term");  // Also supports removal
 //! ```
 //!
+//! **Unicode application with dynamic insert AND remove:**
+//! ```rust,ignore
+//! use liblevenshtein::dictionary::dynamic_dawg_char::DynamicDawgChar;
+//! let dict = DynamicDawgChar::from_terms(vec!["café", "naïve", "中文"]);
+//! dict.insert("新しい");  // Thread-safe Unicode insertion
+//! dict.remove("café");    // Thread-safe removal
+//! ```
+//!
 //! **Finding patterns anywhere in text (not just as prefixes):**
 //! ```rust,ignore
 //! use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
@@ -102,6 +117,7 @@ pub mod dawg_query;
 pub mod double_array_trie;
 pub mod double_array_trie_char;
 pub mod dynamic_dawg;
+pub mod dynamic_dawg_char;
 pub mod factory;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap;

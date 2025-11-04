@@ -147,6 +147,32 @@ mod serialization_tests {
     }
 
     #[test]
+    fn test_dynamic_dawg_char_bincode_roundtrip() {
+        use liblevenshtein::dictionary::dynamic_dawg_char::DynamicDawgChar;
+
+        let terms = test_terms();
+        let dict: DynamicDawgChar<()> = DynamicDawgChar::from_terms(terms.clone());
+
+        // Serialize
+        let mut buffer = Vec::new();
+        bincode::serialize_into(&mut buffer, &dict).expect("Failed to serialize DynamicDawgChar");
+
+        // Deserialize
+        let deserialized: DynamicDawgChar<()> =
+            bincode::deserialize(&buffer).expect("Failed to deserialize DynamicDawgChar");
+
+        // Verify
+        for term in &terms {
+            assert!(
+                deserialized.contains(term),
+                "DynamicDawgChar missing term: {}",
+                term
+            );
+        }
+        assert_eq!(dict.term_count(), deserialized.term_count());
+    }
+
+    #[test]
     fn test_suffix_automaton_bincode_roundtrip() {
         let terms: Vec<String> = test_terms().iter().map(|s| s.to_string()).collect();
         let dict = SuffixAutomaton::from_texts(terms.clone());
@@ -291,6 +317,31 @@ mod serialization_tests {
             assert!(
                 deserialized.contains(term),
                 "DynamicDawg missing term: {}",
+                term
+            );
+        }
+        assert_eq!(dict.term_count(), deserialized.term_count());
+    }
+
+    #[test]
+    fn test_dynamic_dawg_char_json_roundtrip() {
+        use liblevenshtein::dictionary::dynamic_dawg_char::DynamicDawgChar;
+
+        let terms = test_terms();
+        let dict: DynamicDawgChar<()> = DynamicDawgChar::from_terms(terms.clone());
+
+        // Serialize
+        let json = serde_json::to_string(&dict).expect("Failed to serialize DynamicDawgChar to JSON");
+
+        // Deserialize
+        let deserialized: DynamicDawgChar<()> =
+            serde_json::from_str(&json).expect("Failed to deserialize DynamicDawgChar from JSON");
+
+        // Verify
+        for term in &terms {
+            assert!(
+                deserialized.contains(term),
+                "DynamicDawgChar missing term: {}",
                 term
             );
         }
