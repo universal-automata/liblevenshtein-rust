@@ -10,7 +10,6 @@
 use super::error::{ContextError, Result};
 use super::{CheckpointStack, Completion, ContextId, ContextTree, DraftBuffer};
 use crate::dictionary::pathmap::PathMapDictionary;
-use crate::dictionary::Dictionary;
 use crate::transducer::{Algorithm, Transducer};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};

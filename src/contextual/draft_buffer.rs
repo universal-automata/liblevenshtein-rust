@@ -100,11 +100,11 @@ impl DraftBuffer {
     /// ```
     /// use liblevenshtein::contextual::DraftBuffer;
     ///
-    /// let buffer = DraftBuffer::from_str("hello");
+    /// let buffer = DraftBuffer::from_string("hello");
     /// assert_eq!(buffer.as_str(), "hello");
     /// assert_eq!(buffer.len(), 5);
     /// ```
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         let chars: VecDeque<char> = s.chars().collect();
         Self { chars }
     }
@@ -148,7 +148,7 @@ impl DraftBuffer {
     /// ```
     /// use liblevenshtein::contextual::DraftBuffer;
     ///
-    /// let mut buffer = DraftBuffer::from_str("test");
+    /// let mut buffer = DraftBuffer::from_string("test");
     /// assert_eq!(buffer.delete(), Some('t'));
     /// assert_eq!(buffer.delete(), Some('s'));
     /// assert_eq!(buffer.as_str(), "te");
@@ -165,7 +165,7 @@ impl DraftBuffer {
     /// ```
     /// use liblevenshtein::contextual::DraftBuffer;
     ///
-    /// let buffer = DraftBuffer::from_str("hello");
+    /// let buffer = DraftBuffer::from_string("hello");
     /// assert_eq!(buffer.len(), 5);
     /// ```
     pub fn len(&self) -> usize {
@@ -197,7 +197,7 @@ impl DraftBuffer {
     /// ```
     /// use liblevenshtein::contextual::DraftBuffer;
     ///
-    /// let buffer = DraftBuffer::from_str("test");
+    /// let buffer = DraftBuffer::from_string("test");
     /// assert_eq!(buffer.as_str(), "test");
     /// ```
     pub fn as_str(&self) -> String {
@@ -211,7 +211,7 @@ impl DraftBuffer {
     /// ```
     /// use liblevenshtein::contextual::DraftBuffer;
     ///
-    /// let buffer = DraftBuffer::from_str("test");
+    /// let buffer = DraftBuffer::from_string("test");
     /// assert_eq!(buffer.as_bytes(), b"test");
     /// ```
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -225,7 +225,7 @@ impl DraftBuffer {
     /// ```
     /// use liblevenshtein::contextual::DraftBuffer;
     ///
-    /// let mut buffer = DraftBuffer::from_str("test");
+    /// let mut buffer = DraftBuffer::from_string("test");
     /// buffer.clear();
     /// assert!(buffer.is_empty());
     /// ```
@@ -246,7 +246,7 @@ impl DraftBuffer {
     /// ```
     /// use liblevenshtein::contextual::DraftBuffer;
     ///
-    /// let mut buffer = DraftBuffer::from_str("hello");
+    /// let mut buffer = DraftBuffer::from_string("hello");
     /// buffer.truncate(3);
     /// assert_eq!(buffer.as_str(), "hel");
     /// ```
@@ -265,13 +265,13 @@ impl Default for DraftBuffer {
 
 impl From<String> for DraftBuffer {
     fn from(s: String) -> Self {
-        Self::from_str(&s)
+        Self::from_string(&s)
     }
 }
 
 impl From<&str> for DraftBuffer {
     fn from(s: &str) -> Self {
-        Self::from_str(s)
+        Self::from_string(s)
     }
 }
 
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn test_delete() {
-        let mut buffer = DraftBuffer::from_str("test");
+        let mut buffer = DraftBuffer::from_string("test");
         assert_eq!(buffer.delete(), Some('t'));
         assert_eq!(buffer.as_str(), "tes");
         assert_eq!(buffer.delete(), Some('s'));
@@ -321,14 +321,14 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        let buffer = DraftBuffer::from_str("hello");
+        let buffer = DraftBuffer::from_string("hello");
         assert_eq!(buffer.len(), 5);
         assert_eq!(buffer.as_str(), "hello");
     }
 
     #[test]
     fn test_clear() {
-        let mut buffer = DraftBuffer::from_str("test");
+        let mut buffer = DraftBuffer::from_string("test");
         buffer.clear();
         assert!(buffer.is_empty());
         assert_eq!(buffer.as_str(), "");
@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn test_truncate() {
-        let mut buffer = DraftBuffer::from_str("hello");
+        let mut buffer = DraftBuffer::from_string("hello");
         buffer.truncate(3);
         assert_eq!(buffer.as_str(), "hel");
         assert_eq!(buffer.len(), 3);
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn test_truncate_longer() {
-        let mut buffer = DraftBuffer::from_str("hi");
+        let mut buffer = DraftBuffer::from_string("hi");
         buffer.truncate(10);
         assert_eq!(buffer.as_str(), "hi");
         assert_eq!(buffer.len(), 2);
@@ -364,13 +364,13 @@ mod tests {
 
     #[test]
     fn test_as_bytes() {
-        let buffer = DraftBuffer::from_str("test");
+        let buffer = DraftBuffer::from_string("test");
         assert_eq!(buffer.as_bytes(), b"test");
     }
 
     #[test]
     fn test_display() {
-        let buffer = DraftBuffer::from_str("test");
+        let buffer = DraftBuffer::from_string("test");
         assert_eq!(format!("{}", buffer), "test");
     }
 

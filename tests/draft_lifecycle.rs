@@ -82,15 +82,15 @@ mod draft_lifecycle_tests {
 
         // Create root context (global scope)
         let global_ctx = tree.create_root(0);
-        buffers.insert(global_ctx, DraftBuffer::from_str("global_var"));
+        buffers.insert(global_ctx, DraftBuffer::from_string("global_var"));
 
         // Create function context (child of global)
         let func_ctx = tree.create_child(1, global_ctx).unwrap();
-        buffers.insert(func_ctx, DraftBuffer::from_str("local_var"));
+        buffers.insert(func_ctx, DraftBuffer::from_string("local_var"));
 
         // Create block context (child of function)
         let block_ctx = tree.create_child(2, func_ctx).unwrap();
-        buffers.insert(block_ctx, DraftBuffer::from_str("block_var"));
+        buffers.insert(block_ctx, DraftBuffer::from_string("block_var"));
 
         // Verify hierarchy
         assert_eq!(tree.depth(global_ctx), Some(0));
@@ -185,13 +185,13 @@ mod draft_lifecycle_tests {
 
         // Create hierarchy: root -> func -> block
         let root = tree.create_root(0);
-        drafts.insert(root, DraftBuffer::from_str("root"));
+        drafts.insert(root, DraftBuffer::from_string("root"));
 
         let func = tree.create_child(1, root).unwrap();
-        drafts.insert(func, DraftBuffer::from_str("func"));
+        drafts.insert(func, DraftBuffer::from_string("func"));
 
         let block = tree.create_child(2, func).unwrap();
-        drafts.insert(block, DraftBuffer::from_str("block"));
+        drafts.insert(block, DraftBuffer::from_string("block"));
 
         // Verify all contexts exist
         assert_eq!(tree.len(), 3);

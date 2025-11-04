@@ -147,9 +147,9 @@ unsafe fn characteristic_vector_sse41<'a>(
     }
 
     // Process remaining elements with scalar
-    for i in 4..len {
+    for (i, cell) in buffer.iter_mut().enumerate().take(len).skip(4) {
         let query_idx = offset + i;
-        buffer[i] = query_idx < query.len() && query[query_idx] == dict_char;
+        *cell = query_idx < query.len() && query[query_idx] == dict_char;
     }
 
     &buffer[..len]
@@ -397,8 +397,8 @@ unsafe fn check_subsumption_avx2<'a>(
     let mask = _mm256_movemask_ps(_mm256_castsi256_ps(final_mask));
 
     // Write boolean results
-    for idx in 0..8 {
-        results[idx] = (mask & (1 << idx)) != 0;
+    for (idx, result) in results.iter_mut().enumerate().take(8) {
+        *result = (mask & (1 << idx)) != 0;
     }
 
     &results[..8]
@@ -458,8 +458,8 @@ unsafe fn check_subsumption_sse41<'a>(
     // Extract results
     let mask = _mm_movemask_ps(_mm_castsi128_ps(final_mask));
 
-    for idx in 0..4 {
-        results[idx] = (mask & (1 << idx)) != 0;
+    for (idx, result) in results.iter_mut().enumerate().take(4) {
+        *result = (mask & (1 << idx)) != 0;
     }
 
     // Process remaining elements with scalar (if count > 4)
@@ -858,8 +858,8 @@ unsafe fn find_minimum_sse41(values: &[usize], count: usize) -> usize {
     let mut min_val = _mm_extract_epi32(final_min, 0) as usize;
 
     // Process remaining values (if count > 4) with scalar
-    for i in 4..count {
-        min_val = min_val.min(values[i]);
+    for value in values.iter().take(count).skip(4) {
+        min_val = min_val.min(*value);
     }
 
     min_val

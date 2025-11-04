@@ -64,7 +64,7 @@ impl Checkpoint {
     /// ```
     /// use liblevenshtein::contextual::{DraftBuffer, Checkpoint};
     ///
-    /// let buffer = DraftBuffer::from_str("test");
+    /// let buffer = DraftBuffer::from_string("test");
     /// let checkpoint = Checkpoint::from_buffer(&buffer);
     /// assert_eq!(checkpoint.position(), 4);
     /// ```
@@ -120,7 +120,7 @@ impl Checkpoint {
     /// ```
     /// use liblevenshtein::contextual::{DraftBuffer, Checkpoint};
     ///
-    /// let mut buffer = DraftBuffer::from_str("hello");
+    /// let mut buffer = DraftBuffer::from_string("hello");
     /// let checkpoint = Checkpoint::at(3);
     ///
     /// checkpoint.restore(&mut buffer);
@@ -240,7 +240,7 @@ impl CheckpointStack {
     /// ```
     /// use liblevenshtein::contextual::{DraftBuffer, CheckpointStack};
     ///
-    /// let buffer = DraftBuffer::from_str("test");
+    /// let buffer = DraftBuffer::from_string("test");
     /// let mut stack = CheckpointStack::new();
     /// stack.push_from_buffer(&buffer);
     /// assert_eq!(stack.len(), 1);
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_checkpoint_from_buffer() {
-        let buffer = DraftBuffer::from_str("test");
+        let buffer = DraftBuffer::from_string("test");
         let checkpoint = Checkpoint::from_buffer(&buffer);
         assert_eq!(checkpoint.position(), 4);
     }
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_checkpoint_restore() {
-        let mut buffer = DraftBuffer::from_str("hello");
+        let mut buffer = DraftBuffer::from_string("hello");
         let checkpoint = Checkpoint::at(3);
         checkpoint.restore(&mut buffer);
         assert_eq!(buffer.as_str(), "hel");
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn test_checkpoint_stack_from_buffer() {
-        let buffer = DraftBuffer::from_str("test");
+        let buffer = DraftBuffer::from_string("test");
         let mut stack = CheckpointStack::new();
         stack.push_from_buffer(&buffer);
         assert_eq!(stack.len(), 1);

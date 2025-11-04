@@ -686,7 +686,7 @@ fn load_json_gzip_dict(path: &Path, backend: DictionaryBackend) -> Result<DictCo
 }
 
 /// Extract terms from a dictionary
-fn extract_terms_from_dict<D: Dictionary>(dict: &D) -> Vec<String>
+fn extract_terms_from_dict<D>(dict: &D) -> Vec<String>
 where
     D: Dictionary,
     D::Node: DictionaryNode<Unit = u8>,

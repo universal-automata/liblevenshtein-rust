@@ -430,10 +430,9 @@ impl<V: DictionaryValue> DictionaryNode for PathMapNodeChar<V> {
 
                             // Find a continuation byte (starts with 10)
                             if let Some(&cont_byte) = (0..=255u8)
-                                .filter(|b| {
+                                .find(|b| {
                                     child_mask.test_bit(*b) && (*b & 0b1100_0000) == 0b1000_0000
                                 })
-                                .next()
                                 .as_ref()
                             {
                                 utf8_bytes.push(cont_byte);
