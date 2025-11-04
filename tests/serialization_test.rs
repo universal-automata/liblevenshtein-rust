@@ -331,7 +331,8 @@ mod serialization_tests {
         let dict: DynamicDawgChar<()> = DynamicDawgChar::from_terms(terms.clone());
 
         // Serialize
-        let json = serde_json::to_string(&dict).expect("Failed to serialize DynamicDawgChar to JSON");
+        let json =
+            serde_json::to_string(&dict).expect("Failed to serialize DynamicDawgChar to JSON");
 
         // Deserialize
         let deserialized: DynamicDawgChar<()> =

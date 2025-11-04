@@ -241,7 +241,9 @@ fn bench_hierarchical_concurrent(c: &mut Criterion) {
         for i in 1..=4 {
             let child = engine.create_child_context(i, root).unwrap();
             children.push(child);
-            engine.finalize_direct(child, &format!("child_{}", i)).unwrap();
+            engine
+                .finalize_direct(child, &format!("child_{}", i))
+                .unwrap();
 
             for j in 1..=4 {
                 let id = i * 10 + j;
@@ -255,7 +257,9 @@ fn bench_hierarchical_concurrent(c: &mut Criterion) {
 
         // Add global terms
         for i in 0..50 {
-            engine.finalize_direct(root, &format!("global_{}", i)).unwrap();
+            engine
+                .finalize_direct(root, &format!("global_{}", i))
+                .unwrap();
         }
 
         b.iter(|| {

@@ -4,8 +4,8 @@
 //! "near-minimal" structure. Perfect minimality can be restored via
 //! explicit compaction.
 
-use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 use crate::dictionary::value::DictionaryValue;
+use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 use parking_lot::RwLock;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
@@ -74,7 +74,7 @@ struct DynamicDawgInner<V: DictionaryValue> {
     #[cfg_attr(feature = "serialization", serde(skip))]
     last_minimized_node_count: usize,
     #[cfg_attr(feature = "serialization", serde(skip))]
-    auto_minimize_threshold: f32,  // Trigger minimize when nodes > last * threshold
+    auto_minimize_threshold: f32, // Trigger minimize when nodes > last * threshold
     // Bloom filter for fast negative lookup rejection (Opt #4)
     #[cfg_attr(feature = "serialization", serde(skip))]
     bloom_filter: Option<BloomFilter>,
@@ -87,7 +87,7 @@ struct DynamicDawgInner<V: DictionaryValue> {
 /// - False negatives: Never (guaranteed correct rejection)
 #[derive(Debug, Clone)]
 struct BloomFilter {
-    bits: Vec<u64>,  // Bit vector (64-bit chunks for efficiency)
+    bits: Vec<u64>, // Bit vector (64-bit chunks for efficiency)
     bit_count: usize,
     hash_count: usize,
 }
@@ -281,7 +281,7 @@ impl<V: DictionaryValue> DynamicDawg<V> {
                 term_count: 0,
                 needs_compaction: false,
                 suffix_cache: FxHashMap::default(),
-                last_minimized_node_count: 1,  // Start with root node
+                last_minimized_node_count: 1, // Start with root node
                 auto_minimize_threshold,
                 bloom_filter,
             })),
@@ -296,9 +296,7 @@ impl<V: DictionaryValue> DynamicDawg<V> {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let mut term_vec: Vec<String> = terms.into_iter()
-            .map(|s| s.as_ref().to_string())
-            .collect();
+        let mut term_vec: Vec<String> = terms.into_iter().map(|s| s.as_ref().to_string()).collect();
         term_vec.sort_unstable();
 
         let dawg = Self::new();
@@ -710,9 +708,7 @@ impl<V: DictionaryValue> DynamicDawg<V> {
         S: AsRef<str>,
     {
         // Collect and sort for optimal prefix sharing
-        let mut term_vec: Vec<String> = terms.into_iter()
-            .map(|s| s.as_ref().to_string())
-            .collect();
+        let mut term_vec: Vec<String> = terms.into_iter().map(|s| s.as_ref().to_string()).collect();
         term_vec.sort_unstable();
 
         let mut added = 0;
@@ -806,8 +802,8 @@ impl<V: DictionaryValue> DynamicDawgInner<V> {
     /// state without the overhead of minimizing after every single operation.
     fn check_and_auto_minimize(&mut self) {
         let current_nodes = self.nodes.len();
-        let threshold_nodes = (self.last_minimized_node_count as f32
-            * self.auto_minimize_threshold) as usize;
+        let threshold_nodes =
+            (self.last_minimized_node_count as f32 * self.auto_minimize_threshold) as usize;
 
         if current_nodes > threshold_nodes && !self.auto_minimize_threshold.is_infinite() {
             // Trigger automatic minimization
@@ -887,17 +883,17 @@ impl<V: DictionaryValue> DynamicDawgInner<V> {
             let node = &self.nodes[current_idx];
 
             // Find the edge for this byte
-            if let Some(&next_idx) = node.edges.iter()
+            if let Some(&next_idx) = node
+                .edges
+                .iter()
                 .find(|(l, _)| *l == byte)
                 .map(|(_, idx)| idx)
             {
                 current_idx = next_idx;
 
                 // If this was the last byte, check if final state matches
-                if i == suffix.len() - 1 {
-                    if self.nodes[current_idx].is_final != is_final {
-                        return false;
-                    }
+                if i == suffix.len() - 1 && self.nodes[current_idx].is_final != is_final {
+                    return false;
                 }
             } else {
                 return false; // Missing edge
@@ -1020,10 +1016,7 @@ impl<V: DictionaryValue> DynamicDawgInner<V> {
 
                 if !found_match {
                     // Hash collision - this is a different node with same hash
-                    sig_to_canonical
-                        .get_mut(sig)
-                        .unwrap()
-                        .push(node_idx);
+                    sig_to_canonical.get_mut(sig).unwrap().push(node_idx);
                     node_mapping[node_idx] = node_idx;
                 }
             } else {
@@ -1063,12 +1056,7 @@ impl<V: DictionaryValue> DynamicDawgInner<V> {
     ///
     /// Phase 2.2: Used to verify true equality when hash signatures match,
     /// preventing false merges from hash collisions.
-    fn nodes_structurally_equal(
-        &self,
-        idx1: usize,
-        idx2: usize,
-        node_mapping: &[usize],
-    ) -> bool {
+    fn nodes_structurally_equal(&self, idx1: usize, idx2: usize, node_mapping: &[usize]) -> bool {
         let node1 = &self.nodes[idx1];
         let node2 = &self.nodes[idx2];
 
@@ -1351,7 +1339,10 @@ impl<V: DictionaryValue> DictionaryNode for DynamicDawgNode<V> {
         // Empirical testing shows crossover at 16-20 edges
         let child_idx = if self.edges.len() < 16 {
             // Linear search - cache-friendly for small counts
-            self.edges.iter().find(|(b, _)| *b == label).map(|(_, idx)| *idx)
+            self.edges
+                .iter()
+                .find(|(b, _)| *b == label)
+                .map(|(_, idx)| *idx)
         } else {
             // Binary search - efficient for large edge counts
             self.edges
@@ -1374,32 +1365,32 @@ impl<V: DictionaryValue> DictionaryNode for DynamicDawgNode<V> {
     fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
         // Phase 1.2: Batch load child nodes with single lock acquisition
         let inner = self.dawg.read();
-        let child_data: Vec<_> = self.edges
+        let child_data: Vec<_> = self
+            .edges
             .iter()
             .map(|(byte, idx)| {
                 let child_node = &inner.nodes[*idx];
-                (
-                    *byte,
-                    *idx,
-                    child_node.is_final,
-                    child_node.edges.clone(),
-                )
+                (*byte, *idx, child_node.is_final, child_node.edges.clone())
             })
             .collect();
         drop(inner);
 
         let dawg = Arc::clone(&self.dawg);
-        Box::new(child_data.into_iter().map(move |(byte, idx, is_final, edges)| {
-            (
-                byte,
-                DynamicDawgNode {
-                    dawg: Arc::clone(&dawg),
-                    node_idx: idx,
-                    is_final,
-                    edges,
-                },
-            )
-        }))
+        Box::new(
+            child_data
+                .into_iter()
+                .map(move |(byte, idx, is_final, edges)| {
+                    (
+                        byte,
+                        DynamicDawgNode {
+                            dawg: Arc::clone(&dawg),
+                            node_idx: idx,
+                            is_final,
+                            edges,
+                        },
+                    )
+                }),
+        )
     }
 
     // Phase 1.2: Use cached data - no lock needed
@@ -1420,7 +1411,9 @@ impl<V: DictionaryValue> MappedDictionaryNode for DynamicDawgNode<V> {
     fn value(&self) -> Option<Self::Value> {
         // Need to lock to get the value
         let inner = self.dawg.read();
-        inner.nodes.get(self.node_idx)
+        inner
+            .nodes
+            .get(self.node_idx)
             .and_then(|node| node.value.clone())
     }
 }
@@ -1539,7 +1532,8 @@ mod tests {
 
     #[test]
     fn test_batch_remove_many() {
-        let dawg: DynamicDawg<()> = DynamicDawg::from_terms(vec!["test", "testing", "tested", "tester"]);
+        let dawg: DynamicDawg<()> =
+            DynamicDawg::from_terms(vec!["test", "testing", "tested", "tester"]);
 
         let to_remove = vec!["testing", "tester"];
         let removed = dawg.remove_many(to_remove);
@@ -1707,7 +1701,8 @@ mod tests {
 
     #[test]
     fn test_minimize_idempotent() {
-        let dawg: DynamicDawg<()> = DynamicDawg::from_terms(vec!["apple", "application", "apply", "apricot"]);
+        let dawg: DynamicDawg<()> =
+            DynamicDawg::from_terms(vec!["apple", "application", "apply", "apricot"]);
 
         // First minimization
         let _merged1 = dawg.minimize();

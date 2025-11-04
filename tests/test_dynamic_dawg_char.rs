@@ -39,8 +39,7 @@ fn test_dynamic_dawg_char_empty_query_unicode() {
 fn test_dynamic_dawg_char_exact_match() {
     println!("\n=== DynamicDawgChar: Exact Match ===\n");
 
-    let dict: DynamicDawgChar<()> =
-        DynamicDawgChar::from_terms(vec!["café", "naïve", "résumé"]);
+    let dict: DynamicDawgChar<()> = DynamicDawgChar::from_terms(vec!["café", "naïve", "résumé"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Dictionary: [\"café\", \"naïve\", \"résumé\"]");
@@ -105,8 +104,7 @@ fn test_dynamic_dawg_char_emoji_distance() {
 fn test_dynamic_dawg_char_emoji_with_text() {
     println!("\n=== DynamicDawgChar: Emoji with Text ===\n");
 
-    let dict: DynamicDawgChar<()> =
-        DynamicDawgChar::from_terms(vec!["hello🎉", "world🌍"]);
+    let dict: DynamicDawgChar<()> = DynamicDawgChar::from_terms(vec!["hello🎉", "world🌍"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Dictionary: [\"hello🎉\", \"world🌍\"]");
@@ -123,8 +121,7 @@ fn test_dynamic_dawg_char_emoji_with_text() {
 fn test_dynamic_dawg_char_cjk_distance() {
     println!("\n=== DynamicDawgChar: CJK Character Distances ===\n");
 
-    let dict: DynamicDawgChar<()> =
-        DynamicDawgChar::from_terms(vec!["中", "中文", "中文字"]);
+    let dict: DynamicDawgChar<()> = DynamicDawgChar::from_terms(vec!["中", "中文", "中文字"]);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Dictionary: [\"中\", \"中文\", \"中文字\"]");
@@ -525,7 +522,10 @@ fn test_dynamic_dawg_char_vs_byte_level() {
     // Byte-level incorrectly requires distance 2 (¡ is 2 bytes: 0xC2 0xA1)
     let results_byte: Vec<_> = trans_byte.query("", 1).collect();
     println!("  Byte-level results: {:?}", results_byte);
-    assert!(results_byte.is_empty(), "Byte-level should NOT find \"¡\" at distance 1");
+    assert!(
+        results_byte.is_empty(),
+        "Byte-level should NOT find \"¡\" at distance 1"
+    );
 
     // Character-level correctly requires distance 1 (¡ is 1 character)
     let results_char: Vec<_> = trans_char.query("", 1).collect();

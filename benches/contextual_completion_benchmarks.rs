@@ -146,7 +146,9 @@ fn bench_complete_drafts(c: &mut Criterion) {
 
             // Add drafts to each context
             for i in 0..depth {
-                engine.insert_str(i as u32, &format!("draft_{}", i)).unwrap();
+                engine
+                    .insert_str(i as u32, &format!("draft_{}", i))
+                    .unwrap();
             }
 
             b.iter(|| {

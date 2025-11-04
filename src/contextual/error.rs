@@ -50,10 +50,7 @@ pub enum ContextError {
     /// This error occurs when trying to create a parent-child relationship
     /// that would create a cycle in the context tree.
     #[error("Circular context hierarchy detected: {0} -> {1}")]
-    CircularHierarchy(
-        crate::contextual::ContextId,
-        crate::contextual::ContextId,
-    ),
+    CircularHierarchy(crate::contextual::ContextId, crate::contextual::ContextId),
 }
 
 /// A specialized `Result` type for contextual completion operations.

@@ -289,7 +289,9 @@ mod stress_tests {
 
         // Populate dictionary
         for i in 0..1_000 {
-            engine.finalize_direct(root, &format!("term_{}", i)).unwrap();
+            engine
+                .finalize_direct(root, &format!("term_{}", i))
+                .unwrap();
         }
 
         println!("Running concurrent stress test with 16 threads...");

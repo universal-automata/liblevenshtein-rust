@@ -6,7 +6,7 @@
 //! node-based QueryIterator.
 
 use crate::dictionary::zipper::DictZipper;
-use crate::transducer::{AutomatonZipper, IntersectionZipper, StatePool, Algorithm, Candidate};
+use crate::transducer::{Algorithm, AutomatonZipper, Candidate, IntersectionZipper, StatePool};
 use std::collections::VecDeque;
 
 /// Query iterator using zipper-based BFS traversal.
@@ -97,12 +97,7 @@ where
     /// assert_eq!(results.len(), 1);
     /// assert_eq!(results[0].term, "test");
     /// ```
-    pub fn new(
-        dict_zipper: D,
-        query: &str,
-        max_distance: usize,
-        algorithm: Algorithm,
-    ) -> Self {
+    pub fn new(dict_zipper: D, query: &str, max_distance: usize, algorithm: Algorithm) -> Self {
         let automaton = AutomatonZipper::new(query.as_bytes(), max_distance, algorithm);
         let intersection = IntersectionZipper::new(dict_zipper, automaton);
 
@@ -255,12 +250,7 @@ mod tests {
         dict.insert("bacd");
 
         let dict_zipper = PathMapZipper::new_from_dict(&dict);
-        let iter = ZipperQueryIterator::new(
-            dict_zipper,
-            "abcd",
-            1,
-            Algorithm::Transposition
-        );
+        let iter = ZipperQueryIterator::new(dict_zipper, "abcd", 1, Algorithm::Transposition);
 
         let results: Vec<_> = iter.collect();
 
@@ -273,9 +263,8 @@ mod tests {
     fn test_larger_dictionary() {
         let dict = PathMapDictionary::<()>::new();
         let words = vec![
-            "cat", "car", "card", "care", "careful",
-            "dog", "door", "dot",
-            "test", "testing", "tester",
+            "cat", "car", "card", "care", "careful", "dog", "door", "dot", "test", "testing",
+            "tester",
         ];
         for word in &words {
             dict.insert(word);

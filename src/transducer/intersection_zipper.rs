@@ -117,11 +117,7 @@ where
     /// Create an intersection zipper with a parent path.
     ///
     /// Used internally when creating child zippers.
-    fn with_parent(
-        dict: D,
-        automaton: AutomatonZipper,
-        parent: Option<Box<PathNode<u8>>>,
-    ) -> Self {
+    fn with_parent(dict: D, automaton: AutomatonZipper, parent: Option<Box<PathNode<u8>>>) -> Self {
         IntersectionZipper {
             dict,
             automaton,
@@ -178,7 +174,8 @@ where
 
         // For final dictionary nodes, check if automaton accepts
         let term_length = self.depth();
-        self.automaton.infer_distance(term_length)
+        self.automaton
+            .infer_distance(term_length)
             .map(|dist| dist <= self.automaton.max_distance())
             .unwrap_or(false)
     }
@@ -229,9 +226,7 @@ where
     /// ```
     #[inline]
     pub fn depth(&self) -> usize {
-        self.parent.as_ref()
-            .map(|p| p.depth())
-            .unwrap_or(0)
+        self.parent.as_ref().map(|p| p.depth()).unwrap_or(0)
     }
 
     /// Reconstruct the term (path) from root to current position.
@@ -298,29 +293,24 @@ where
     /// assert_eq!(children.len(), 1);
     /// assert_eq!(children[0].0, b'c');
     /// ```
-    pub fn children<'a>(&'a self, pool: &'a mut StatePool) -> impl Iterator<Item = (u8, Self)> + 'a {
+    pub fn children<'a>(
+        &'a self,
+        pool: &'a mut StatePool,
+    ) -> impl Iterator<Item = (u8, Self)> + 'a {
         let parent_for_children = self.parent.clone();
         let automaton = self.automaton.clone();
 
-        self.dict.children()
-            .filter_map(move |(label, dict_child)| {
-                // Try to transition automaton with this label
-                automaton.transition(label, pool).map(|auto_child| {
-                    // Create parent node for child
-                    let new_parent = Some(Box::new(PathNode::new(
-                        label,
-                        parent_for_children.clone(),
-                    )));
+        self.dict.children().filter_map(move |(label, dict_child)| {
+            // Try to transition automaton with this label
+            automaton.transition(label, pool).map(|auto_child| {
+                // Create parent node for child
+                let new_parent = Some(Box::new(PathNode::new(label, parent_for_children.clone())));
 
-                    let child = IntersectionZipper::with_parent(
-                        dict_child,
-                        auto_child,
-                        new_parent,
-                    );
+                let child = IntersectionZipper::with_parent(dict_child, auto_child, new_parent);
 
-                    (label, child)
-                })
+                (label, child)
             })
+        })
     }
 
     /// Check if the automaton state is viable (has positions).

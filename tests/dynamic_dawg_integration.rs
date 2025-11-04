@@ -320,11 +320,17 @@ fn test_dynamic_dawg_with_contextual_completion_basic() {
 
     // Query should find it  (exact match, distance 0)
     let completions = engine.complete_finalized(ctx, "test", 0);
-    assert!(completions.iter().any(|c| c.term == "test"), "Should find exact match 'test'");
+    assert!(
+        completions.iter().any(|c| c.term == "test"),
+        "Should find exact match 'test'"
+    );
 
     // Fuzzy query should also find it
     let completions = engine.complete_finalized(ctx, "tst", 1); // Missing 'e'
-    assert!(completions.iter().any(|c| c.term == "test"), "Should find 'test' with distance 1");
+    assert!(
+        completions.iter().any(|c| c.term == "test"),
+        "Should find 'test' with distance 1"
+    );
 }
 
 #[test]
@@ -388,11 +394,16 @@ fn test_dynamic_dawg_contextual_with_draft_debug() {
     println!("Exact match completions: {:?}", completions);
 
     let completions = engine.complete_finalized(ctx, "hel", 2); // Need distance 2: "hel" -> "hello"
-    println!("Fuzzy completions for 'hel' (distance 2): {:?}", completions);
+    println!(
+        "Fuzzy completions for 'hel' (distance 2): {:?}",
+        completions
+    );
 
     // Should now be queryable
-    assert!(completions.iter().any(|c| c.term == "hello"),
-            "Should find 'hello' in completions");
+    assert!(
+        completions.iter().any(|c| c.term == "hello"),
+        "Should find 'hello' in completions"
+    );
 }
 
 #[test]

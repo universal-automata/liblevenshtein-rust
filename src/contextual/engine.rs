@@ -208,11 +208,7 @@ where
     /// let func = engine.create_child_context(1, global).unwrap();
     /// assert_eq!(func, 1);
     /// ```
-    pub fn create_child_context(
-        &self,
-        id: ContextId,
-        parent_id: ContextId,
-    ) -> Result<ContextId> {
+    pub fn create_child_context(&self, id: ContextId, parent_id: ContextId) -> Result<ContextId> {
         let mut tree = self.context_tree.write().unwrap();
         tree.create_child(id, parent_id)?;
 
@@ -796,11 +792,7 @@ where
     /// engine.finalize_direct(ctx, "function").unwrap();
     /// engine.finalize_direct(ctx, "variable").unwrap();
     /// ```
-    pub fn finalize_direct(
-        &self,
-        context: ContextId,
-        term: &str,
-    ) -> Result<()> {
+    pub fn finalize_direct(&self, context: ContextId, term: &str) -> Result<()> {
         if !self.context_exists(context) {
             return Err(ContextError::ContextNotFound(context));
         }

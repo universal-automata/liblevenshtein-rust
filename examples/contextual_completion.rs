@@ -94,8 +94,10 @@ fn main() {
     let completions = engine.complete(block, "hel", 2);
     println!("\nCompletions for 'hel' (max distance 2):");
     for comp in &completions {
-        println!("  - {} (distance: {}, draft: {})",
-                 comp.term, comp.distance, comp.is_draft);
+        println!(
+            "  - {} (distance: {}, draft: {})",
+            comp.term, comp.distance, comp.is_draft
+        );
     }
     println!();
 
@@ -120,7 +122,10 @@ fn main() {
     // Undo to checkpoint
     engine.undo(block).unwrap();
     println!("Undid to checkpoint");
-    println!("Current draft after undo: {:?}", engine.get_draft(block).unwrap());
+    println!(
+        "Current draft after undo: {:?}",
+        engine.get_draft(block).unwrap()
+    );
     println!();
 
     // Scenario 5: Finalize draft
@@ -147,8 +152,10 @@ fn main() {
         println!("  (no matches)");
     } else {
         for comp in &block_completions {
-            println!("  - {} (distance: {}, contexts: {:?})",
-                     comp.term, comp.distance, comp.contexts);
+            println!(
+                "  - {} (distance: {}, contexts: {:?})",
+                comp.term, comp.distance, comp.contexts
+            );
         }
     }
 
@@ -159,8 +166,10 @@ fn main() {
         println!("  (no matches - 'hello' is in block scope, not visible from global)");
     } else {
         for comp in &global_completions {
-            println!("  - {} (distance: {}, contexts: {:?})",
-                     comp.term, comp.distance, comp.contexts);
+            println!(
+                "  - {} (distance: {}, contexts: {:?})",
+                comp.term, comp.distance, comp.contexts
+            );
         }
     }
 
@@ -170,8 +179,10 @@ fn main() {
         println!("  (no matches)");
     } else {
         for comp in &block_completions2 {
-            println!("  - {} (distance: {}, contexts: {:?})",
-                     comp.term, comp.distance, comp.contexts);
+            println!(
+                "  - {} (distance: {}, contexts: {:?})",
+                comp.term, comp.distance, comp.contexts
+            );
         }
     }
     println!("\nNote: Child scopes see parent terms, but parents don't see children");
@@ -187,8 +198,10 @@ fn main() {
     let completions = engine.complete(block, "hello", 2);
     println!("Completions for 'hello' (with draft 'hello_world'):");
     for comp in &completions {
-        println!("  - {} (distance: {}, draft: {})",
-                 comp.term, comp.distance, comp.is_draft);
+        println!(
+            "  - {} (distance: {}, draft: {})",
+            comp.term, comp.distance, comp.is_draft
+        );
     }
 
     // The draft version should appear first due to sorting

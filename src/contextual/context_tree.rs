@@ -136,11 +136,7 @@ impl ContextTree {
     ///
     /// assert_eq!(tree.parent(child), Some(root));
     /// ```
-    pub fn create_child(
-        &mut self,
-        id: ContextId,
-        parent_id: ContextId,
-    ) -> Result<ContextId> {
+    pub fn create_child(&mut self, id: ContextId, parent_id: ContextId) -> Result<ContextId> {
         if !self.nodes.contains_key(&parent_id) {
             return Err(ContextError::ContextNotFound(parent_id));
         }

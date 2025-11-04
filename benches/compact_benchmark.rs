@@ -96,48 +96,40 @@ fn bench_minimize_vs_compact(c: &mut Criterion) {
 
         // Minimize benchmark
         group.throughput(Throughput::Elements(*size as u64));
-        group.bench_with_input(
-            BenchmarkId::new("minimize", size),
-            size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let dawg = DynamicDawg::new();
-                        for term in &terms {
-                            dawg.insert(term);
-                        }
-                        dawg
-                    },
-                    |dawg| {
-                        let merged = dawg.minimize();
-                        black_box(merged);
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("minimize", size), size, |b, _| {
+            b.iter_batched(
+                || {
+                    let dawg = DynamicDawg::new();
+                    for term in &terms {
+                        dawg.insert(term);
+                    }
+                    dawg
+                },
+                |dawg| {
+                    let merged = dawg.minimize();
+                    black_box(merged);
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
 
         // Compact benchmark
-        group.bench_with_input(
-            BenchmarkId::new("compact", size),
-            size,
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let dawg = DynamicDawg::new();
-                        for term in &terms {
-                            dawg.insert(term);
-                        }
-                        dawg
-                    },
-                    |dawg| {
-                        let removed = dawg.compact();
-                        black_box(removed);
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("compact", size), size, |b, _| {
+            b.iter_batched(
+                || {
+                    let dawg = DynamicDawg::new();
+                    for term in &terms {
+                        dawg.insert(term);
+                    }
+                    dawg
+                },
+                |dawg| {
+                    let removed = dawg.compact();
+                    black_box(removed);
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
     group.finish();
 }

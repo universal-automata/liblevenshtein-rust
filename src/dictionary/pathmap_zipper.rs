@@ -5,9 +5,9 @@
 
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::zipper::{DictZipper, ValuedDictZipper};
-use pathmap::PathMap;
 use pathmap::utils::BitMask;
 use pathmap::zipper::{ReadZipperUntracked, Zipper, ZipperMoving, ZipperValues};
+use pathmap::PathMap;
 use std::sync::{Arc, RwLock};
 
 /// Zipper for PathMap-backed dictionaries.
@@ -175,7 +175,7 @@ impl<V: DictionaryValue> DictZipper for PathMapZipper<V> {
         if exists {
             Some(PathMapZipper {
                 map: Arc::clone(&self.map),
-                path: Arc::from(new_path),  // Convert Vec<u8> to Arc<[u8]>
+                path: Arc::from(new_path), // Convert Vec<u8> to Arc<[u8]>
             })
         } else {
             None

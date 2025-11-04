@@ -5,8 +5,8 @@
 //! the automaton zipper tracks the current state of the Levenshtein automaton
 //! as it processes input characters.
 
-use crate::transducer::{Algorithm, Position, State, StatePool};
 use crate::transducer::transition::transition_state_pooled;
+use crate::transducer::{Algorithm, Position, State, StatePool};
 use std::sync::Arc;
 
 /// Zipper for tracking Levenshtein automaton state during traversal.
@@ -106,11 +106,7 @@ impl AutomatonZipper {
         // Initialize with positions for each possible starting distance
         // This handles the case where the dictionary term starts with insertions
         for distance in 0..=max_distance {
-            state.insert(
-                Position::new(0, distance),
-                algorithm,
-                query.len(),
-            );
+            state.insert(Position::new(0, distance), algorithm, query.len());
         }
 
         AutomatonZipper {
@@ -191,12 +187,15 @@ impl AutomatonZipper {
             self.max_distance,
             self.algorithm,
             false, // substring_mode
-        ).map(|next_state| AutomatonZipper::with_state(
-            next_state,
-            Arc::clone(&self.query),
-            self.max_distance,
-            self.algorithm,
-        ))
+        )
+        .map(|next_state| {
+            AutomatonZipper::with_state(
+                next_state,
+                Arc::clone(&self.query),
+                self.max_distance,
+                self.algorithm,
+            )
+        })
     }
 
     /// Get the minimum edit distance if the automaton is in an accepting state.
@@ -235,7 +234,9 @@ impl AutomatonZipper {
         let query_len = self.query.len();
 
         // Find positions that have consumed all query characters
-        let accepting_positions: Vec<_> = self.state.positions()
+        let accepting_positions: Vec<_> = self
+            .state
+            .positions()
             .iter()
             .filter(|p| p.term_index == query_len && !p.is_special)
             .collect();
@@ -541,7 +542,7 @@ mod tests {
         // For term_length=2, this is an EXACT match (both are length 2)
         // So distance should be 0, not 2!
 
-        assert_eq!(z2.infer_distance(2), Some(0));  // Exact match: "te" query, "te" dict term
+        assert_eq!(z2.infer_distance(2), Some(0)); // Exact match: "te" query, "te" dict term
     }
 
     #[test]

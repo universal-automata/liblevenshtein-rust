@@ -187,7 +187,10 @@ fn main() {
 
     // Update a value
     dict_values.insert_with_value("café", 10);
-    println!("\n   Updated \"café\" → {}", dict_values.get_value("café").unwrap());
+    println!(
+        "\n   Updated \"café\" → {}",
+        dict_values.get_value("café").unwrap()
+    );
 
     println!("\n✓ Dynamic DAWG Unicode demonstration completed!");
 

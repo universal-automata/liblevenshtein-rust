@@ -23,10 +23,15 @@ fn test_minimal_failing_case() {
     println!("  contains('kb'): {}", dict.contains("kb"));
     println!("  contains('jb'): {}", dict.contains("jb"));
     println!("  contains('j'): {}", dict.contains("j"));
-    println!("  contains('k'): {} <-- SHOULD BE FALSE!", dict.contains("k"));
+    println!(
+        "  contains('k'): {} <-- SHOULD BE FALSE!",
+        dict.contains("k")
+    );
     println!("  contains('b'): {}", dict.contains("b"));
 
     // The bug: 'k' should NOT be in the dictionary!
-    assert!(!dict.contains("k"),
-            "Dictionary should not contain 'k' but contains() returned true!");
+    assert!(
+        !dict.contains("k"),
+        "Dictionary should not contain 'k' but contains() returned true!"
+    );
 }
