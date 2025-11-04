@@ -116,6 +116,8 @@ pub mod dawg_optimized;
 pub mod dawg_query;
 pub mod double_array_trie;
 pub mod double_array_trie_char;
+pub mod double_array_trie_char_zipper;
+pub mod double_array_trie_zipper;
 pub mod dynamic_dawg;
 pub mod dynamic_dawg_char;
 pub mod factory;

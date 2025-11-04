@@ -23,7 +23,8 @@
 //! - Edit distance must be measured in characters, not bytes
 //! - Correctness is more important than maximum performance
 
-use crate::dictionary::{Dictionary, DictionaryNode};
+use crate::dictionary::value::DictionaryValue;
+use crate::dictionary::{Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode};
 use std::sync::Arc;
 
 #[cfg(feature = "serialization")]
@@ -75,7 +76,7 @@ where
     derive(serde::Serialize, serde::Deserialize)
 )]
 #[derive(Clone, Debug)]
-struct DATSharedChar {
+pub(crate) struct DATSharedChar<V: DictionaryValue = ()> {
     /// BASE array: offset for computing next state
     #[cfg_attr(
         feature = "serialization",
@@ -84,7 +85,7 @@ struct DATSharedChar {
             deserialize_with = "deserialize_arc_vec"
         )
     )]
-    base: Arc<Vec<i32>>,
+    pub(crate) base: Arc<Vec<i32>>,
 
     /// CHECK array: parent state verification
     #[cfg_attr(
@@ -94,7 +95,7 @@ struct DATSharedChar {
             deserialize_with = "deserialize_arc_vec"
         )
     )]
-    check: Arc<Vec<i32>>,
+    pub(crate) check: Arc<Vec<i32>>,
 
     /// Final states marking valid term endings
     #[cfg_attr(
@@ -104,7 +105,7 @@ struct DATSharedChar {
             deserialize_with = "deserialize_arc_vec"
         )
     )]
-    is_final: Arc<Vec<bool>>,
+    pub(crate) is_final: Arc<Vec<bool>>,
 
     /// Edge lists per state: which chars have valid transitions
     #[cfg_attr(
@@ -114,13 +115,27 @@ struct DATSharedChar {
             deserialize_with = "deserialize_arc_vec_vec"
         )
     )]
-    edges: Arc<Vec<Vec<char>>>,
+    pub(crate) edges: Arc<Vec<Vec<char>>>,
+
+    /// Values associated with final states
+    #[cfg_attr(
+        feature = "serialization",
+        serde(
+            serialize_with = "serialize_arc_vec",
+            deserialize_with = "deserialize_arc_vec"
+        )
+    )]
+    pub(crate) values: Arc<Vec<Option<V>>>,
 }
 
 /// Character-level Double-Array Trie for proper Unicode support.
 ///
 /// This variant operates at the Unicode character level, ensuring correct
 /// edit distance calculations for multi-byte UTF-8 sequences.
+///
+/// # Type Parameters
+///
+/// * `V` - The type of values associated with dictionary terms (default: `()`)
 ///
 /// # Example
 ///
@@ -140,9 +155,9 @@ struct DATSharedChar {
     derive(serde::Serialize, serde::Deserialize)
 )]
 #[derive(Clone, Debug)]
-pub struct DoubleArrayTrieChar {
+pub struct DoubleArrayTrieChar<V: DictionaryValue = ()> {
     /// Shared data referenced by all nodes
-    shared: DATSharedChar,
+    pub(crate) shared: DATSharedChar<V>,
 
     /// Free list for deleted/unused states
     #[allow(dead_code)]
@@ -159,7 +174,7 @@ pub struct DoubleArrayTrieChar {
     num_terms: usize,
 }
 
-impl DoubleArrayTrieChar {
+impl DoubleArrayTrieChar<()> {
     /// Create a new character-level Double-Array Trie from an iterator of terms.
     ///
     /// # Example
@@ -190,10 +205,10 @@ impl DoubleArrayTrieChar {
 
         let mut builder = DATBuilderChar::new();
         for term in &terms {
-            builder.insert(term);
+            builder.insert(term, None);
         }
 
-        let (base, check, is_final, edges) = builder.build();
+        let (base, check, is_final, edges, values) = builder.build();
 
         Self {
             shared: DATSharedChar {
@@ -201,6 +216,7 @@ impl DoubleArrayTrieChar {
                 check: Arc::new(check),
                 is_final: Arc::new(is_final),
                 edges: Arc::new(edges),
+                values: Arc::new(values),
             },
             free_list: Arc::new(Vec::new()),
             num_terms,
@@ -215,6 +231,7 @@ impl DoubleArrayTrieChar {
                 check: Arc::new(vec![0]),
                 is_final: Arc::new(vec![false]),
                 edges: Arc::new(vec![vec![]]),
+                values: Arc::new(vec![None]),
             },
             free_list: Arc::new(Vec::new()),
             num_terms: 0,
@@ -222,8 +239,113 @@ impl DoubleArrayTrieChar {
     }
 }
 
-impl Dictionary for DoubleArrayTrieChar {
-    type Node = DoubleArrayTrieCharNode;
+impl<V: DictionaryValue> DoubleArrayTrieChar<V> {
+    /// Create a character-level DAT from an iterator of (term, value) pairs.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+    ///
+    /// let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+    ///     ("café", 1),
+    ///     ("中文", 2),
+    /// ]);
+    /// ```
+    pub fn from_terms_with_values<I, S>(terms: I) -> Self
+    where
+        I: IntoIterator<Item = (S, V)>,
+        S: AsRef<str>,
+    {
+        let mut term_value_pairs: Vec<(Vec<char>, V)> = terms
+            .into_iter()
+            .map(|(s, v)| (s.as_ref().chars().collect(), v))
+            .collect();
+
+        term_value_pairs.sort_by(|a, b| a.0.cmp(&b.0));
+
+        // Remove duplicates, keeping last value
+        term_value_pairs.dedup_by(|a, b| {
+            if a.0 == b.0 {
+                b.1 = a.1.clone();
+                true
+            } else {
+                false
+            }
+        });
+
+        let num_terms = term_value_pairs.len();
+
+        if term_value_pairs.is_empty() {
+            return Self {
+                shared: DATSharedChar {
+                    base: Arc::new(vec![0]),
+                    check: Arc::new(vec![0]),
+                    is_final: Arc::new(vec![false]),
+                    edges: Arc::new(vec![vec![]]),
+                    values: Arc::new(vec![None]),
+                },
+                free_list: Arc::new(Vec::new()),
+                num_terms: 0,
+            };
+        }
+
+        let mut builder = DATBuilderChar::new();
+        for (term, value) in term_value_pairs {
+            builder.insert(&term, Some(value));
+        }
+
+        let (base, check, is_final, edges, values) = builder.build();
+
+        Self {
+            shared: DATSharedChar {
+                base: Arc::new(base),
+                check: Arc::new(check),
+                is_final: Arc::new(is_final),
+                edges: Arc::new(edges),
+                values: Arc::new(values),
+            },
+            free_list: Arc::new(Vec::new()),
+            num_terms,
+        }
+    }
+
+    /// Get the value associated with a term.
+    ///
+    /// Returns `None` if the term doesn't exist or has no value.
+    pub fn get_value(&self, term: &str) -> Option<V> {
+        let mut state = 0;
+        for c in term.chars() {
+            if state >= self.shared.base.len() {
+                return None;
+            }
+
+            let base = self.shared.base[state];
+            if base < 0 {
+                return None;
+            }
+
+            let char_code = c as u32;
+            let next = (base as u32).wrapping_add(char_code) as usize;
+
+            if next >= self.shared.check.len() || self.shared.check[next] != state as i32 {
+                return None;
+            }
+
+            state = next;
+        }
+
+        // Check if final and return value
+        if state < self.shared.is_final.len() && self.shared.is_final[state] {
+            self.shared.values.get(state).and_then(|v| v.clone())
+        } else {
+            None
+        }
+    }
+}
+
+impl<V: DictionaryValue> Dictionary for DoubleArrayTrieChar<V> {
+    type Node = DoubleArrayTrieCharNode<V>;
 
     fn root(&self) -> Self::Node {
         DoubleArrayTrieCharNode {
@@ -239,15 +361,15 @@ impl Dictionary for DoubleArrayTrieChar {
 
 /// Node reference for character-level Dictionary trait implementation.
 #[derive(Clone)]
-pub struct DoubleArrayTrieCharNode {
+pub struct DoubleArrayTrieCharNode<V: DictionaryValue = ()> {
     /// Current state index
     state: usize,
 
     /// Shared data
-    shared: DATSharedChar,
+    shared: DATSharedChar<V>,
 }
 
-impl DictionaryNode for DoubleArrayTrieCharNode {
+impl<V: DictionaryValue> DictionaryNode for DoubleArrayTrieCharNode<V> {
     type Unit = char;
 
     fn is_final(&self) -> bool {
@@ -322,26 +444,28 @@ impl DictionaryNode for DoubleArrayTrieCharNode {
 }
 
 /// Builder for character-level Double-Array Trie.
-struct DATBuilderChar {
+struct DATBuilderChar<V: DictionaryValue = ()> {
     base: Vec<i32>,
     check: Vec<i32>,
     is_final: Vec<bool>,
     edges: Vec<Vec<char>>,
+    values: Vec<Option<V>>,
     used: Vec<bool>,
 }
 
-impl DATBuilderChar {
+impl<V: DictionaryValue> DATBuilderChar<V> {
     fn new() -> Self {
         Self {
             base: vec![0],
             check: vec![0],
             is_final: vec![false],
             edges: vec![vec![]],
+            values: vec![None],
             used: vec![false],
         }
     }
 
-    fn insert(&mut self, term: &[char]) {
+    fn insert(&mut self, term: &[char], value: Option<V>) {
         let mut state = 0;
 
         for &c in term {
@@ -351,6 +475,12 @@ impl DATBuilderChar {
         if state < self.is_final.len() {
             self.is_final[state] = true;
         }
+
+        // Store value
+        while state >= self.values.len() {
+            self.values.push(None);
+        }
+        self.values[state] = value;
     }
 
     fn get_or_create_transition(&mut self, from_state: usize, label: char) -> usize {
@@ -360,6 +490,7 @@ impl DATBuilderChar {
             self.check.push(0);
             self.is_final.push(false);
             self.edges.push(vec![]);
+            self.values.push(None);
             self.used.push(false);
         }
 
@@ -380,6 +511,7 @@ impl DATBuilderChar {
             self.check.push(0);
             self.is_final.push(false);
             self.edges.push(vec![]);
+            self.values.push(None);
             self.used.push(false);
         }
 
@@ -412,6 +544,7 @@ impl DATBuilderChar {
                     self.check.push(0);
                     self.is_final.push(false);
                     self.edges.push(vec![]);
+                    self.values.push(None);
                     self.used.push(false);
                 }
 
@@ -420,6 +553,7 @@ impl DATBuilderChar {
                 self.check[new_next] = from_state as i32;
                 self.is_final[new_next] = self.is_final[old_next];
                 self.edges[new_next] = self.edges[old_next].clone();
+                self.values[new_next] = self.values[old_next].clone();
                 self.used[new_next] = true;
 
                 // Clear old location (only if it belongs to us)
@@ -429,6 +563,7 @@ impl DATBuilderChar {
                     self.base[old_next] = 0;
                     self.is_final[old_next] = false;
                     self.edges[old_next].clear();
+                    self.values[old_next] = None;
                 }
 
                 // Update any children of this relocated node
@@ -457,6 +592,7 @@ impl DATBuilderChar {
                 self.check.push(0);
                 self.is_final.push(false);
                 self.edges.push(vec![]);
+                self.values.push(None);
                 self.used.push(false);
             }
         }
@@ -496,8 +632,39 @@ impl DATBuilderChar {
         1
     }
 
-    fn build(self) -> (Vec<i32>, Vec<i32>, Vec<bool>, Vec<Vec<char>>) {
-        (self.base, self.check, self.is_final, self.edges)
+    fn build(self) -> (Vec<i32>, Vec<i32>, Vec<bool>, Vec<Vec<char>>, Vec<Option<V>>) {
+        (self.base, self.check, self.is_final, self.edges, self.values)
+    }
+}
+
+// MappedDictionary trait implementations
+impl<V: DictionaryValue> MappedDictionaryNode for DoubleArrayTrieCharNode<V> {
+    type Value = V;
+
+    fn value(&self) -> Option<Self::Value> {
+        if self.state < self.shared.values.len() {
+            self.shared.values[self.state].clone()
+        } else {
+            None
+        }
+    }
+}
+
+impl<V: DictionaryValue> MappedDictionary for DoubleArrayTrieChar<V> {
+    type Value = V;
+
+    fn get_value(&self, term: &str) -> Option<Self::Value> {
+        Self::get_value(self, term)
+    }
+
+    fn contains_with_value<F>(&self, term: &str, predicate: F) -> bool
+    where
+        F: Fn(&Self::Value) -> bool,
+    {
+        match self.get_value(term) {
+            Some(ref value) => predicate(value),
+            None => false,
+        }
     }
 }
 
@@ -581,5 +748,102 @@ mod tests {
         let edges: Vec<char> = a_node.edges().map(|(c, _)| c).collect();
         assert!(edges.contains(&'t'));
         assert!(edges.contains(&'r'));
+    }
+
+    // MappedDictionary tests with UTF-8
+    #[test]
+    fn test_mapped_dictionary_with_unicode_values() {
+        let terms = vec![
+            ("café", 1),
+            ("中文", 2),
+            ("🎉", 3),
+            ("naïve", 4),
+        ];
+
+        let dict = DoubleArrayTrieChar::from_terms_with_values(terms);
+
+        assert_eq!(dict.get_value("café"), Some(1));
+        assert_eq!(dict.get_value("中文"), Some(2));
+        assert_eq!(dict.get_value("🎉"), Some(3));
+        assert_eq!(dict.get_value("naïve"), Some(4));
+        assert_eq!(dict.get_value("missing"), None);
+    }
+
+    #[test]
+    fn test_mapped_dictionary_contains_with_value() {
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+            ("café", 42),
+            ("résumé", 100),
+        ]);
+
+        assert!(dict.contains_with_value("café", |v| *v == 42));
+        assert!(dict.contains_with_value("résumé", |v| *v > 50));
+        assert!(!dict.contains_with_value("café", |v| *v > 50));
+        assert!(!dict.contains_with_value("missing", |v| *v == 42));
+    }
+
+    #[test]
+    fn test_mapped_dictionary_node_value() {
+        use crate::dictionary::{Dictionary, MappedDictionaryNode};
+
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+            ("test", 123),
+        ]);
+
+        let root = dict.root();
+        let t_node = root.transition('t').unwrap();
+        let e_node = t_node.transition('e').unwrap();
+        let s_node = e_node.transition('s').unwrap();
+        let final_node = s_node.transition('t').unwrap();
+
+        assert!(final_node.is_final());
+        assert_eq!(final_node.value(), Some(123));
+        assert_eq!(s_node.value(), None); // Not final
+    }
+
+    #[test]
+    fn test_backward_compatibility() {
+        // Default type parameter should be ()
+        let dict: DoubleArrayTrieChar = DoubleArrayTrieChar::from_terms(vec!["café", "中文"]);
+
+        assert!(dict.contains("café"));
+        assert!(dict.contains("中文"));
+        assert_eq!(dict.len(), Some(2));
+    }
+
+    #[test]
+    fn test_empty_string_with_value() {
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+            ("", 1),
+            ("test", 2),
+        ]);
+
+        assert_eq!(dict.get_value(""), Some(1));
+        assert_eq!(dict.get_value("test"), Some(2));
+    }
+
+    #[test]
+    fn test_duplicate_update_value() {
+        // When duplicates exist, keep the last value
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+            ("café", 1),
+            ("café", 2), // Should override
+        ]);
+
+        assert_eq!(dict.get_value("café"), Some(2));
+        assert_eq!(dict.len(), Some(1)); // Only one term
+    }
+
+    #[test]
+    fn test_string_values() {
+        let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+            ("café", "coffee"),
+            ("中文", "Chinese"),
+            ("🎉", "party"),
+        ]);
+
+        assert_eq!(dict.get_value("café"), Some("coffee"));
+        assert_eq!(dict.get_value("中文"), Some("Chinese"));
+        assert_eq!(dict.get_value("🎉"), Some("party"));
     }
 }

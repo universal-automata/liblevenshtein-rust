@@ -33,7 +33,8 @@
 //! - Cache-sensitive applications
 //! - Scenarios requiring occasional updates
 
-use crate::dictionary::{Dictionary, DictionaryNode};
+use crate::dictionary::value::DictionaryValue;
+use crate::dictionary::{Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode};
 use std::sync::Arc;
 
 #[cfg(feature = "serialization")]
@@ -87,10 +88,12 @@ where
 /// Reduces Arc cloning overhead by grouping all shared arrays together.
 #[cfg_attr(
     feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(serialize = "V: serde::Serialize")),
+    serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
 #[derive(Clone, Debug)]
-struct DATShared {
+pub(crate) struct DATShared<V: DictionaryValue = ()> {
     /// BASE array: offset for computing next state
     #[cfg_attr(
         feature = "serialization",
@@ -99,7 +102,7 @@ struct DATShared {
             deserialize_with = "deserialize_arc_vec"
         )
     )]
-    base: Arc<Vec<i32>>,
+    pub(crate) base: Arc<Vec<i32>>,
 
     /// CHECK array: parent state verification
     #[cfg_attr(
@@ -109,7 +112,7 @@ struct DATShared {
             deserialize_with = "deserialize_arc_vec"
         )
     )]
-    check: Arc<Vec<i32>>,
+    pub(crate) check: Arc<Vec<i32>>,
 
     /// Final states marking valid term endings
     #[cfg_attr(
@@ -119,7 +122,7 @@ struct DATShared {
             deserialize_with = "deserialize_arc_vec"
         )
     )]
-    is_final: Arc<Vec<bool>>,
+    pub(crate) is_final: Arc<Vec<bool>>,
 
     /// Edge lists per state: which bytes have valid transitions
     /// This optimizes the edges() iterator to only check actual edges
@@ -131,7 +134,18 @@ struct DATShared {
             deserialize_with = "deserialize_arc_vec_vec"
         )
     )]
-    edges: Arc<Vec<Vec<u8>>>,
+    pub(crate) edges: Arc<Vec<Vec<u8>>>,
+
+    /// Optional values associated with final states
+    /// Indexed by state number; only final states may have Some(value)
+    #[cfg_attr(
+        feature = "serialization",
+        serde(
+            serialize_with = "serialize_arc_vec",
+            deserialize_with = "deserialize_arc_vec"
+        )
+    )]
+    pub(crate) values: Arc<Vec<Option<V>>>,
 }
 
 /// A compact, cache-efficient dictionary implementation using the Double-Array Trie data structure.
@@ -180,12 +194,14 @@ struct DATShared {
 /// ```
 #[cfg_attr(
     feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(serialize = "V: serde::Serialize")),
+    serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
 #[derive(Clone, Debug)]
-pub struct DoubleArrayTrie {
+pub struct DoubleArrayTrie<V: DictionaryValue = ()> {
     /// Shared data referenced by all nodes
-    shared: DATShared,
+    pub(crate) shared: DATShared<V>,
 
     /// Free list for deleted/unused states (reserved for future dynamic operations)
     #[allow(dead_code)]
@@ -208,7 +224,7 @@ pub struct DoubleArrayTrie {
 }
 
 /// Builder for constructing a Double-Array Trie incrementally.
-pub struct DoubleArrayTrieBuilder {
+pub struct DoubleArrayTrieBuilder<V: DictionaryValue = ()> {
     /// BASE array being built
     base: Vec<i32>,
 
@@ -217,6 +233,9 @@ pub struct DoubleArrayTrieBuilder {
 
     /// Final state markers
     is_final: Vec<bool>,
+
+    /// Optional values for final states
+    values: Vec<Option<V>>,
 
     /// Free list tracking unused states
     free_list: Vec<usize>,
@@ -233,7 +252,7 @@ pub struct DoubleArrayTrieBuilder {
     rebuild_threshold: f64,
 }
 
-impl DoubleArrayTrieBuilder {
+impl<V: DictionaryValue> DoubleArrayTrieBuilder<V> {
     /// Create a new DAT builder.
     pub fn new() -> Self {
         // State 0 is reserved as a sentinel/error state
@@ -241,11 +260,13 @@ impl DoubleArrayTrieBuilder {
         let base = vec![-1, 0]; // -1 for sentinel, 0 for root
         let check = vec![-1, -1]; // -1 means unused
         let is_final = vec![false, false];
+        let values = vec![None, None]; // No values at sentinel or root initially
 
         Self {
             base,
             check,
             is_final,
+            values,
             free_list: Vec::new(),
             term_count: 0,
             next_state: 2,          // Next available state
@@ -259,22 +280,35 @@ impl DoubleArrayTrieBuilder {
         self
     }
 
-    /// Insert a term into the trie.
+    /// Insert a term into the trie without a value.
     pub fn insert(&mut self, term: &str) -> bool {
+        self.insert_with_value(term, None)
+    }
+
+    /// Insert a term into the trie with an optional value.
+    pub fn insert_with_value(&mut self, term: &str, value: Option<V>) -> bool {
         // Handle empty string: mark root (state 1) as final
         if term.is_empty() {
-            // Ensure is_final is large enough for root state (state 1)
+            // Ensure arrays are large enough for root state (state 1)
             while self.is_final.len() <= 1 {
                 self.is_final.push(false);
+            }
+            while self.values.len() <= 1 {
+                self.values.push(None);
             }
 
             // Check if root is already final (empty string already inserted)
             if self.is_final[1] {
+                // Update value if provided
+                if value.is_some() {
+                    self.values[1] = value;
+                }
                 return false; // Already exists
             }
 
             // Mark root as final and increment term count
             self.is_final[1] = true;
+            self.values[1] = value;
             self.term_count += 1;
             return true;
         }
@@ -294,12 +328,20 @@ impl DoubleArrayTrieBuilder {
 
         // Mark final state
         if state < self.is_final.len() && self.is_final[state] {
+            // Update value if provided
+            if value.is_some() && state < self.values.len() {
+                self.values[state] = value;
+            }
             false // Already exists
         } else {
             while state >= self.is_final.len() {
                 self.is_final.push(false);
             }
+            while state >= self.values.len() {
+                self.values.push(None);
+            }
             self.is_final[state] = true;
+            self.values[state] = value;
             self.term_count += 1;
             true
         }
@@ -332,6 +374,7 @@ impl DoubleArrayTrieBuilder {
             self.base.push(-1);
             self.check.push(-1);
             self.is_final.push(false);
+            self.values.push(None);
         }
 
         // Find a valid next_state based on BASE
@@ -352,6 +395,7 @@ impl DoubleArrayTrieBuilder {
             self.base.push(-1);
             self.check.push(-1);
             self.is_final.push(false);
+            self.values.push(None);
         }
 
         if self.check[next_state] >= 0 {
@@ -388,12 +432,20 @@ impl DoubleArrayTrieBuilder {
                     self.base.push(-1);
                     self.check.push(-1);
                     self.is_final.push(false);
+                    self.values.push(None);
                 }
 
                 // Move the child's data
                 self.check[new_child] = state as i32; // CHECK points to parent
                 self.base[new_child] = self.base[old_child];
                 self.is_final[new_child] = self.is_final[old_child];
+                // Move the value if it exists
+                if old_child < self.values.len() {
+                    while new_child >= self.values.len() {
+                        self.values.push(None);
+                    }
+                    self.values[new_child] = self.values[old_child].clone();
+                }
 
                 // Update all grandchildren's CHECK pointers
                 if self.base[old_child] >= 0 {
@@ -412,6 +464,9 @@ impl DoubleArrayTrieBuilder {
                 self.check[old_child] = -1;
                 self.base[old_child] = -1;
                 self.is_final[old_child] = false;
+                if old_child < self.values.len() {
+                    self.values[old_child] = None;
+                }
             }
 
             // Update state's BASE
@@ -422,6 +477,7 @@ impl DoubleArrayTrieBuilder {
                 self.base.push(-1);
                 self.check.push(-1);
                 self.is_final.push(false);
+                self.values.push(None);
             }
 
             self.check[new_next] = state as i32;
@@ -482,7 +538,7 @@ impl DoubleArrayTrieBuilder {
     }
 
     /// Build the final DoubleArrayTrie.
-    pub fn build(self) -> DoubleArrayTrie {
+    pub fn build(self) -> DoubleArrayTrie<V> {
         // Compute edge lists for each state to optimize edges() iteration
         let mut edges = vec![Vec::new(); self.base.len()];
 
@@ -506,6 +562,7 @@ impl DoubleArrayTrieBuilder {
                 check: Arc::new(self.check),
                 is_final: Arc::new(self.is_final),
                 edges: Arc::new(edges),
+                values: Arc::new(self.values),
             },
             free_list: Arc::new(self.free_list),
             term_count: self.term_count,
@@ -514,36 +571,79 @@ impl DoubleArrayTrieBuilder {
     }
 }
 
-impl Default for DoubleArrayTrieBuilder {
+impl<V: DictionaryValue> Default for DoubleArrayTrieBuilder<V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl DoubleArrayTrie {
+impl<V: DictionaryValue> DoubleArrayTrie<V> {
     /// Create a new empty Double-Array Trie.
     pub fn new() -> Self {
         DoubleArrayTrieBuilder::new().build()
     }
 
-    /// Create a DAT from an iterator of terms.
+    /// Create a DAT from an iterator of (term, value) pairs.
     ///
     /// For optimal space efficiency, terms should be sorted.
-    pub fn from_terms<I, S>(terms: I) -> Self
+    pub fn from_terms_with_values<I, S>(terms: I) -> Self
     where
-        I: IntoIterator<Item = S>,
+        I: IntoIterator<Item = (S, V)>,
         S: AsRef<str>,
     {
-        let mut sorted_terms: Vec<String> =
-            terms.into_iter().map(|s| s.as_ref().to_string()).collect();
-        sorted_terms.sort();
-        sorted_terms.dedup();
+        let mut term_value_pairs: Vec<(String, V)> = terms
+            .into_iter()
+            .map(|(s, v)| (s.as_ref().to_string(), v))
+            .collect();
+
+        // Sort by term
+        term_value_pairs.sort_by(|a, b| a.0.cmp(&b.0));
+
+        // Remove duplicates (keep last value)
+        term_value_pairs.dedup_by(|a, b| {
+            if a.0 == b.0 {
+                // Swap to keep the later value
+                std::mem::swap(&mut a.1, &mut b.1);
+                true
+            } else {
+                false
+            }
+        });
 
         let mut builder = DoubleArrayTrieBuilder::new();
-        for term in sorted_terms {
-            builder.insert(&term);
+        for (term, value) in term_value_pairs {
+            builder.insert_with_value(&term, Some(value));
         }
         builder.build()
+    }
+
+    /// Get the value associated with a term.
+    ///
+    /// Returns `None` if the term doesn't exist in the dictionary.
+    pub fn get_value(&self, term: &str) -> Option<V> {
+        // Navigate to final state
+        let mut state = 1; // Root
+        for &byte in term.as_bytes() {
+            if state >= self.shared.base.len() {
+                return None;
+            }
+            let base = self.shared.base[state];
+            if base < 0 {
+                return None;
+            }
+            let next = (base as usize) + (byte as usize);
+            if next >= self.shared.check.len() || self.shared.check[next] != state as i32 {
+                return None;
+            }
+            state = next;
+        }
+
+        // Check if final and return value
+        if state < self.shared.is_final.len() && self.shared.is_final[state] {
+            self.shared.values.get(state).and_then(|v| v.clone())
+        } else {
+            None
+        }
     }
 
     /// Get the number of terms in the dictionary.
@@ -593,23 +693,46 @@ impl DoubleArrayTrie {
     }
 }
 
-impl Default for DoubleArrayTrie {
+impl<V: DictionaryValue> Default for DoubleArrayTrie<V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
+// Backward-compatible impl for unit type (no values)
+impl DoubleArrayTrie<()> {
+    /// Create a DAT from an iterator of terms (without values).
+    ///
+    /// For optimal space efficiency, terms should be sorted.
+    pub fn from_terms<I, S>(terms: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut sorted_terms: Vec<String> =
+            terms.into_iter().map(|s| s.as_ref().to_string()).collect();
+        sorted_terms.sort();
+        sorted_terms.dedup();
+
+        let mut builder = DoubleArrayTrieBuilder::new();
+        for term in sorted_terms {
+            builder.insert(&term);
+        }
+        builder.build()
+    }
+}
+
 /// Node reference for Dictionary trait implementation.
 #[derive(Clone)]
-pub struct DoubleArrayTrieNode {
+pub struct DoubleArrayTrieNode<V: DictionaryValue = ()> {
     /// Current state index
     state: usize,
 
     /// Shared data (reduces Arc cloning overhead)
-    shared: DATShared,
+    shared: DATShared<V>,
 }
 
-impl DictionaryNode for DoubleArrayTrieNode {
+impl<V: DictionaryValue> DictionaryNode for DoubleArrayTrieNode<V> {
     type Unit = u8;
 
     fn is_final(&self) -> bool {
@@ -679,16 +802,16 @@ impl DictionaryNode for DoubleArrayTrieNode {
     }
 }
 
-// Serialization support
+// Serialization support - only for unit type (backward compatibility)
 #[cfg(feature = "serialization")]
-impl crate::serialization::DictionaryFromTerms for DoubleArrayTrie {
+impl crate::serialization::DictionaryFromTerms for DoubleArrayTrie<()> {
     fn from_terms<I: IntoIterator<Item = String>>(terms: I) -> Self {
         DoubleArrayTrie::from_terms(terms)
     }
 }
 
-impl Dictionary for DoubleArrayTrie {
-    type Node = DoubleArrayTrieNode;
+impl<V: DictionaryValue> Dictionary for DoubleArrayTrie<V> {
+    type Node = DoubleArrayTrieNode<V>;
 
     fn root(&self) -> Self::Node {
         DoubleArrayTrieNode {
@@ -706,13 +829,45 @@ impl Dictionary for DoubleArrayTrie {
     }
 }
 
+// MappedDictionary trait implementations
+impl<V: DictionaryValue> MappedDictionaryNode for DoubleArrayTrieNode<V> {
+    type Value = V;
+
+    fn value(&self) -> Option<Self::Value> {
+        if self.state < self.shared.values.len() {
+            self.shared.values[self.state].clone()
+        } else {
+            None
+        }
+    }
+}
+
+impl<V: DictionaryValue> MappedDictionary for DoubleArrayTrie<V> {
+    type Value = V;
+
+    fn get_value(&self, term: &str) -> Option<Self::Value> {
+        // Delegate to the inherent method
+        Self::get_value(self, term)
+    }
+
+    fn contains_with_value<F>(&self, term: &str, predicate: F) -> bool
+    where
+        F: Fn(&Self::Value) -> bool,
+    {
+        match self.get_value(term) {
+            Some(ref value) => predicate(value),
+            None => false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_empty_dat() {
-        let dat = DoubleArrayTrie::new();
+        let dat: DoubleArrayTrie<()> = DoubleArrayTrie::new();
         assert_eq!(dat.len(), Some(0));
         assert!(dat.is_empty());
     }
@@ -811,7 +966,7 @@ mod tests {
 
     #[test]
     fn test_incremental_construction() {
-        let mut builder = DoubleArrayTrieBuilder::new();
+        let mut builder: DoubleArrayTrieBuilder<()> = DoubleArrayTrieBuilder::new();
 
         assert!(builder.insert("hello"));
         assert!(builder.insert("world"));
@@ -823,5 +978,124 @@ mod tests {
         assert!(dat.contains("hello"));
         assert!(dat.contains("world"));
         assert!(dat.contains("test"));
+    }
+
+    // MappedDictionary tests
+    #[test]
+    fn test_mapped_dictionary_with_values() {
+        let terms = vec![
+            ("apple", 1),
+            ("application", 2),
+            ("apply", 3),
+        ];
+
+        let dict = DoubleArrayTrie::from_terms_with_values(terms);
+
+        assert_eq!(dict.get_value("apple"), Some(1));
+        assert_eq!(dict.get_value("application"), Some(2));
+        assert_eq!(dict.get_value("apply"), Some(3));
+        assert_eq!(dict.get_value("apricot"), None);
+    }
+
+    #[test]
+    fn test_mapped_dictionary_contains_with_value() {
+        let dict = DoubleArrayTrie::from_terms_with_values(vec![
+            ("test", 42),
+            ("testing", 100),
+        ]);
+
+        assert!(dict.contains_with_value("test", |v| *v == 42));
+        assert!(dict.contains_with_value("testing", |v| *v > 50));
+        assert!(!dict.contains_with_value("test", |v| *v > 50));
+        assert!(!dict.contains_with_value("missing", |v| *v == 42));
+    }
+
+    #[test]
+    fn test_mapped_dictionary_node_value() {
+        use crate::dictionary::MappedDictionaryNode;
+
+        let dict = DoubleArrayTrie::from_terms_with_values(vec![
+            ("cat", 1),
+            ("catch", 2),
+        ]);
+
+        let root = dict.root();
+        // Navigate to "cat"
+        let c = root.transition(b'c').unwrap();
+        let a = c.transition(b'a').unwrap();
+        let t = a.transition(b't').unwrap();
+
+        assert!(t.is_final());
+        assert_eq!(t.value(), Some(1));
+
+        // Continue to "catch"
+        let c2 = t.transition(b'c').unwrap();
+        let h = c2.transition(b'h').unwrap();
+
+        assert!(h.is_final());
+        assert_eq!(h.value(), Some(2));
+    }
+
+    #[test]
+    fn test_backward_compatibility_without_values() {
+        // Default type parameter should be ()
+        let dict: DoubleArrayTrie = DoubleArrayTrie::from_terms(vec!["test", "testing"]);
+
+        assert!(dict.contains("test"));
+        assert_eq!(dict.len(), Some(2));
+
+        // get_value should return None for unit type
+        assert_eq!(dict.get_value("test"), None);
+    }
+
+    #[test]
+    fn test_builder_with_values() {
+        let mut builder: DoubleArrayTrieBuilder<i32> = DoubleArrayTrieBuilder::new();
+
+        builder.insert_with_value("hello", Some(10));
+        builder.insert_with_value("world", Some(20));
+        builder.insert_with_value("test", Some(30));
+
+        let dat = builder.build();
+
+        assert_eq!(dat.len(), Some(3));
+        assert_eq!(dat.get_value("hello"), Some(10));
+        assert_eq!(dat.get_value("world"), Some(20));
+        assert_eq!(dat.get_value("test"), Some(30));
+    }
+
+    #[test]
+    fn test_empty_string_with_value() {
+        let mut builder: DoubleArrayTrieBuilder<i32> = DoubleArrayTrieBuilder::new();
+        builder.insert_with_value("", Some(42));
+
+        let dat = builder.build();
+        assert_eq!(dat.get_value(""), Some(42));
+    }
+
+    #[test]
+    fn test_duplicate_update_value() {
+        let mut builder: DoubleArrayTrieBuilder<i32> = DoubleArrayTrieBuilder::new();
+
+        assert!(builder.insert_with_value("test", Some(10)));
+        assert!(!builder.insert_with_value("test", Some(20))); // Duplicate, updates value
+
+        let dat = builder.build();
+
+        assert_eq!(dat.len(), Some(1));
+        assert_eq!(dat.get_value("test"), Some(20)); // Should have updated value
+    }
+
+    #[test]
+    fn test_string_values() {
+        let dict = DoubleArrayTrie::from_terms_with_values(vec![
+            ("hello", "greeting"),
+            ("world", "noun"),
+            ("test", "verb"),
+        ]);
+
+        assert_eq!(dict.get_value("hello"), Some("greeting"));
+        assert_eq!(dict.get_value("world"), Some("noun"));
+        assert_eq!(dict.get_value("test"), Some("verb"));
     }
 }
