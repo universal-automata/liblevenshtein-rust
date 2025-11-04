@@ -1241,6 +1241,30 @@ impl Command {
             r#"{}
 
 {}
+  The prompt shows your current state:
+    {} Ready to accept input
+    {} Entering multi-line command (end line with \)
+    {} Success indicator
+    {} Warning/recoverable error
+
+  Current settings shown in prompt: backend/algorithm/max_distance
+  Example: path-map/Standard/d2
+
+{}
+  Tab       - Auto-complete commands and arguments
+  Ctrl+C    - Cancel current line (use 'exit' or Ctrl+D to quit)
+  Ctrl+D    - Exit REPL
+  Ctrl+R    - Search command history
+  Up/Down   - Navigate command history
+
+{}
+  1. Load a dictionary:      load /usr/share/dict/words
+  2. Query for similar term: query test
+  3. Adjust settings:        distance 3
+  4. Query again:            query exampl
+  5. Get help on command:    help query
+
+{}
   query, q <term> [distance] [--prefix] [--limit N]
                               Search for similar terms
   insert, add <term> ...    Insert term(s) into dictionary
@@ -1255,13 +1279,17 @@ impl Command {
 
 {}
   backend, use <type>       Change dictionary backend
-                            Types: pathmap, dawg, dynamic-dawg
+                            Types: pathmap, double-array-trie, dawg,
+                                   optimized-dawg, dynamic-dawg, suffix-automaton
   algorithm, algo <type>    Change Levenshtein algorithm
                             Types: standard, transposition, merge-and-split
   distance, dist <n>        Set maximum edit distance
   prefix [on|off]           Toggle prefix matching mode
   show-distances [on|off]   Toggle distance display in results
   limit <n>                 Set result limit (0 or 'none' to remove)
+  format <type>             Set serialization format
+                            Types: text, bincode, json, protobuf
+  auto-sync [on|off]        Toggle auto-save on modifications
 
 {}
   clear                     Remove all terms from dictionary
@@ -1292,11 +1320,21 @@ impl Command {
   liblevenshtein> prefix on
   liblevenshtein> query tes
 
-For detailed help on a command, type: help <command>
+{}
+  For detailed help on any command: help <command>
+  For tips on getting started:      help quickstart
+  Report issues: https://github.com/anthropics/liblevenshtein-rust
 "#,
             "liblevenshtein REPL - Interactive Levenshtein Dictionary Explorer"
                 .bold()
                 .underline(),
+            "Understanding the Prompt:".bold(),
+            "🔵".to_string(),
+            "🟡".to_string(),
+            "✓".green(),
+            "⚠".yellow(),
+            "Keyboard Shortcuts:".bold(),
+            "Quick Start:".bold(),
             "Dictionary Operations:".bold(),
             "File Operations:".bold(),
             "Configuration:".bold(),
@@ -1304,6 +1342,7 @@ For detailed help on a command, type: help <command>
             "Cache Operations:".bold(),
             "Utility:".bold(),
             "Examples:".bold(),
+            "More Help:".bold(),
         )
     }
 

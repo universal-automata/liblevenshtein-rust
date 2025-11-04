@@ -84,7 +84,7 @@ impl CommandHighlighter {
         }
     }
 
-    fn highlight_args(&self, args: &str, _cmd: &str) -> String {
+    fn highlight_args(&self, args: &str, cmd: &str) -> String {
         let mut result = String::new();
         let mut in_option = false;
 
@@ -92,7 +92,7 @@ impl CommandHighlighter {
             result.push(' ');
 
             if part.starts_with("--") || part.starts_with('-') {
-                // Highlight options in yellow
+                // Highlight options/flags in yellow
                 result.push_str(&part.yellow().to_string());
                 in_option = true;
             } else if in_option {
@@ -102,6 +102,29 @@ impl CommandHighlighter {
             } else if part.parse::<usize>().is_ok() {
                 // Highlight numbers in magenta
                 result.push_str(&part.magenta().to_string());
+            } else if matches!(part.to_lowercase().as_str(), "on" | "off" | "true" | "false") {
+                // Highlight boolean keywords in green
+                result.push_str(&part.green().to_string());
+            } else if Self::is_backend_name(part) || Self::is_algorithm_name(part) {
+                // Highlight backend/algorithm names in cyan
+                result.push_str(&part.cyan().to_string());
+            } else if Self::is_format_name(part) {
+                // Highlight format names in cyan
+                result.push_str(&part.cyan().to_string());
+            } else if part.ends_with(".txt")
+                || part.ends_with(".bin")
+                || part.ends_with(".json")
+                || part.ends_with(".pb")
+                || part.ends_with(".paths")
+            {
+                // Highlight file paths in bright white
+                result.push_str(&part.bright_white().to_string());
+            } else if matches!(
+                cmd,
+                "query" | "q" | "insert" | "add" | "delete" | "remove" | "rm" | "contains" | "has"
+            ) {
+                // Highlight query terms and dictionary terms in white
+                result.push_str(part);
             } else {
                 // Regular arguments
                 result.push_str(part);
@@ -109,6 +132,49 @@ impl CommandHighlighter {
         }
 
         result
+    }
+
+    fn is_backend_name(s: &str) -> bool {
+        matches!(
+            s.to_lowercase().as_str(),
+            "pathmap"
+                | "path-map"
+                | "double-array-trie"
+                | "doublearraytrie"
+                | "dat"
+                | "dawg"
+                | "optimized-dawg"
+                | "optimizeddawg"
+                | "dynamic-dawg"
+                | "dynamicdawg"
+                | "suffix-automaton"
+                | "suffixautomaton"
+        )
+    }
+
+    fn is_algorithm_name(s: &str) -> bool {
+        matches!(
+            s.to_lowercase().as_str(),
+            "standard" | "std" | "transposition" | "trans" | "merge-and-split" | "mas"
+        )
+    }
+
+    fn is_format_name(s: &str) -> bool {
+        matches!(
+            s.to_lowercase().as_str(),
+            "text"
+                | "txt"
+                | "bincode"
+                | "bin"
+                | "json"
+                | "protobuf"
+                | "pb"
+                | "bincode-gzip"
+                | "json-gzip"
+                | "protobuf-gzip"
+                | "paths-native"
+                | "paths"
+        )
     }
 }
 

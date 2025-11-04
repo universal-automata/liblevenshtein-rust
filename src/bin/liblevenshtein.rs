@@ -195,12 +195,42 @@ fn run_repl(
 
         line_num += 1;
 
-        // Generate prompt based on current phase
+        // Generate prompt with state indicator and context
+        let state_indicator = state_machine.phase().status_indicator();
+        let backend_str = format!("{}", state.backend).bright_yellow();
+        let algo_str = format!("{:?}", state.algorithm).bright_green();
+        let dist_str = format!("d{}", state.max_distance).bright_magenta();
+
+        let context = format!("{}/{}/{}", backend_str, algo_str, dist_str);
+
         let prompt = match state_machine.phase() {
             liblevenshtein::repl::ReplPhase::Continuation { .. } => {
-                format!("{}[{}]...> ", "liblevenshtein".bright_cyan().bold(), line_num)
+                format!(
+                    "{} {}[{}] {}...> ",
+                    state_indicator,
+                    "liblevenshtein".bright_cyan().bold(),
+                    line_num,
+                    context
+                )
             }
-            _ => format!("{}[{}]> ", "liblevenshtein".bright_cyan().bold(), line_num),
+            liblevenshtein::repl::ReplPhase::Error { .. } => {
+                format!(
+                    "{} {}[{}] {}> ",
+                    state_indicator,
+                    "liblevenshtein".bright_cyan().bold(),
+                    line_num,
+                    context
+                )
+            }
+            _ => {
+                format!(
+                    "{} {}[{}] {}> ",
+                    state_indicator,
+                    "liblevenshtein".bright_cyan().bold(),
+                    line_num,
+                    context
+                )
+            }
         };
 
         // Read input
