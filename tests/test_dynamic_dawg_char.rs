@@ -386,6 +386,7 @@ fn test_dynamic_dawg_char_value_updates() {
 }
 
 #[test]
+#[cfg(feature = "pathmap-backend")]
 fn test_dynamic_dawg_char_value_filtered_query() {
     use liblevenshtein::cache::multimap::FuzzyMultiMap;
     use std::collections::HashSet;
