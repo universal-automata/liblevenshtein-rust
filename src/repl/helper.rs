@@ -124,7 +124,7 @@ impl Completer for LevenshteinHelper {
                     .filter(|b| b.starts_with(&prefix))
                     .map(|b| Pair {
                         display: b.clone(),
-                        replacement: b.clone(),
+                        replacement: format!("{} ", b),
                     })
                     .collect();
                 Ok((start, candidates))
@@ -137,7 +137,7 @@ impl Completer for LevenshteinHelper {
                     .filter(|a| a.starts_with(&prefix))
                     .map(|a| Pair {
                         display: a.clone(),
-                        replacement: a.clone(),
+                        replacement: format!("{} ", a),
                     })
                     .collect();
                 Ok((start, candidates))
@@ -150,7 +150,7 @@ impl Completer for LevenshteinHelper {
                     .filter(|o| o.starts_with(&prefix))
                     .map(|o| Pair {
                         display: o.to_string(),
-                        replacement: o.to_string(),
+                        replacement: format!("{} ", o),
                     })
                     .collect();
                 Ok((start, candidates))
@@ -163,7 +163,7 @@ impl Completer for LevenshteinHelper {
                     .filter(|cmd| cmd.starts_with(&prefix))
                     .map(|cmd| Pair {
                         display: cmd.clone(),
-                        replacement: cmd.clone(),
+                        replacement: format!("{} ", cmd),
                     })
                     .collect();
                 Ok((start, candidates))

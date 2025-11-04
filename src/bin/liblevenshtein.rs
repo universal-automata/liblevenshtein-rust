@@ -85,8 +85,9 @@ fn run_repl(
     };
     let merged_config = config.merge_with_cli(&cli_overrides);
 
-    // Save merged config for future use
-    let _ = merged_config.save();
+    // NOTE: We don't save config at startup to avoid overwriting user preferences
+    // with CLI defaults. Config will be saved when user changes settings during
+    // the REPL session.
 
     // Print banner
     print_banner();
@@ -202,28 +203,45 @@ fn run_repl(
 
                 // Parse and execute command
                 match Command::parse(line) {
-                    Ok(command) => match command.execute(&mut state) {
-                        Ok(CommandResult::Continue(output)) => {
-                            if !output.is_empty() {
-                                println!("{}", output);
-                            }
+                    Ok(command) => {
+                        // Check if command modifies dictionary (before execution)
+                        let modifies_dict = matches!(
+                            command,
+                            Command::Insert { .. }
+                                | Command::Delete { .. }
+                                | Command::Clear
+                                | Command::Load { .. }
+                        );
 
-                            // Auto-sync if enabled
-                            if auto_sync {
-                                if let Some(ref _path) = dict_path {
-                                    // TODO: Implement auto-save
+                        match command.execute(&mut state) {
+                            Ok(CommandResult::Continue(output)) => {
+                                if !output.is_empty() {
+                                    println!("{}", output);
+                                }
+
+                                // Auto-sync if enabled and command modified dictionary
+                                if modifies_dict && state.auto_sync {
+                                    if let Some(ref path) = state.auto_sync_path {
+                                        if let Err(e) = state.save_to_file(path) {
+                                            eprintln!(
+                                                "{}: Failed to auto-save dictionary: {}",
+                                                "Warning".yellow(),
+                                                e
+                                            );
+                                        }
+                                    }
                                 }
                             }
+                            Ok(CommandResult::Exit) => {
+                                println!("{}", "Goodbye!".green());
+                                break;
+                            }
+                            Ok(CommandResult::Silent) => {}
+                            Err(e) => {
+                                eprintln!("{}: {}", "Error".red().bold(), e);
+                            }
                         }
-                        Ok(CommandResult::Exit) => {
-                            println!("{}", "Goodbye!".green());
-                            break;
-                        }
-                        Ok(CommandResult::Silent) => {}
-                        Err(e) => {
-                            eprintln!("{}: {}", "Error".red().bold(), e);
-                        }
-                    },
+                    }
                     Err(e) => {
                         eprintln!("{}: {}", "Parse error".red().bold(), e);
                     }
@@ -251,6 +269,11 @@ fn run_repl(
         if let Err(e) = editor.save_history(history_path) {
             eprintln!("{}: Failed to save history: {}", "Warning".yellow(), e);
         }
+    }
+
+    // Save config on exit
+    if let Err(e) = state.save_config() {
+        eprintln!("{}: Failed to save config: {}", "Warning".yellow(), e);
     }
 
     Ok(())

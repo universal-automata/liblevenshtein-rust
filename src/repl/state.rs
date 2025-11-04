@@ -646,6 +646,29 @@ impl ReplState {
             Err(anyhow::anyhow!("Cache is not enabled"))
         }
     }
+
+    /// Convert current state to PersistentConfig
+    #[cfg(feature = "cli")]
+    pub fn to_persistent_config(&self) -> crate::cli::paths::PersistentConfig {
+        crate::cli::paths::PersistentConfig {
+            dict_path: self.auto_sync_path.clone(),
+            backend: Some(self.backend),
+            format: Some(self.serialization_format),
+            algorithm: Some(self.algorithm),
+            max_distance: Some(self.max_distance),
+            prefix_mode: Some(self.prefix_mode),
+            show_distances: Some(self.show_distances),
+            result_limit: Some(self.result_limit),
+            auto_sync: Some(self.auto_sync),
+        }
+    }
+
+    /// Save current state to configuration file
+    #[cfg(feature = "cli")]
+    pub fn save_config(&self) -> Result<()> {
+        let config = self.to_persistent_config();
+        config.save_to(self.config_file_path.clone())
+    }
 }
 
 impl Default for ReplState {

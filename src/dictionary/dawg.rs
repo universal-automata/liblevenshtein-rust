@@ -12,6 +12,10 @@ use std::sync::Arc;
 
 /// A DAWG dictionary for approximate string matching.
 ///
+/// **Note**: For production use, [`OptimizedDawg`](crate::dictionary::dawg_optimized::OptimizedDawg)
+/// is recommended as it provides 20-25% faster queries and uses 30% less memory.
+/// This implementation is kept as a reference implementation and for benchmarking.
+///
 /// The DAWG is constructed from a sorted list of terms and uses
 /// structural sharing to minimize memory usage. Once constructed,
 /// the DAWG is immutable and can be safely shared across threads.
@@ -28,6 +32,11 @@ use std::sync::Arc;
 /// - **Construction**: O(n) for sorted input where n is total characters
 /// - **Lookup**: O(m) where m is the query term length
 /// - **Thread-safe**: Fully immutable, safe for concurrent access
+///
+/// # See Also
+///
+/// - [`OptimizedDawg`](crate::dictionary::dawg_optimized::OptimizedDawg) - Preferred production implementation
+/// - [`DynamicDawg`](crate::dictionary::dynamic_dawg::DynamicDawg) - Mutable DAWG supporting insertions/deletions
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serialization",

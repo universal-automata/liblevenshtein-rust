@@ -749,6 +749,11 @@ impl Command {
 
                 let old_backend = state.backend;
                 state.change_backend(*backend)?;
+
+                // Save config after backend change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
+
                 let msg = format!(
                     "Migrated from {} to {} ({} terms)",
                     old_backend.to_string().yellow(),
@@ -760,6 +765,11 @@ impl Command {
 
             Self::Algorithm { algorithm } => {
                 state.algorithm = *algorithm;
+
+                // Save config after algorithm change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
+
                 let msg = format!(
                     "Algorithm set to {}",
                     format!("{:?}", algorithm).green().bold()
@@ -769,6 +779,11 @@ impl Command {
 
             Self::Distance { distance } => {
                 state.max_distance = *distance;
+
+                // Save config after distance change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
+
                 let msg = format!(
                     "Max distance set to {}",
                     distance.to_string().green().bold()
@@ -779,6 +794,11 @@ impl Command {
             Self::PrefixMode { enable } => {
                 let new_state = enable.unwrap_or(!state.prefix_mode);
                 state.prefix_mode = new_state;
+
+                // Save config after prefix mode change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
+
                 let msg = format!(
                     "Prefix mode {}",
                     if new_state {
@@ -793,6 +813,11 @@ impl Command {
             Self::ShowDistances { enable } => {
                 let new_state = enable.unwrap_or(!state.show_distances);
                 state.show_distances = new_state;
+
+                // Save config after show distances change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
+
                 let msg = format!(
                     "Distance display {}",
                     if new_state {
@@ -806,6 +831,11 @@ impl Command {
 
             Self::Limit { limit } => {
                 state.result_limit = *limit;
+
+                // Save config after limit change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
+
                 let msg = if let Some(n) = limit {
                     format!("Result limit set to {}", n.to_string().green().bold())
                 } else {
@@ -852,6 +882,11 @@ impl Command {
                 }
 
                 state.serialization_format = *format;
+
+                // Save config after format change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
+
                 let msg = format!(
                     "Serialization format set to {}",
                     format.to_string().green().bold()
@@ -867,6 +902,10 @@ impl Command {
                     state.auto_sync = !state.auto_sync;
                     state.auto_sync
                 };
+
+                // Save config after auto-sync change
+                #[cfg(feature = "cli")]
+                state.save_config().ok();
 
                 if new_state && state.auto_sync_path.is_none() {
                     return Ok(CommandResult::Continue(

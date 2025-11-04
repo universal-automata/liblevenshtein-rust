@@ -101,6 +101,10 @@ use crate::dictionary::{Dictionary, DictionaryNode};
 /// // let sa = CompressedSuffixAutomaton::from_texts(vec!["text1", "text2"]);
 /// // // May not find all substrings correctly!
 /// ```
+#[deprecated(
+    since = "0.6.0",
+    note = "This implementation has known bugs with generalized suffix automaton (multiple texts). Use SuffixAutomaton instead for reliable substring matching."
+)]
 #[derive(Clone, Debug)]
 pub struct CompressedSuffixAutomaton {
     inner: Arc<RwLock<CompressedSuffixAutomatonInner>>,
