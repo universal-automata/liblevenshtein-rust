@@ -73,7 +73,9 @@ where
 /// Shared data for character-level Double-Array Trie.
 #[cfg_attr(
     feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(serialize = "V: serde::Serialize")),
+    serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
 #[derive(Clone, Debug)]
 pub(crate) struct DATSharedChar<V: DictionaryValue = ()> {
@@ -152,7 +154,9 @@ pub(crate) struct DATSharedChar<V: DictionaryValue = ()> {
 /// ```
 #[cfg_attr(
     feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(serialize = "V: serde::Serialize")),
+    serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
 #[derive(Clone, Debug)]
 pub struct DoubleArrayTrieChar<V: DictionaryValue = ()> {

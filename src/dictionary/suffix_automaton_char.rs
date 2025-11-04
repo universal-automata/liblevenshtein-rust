@@ -1,8 +1,9 @@
-//! Suffix automaton dictionary for approximate substring matching.
+//! Character-level suffix automaton dictionary for Unicode substring matching.
 //!
-//! This module implements a suffix automaton, which enables efficient approximate
-//! matching of substrings anywhere within indexed text (not just prefixes like
-//! traditional dictionaries).
+//! This module implements a character-level suffix automaton, which enables efficient
+//! approximate matching of substrings anywhere within indexed text with correct
+//! Unicode semantics. Unlike the byte-level `SuffixAutomaton`, this variant operates
+//! on Unicode scalar values (`char`) for proper multi-byte UTF-8 handling.
 //!
 //! # Overview
 //!
@@ -19,7 +20,7 @@
 //! ## Code Search
 //!
 //! ```rust,no_run
-//! use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+//! use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
 //! use liblevenshtein::transducer::{Transducer, Algorithm};
 //!
 //! let code = r#"
@@ -28,7 +29,7 @@
 //! }
 //! "#;
 //!
-//! let dict = SuffixAutomaton::<()>::from_text(code);
+//! let dict = SuffixAutomatonChar::<()>::from_text(code);
 //! let transducer = Transducer::new(dict, Algorithm::Standard);
 //!
 //! // Find "calculate" with typos
@@ -40,7 +41,7 @@
 //! ## Document Search
 //!
 //! ```rust,no_run
-//! use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+//! use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
 //! use liblevenshtein::transducer::{Transducer, Algorithm};
 //!
 //! let docs = vec![
@@ -48,7 +49,7 @@
 //!     "Suffix trees and suffix arrays for pattern search",
 //! ];
 //!
-//! let dict = SuffixAutomaton::<()>::from_texts(docs);
+//! let dict = SuffixAutomatonChar::<()>::from_texts(docs);
 //! let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 //!
 //! // Find "algorithm" even if misspelled
@@ -63,10 +64,10 @@
 //! # Dynamic Updates
 //!
 //! ```rust,no_run
-//! use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+//! use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
 //! use liblevenshtein::transducer::{Transducer, Algorithm};
 //!
-//! let dict = SuffixAutomaton::<()>::new();
+//! let dict = SuffixAutomatonChar::<()>::new();
 //! let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 //!
 //! // Build index incrementally
@@ -88,7 +89,7 @@
 //!
 //! # Comparison with Prefix Dictionaries
 //!
-//! | Feature | PathMap/DAWG | SuffixAutomaton |
+//! | Feature | PathMap/DAWG | SuffixAutomatonChar |
 //! |---------|--------------|-----------------|
 //! | **Matching** | Prefix (whole words) | Substring (anywhere) |
 //! | **Use Case** | Spell check, completion | Full-text search |
@@ -120,11 +121,11 @@ use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
     serde(bound(serialize = "V: serde::Serialize")),
     serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
-pub(crate) struct SuffixNode<V: DictionaryValue = ()> {
-    /// Outgoing edges: (byte label, target state index).
+pub(crate) struct SuffixNodeChar<V: DictionaryValue = ()> {
+    /// Outgoing edges: (character label, target state index).
     ///
-    /// Kept sorted by byte for efficient binary search on large alphabets.
-    pub(crate) edges: Vec<(u8, usize)>,
+    /// Kept sorted by character for efficient binary search on large alphabets.
+    pub(crate) edges: Vec<(char, usize)>,
 
     /// Suffix link: points to state representing the longest proper suffix
     /// in a different endpos equivalence class.
@@ -155,7 +156,7 @@ pub(crate) struct SuffixNode<V: DictionaryValue = ()> {
     pub(crate) value: Option<V>,
 }
 
-impl<V: DictionaryValue> SuffixNode<V> {
+impl<V: DictionaryValue> SuffixNodeChar<V> {
     /// Create a new root node.
     fn root() -> Self {
         Self {
@@ -184,7 +185,7 @@ impl<V: DictionaryValue> SuffixNode<V> {
     ///
     /// Uses linear search for small edge counts, binary search for larger.
     /// Threshold at 16 edges based on benchmarks from DAWG implementation.
-    fn find_edge(&self, label: u8) -> Option<usize> {
+    fn find_edge(&self, label: char) -> Option<usize> {
         if self.edges.len() < 16 {
             self.edges
                 .iter()
@@ -199,7 +200,7 @@ impl<V: DictionaryValue> SuffixNode<V> {
     }
 
     /// Add an edge, maintaining sorted order.
-    fn add_edge(&mut self, label: u8, target: usize) {
+    fn add_edge(&mut self, label: char, target: usize) {
         // Find insertion point to maintain sorted order
         match self.edges.binary_search_by_key(&label, |(b, _)| *b) {
             Ok(idx) => {
@@ -214,7 +215,7 @@ impl<V: DictionaryValue> SuffixNode<V> {
     }
 
     /// Update an existing edge target.
-    fn update_edge(&mut self, label: u8, new_target: usize) -> bool {
+    fn update_edge(&mut self, label: char, new_target: usize) -> bool {
         if let Some(idx) = self.edges.iter().position(|(b, _)| *b == label) {
             self.edges[idx].1 = new_target;
             true
@@ -235,12 +236,12 @@ impl<V: DictionaryValue> SuffixNode<V> {
     serde(bound(serialize = "V: serde::Serialize")),
     serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
-pub(crate) struct SuffixAutomatonInner<V: DictionaryValue = ()> {
+pub(crate) struct SuffixAutomatonCharInner<V: DictionaryValue = ()> {
     /// Node storage (index-based graph).
     ///
     /// State 0 is always the root. States are added sequentially during
     /// construction, resulting in dense index space.
-    pub(crate) nodes: Vec<SuffixNode<V>>,
+    pub(crate) nodes: Vec<SuffixNodeChar<V>>,
 
     /// Current state during online construction.
     ///
@@ -270,11 +271,11 @@ pub(crate) struct SuffixAutomatonInner<V: DictionaryValue = ()> {
     needs_compaction: bool,
 }
 
-impl<V: DictionaryValue> SuffixAutomatonInner<V> {
+impl<V: DictionaryValue> SuffixAutomatonCharInner<V> {
     /// Create an empty suffix automaton with root state.
     fn new() -> Self {
         Self {
-            nodes: vec![SuffixNode::root()],
+            nodes: vec![SuffixNodeChar::root()],
             last_state: 0,
             string_count: 0,
             source_texts: Vec::new(),
@@ -304,9 +305,9 @@ impl<V: DictionaryValue> SuffixAutomatonInner<V> {
     /// Unlike prefix tries where only complete words are final, in a suffix
     /// automaton EVERY state (except root) represents a valid substring.
     /// We mark all states as final to work with Transducer's matching logic.
-    fn extend(&mut self, ch: u8) {
+    fn extend(&mut self, ch: char) {
         let cur = self.nodes.len();
-        let mut new_node = SuffixNode::new(self.nodes[self.last_state].max_length + 1);
+        let mut new_node = SuffixNodeChar::new(self.nodes[self.last_state].max_length + 1);
         // Mark as final since every reachable state is a valid substring
         new_node.is_final = true;
         self.nodes.push(new_node);
@@ -390,10 +391,10 @@ impl<V: DictionaryValue> SuffixAutomatonInner<V> {
 /// Use with `Transducer` just like any other dictionary:
 ///
 /// ```rust,no_run
-/// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+/// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
 /// use liblevenshtein::transducer::{Transducer, Algorithm};
 ///
-/// let dict = SuffixAutomaton::<()>::from_text("example text");
+/// let dict = SuffixAutomatonChar::<()>::from_text("example text");
 /// let transducer = Transducer::new(dict, Algorithm::Standard);
 ///
 /// for term in transducer.query("exmple", 1) {
@@ -401,25 +402,25 @@ impl<V: DictionaryValue> SuffixAutomatonInner<V> {
 /// }
 /// ```
 #[derive(Clone, Debug)]
-pub struct SuffixAutomaton<V: DictionaryValue = ()> {
-    pub(crate) inner: Arc<RwLock<SuffixAutomatonInner<V>>>,
+pub struct SuffixAutomatonChar<V: DictionaryValue = ()> {
+    pub(crate) inner: Arc<RwLock<SuffixAutomatonCharInner<V>>>,
 }
 
-impl<V: DictionaryValue> SuffixAutomaton<V> {
+impl<V: DictionaryValue> SuffixAutomatonChar<V> {
     /// Create an empty suffix automaton.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
-    /// let dict = SuffixAutomaton::<()>::new();
+    /// let dict = SuffixAutomatonChar::<()>::new();
     /// dict.insert("hello");
     /// dict.insert("world");
     /// ```
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(RwLock::new(SuffixAutomatonInner::new())),
+            inner: Arc::new(RwLock::new(SuffixAutomatonCharInner::new())),
         }
     }
 
@@ -455,10 +456,10 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
     /// let code = "fn main() { println!(\"Hello\"); }";
-    /// let dict = SuffixAutomaton::<()>::from_text(code);
+    /// let dict = SuffixAutomatonChar::<()>::from_text(code);
     /// ```
     pub fn from_text(text: &str) -> Self {
         let dict = Self::new();
@@ -473,14 +474,14 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
     /// let docs = vec![
     ///     "First document text",
     ///     "Second document text",
     ///     "Third document text",
     /// ];
-    /// let dict = SuffixAutomaton::<()>::from_texts(docs);
+    /// let dict = SuffixAutomatonChar::<()>::from_texts(docs);
     /// ```
     pub fn from_texts<I, S>(texts: I) -> Self
     where
@@ -501,9 +502,9 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
-    /// let dict = SuffixAutomaton::<()>::new();
+    /// let dict = SuffixAutomatonChar::<()>::new();
     /// dict.insert("testing insertion");
     /// ```
     pub fn insert(&self, text: &str) -> bool {
@@ -514,7 +515,7 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
         inner.source_texts.push(text.to_string());
 
         // Extend automaton with each character
-        for ch in text.bytes() {
+        for ch in text.chars() {
             inner.extend(ch);
         }
 
@@ -545,9 +546,9 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
-    /// let dict = SuffixAutomaton::<()>::new();
+    /// let dict = SuffixAutomatonChar::<()>::new();
     /// dict.insert("test string");
     /// assert!(dict.remove("test string"));
     /// assert!(!dict.remove("test string")); // Already removed
@@ -557,7 +558,7 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
 
         // Navigate to end state for this text
         let mut state = 0;
-        for ch in text.bytes() {
+        for ch in text.chars() {
             match inner.nodes[state].find_edge(ch) {
                 Some(next) => state = next,
                 None => return false, // String not present
@@ -607,16 +608,16 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
-    /// let dict = SuffixAutomaton::<()>::new();
+    /// let dict = SuffixAutomatonChar::<()>::new();
     /// dict.insert("test");
     /// dict.clear();
     /// assert_eq!(dict.string_count(), 0);
     /// ```
     pub fn clear(&self) {
         let mut inner = self.inner.write().unwrap();
-        *inner = SuffixAutomatonInner::new();
+        *inner = SuffixAutomatonCharInner::new();
     }
 
     /// Compact internal structure (garbage collection).
@@ -632,9 +633,9 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
-    /// let dict = SuffixAutomaton::<()>::new();
+    /// let dict = SuffixAutomatonChar::<()>::new();
     /// dict.insert("test1");
     /// dict.insert("test2");
     /// dict.remove("test1");
@@ -705,9 +706,9 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
-    /// let dict = SuffixAutomaton::<()>::new();
+    /// let dict = SuffixAutomatonChar::<()>::new();
     /// assert_eq!(dict.string_count(), 0);
     ///
     /// dict.insert("test");
@@ -725,9 +726,9 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
-    /// let dict = SuffixAutomaton::<()>::new();
+    /// let dict = SuffixAutomatonChar::<()>::new();
     /// dict.insert("test");
     /// dict.remove("test");
     ///
@@ -751,10 +752,10 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
     /// let docs = vec!["testing", "test"];
-    /// let dict = SuffixAutomaton::<()>::from_texts(docs);
+    /// let dict = SuffixAutomatonChar::<()>::from_texts(docs);
     ///
     /// // Note: Position tracking is currently limited to final states
     /// // This is a placeholder for future enhancement
@@ -766,8 +767,8 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
 
         // Navigate to the state for this substring
         let mut state = 0;
-        for byte in substring.as_bytes() {
-            match inner.nodes[state].find_edge(*byte) {
+        for ch in substring.chars() {
+            match inner.nodes[state].find_edge(ch) {
                 Some(next) => state = next,
                 None => return Vec::new(), // Substring not found
             }
@@ -798,10 +799,10 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     /// # Examples
     ///
     /// ```rust
-    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
     ///
     /// let texts = vec!["hello world", "test string"];
-    /// let dict = SuffixAutomaton::<()>::from_texts(texts.clone());
+    /// let dict = SuffixAutomatonChar::<()>::from_texts(texts.clone());
     ///
     /// let sources = dict.source_texts();
     /// assert_eq!(sources.len(), 2);
@@ -812,14 +813,14 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     }
 }
 
-impl<V: DictionaryValue> Default for SuffixAutomaton<V> {
+impl<V: DictionaryValue> Default for SuffixAutomatonChar<V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[cfg(feature = "serialization")]
-impl<V: DictionaryValue + serde::Serialize> serde::Serialize for SuffixAutomaton<V> {
+impl<V: DictionaryValue + serde::Serialize> serde::Serialize for SuffixAutomatonChar<V> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -831,13 +832,13 @@ impl<V: DictionaryValue + serde::Serialize> serde::Serialize for SuffixAutomaton
 }
 
 #[cfg(feature = "serialization")]
-impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de> for SuffixAutomaton<V> {
+impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de> for SuffixAutomatonChar<V> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let inner = SuffixAutomatonInner::deserialize(deserializer)?;
-        Ok(SuffixAutomaton {
+        let inner = SuffixAutomatonCharInner::deserialize(deserializer)?;
+        Ok(SuffixAutomatonChar {
             inner: Arc::new(RwLock::new(inner)),
         })
     }
@@ -848,23 +849,23 @@ impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de> 
 /// Implements `DictionaryNode` trait for compatibility with existing
 /// `Transducer` and query infrastructure.
 #[derive(Clone, Debug)]
-pub struct SuffixNodeHandle<V: DictionaryValue = ()> {
+pub struct SuffixNodeCharHandle<V: DictionaryValue = ()> {
     /// Reference to the automaton (for traversal).
-    automaton: Arc<RwLock<SuffixAutomatonInner<V>>>,
+    automaton: Arc<RwLock<SuffixAutomatonCharInner<V>>>,
 
     /// Current state index.
     state_id: usize,
 }
 
-impl<V: DictionaryValue> DictionaryNode for SuffixNodeHandle<V> {
-    type Unit = u8;
+impl<V: DictionaryValue> DictionaryNode for SuffixNodeCharHandle<V> {
+    type Unit = char;
 
     fn is_final(&self) -> bool {
         let inner = self.automaton.read().unwrap();
         inner.nodes[self.state_id].is_final
     }
 
-    fn transition(&self, label: u8) -> Option<Self> {
+    fn transition(&self, label: char) -> Option<Self> {
         let inner = self.automaton.read().unwrap();
         inner.nodes[self.state_id]
             .find_edge(label)
@@ -874,7 +875,7 @@ impl<V: DictionaryValue> DictionaryNode for SuffixNodeHandle<V> {
             })
     }
 
-    fn edges(&self) -> Box<dyn Iterator<Item = (u8, Self)> + '_> {
+    fn edges(&self) -> Box<dyn Iterator<Item = (char, Self)> + '_> {
         // Clone edges to avoid holding lock during iteration
         let inner = self.automaton.read().unwrap();
         let edges = inner.nodes[self.state_id].edges.clone();
@@ -891,7 +892,7 @@ impl<V: DictionaryValue> DictionaryNode for SuffixNodeHandle<V> {
         }))
     }
 
-    fn has_edge(&self, label: u8) -> bool {
+    fn has_edge(&self, label: char) -> bool {
         let inner = self.automaton.read().unwrap();
         inner.nodes[self.state_id].find_edge(label).is_some()
     }
@@ -902,11 +903,11 @@ impl<V: DictionaryValue> DictionaryNode for SuffixNodeHandle<V> {
     }
 }
 
-impl<V: DictionaryValue> Dictionary for SuffixAutomaton<V> {
-    type Node = SuffixNodeHandle<V>;
+impl<V: DictionaryValue> Dictionary for SuffixAutomatonChar<V> {
+    type Node = SuffixNodeCharHandle<V>;
 
     fn root(&self) -> Self::Node {
-        SuffixNodeHandle {
+        SuffixNodeCharHandle {
             automaton: Arc::clone(&self.inner),
             state_id: 0,
         }
@@ -914,8 +915,8 @@ impl<V: DictionaryValue> Dictionary for SuffixAutomaton<V> {
 
     fn contains(&self, term: &str) -> bool {
         let mut node = self.root();
-        for byte in term.as_bytes() {
-            match node.transition(*byte) {
+        for ch in term.chars() {
+            match node.transition(ch) {
                 Some(next) => node = next,
                 None => return false,
             }
@@ -939,7 +940,7 @@ impl<V: DictionaryValue> Dictionary for SuffixAutomaton<V> {
 }
 
 #[cfg(feature = "serialization")]
-impl<V: DictionaryValue> crate::serialization::DictionaryFromTerms for SuffixAutomaton<V> {
+impl<V: DictionaryValue> crate::serialization::DictionaryFromTerms for SuffixAutomatonChar<V> {
     /// Create a suffix automaton from texts.
     ///
     /// Note: For suffix automata, "terms" are treated as source texts
@@ -955,7 +956,7 @@ impl<V: DictionaryValue> crate::serialization::DictionaryFromTerms for SuffixAut
 
 use crate::dictionary::{MappedDictionary, MappedDictionaryNode, MutableMappedDictionary};
 
-impl<V: DictionaryValue> MappedDictionaryNode for SuffixNodeHandle<V> {
+impl<V: DictionaryValue> MappedDictionaryNode for SuffixNodeCharHandle<V> {
     type Value = V;
 
     fn value(&self) -> Option<Self::Value> {
@@ -964,14 +965,14 @@ impl<V: DictionaryValue> MappedDictionaryNode for SuffixNodeHandle<V> {
     }
 }
 
-impl<V: DictionaryValue> MappedDictionary for SuffixAutomaton<V> {
+impl<V: DictionaryValue> MappedDictionary for SuffixAutomatonChar<V> {
     type Value = V;
 
     fn get_value(&self, term: &str) -> Option<Self::Value> {
         // Navigate to the term
         let mut node = self.root();
-        for byte in term.as_bytes() {
-            match node.transition(*byte) {
+        for ch in term.chars() {
+            match node.transition(ch) {
                 Some(next) => node = next,
                 None => return None,
             }
@@ -992,7 +993,7 @@ impl<V: DictionaryValue> MappedDictionary for SuffixAutomaton<V> {
     }
 }
 
-impl<V: DictionaryValue> MutableMappedDictionary for SuffixAutomaton<V> {
+impl<V: DictionaryValue> MutableMappedDictionary for SuffixAutomatonChar<V> {
     fn insert_with_value(&self, term: &str, value: Self::Value) -> bool {
         let mut inner = self.inner.write().unwrap();
 
@@ -1000,8 +1001,8 @@ impl<V: DictionaryValue> MutableMappedDictionary for SuffixAutomaton<V> {
         inner.last_state = 0;
 
         // Extend with all characters
-        for &byte in term.as_bytes() {
-            inner.extend(byte);
+        for ch in term.chars() {
+            inner.extend(ch);
         }
 
         // Set the value at the final state
@@ -1022,14 +1023,14 @@ mod tests {
 
     #[test]
     fn test_empty_automaton() {
-        let dict = SuffixAutomaton::<()>::new();
+        let dict = SuffixAutomatonChar::<()>::new();
         assert_eq!(dict.string_count(), 0);
         assert!(!dict.needs_compaction());
     }
 
     #[test]
     fn test_single_character() {
-        let dict = SuffixAutomaton::<()>::from_text("a");
+        let dict = SuffixAutomatonChar::<()>::from_text("a");
         assert_eq!(dict.string_count(), 1);
         assert!(dict.contains("a"));
         assert!(!dict.contains("b"));
@@ -1037,7 +1038,7 @@ mod tests {
 
     #[test]
     fn test_simple_string() {
-        let dict = SuffixAutomaton::<()>::from_text("abc");
+        let dict = SuffixAutomatonChar::<()>::from_text("abc");
         assert_eq!(dict.string_count(), 1);
 
         // All suffixes should be present
@@ -1057,7 +1058,7 @@ mod tests {
 
     #[test]
     fn test_repeated_characters() {
-        let dict = SuffixAutomaton::<()>::from_text("aaa");
+        let dict = SuffixAutomatonChar::<()>::from_text("aaa");
         assert_eq!(dict.string_count(), 1);
 
         assert!(dict.contains("aaa"));
@@ -1067,7 +1068,7 @@ mod tests {
 
     #[test]
     fn test_complex_string() {
-        let dict = SuffixAutomaton::<()>::from_text("abcbc");
+        let dict = SuffixAutomatonChar::<()>::from_text("abcbc");
         assert_eq!(dict.string_count(), 1);
 
         // All suffixes
@@ -1084,7 +1085,7 @@ mod tests {
 
     #[test]
     fn test_multiple_strings() {
-        let dict = SuffixAutomaton::<()>::from_texts(vec!["abc", "def"]);
+        let dict = SuffixAutomatonChar::<()>::from_texts(vec!["abc", "def"]);
         assert_eq!(dict.string_count(), 2);
 
         // Substrings from first text
@@ -1100,7 +1101,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_remove() {
-        let dict = SuffixAutomaton::<()>::new();
+        let dict = SuffixAutomatonChar::<()>::new();
 
         assert!(dict.insert("test"));
         assert_eq!(dict.string_count(), 1);
@@ -1115,7 +1116,7 @@ mod tests {
 
     #[test]
     fn test_clear() {
-        let dict = SuffixAutomaton::<()>::from_texts(vec!["abc", "def", "ghi"]);
+        let dict = SuffixAutomatonChar::<()>::from_texts(vec!["abc", "def", "ghi"]);
         assert_eq!(dict.string_count(), 3);
 
         dict.clear();
@@ -1125,7 +1126,7 @@ mod tests {
 
     #[test]
     fn test_compaction() {
-        let dict = SuffixAutomaton::<()>::new();
+        let dict = SuffixAutomatonChar::<()>::new();
 
         dict.insert("test1");
         dict.insert("test2");
@@ -1149,7 +1150,7 @@ mod tests {
     fn test_match_positions() {
         // Position tracking currently works for strings that end at final states
         let docs = vec!["hello", "world"];
-        let dict = SuffixAutomaton::<()>::from_texts(docs);
+        let dict = SuffixAutomatonChar::<()>::from_texts(docs);
 
         // "hello" and "world" are complete strings, so they end at final states
         let positions_hello = dict.match_positions("hello");
@@ -1167,7 +1168,7 @@ mod tests {
 
     #[test]
     fn test_dictionary_trait() {
-        let dict = SuffixAutomaton::<()>::from_text("test");
+        let dict = SuffixAutomatonChar::<()>::from_text("test");
 
         // Test Dictionary trait methods
         assert_eq!(dict.len(), Some(1));
@@ -1176,15 +1177,15 @@ mod tests {
 
         // Test node traversal
         let root = dict.root();
-        assert!(root.has_edge(b't'));
+        assert!(root.has_edge('t'));
 
-        let node_t = root.transition(b't').unwrap();
-        assert!(node_t.has_edge(b'e'));
+        let node_t = root.transition('t').unwrap();
+        assert!(node_t.has_edge('e'));
     }
 
     #[test]
     fn test_node_edges() {
-        let dict = SuffixAutomaton::<()>::from_text("ab");
+        let dict = SuffixAutomatonChar::<()>::from_text("ab");
         let root = dict.root();
 
         let edges: Vec<_> = root.edges().collect();
@@ -1192,14 +1193,14 @@ mod tests {
 
         // Should have edges for suffixes "ab" and "b"
         let labels: Vec<_> = edges.iter().map(|(l, _)| *l).collect();
-        assert!(labels.contains(&b'a') || labels.contains(&b'b'));
+        assert!(labels.contains(&'a') || labels.contains(&'b'));
     }
 
     #[test]
     fn test_mapped_dictionary_basic() {
         use crate::dictionary::MappedDictionary;
 
-        let dict: SuffixAutomaton<u32> = SuffixAutomaton::new();
+        let dict: SuffixAutomatonChar<u32> = SuffixAutomatonChar::new();
         dict.insert_with_value("test", 42);
         dict.insert_with_value("hello", 100);
 
@@ -1212,7 +1213,7 @@ mod tests {
     fn test_mapped_dictionary_contains_with_value() {
         use crate::dictionary::MappedDictionary;
 
-        let dict: SuffixAutomaton<String> = SuffixAutomaton::new();
+        let dict: SuffixAutomatonChar<String> = SuffixAutomatonChar::new();
         dict.insert_with_value("test", "value1".to_string());
         dict.insert_with_value("hello", "value2".to_string());
 
@@ -1225,7 +1226,7 @@ mod tests {
     fn test_mapped_dictionary_vec_values() {
         use crate::dictionary::MappedDictionary;
 
-        let dict: SuffixAutomaton<Vec<usize>> = SuffixAutomaton::new();
+        let dict: SuffixAutomatonChar<Vec<usize>> = SuffixAutomatonChar::new();
         dict.insert_with_value("scoped", vec![1, 2, 3]);
         dict.insert_with_value("global", vec![0]);
 
@@ -1238,20 +1239,79 @@ mod tests {
     fn test_mapped_node_value() {
         use crate::dictionary::MappedDictionaryNode;
 
-        let dict: SuffixAutomaton<u32> = SuffixAutomaton::new();
+        let dict: SuffixAutomatonChar<u32> = SuffixAutomatonChar::new();
         dict.insert_with_value("test", 42);
 
         // Navigate to "test"
         let root = dict.root();
-        let t = root.transition(b't').unwrap();
-        let e = t.transition(b'e').unwrap();
-        let s = e.transition(b's').unwrap();
-        let t2 = s.transition(b't').unwrap();
+        let t = root.transition('t').unwrap();
+        let e = t.transition('e').unwrap();
+        let s = e.transition('s').unwrap();
+        let t2 = s.transition('t').unwrap();
 
         // The final node should have the value
         assert_eq!(t2.value(), Some(42));
 
         // Non-final nodes should not have values
         assert_eq!(t.value(), None);
+    }
+
+    #[test]
+    fn test_unicode_cafe() {
+        // Test with accented characters (multi-byte UTF-8)
+        let dict = SuffixAutomatonChar::<()>::from_text("café");
+
+        // All suffixes should be present
+        assert!(dict.contains("café"));  // 4 chars, 5 bytes
+        assert!(dict.contains("afé"));   // 3 chars, 4 bytes
+        assert!(dict.contains("fé"));    // 2 chars, 3 bytes
+        assert!(dict.contains("é"));     // 1 char, 2 bytes
+
+        // Prefixes should also be found
+        assert!(dict.contains("caf"));
+        assert!(dict.contains("ca"));
+        assert!(dict.contains("c"));
+    }
+
+    #[test]
+    fn test_unicode_emoji() {
+        // Test with emoji (4-byte UTF-8)
+        let dict = SuffixAutomatonChar::<()>::from_text("test🎉ing");
+
+        assert!(dict.contains("test🎉ing"));
+        assert!(dict.contains("🎉ing"));
+        assert!(dict.contains("🎉"));
+        assert!(dict.contains("ing"));
+    }
+
+    #[test]
+    fn test_unicode_cjk() {
+        // Test with CJK characters
+        let dict = SuffixAutomatonChar::<()>::from_text("你好世界");
+
+        assert!(dict.contains("你好世界"));
+        assert!(dict.contains("好世界"));
+        assert!(dict.contains("世界"));
+        assert!(dict.contains("界"));
+        assert!(dict.contains("你好"));
+        assert!(dict.contains("你"));
+    }
+
+    #[test]
+    fn test_unicode_mixed() {
+        // Test with mixed Unicode content
+        let dict = SuffixAutomatonChar::<String>::from_texts(vec![
+            "café☕",
+            "naïve🌟",
+            "中文test"
+        ]);
+
+        assert_eq!(dict.string_count(), 3);
+        assert!(dict.contains("café"));
+        assert!(dict.contains("☕"));
+        assert!(dict.contains("naïve"));
+        assert!(dict.contains("🌟"));
+        assert!(dict.contains("中文"));
+        assert!(dict.contains("test"));
     }
 }

@@ -62,7 +62,7 @@ This library provides efficient fuzzy string matching against large dictionaries
   - **DynamicDawg** - DAWG with online insert/delete/minimize operations
   - **DynamicDawgChar** - Character-level DAWG with Unicode support and online updates
   - **SuffixAutomaton** - For substring/infix matching
-  - **CompressedSuffixAutomaton** ⚠️ (experimental, incomplete) - Compressed suffix automaton (single-text only)
+  - **SuffixAutomatonChar** - Character-level suffix automaton for Unicode substring matching
   - Extensible trait-based design for custom backends
 - **Ordered results**: `OrderedQueryIterator` returns results sorted by distance first, then lexicographically
 - **Filtering and prefix matching**: Filter results with custom predicates, enable prefix mode for code completion

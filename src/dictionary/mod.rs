@@ -35,6 +35,12 @@
 //! - **Need substring/infix search?** Use [`SuffixAutomaton`](suffix_automaton::SuffixAutomaton)
 //!   - Find patterns anywhere in text (not just prefixes)
 //!   - Specialized for suffix-based matching
+//!   - Byte-level operation
+//!
+//! - **Need substring search with Unicode?** Use [`SuffixAutomatonChar`](suffix_automaton_char::SuffixAutomatonChar)
+//!   - Correct character-level substring matching
+//!   - Handles accented characters, CJK, emoji correctly
+//!   - ~5% performance overhead vs byte-level
 //!
 //! ## Detailed Comparison
 //!
@@ -49,6 +55,7 @@
 //! | **[DawgDictionary]** | Static dictionaries | ⭐⭐⭐ | ⭐⭐⭐ | ❌ | Byte-level |
 //! | **[OptimizedDawg]** | Fast construction | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ❌ | Byte-level |
 //! | **[SuffixAutomaton]** | Substring search | ⭐⭐⭐ | ⭐⭐ | ✅ Insert + Remove | Byte-level |
+//! | **[SuffixAutomatonChar]** | Unicode substring search | ⭐⭐⭐ | ⭐⭐ | ✅ Insert + Remove | ✅ Character-level |
 //!
 //! [DoubleArrayTrie]: double_array_trie::DoubleArrayTrie
 //! [DoubleArrayTrieChar]: double_array_trie_char::DoubleArrayTrieChar
@@ -59,6 +66,7 @@
 //! [DawgDictionary]: dawg::DawgDictionary
 //! [OptimizedDawg]: dawg_optimized::OptimizedDawg
 //! [SuffixAutomaton]: suffix_automaton::SuffixAutomaton
+//! [SuffixAutomatonChar]: suffix_automaton_char::SuffixAutomatonChar
 //!
 //! ## Performance Benchmarks (10,000 words)
 //!
@@ -105,12 +113,18 @@
 //! **Finding patterns anywhere in text (not just as prefixes):**
 //! ```rust,ignore
 //! use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
-//! let dict = SuffixAutomaton::from_source_text("the quick brown fox");
+//! let dict = SuffixAutomaton::<()>::from_text("the quick brown fox");
 //! // Can find "quick" even though it's not a prefix
+//! ```
+//!
+//! **Unicode substring search (finding patterns in multi-language text):**
+//! ```rust,ignore
+//! use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
+//! let dict = SuffixAutomatonChar::<()>::from_text("café naïve 中文 🎉");
+//! // Can find "café", "naï", "中", "🎉" anywhere in the text
 //! ```
 
 pub mod char_unit;
-pub mod compressed_suffix_automaton;
 pub mod dawg;
 pub mod dawg_optimized;
 pub mod dawg_query;
@@ -120,6 +134,8 @@ pub mod double_array_trie_char_zipper;
 pub mod double_array_trie_zipper;
 pub mod dynamic_dawg;
 pub mod dynamic_dawg_char;
+pub mod dynamic_dawg_char_zipper;
+pub mod dynamic_dawg_zipper;
 pub mod factory;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap;
@@ -128,6 +144,9 @@ pub mod pathmap_char;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap_zipper;
 pub mod suffix_automaton;
+pub mod suffix_automaton_char;
+pub mod suffix_automaton_char_zipper;
+pub mod suffix_automaton_zipper;
 pub mod value;
 pub mod zipper;
 

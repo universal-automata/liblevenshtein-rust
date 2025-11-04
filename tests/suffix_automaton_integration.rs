@@ -9,7 +9,7 @@ use liblevenshtein::transducer::{Algorithm, Transducer};
 #[test]
 fn test_exact_substring_match() {
     let text = "The quick brown fox jumps over the lazy dog";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Exact matches with distance 0
@@ -25,7 +25,7 @@ fn test_exact_substring_match() {
 #[test]
 fn test_approximate_substring_match() {
     let text = "testing approximate matching in suffix automaton";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Should find "approximate" with 1 typo
@@ -42,7 +42,7 @@ fn test_approximate_substring_match() {
 #[test]
 fn test_ordered_query() {
     let text = "algorithm implementation test";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Query with ordered results
@@ -66,7 +66,7 @@ fn test_multiple_documents() {
         "second document also has test",
         "third one contains testing",
     ];
-    let dict = SuffixAutomaton::from_texts(docs);
+    let dict = SuffixAutomaton::<()>::from_texts(docs);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Search across all documents
@@ -91,7 +91,7 @@ fn test_code_search_example() {
     }
     "#;
 
-    let dict = SuffixAutomaton::from_text(code);
+    let dict = SuffixAutomaton::<()>::from_text(code);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Find function names with typos
@@ -109,7 +109,7 @@ fn test_code_search_example() {
 fn test_substring_vs_prefix_behavior() {
     // Compare suffix automaton (substring matching) behavior
     let text = "contestation";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Suffix automaton should find substrings anywhere
@@ -124,7 +124,7 @@ fn test_substring_vs_prefix_behavior() {
 
 #[test]
 fn test_dynamic_updates_with_queries() {
-    let dict = SuffixAutomaton::new();
+    let dict = SuffixAutomaton::<()>::new();
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     // Initially empty
@@ -150,7 +150,7 @@ fn test_dynamic_updates_with_queries() {
 #[test]
 fn test_empty_query() {
     let text = "sample text";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Empty query with suffix automaton returns all substrings (correct behavior)
@@ -166,7 +166,7 @@ fn test_empty_query() {
 #[test]
 fn test_distance_variations() {
     let text = "programming";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Distance 0: exact match only
@@ -185,7 +185,7 @@ fn test_distance_variations() {
 #[test]
 fn test_special_characters() {
     let text = "hello-world test_case foo.bar";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // Should handle special characters
@@ -202,7 +202,7 @@ fn test_special_characters() {
 #[test]
 fn test_unicode_text() {
     let text = "hello мир 世界 🌍";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     // ASCII substring

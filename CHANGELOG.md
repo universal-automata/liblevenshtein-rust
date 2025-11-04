@@ -7,6 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-11-04
+
+### Added
+
+#### SuffixAutomatonChar - Unicode Substring Matching (2025-11-04)
+- **New SuffixAutomatonChar dictionary backend**
+  - Character-level variant of SuffixAutomaton for correct Unicode substring matching
+  - Operates on Unicode scalar values (`char`) instead of bytes (`u8`)
+  - Correct character-level matching for multi-byte UTF-8 sequences
+  - Example: finds "café" as substring in "local café shop" with correct distances
+  - Supports all Unicode: accented characters, CJK, emoji, Cyrillic, etc.
+
+- **Full suffix automaton capabilities with Unicode**
+  - Thread-safe insert and remove operations
+  - Online construction algorithm (O(n) amortized)
+  - Endpos equivalence and suffix links
+  - Generic over value types: `SuffixAutomatonChar<V: DictionaryValue = ()>`
+  - Serialization support with proper bounds
+
+- **Performance characteristics**
+  - ~5-8% slower than byte-level due to character iteration
+  - ~4x memory for edge labels (4 bytes per `char` vs 1 byte per `u8`)
+  - ≤2n-1 states for n-character text (same as byte-level)
+  - Recommended for Unicode substring search applications
+
+- **Comprehensive testing and documentation**
+  - 20 tests covering Unicode scenarios (café, emoji, CJK, mixed)
+  - Module documentation with usage examples
+  - Added to DOCUMENTATION_INDEX.md
+  - Updated dictionary comparison tables
+
+#### Zipper Implementations for Navigation (2025-11-04)
+- **DynamicDawgZipper** - Byte-level DAWG navigation
+  - State-index-based navigation with lock-per-operation pattern
+  - Implements `DictZipper` and `ValuedDictZipper` traits
+  - Thread-safe concurrent access
+  - 12 tests covering navigation, values, concurrency
+
+- **DynamicDawgCharZipper** - Character-level DAWG navigation
+  - Unicode-aware zipper for DynamicDawgChar
+  - Path tracking with `Vec<char>`
+  - 14 tests including Unicode-specific scenarios
+
+- **SuffixAutomatonZipper** - Byte-level substring navigation
+  - Efficient navigation through suffix automaton states
+  - Lock-per-operation for minimal contention
+  - 12 tests for substring matching scenarios
+
+- **SuffixAutomatonCharZipper** - Unicode substring navigation
+  - Character-level zipper for SuffixAutomatonChar
+  - Correct Unicode path tracking
+  - 14 tests including emoji and CJK navigation
+
+#### MappedDictionary Support for SuffixAutomaton (2025-11-04)
+- **Extended SuffixAutomaton with value support**
+  - Made generic over `V: DictionaryValue` (default `()`)
+  - Implemented `MappedDictionary` and `MappedDictionaryNode` traits
+  - Added `insert_with_value()` and `get_value()` methods
+  - Full backward compatibility with existing code
+  - Proper serde serialization bounds
+
+- **Use cases**
+  - Code search with metadata (file paths, line numbers)
+  - Document search with occurrence positions
+  - Log analysis with contextual information
+
+### Fixed
+- **Serialization bounds for DoubleArrayTrieChar**
+  - Added serde bounds for generic type parameter `V`
+  - Fixes compilation with `--all-features` flag
+  - Applied to both `DATSharedChar` and `DoubleArrayTrieChar` structs
+
+- **Type annotations in examples and tests**
+  - Updated examples to use explicit type parameters (`SuffixAutomaton::<()>`)
+  - Fixed serialization test type annotations
+  - Removed deprecated `compressed_suffix_demo.rs` example
+
+- **Import paths in SuffixAutomatonChar doctests**
+  - Fixed module imports from `suffix_automaton::` to `suffix_automaton_char::`
+  - All 10+ doctests now compile correctly
+
+### Documentation
+- **Updated src/dictionary/mod.rs**
+  - Added SuffixAutomatonChar to quick start guide
+  - Updated comparison table with Unicode substring search
+  - Added usage example with multi-language text
+
+- **Updated DOCUMENTATION_INDEX.md**
+  - Added SuffixAutomatonChar to dictionary types table
+  - Added 4 new zipper types to zipper section
+  - Added SuffixAutomatonChar implementation details (~1100 lines)
+
+### Removed
+- **CompressedSuffixAutomaton** (experimental, incomplete)
+  - Removed implementation file: `src/dictionary/compressed_suffix_automaton.rs`
+  - Removed from prelude exports
+  - Removed from module declarations
+  - Removed from README.md
+  - **Breaking change**: Code using `CompressedSuffixAutomaton` should migrate to:
+    - `SuffixAutomaton` for byte-level substring matching
+    - `SuffixAutomatonChar` for Unicode substring matching
+  - Rationale: Was experimental, incomplete, and single-text only; superseded by fully-featured suffix automaton implementations
+
 ## [0.5.0] - 2025-11-04
 
 ### Added

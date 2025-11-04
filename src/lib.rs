@@ -51,7 +51,6 @@ pub mod cli;
 
 /// Common imports for convenient usage
 pub mod prelude {
-    pub use crate::dictionary::compressed_suffix_automaton::CompressedSuffixAutomaton;
     pub use crate::dictionary::dawg::DawgDictionary;
     pub use crate::dictionary::dawg_optimized::OptimizedDawg;
     pub use crate::dictionary::double_array_trie::DoubleArrayTrie;

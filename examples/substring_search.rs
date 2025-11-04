@@ -47,7 +47,7 @@ async fn fetch_user_data(user_id: u64) -> Result<User, Error> {
 "#;
 
     // Build suffix automaton from code
-    let dict = SuffixAutomaton::from_text(code);
+    let dict = SuffixAutomaton::<()>::from_text(code);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Indexed code snippet ({} characters)\n", code.len());
@@ -85,7 +85,7 @@ fn document_search_example() {
                     Levenshtein, who considered this distance in 1965. The metric \
                     is also known as edit distance.";
 
-    let dict = SuffixAutomaton::from_text(document);
+    let dict = SuffixAutomaton::<()>::from_text(document);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Indexed document ({} characters)\n", document.len());
@@ -118,7 +118,7 @@ fn multi_document_search_example() {
     ];
 
     // Index all documents
-    let dict = SuffixAutomaton::from_texts(documents.clone());
+    let dict = SuffixAutomaton::<()>::from_texts(documents.clone());
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     println!("Indexed {} documents\n", documents.len());
@@ -153,7 +153,7 @@ fn ordered_results_example() {
     let text = "The quick brown fox jumps over the lazy dog. The five boxing \
                 wizards jump quickly. Pack my box with five dozen liquor jugs.";
 
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
 
     println!("Indexed text ({} characters)\n", text.len());

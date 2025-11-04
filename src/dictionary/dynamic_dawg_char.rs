@@ -62,7 +62,7 @@ use std::sync::Arc;
 /// ```
 #[derive(Clone, Debug)]
 pub struct DynamicDawgChar<V: DictionaryValue = ()> {
-    inner: Arc<RwLock<DynamicDawgCharInner<V>>>,
+    pub(crate) inner: Arc<RwLock<DynamicDawgCharInner<V>>>,
 }
 
 #[derive(Debug)]
@@ -72,8 +72,8 @@ pub struct DynamicDawgChar<V: DictionaryValue = ()> {
     serde(bound(serialize = "V: serde::Serialize")),
     serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
-struct DynamicDawgCharInner<V: DictionaryValue> {
-    nodes: Vec<DawgNodeChar<V>>,
+pub(crate) struct DynamicDawgCharInner<V: DictionaryValue> {
+    pub(crate) nodes: Vec<DawgNodeChar<V>>,
     term_count: usize,
     needs_compaction: bool,
     // Suffix sharing cache: hash of suffix -> node index
@@ -120,14 +120,14 @@ struct NodeSignature {
     serde(bound(serialize = "V: serde::Serialize")),
     serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
-struct DawgNodeChar<V: DictionaryValue> {
+pub(crate) struct DawgNodeChar<V: DictionaryValue> {
     // Use SmallVec to avoid heap allocation for nodes with ≤4 edges (most common case)
-    edges: SmallVec<[(char, usize); 4]>,
-    is_final: bool,
+    pub(crate) edges: SmallVec<[(char, usize); 4]>,
+    pub(crate) is_final: bool,
     // Reference count for dynamic deletion
     ref_count: usize,
     // Optional value associated with this node (only for final nodes)
-    value: Option<V>,
+    pub(crate) value: Option<V>,
 }
 
 impl<V: DictionaryValue> DawgNodeChar<V> {

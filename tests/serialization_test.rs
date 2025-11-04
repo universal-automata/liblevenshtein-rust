@@ -175,7 +175,7 @@ mod serialization_tests {
     #[test]
     fn test_suffix_automaton_bincode_roundtrip() {
         let terms: Vec<String> = test_terms().iter().map(|s| s.to_string()).collect();
-        let dict = SuffixAutomaton::from_texts(terms.clone());
+        let dict = SuffixAutomaton::<()>::from_texts(terms.clone());
 
         // Serialize
         let mut buffer = Vec::new();
@@ -352,7 +352,7 @@ mod serialization_tests {
     #[test]
     fn test_suffix_automaton_json_roundtrip() {
         let terms: Vec<String> = test_terms().iter().map(|s| s.to_string()).collect();
-        let dict = SuffixAutomaton::from_texts(terms.clone());
+        let dict = SuffixAutomaton::<()>::from_texts(terms.clone());
 
         // Serialize
         let json =

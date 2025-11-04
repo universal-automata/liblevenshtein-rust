@@ -7,7 +7,7 @@ use liblevenshtein::transducer::{Algorithm, Transducer};
 fn main() {
     // Use simple text first for debugging
     let text = "ab";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict = SuffixAutomaton::<()>::from_text(text);
 
     println!("=== Dictionary Info ===");
     println!("String count: {}", dict.string_count());
