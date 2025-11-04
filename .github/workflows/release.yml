@@ -431,9 +431,38 @@ jobs:
           liblevenshtein query "tset" --dict /tmp/test-dict.txt -m 2
           echo "Basic query test passed!"
 
+  create-release:
+    name: Create GitHub Release
+    needs: [build-matrix, package-deb, package-rpm, package-arch, test-deb-package, test-rpm-package, test-arch-package]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            liblevenshtein-linux-*/*.tar.gz
+            liblevenshtein-linux-*/*.zip
+            liblevenshtein-macos-*/*.tar.gz
+            liblevenshtein-macos-*/*.zip
+            debian-package/*.deb
+            rpm-package/*.rpm
+            arch-package-*/*.pkg.tar.zst
+          draft: false
+          prerelease: false
+          body: |
+            See [CHANGELOG.md](https://github.com/universal-automata/liblevenshtein-rust/blob/master/CHANGELOG.md) for details.
+
+            **Available on crates.io**: `cargo add liblevenshtein`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-crates-io:
     name: Publish to crates.io
-    needs: [build-matrix, test-deb-package, test-rpm-package, test-arch-package]
+    needs: create-release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -615,32 +644,3 @@ jobs:
           echo "  - Unicode support works"
           echo "  - All algorithms available"
           echo "  - Serialization feature works"
-
-  create-release:
-    name: Create GitHub Release
-    needs: [build-matrix, package-deb, package-rpm, package-arch, test-deb-package, test-rpm-package, test-arch-package, test-crates-io]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            liblevenshtein-linux-*/*.tar.gz
-            liblevenshtein-linux-*/*.zip
-            liblevenshtein-macos-*/*.tar.gz
-            liblevenshtein-macos-*/*.zip
-            debian-package/*.deb
-            rpm-package/*.rpm
-            arch-package-*/*.pkg.tar.zst
-          draft: false
-          prerelease: false
-          body: |
-            See [CHANGELOG.md](https://github.com/universal-automata/liblevenshtein-rust/blob/master/CHANGELOG.md) for details.
-
-            **Available on crates.io**: `cargo add liblevenshtein`
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
