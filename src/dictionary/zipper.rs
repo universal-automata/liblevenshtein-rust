@@ -261,6 +261,7 @@ mod tests {
     // Actual functionality tests are in backend-specific test files
 
     #[test]
+    #[allow(dead_code)]
     fn test_dict_zipper_trait_bounds() {
         fn requires_zipper<Z: DictZipper>() {}
 
@@ -269,6 +270,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(dead_code)]
     fn test_valued_zipper_trait_bounds() {
         fn requires_valued_zipper<Z: ValuedDictZipper>() {}
 
