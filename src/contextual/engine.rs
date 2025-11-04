@@ -23,6 +23,10 @@ use std::sync::{Arc, Mutex, RwLock};
 /// - **Checkpoints**: Undo history per draft
 /// - **Dictionary**: Finalized terms with context associations
 ///
+/// # Type Parameters
+///
+/// - `D`: Dictionary backend (must implement `MappedDictionary<Value = Vec<ContextId>>`)
+///
 /// # Thread Safety
 ///
 /// The engine uses interior mutability with `Mutex` and `RwLock` for
@@ -33,10 +37,15 @@ use std::sync::{Arc, Mutex, RwLock};
 ///
 /// ```
 /// use liblevenshtein::contextual::ContextualCompletionEngine;
+/// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
 /// use liblevenshtein::transducer::Algorithm;
 ///
-/// // Create engine
+/// // Create engine with default PathMapDictionary backend
 /// let engine = ContextualCompletionEngine::new();
+///
+/// // Or create with a specific dictionary
+/// let dict = PathMapDictionary::new();
+/// let engine2 = ContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
 ///
 /// // Create global context
 /// let global = engine.create_root_context(0);
@@ -48,7 +57,10 @@ use std::sync::{Arc, Mutex, RwLock};
 /// let completions = engine.complete(global, "helo", 1);
 /// assert!(completions.iter().any(|c| c.term == "hello"));
 /// ```
-pub struct ContextualCompletionEngine {
+pub struct ContextualCompletionEngine<D = PathMapDictionary<Vec<ContextId>>>
+where
+    D: crate::dictionary::MutableMappedDictionary<Value = Vec<ContextId>> + Clone,
+{
     /// Draft buffers per context (context_id -> buffer)
     drafts: Arc<Mutex<HashMap<ContextId, DraftBuffer>>>,
 
@@ -60,11 +72,12 @@ pub struct ContextualCompletionEngine {
 
     /// Transducer for fuzzy matching against finalized dictionary
     /// Maps terms to the contexts where they're defined
-    transducer: Arc<RwLock<Transducer<PathMapDictionary<Vec<ContextId>>>>>,
+    transducer: Arc<RwLock<Transducer<D>>>,
 }
 
-impl ContextualCompletionEngine {
-    /// Create a new engine with default configuration (Standard algorithm).
+// Convenience constructors for default PathMapDictionary backend
+impl ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
+    /// Create a new engine with default configuration (PathMapDictionary + Standard algorithm).
     ///
     /// # Examples
     ///
@@ -77,7 +90,7 @@ impl ContextualCompletionEngine {
         Self::with_algorithm(Algorithm::Standard)
     }
 
-    /// Create an engine with a specific Levenshtein algorithm variant.
+    /// Create an engine with a specific Levenshtein algorithm variant (using PathMapDictionary).
     ///
     /// # Arguments
     ///
@@ -93,6 +106,33 @@ impl ContextualCompletionEngine {
     /// ```
     pub fn with_algorithm(algorithm: Algorithm) -> Self {
         let dictionary = PathMapDictionary::<Vec<ContextId>>::new();
+        Self::with_dictionary(dictionary, algorithm)
+    }
+}
+
+// Generic implementation for all dictionary backends
+impl<D> ContextualCompletionEngine<D>
+where
+    D: crate::dictionary::MutableMappedDictionary<Value = Vec<ContextId>> + Clone,
+{
+    /// Create an engine with a specific dictionary backend and algorithm.
+    ///
+    /// # Arguments
+    ///
+    /// * `dictionary` - Dictionary backend to use for storing finalized terms
+    /// * `algorithm` - Levenshtein algorithm variant
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+    /// use liblevenshtein::transducer::Algorithm;
+    ///
+    /// let dict = PathMapDictionary::new();
+    /// let engine = ContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
+    /// ```
+    pub fn with_dictionary(dictionary: D, algorithm: Algorithm) -> Self {
         let transducer = Transducer::new(dictionary, algorithm);
 
         Self {
@@ -1119,7 +1159,7 @@ impl ContextualCompletionEngine {
     }
 }
 
-impl Default for ContextualCompletionEngine {
+impl Default for ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
     fn default() -> Self {
         Self::new()
     }
@@ -1712,7 +1752,7 @@ mod tests {
 
     #[test]
     fn test_levenshtein_distance() {
-        use ContextualCompletionEngine as Engine;
+        type Engine = ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>>;
 
         assert_eq!(Engine::levenshtein_distance("", ""), 0);
         assert_eq!(Engine::levenshtein_distance("abc", ""), 3);

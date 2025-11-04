@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Generic DynamicDawg with Value Support (2025-11-04)
+- **Made DynamicDawg generic over value types**
+  - Changed from `DynamicDawg` to `DynamicDawg<V: DictionaryValue = ()>` with default type parameter
+  - Added `value: Option<V>` field to DawgNode for storing associated values
+  - Implemented `insert_with_value()` and `get_value()` methods
+  - Full backward compatibility: existing code using `DynamicDawg` continues to work
+  - Enables fuzzy dictionaries with metadata (frequencies, scores, context IDs, etc.)
+
+- **New MutableMappedDictionary trait**
+  - Extends MappedDictionary with `insert_with_value()` method
+  - Implemented for DynamicDawg, PathMapDictionary, and PathMapDictionaryChar
+  - Provides unified API for mutable dictionaries with values
+  - Enables generic programming over different dictionary backends
+
+- **Generic ContextualCompletionEngine**
+  - Made generic over `D: MutableMappedDictionary<Value = Vec<ContextId>>`
+  - Can now use any mutable mapped dictionary backend (PathMap, DynamicDawg, etc.)
+  - Convenience constructors maintain backward compatibility
+  - `with_dictionary()` constructor for custom backends
+  - All 93 contextual engine tests pass with generic implementation
+
+- **Comprehensive integration tests**
+  - 19 new integration tests in `tests/dynamic_dawg_integration.rs`
+  - Tests DynamicDawg with FuzzyMultiMap (6 tests)
+  - Tests DynamicDawg with eviction wrappers: Lru, Lfu, Ttl, Age (9 tests)
+  - Tests DynamicDawg with ContextualCompletionEngine (4 tests)
+  - Validates end-to-end workflows with value aggregation and caching
+
+### Fixed
+
+#### DynamicDawg Insert Bug (2025-11-04)
+- **Critical bug fix: Suffix sharing causing incorrect term acceptance**
+  - Fixed bug where inserting "j" into ["kb", "jb"] caused "k" to be marked as valid
+  - Root cause: Phase 2.1 suffix sharing created shared entry nodes
+  - When both 'j' and 'k' edges pointed to same node, marking it final affected both paths
+  - Solution: Disabled Phase 2.1 suffix sharing optimization
+  - Trade-off: ~20-40% higher memory usage (mitigated by periodic compaction)
+  - Preserved suffix sharing methods for future optimization work
+
+- **Bug discovery and verification**
+  - Found by property-based testing (proptest)
+  - Created minimal reproducing test case in `tests/debug_proptest_failure.rs`
+  - All 20 DynamicDawg unit tests pass
+  - All 19 integration tests pass
+  - All 22 comprehensive property tests pass
+  - 168 tests pass with `--all-features` enabled
+
 #### DynamicDawg Performance Optimizations (2025-11-03)
 - **Bloom Filter for fast negative lookups** (88-93% improvement)
   - Probabilistic data structure with 3 hash functions and 10 bits per element

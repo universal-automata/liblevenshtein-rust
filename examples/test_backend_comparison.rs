@@ -19,6 +19,6 @@ fn main() {
         DoubleArrayTrie::from_terms(terms.clone()),
     );
     test_dict("DawgDictionary", DawgDictionary::from_iter(terms.clone()));
-    test_dict("DynamicDawg", DynamicDawg::from_terms(terms.clone()));
+    test_dict("DynamicDawg", DynamicDawg::<()>::from_terms(terms.clone()));
     test_dict("OptimizedDawg", OptimizedDawg::from_terms(terms.clone()));
 }

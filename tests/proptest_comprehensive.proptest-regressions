@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc 91ab1277ce68f0f377c4a4e1e162226db73e16392c23e8263a9ddcdb073e580f # shrinks to dict_words = ["a"], query = "bbb", max_dist = 2
 cc 5368e34b1297d5eb6a3aa8961af8e9d1d83e327da639117ab06a808759d83596 # shrinks to dict_words = ["ocj"], query = "coj", max_dist = 1
+cc 624d6ac12d2446a09d81d5762bc1c98b8500ae9c5f1bf450bf327ff6795c3c31 # shrinks to initial_words = ["kb", "jb"], operations = [Insert("j")], query = "a", max_dist = 1

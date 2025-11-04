@@ -284,6 +284,12 @@ impl<V: DictionaryValue> MappedDictionary for PathMapDictionaryChar<V> {
     }
 }
 
+impl<V: DictionaryValue> crate::dictionary::MutableMappedDictionary for PathMapDictionaryChar<V> {
+    fn insert_with_value(&self, term: &str, value: Self::Value) -> bool {
+        PathMapDictionaryChar::insert_with_value(self, term, value)
+    }
+}
+
 /// Character-level PathMap dictionary node.
 ///
 /// Stores the byte-level path but provides character-level traversal.

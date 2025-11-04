@@ -310,6 +310,12 @@ impl<V: DictionaryValue> MappedDictionary for PathMapDictionary<V> {
     }
 }
 
+impl<V: DictionaryValue> crate::dictionary::MutableMappedDictionary for PathMapDictionary<V> {
+    fn insert_with_value(&self, term: &str, value: Self::Value) -> bool {
+        PathMapDictionary::insert_with_value(self, term, value)
+    }
+}
+
 /// PathMap dictionary node using path-based navigation.
 ///
 /// Instead of storing a zipper (which has lifetime issues), we store

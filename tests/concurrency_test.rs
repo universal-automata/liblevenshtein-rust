@@ -76,7 +76,7 @@ fn test_parallel_reads() {
 
 #[test]
 fn test_read_during_write() {
-    let dict = DynamicDawg::from_terms(vec!["test"]);
+    let dict: DynamicDawg<()> = DynamicDawg::from_terms(vec!["test"]);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     let dict_writer = dict.clone();

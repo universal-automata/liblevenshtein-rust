@@ -12,7 +12,7 @@ fn main() {
     println!("=== Dynamic Dictionary Example ===\n");
 
     // Start with a small dictionary (using DynamicDawg for runtime updates)
-    let dict = DynamicDawg::from_terms(vec!["cat", "dog", "bird"]);
+    let dict: DynamicDawg<()> = DynamicDawg::from_terms(vec!["cat", "dog", "bird"]);
     let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
     println!("Initial dictionary: cat, dog, bird");
@@ -72,7 +72,7 @@ fn main() {
     use std::thread;
     use std::time::Duration;
 
-    let dict2 = DynamicDawg::from_terms(vec!["test"]);
+    let dict2: DynamicDawg<()> = DynamicDawg::from_terms(vec!["test"]);
     let transducer2 = Transducer::new(dict2.clone(), Algorithm::Standard);
 
     // Clone for thread

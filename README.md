@@ -257,6 +257,60 @@ let dict = DynamicDawg::with_config(
 
 See [`examples/dynamic_dictionary.rs`](examples/dynamic_dictionary.rs) for a complete demonstration.
 
+### Value-Mapped Dictionaries
+
+Store metadata with dictionary terms using **value-mapped dictionaries**:
+
+```rust
+use liblevenshtein::prelude::*;
+use std::collections::HashSet;
+
+// DynamicDawg with integer values (e.g., word frequencies)
+let dict: DynamicDawg<u32> = DynamicDawg::new();
+dict.insert_with_value("apple", 42);
+dict.insert_with_value("apply", 17);
+
+// Retrieve values
+assert_eq!(dict.get_value("apple"), Some(42));
+assert_eq!(dict.get_value("banana"), None);
+
+// Use with FuzzyMap for fuzzy lookups with values
+let map = FuzzyMap::new(dict, Algorithm::Standard);
+let results = map.get_with_distance("aple", 1);  // fuzzy lookup
+// Results include both terms and their values
+
+// Or use FuzzyMultiMap to aggregate multiple values
+let dict: DynamicDawg<HashSet<u32>> = DynamicDawg::new();
+dict.insert_with_value("test", HashSet::from([1, 2, 3]));
+```
+
+**Supported backends**:
+- `DynamicDawg<V>` - Dynamic dictionary with values of type `V`
+- `PathMapDictionary<V>` - PathMap with values (requires `pathmap-backend`)
+- `PathMapDictionaryChar<V>` - Character-level PathMap with values
+
+**Common value types**:
+- `u32` / `u64` - Frequencies, scores, IDs
+- `HashSet<T>` - Multiple associations per term
+- `Vec<T>` - Ordered collections
+- Any type implementing `Clone + Send + Sync + 'static`
+
+**Integration with contextual completion**:
+```rust
+use liblevenshtein::prelude::*;
+
+// Use DynamicDawg backend for contextual completion
+let dict: DynamicDawg<Vec<u32>> = DynamicDawg::new();
+let engine = ContextualCompletionEngine::with_dictionary(
+    dict,
+    Algorithm::Standard
+);
+
+// Insert terms with context IDs
+let ctx = engine.create_root_context();
+engine.insert_finalized(ctx, "variable", vec![ctx]);
+```
+
 ### Ordered Results
 
 Get results sorted by edit distance first, then alphabetically:

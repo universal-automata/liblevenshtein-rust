@@ -5,6 +5,7 @@
 //! explicit compaction.
 
 use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
+use crate::dictionary::value::DictionaryValue;
 use parking_lot::RwLock;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
@@ -13,6 +14,12 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 /// A dynamic DAWG that supports online insertions and deletions.
+///
+/// # Type Parameters
+///
+/// - `V`: Optional value type associated with each term. Use `()` (default) for
+///   dictionaries without values, or any type implementing `DictionaryValue`
+///   (Clone + Send + Sync + 'static) for value-storing dictionaries.
 ///
 /// # Minimality Trade-offs
 ///
@@ -31,18 +38,32 @@ use std::sync::Arc;
 /// - Deletion: O(m)
 /// - Compaction: O(n) where n is total characters
 /// - Space: Near-minimal to ~1.5x minimal (worst case between compactions)
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // Without values (default)
+/// let dict = DynamicDawg::new();
+/// dict.insert("hello");
+///
+/// // With values
+/// let dict: DynamicDawg<u32> = DynamicDawg::new();
+/// dict.insert_with_value("hello", 42);
+/// ```
 #[derive(Clone, Debug)]
-pub struct DynamicDawg {
-    inner: Arc<RwLock<DynamicDawgInner>>,
+pub struct DynamicDawg<V: DictionaryValue = ()> {
+    inner: Arc<RwLock<DynamicDawgInner<V>>>,
 }
 
 #[derive(Debug)]
 #[cfg_attr(
     feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(serialize = "V: serde::Serialize")),
+    serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
-struct DynamicDawgInner {
-    nodes: Vec<DawgNode>,
+struct DynamicDawgInner<V: DictionaryValue> {
+    nodes: Vec<DawgNode<V>>,
     term_count: usize,
     needs_compaction: bool,
     // Suffix sharing cache: hash of suffix -> node index
@@ -85,22 +106,36 @@ struct NodeSignature {
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(serialize = "V: serde::Serialize")),
+    serde(bound(deserialize = "V: serde::Deserialize<'de>"))
 )]
-struct DawgNode {
+struct DawgNode<V: DictionaryValue> {
     // Use SmallVec to avoid heap allocation for nodes with ≤4 edges (most common case)
     edges: SmallVec<[(u8, usize); 4]>,
     is_final: bool,
     // Reference count for dynamic deletion
     ref_count: usize,
+    // Optional value associated with this node (only for final nodes)
+    value: Option<V>,
 }
 
-impl DawgNode {
+impl<V: DictionaryValue> DawgNode<V> {
     fn new(is_final: bool) -> Self {
         DawgNode {
             edges: SmallVec::new(),
             is_final,
             ref_count: 0,
+            value: None,
+        }
+    }
+
+    fn new_with_value(is_final: bool, value: Option<V>) -> Self {
+        DawgNode {
+            edges: SmallVec::new(),
+            is_final,
+            ref_count: 0,
+            value,
         }
     }
 }
@@ -167,16 +202,29 @@ impl BloomFilter {
     }
 
     /// Clear the Bloom filter.
+    #[allow(dead_code)]
     fn clear(&mut self) {
         self.bits.fill(0);
     }
 }
 
-impl DynamicDawg {
+impl<V: DictionaryValue> DynamicDawg<V> {
     /// Create a new empty dynamic DAWG.
     ///
     /// By default, auto-minimization is disabled. Use `with_auto_minimize_threshold()`
     /// to enable automatic minimization.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Without values (default)
+    /// let dawg: DynamicDawg<()> = DynamicDawg::new();
+    /// dawg.insert("hello");
+    ///
+    /// // With values
+    /// let dawg: DynamicDawg<u32> = DynamicDawg::new();
+    /// dawg.insert_with_value("hello", 42);
+    /// ```
     pub fn new() -> Self {
         Self::with_auto_minimize_threshold(f32::INFINITY)
     }
@@ -196,10 +244,10 @@ impl DynamicDawg {
     ///
     /// ```rust,ignore
     /// // Auto-minimize at 50% bloat (default)
-    /// let dawg = DynamicDawg::with_auto_minimize_threshold(1.5);
+    /// let dawg: DynamicDawg<()> = DynamicDawg::with_auto_minimize_threshold(1.5);
     ///
     /// // Disable auto-minimization (manual minimize() calls only)
-    /// let dawg = DynamicDawg::with_auto_minimize_threshold(f32::INFINITY);
+    /// let dawg: DynamicDawg<()> = DynamicDawg::with_auto_minimize_threshold(f32::INFINITY);
     /// ```
     pub fn with_auto_minimize_threshold(threshold: f32) -> Self {
         Self::with_config(threshold, None)
@@ -217,10 +265,10 @@ impl DynamicDawg {
     ///
     /// ```rust,ignore
     /// // With Bloom filter for 10000 expected terms
-    /// let dawg = DynamicDawg::with_config(f32::INFINITY, Some(10000));
+    /// let dawg: DynamicDawg<()> = DynamicDawg::with_config(f32::INFINITY, Some(10000));
     ///
     /// // Without Bloom filter
-    /// let dawg = DynamicDawg::with_config(1.5, None);
+    /// let dawg: DynamicDawg<()> = DynamicDawg::with_config(1.5, None);
     /// ```
     pub fn with_config(auto_minimize_threshold: f32, bloom_filter_capacity: Option<usize>) -> Self {
         let nodes = vec![DawgNode::new(false)]; // Root at index 0
@@ -272,7 +320,7 @@ impl DynamicDawg {
     /// ```rust,ignore
     /// let mut terms = vec!["apple", "banana", "cherry"];
     /// terms.sort();  // Already sorted
-    /// let dawg = DynamicDawg::from_sorted_terms(terms);
+    /// let dawg: DynamicDawg<()> = DynamicDawg::from_sorted_terms(terms);
     /// ```
     pub fn from_sorted_terms<I, S>(terms: I) -> Self
     where
@@ -325,28 +373,25 @@ impl DynamicDawg {
         // Build remaining suffix with sharing
         let start_byte_idx = path.len();
 
-        // Phase 2.1: Try to reuse existing suffix chains
-        if start_byte_idx < bytes.len() {
-            let remaining_suffix = &bytes[start_byte_idx + 1..];
+        // Phase 2.1: DISABLED - Suffix sharing is incompatible with dynamic insertions
+        // that can later mark intermediate nodes as final.
+        //
+        // Bug: When inserting "kb" after "jb", suffix sharing would reuse the same
+        // entry node for both 'j' and 'k' edges. Later, inserting "j" marks that
+        // shared node as final, incorrectly making "k" also appear as a valid term.
+        //
+        // Example:
+        //   dict.insert("jb"); dict.insert("kb");  // Creates shared structure
+        //   dict.insert("j");                       // BUG: also marks "k" as valid
+        //
+        // The correct DAWG structure for ["jb", "kb"] should have distinct nodes
+        // for 'j' and 'k' edges, even though they both continue with 'b'.
+        //
+        // For now, we disable Phase 2.1 and rely on the node-by-node construction
+        // below. Future work: implement proper suffix sharing that creates distinct
+        // intermediate nodes while sharing only the deeper suffix nodes.
 
-            // If we have a suffix to share (at least one more byte after current)
-            if !remaining_suffix.is_empty() {
-                let is_suffix_final = true; // The suffix chain should end in a final state
-
-                if let Some(suffix_entry_idx) =
-                    inner.find_or_create_suffix(remaining_suffix, true, is_suffix_final)
-                {
-                    // Add edge from current node to the suffix chain
-                    let byte = bytes[start_byte_idx];
-                    inner.insert_edge_sorted(node_idx, byte, suffix_entry_idx);
-                    inner.nodes[suffix_entry_idx].ref_count += 1;
-                    inner.term_count += 1;
-                    return true;
-                }
-            }
-        }
-
-        // Fall back to creating nodes one by one (no suffix sharing available)
+        // Create nodes one by one (no suffix sharing)
         for i in start_byte_idx..bytes.len() {
             let byte = bytes[i];
             let new_idx = inner.nodes.len();
@@ -376,6 +421,132 @@ impl DynamicDawg {
         inner.check_and_auto_minimize();
 
         true
+    }
+
+    /// Insert a term with an associated value.
+    ///
+    /// Returns `true` if the term was newly inserted, `false` if it already existed.
+    /// If the term already exists, its value is updated.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let dict: DynamicDawg<u32> = DynamicDawg::new();
+    /// assert!(dict.insert_with_value("hello", 42));
+    /// assert!(!dict.insert_with_value("hello", 43)); // Updates value
+    /// assert_eq!(dict.get_value("hello"), Some(43));
+    /// ```
+    pub fn insert_with_value(&self, term: &str, value: V) -> bool {
+        let mut inner = self.inner.write();
+        let bytes = term.as_bytes();
+
+        // Navigate to insertion point
+        let mut node_idx = 0;
+        let mut path: Vec<(usize, u8)> = Vec::new();
+
+        for &byte in bytes {
+            if let Some(&child_idx) = inner.nodes[node_idx]
+                .edges
+                .iter()
+                .find(|(b, _)| *b == byte)
+                .map(|(_, idx)| idx)
+            {
+                path.push((node_idx, byte));
+                node_idx = child_idx;
+            } else {
+                break;
+            }
+        }
+
+        // Check if term already exists
+        if path.len() == bytes.len() {
+            if inner.nodes[node_idx].is_final {
+                // Term exists - update value
+                inner.nodes[node_idx].value = Some(value);
+                return false;
+            } else {
+                // Mark as final and set value
+                inner.nodes[node_idx].is_final = true;
+                inner.nodes[node_idx].value = Some(value);
+                inner.term_count += 1;
+
+                // Add to Bloom filter
+                if let Some(ref mut bloom) = inner.bloom_filter {
+                    bloom.insert(term);
+                }
+
+                return true;
+            }
+        }
+
+        // Build remaining suffix
+        let start_byte_idx = path.len();
+        for i in start_byte_idx..bytes.len() {
+            let byte = bytes[i];
+            let new_idx = inner.nodes.len();
+            let is_final = i == bytes.len() - 1;
+
+            let mut new_node = if is_final {
+                DawgNode::new_with_value(true, Some(value.clone()))
+            } else {
+                DawgNode::new(false)
+            };
+            new_node.ref_count = 1;
+
+            inner.nodes.push(new_node);
+            inner.insert_edge_sorted(node_idx, byte, new_idx);
+            node_idx = new_idx;
+        }
+
+        inner.term_count += 1;
+
+        // Add to Bloom filter
+        if let Some(ref mut bloom) = inner.bloom_filter {
+            bloom.insert(term);
+        }
+
+        // Auto-minimize if needed
+        inner.check_and_auto_minimize();
+
+        true
+    }
+
+    /// Get the value associated with a term.
+    ///
+    /// Returns `Some(value)` if the term exists, `None` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let dict: DynamicDawg<String> = DynamicDawg::new();
+    /// dict.insert_with_value("key", "value".to_string());
+    /// assert_eq!(dict.get_value("key"), Some("value".to_string()));
+    /// assert_eq!(dict.get_value("unknown"), None);
+    /// ```
+    pub fn get_value(&self, term: &str) -> Option<V> {
+        let inner = self.inner.read();
+        let bytes = term.as_bytes();
+        let mut node_idx = 0;
+
+        // Navigate to the term
+        for &byte in bytes {
+            match inner.nodes[node_idx]
+                .edges
+                .iter()
+                .find(|(b, _)| *b == byte)
+                .map(|(_, idx)| idx)
+            {
+                Some(&child_idx) => node_idx = child_idx,
+                None => return None,
+            }
+        }
+
+        // Check if final and return value
+        if inner.nodes[node_idx].is_final {
+            inner.nodes[node_idx].value.clone()
+        } else {
+            None
+        }
     }
 
     /// Remove a term from the DAWG.
@@ -628,7 +799,7 @@ impl DynamicDawg {
     }
 }
 
-impl DynamicDawgInner {
+impl<V: DictionaryValue> DynamicDawgInner<V> {
     /// Check if auto-minimization should be triggered based on bloat threshold.
     ///
     /// This is called after each insertion to maintain the DAWG in a near-minimal
@@ -650,6 +821,10 @@ impl DynamicDawgInner {
     /// Expected to reduce memory by 20-40% for natural language dictionaries.
     ///
     /// Returns Some(node_idx) if an existing suffix was found/created, None otherwise.
+    ///
+    /// NOTE: Currently unused due to bugs with dynamic insertion (see insert() method).
+    /// Kept for future optimization work that properly handles suffix sharing in dynamic DAWGs.
+    #[allow(dead_code)]
     fn find_or_create_suffix(
         &mut self,
         suffix: &[u8],
@@ -684,6 +859,7 @@ impl DynamicDawgInner {
     /// Compute a hash for a suffix to enable caching.
     ///
     /// Phase 2.1: Uses FxHash for fast non-cryptographic hashing.
+    #[allow(dead_code)]
     fn compute_suffix_hash(&self, suffix: &[u8], is_final: bool) -> u64 {
         use rustc_hash::FxHasher;
         use std::hash::Hasher;
@@ -698,6 +874,7 @@ impl DynamicDawgInner {
     ///
     /// Phase 2.1: Handles hash collisions by checking structural equality.
     /// The node_idx points to the entry node that should have edges to traverse the suffix.
+    #[allow(dead_code)]
     fn verify_suffix_match(&self, node_idx: usize, suffix: &[u8], is_final: bool) -> bool {
         if suffix.is_empty() {
             return false;
@@ -738,6 +915,7 @@ impl DynamicDawgInner {
     ///
     /// Example: create_suffix_chain("est", true) creates:
     /// node_0 --'e'--> node_1 --'s'--> node_2 --'t'--> node_3(final)
+    #[allow(dead_code)]
     fn create_suffix_chain(&mut self, suffix: &[u8], is_final: bool) -> usize {
         if suffix.is_empty() {
             return 0; // Should not happen
@@ -753,6 +931,7 @@ impl DynamicDawgInner {
             edges: SmallVec::new(),
             is_final: false,
             ref_count: 1,
+            value: None,
         });
 
         // Intermediate nodes (one per suffix byte)
@@ -762,6 +941,7 @@ impl DynamicDawgInner {
                 edges: SmallVec::new(),
                 is_final: is_last && is_final,
                 ref_count: 1,
+                value: None,
             });
         }
 
@@ -1025,7 +1205,7 @@ impl DynamicDawgInner {
         }
 
         // Build new node vector
-        let new_nodes: Vec<DawgNode> = reachable
+        let new_nodes: Vec<DawgNode<V>> = reachable
             .iter()
             .map(|&old_idx| {
                 let mut node = self.nodes[old_idx].clone();
@@ -1088,14 +1268,14 @@ impl DynamicDawgInner {
     }
 }
 
-impl Default for DynamicDawg {
+impl<V: DictionaryValue> Default for DynamicDawg<V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[cfg(feature = "serialization")]
-impl serde::Serialize for DynamicDawg {
+impl<V: DictionaryValue + serde::Serialize> serde::Serialize for DynamicDawg<V> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -1107,7 +1287,7 @@ impl serde::Serialize for DynamicDawg {
 }
 
 #[cfg(feature = "serialization")]
-impl<'de> serde::Deserialize<'de> for DynamicDawg {
+impl<'de, V: DictionaryValue + serde::Deserialize<'de>> serde::Deserialize<'de> for DynamicDawg<V> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -1119,8 +1299,8 @@ impl<'de> serde::Deserialize<'de> for DynamicDawg {
     }
 }
 
-impl Dictionary for DynamicDawg {
-    type Node = DynamicDawgNode;
+impl<V: DictionaryValue> Dictionary for DynamicDawg<V> {
+    type Node = DynamicDawgNode<V>;
 
     fn root(&self) -> Self::Node {
         // Phase 1.2: Load cached data with single lock acquisition
@@ -1149,15 +1329,15 @@ impl Dictionary for DynamicDawg {
 /// This eliminates locks from is_final() and edge_count(), and drastically
 /// reduces locks in transition() (only for successful transitions).
 #[derive(Clone)]
-pub struct DynamicDawgNode {
-    dawg: Arc<RwLock<DynamicDawgInner>>,
+pub struct DynamicDawgNode<V: DictionaryValue = ()> {
+    dawg: Arc<RwLock<DynamicDawgInner<V>>>,
     node_idx: usize,
     // Phase 1.2: Cached data
     is_final: bool,
     edges: SmallVec<[(u8, usize); 4]>,
 }
 
-impl DictionaryNode for DynamicDawgNode {
+impl<V: DictionaryValue> DictionaryNode for DynamicDawgNode<V> {
     type Unit = u8;
 
     // Phase 1.2: Use cached data - no lock needed
@@ -1228,13 +1408,56 @@ impl DictionaryNode for DynamicDawgNode {
     }
 }
 
+// ============================================================================
+// MappedDictionary Trait Implementation
+// ============================================================================
+
+use crate::dictionary::{MappedDictionary, MappedDictionaryNode};
+
+impl<V: DictionaryValue> MappedDictionaryNode for DynamicDawgNode<V> {
+    type Value = V;
+
+    fn value(&self) -> Option<Self::Value> {
+        // Need to lock to get the value
+        let inner = self.dawg.read();
+        inner.nodes.get(self.node_idx)
+            .and_then(|node| node.value.clone())
+    }
+}
+
+impl<V: DictionaryValue> MappedDictionary for DynamicDawg<V> {
+    type Value = V;
+
+    fn get_value(&self, term: &str) -> Option<Self::Value> {
+        // Delegate to the inherent method
+        Self::get_value(self, term)
+    }
+
+    fn contains_with_value<F>(&self, term: &str, predicate: F) -> bool
+    where
+        F: Fn(&Self::Value) -> bool,
+    {
+        match self.get_value(term) {
+            Some(ref value) => predicate(value),
+            None => false,
+        }
+    }
+}
+
+impl<V: DictionaryValue> crate::dictionary::MutableMappedDictionary for DynamicDawg<V> {
+    fn insert_with_value(&self, term: &str, value: Self::Value) -> bool {
+        // Delegate to the inherent method
+        Self::insert_with_value(self, term, value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_dynamic_dawg_insert() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
         assert!(dawg.insert("test"));
         assert!(!dawg.insert("test")); // Duplicate
         assert!(dawg.insert("testing"));
@@ -1243,7 +1466,7 @@ mod tests {
 
     #[test]
     fn test_dynamic_dawg_remove() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
         dawg.insert("test");
         dawg.insert("testing");
         dawg.insert("tested");
@@ -1255,7 +1478,7 @@ mod tests {
 
     #[test]
     fn test_dynamic_dawg_compact() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
         dawg.insert("test");
         dawg.insert("testing");
         dawg.insert("tested");
@@ -1274,7 +1497,7 @@ mod tests {
     fn test_dynamic_dawg_with_transducer() {
         use crate::transducer::{Algorithm, Transducer};
 
-        let dawg = DynamicDawg::from_terms(vec!["apple", "application", "apply"]);
+        let dawg: DynamicDawg<()> = DynamicDawg::from_terms(vec!["apple", "application", "apply"]);
         let transducer = Transducer::new(dawg.clone(), Algorithm::Standard);
 
         let results: Vec<_> = transducer.query("aple", 2).collect();
@@ -1288,7 +1511,7 @@ mod tests {
 
     #[test]
     fn test_compaction_flag() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
         dawg.insert("test");
 
         assert!(!dawg.needs_compaction());
@@ -1302,7 +1525,7 @@ mod tests {
 
     #[test]
     fn test_batch_extend() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
         dawg.insert("test");
 
         let new_terms = vec!["testing", "tested", "tester"];
@@ -1316,7 +1539,7 @@ mod tests {
 
     #[test]
     fn test_batch_remove_many() {
-        let dawg = DynamicDawg::from_terms(vec!["test", "testing", "tested", "tester"]);
+        let dawg: DynamicDawg<()> = DynamicDawg::from_terms(vec!["test", "testing", "tested", "tester"]);
 
         let to_remove = vec!["testing", "tester"];
         let removed = dawg.remove_many(to_remove);
@@ -1329,7 +1552,7 @@ mod tests {
 
     #[test]
     fn test_minimize_basic() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
 
         // Insert terms in unsorted order
         dawg.insert("zebra");
@@ -1358,8 +1581,8 @@ mod tests {
         let _terms = ["band", "banana", "bandana", "can", "cane", "candy"];
 
         // Create two identical DAWGs with unsorted insertion
-        let dawg1 = DynamicDawg::new();
-        let dawg2 = DynamicDawg::new();
+        let dawg1: DynamicDawg<()> = DynamicDawg::new();
+        let dawg2: DynamicDawg<()> = DynamicDawg::new();
 
         for term in ["zebra", "apple", "banana", "apricot", "band", "bandana"] {
             dawg1.insert(term);
@@ -1412,7 +1635,7 @@ mod tests {
 
     #[test]
     fn test_minimize_after_deletions() {
-        let dawg =
+        let dawg: DynamicDawg<()> =
             DynamicDawg::from_terms(vec!["test", "testing", "tested", "tester", "testimony"]);
 
         // Remove some terms, creating potential orphaned nodes
@@ -1439,7 +1662,7 @@ mod tests {
 
     #[test]
     fn test_minimize_empty() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
         let merged = dawg.minimize();
 
         // Empty DAWG should have nothing to minimize
@@ -1450,7 +1673,7 @@ mod tests {
 
     #[test]
     fn test_minimize_single_term() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
         dawg.insert("hello");
 
         let nodes_before = dawg.node_count();
@@ -1465,7 +1688,7 @@ mod tests {
 
     #[test]
     fn test_minimize_with_shared_suffixes() {
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
 
         // These words share suffixes: "ing" in testing/running
         dawg.insert("testing");
@@ -1484,7 +1707,7 @@ mod tests {
 
     #[test]
     fn test_minimize_idempotent() {
-        let dawg = DynamicDawg::from_terms(vec!["apple", "application", "apply", "apricot"]);
+        let dawg: DynamicDawg<()> = DynamicDawg::from_terms(vec!["apple", "application", "apply", "apricot"]);
 
         // First minimization
         let _merged1 = dawg.minimize();
@@ -1501,7 +1724,7 @@ mod tests {
     #[test]
     fn test_minimize_no_false_positives() {
         // Test to prevent false positive lookups after minimize()
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
 
         // Insert specific terms in random order
         let inserted_terms = vec!["zebra", "apple", "banana", "apricot", "band", "bandana"];
@@ -1534,9 +1757,65 @@ mod tests {
     }
 
     #[test]
+    fn test_valued_dawg_basic() {
+        // Test DynamicDawg with values
+        let dawg: DynamicDawg<u32> = DynamicDawg::new();
+
+        // Insert with values
+        assert!(dawg.insert_with_value("hello", 42));
+        assert!(dawg.insert_with_value("world", 100));
+        assert!(dawg.insert_with_value("test", 1));
+
+        // Verify values
+        assert_eq!(dawg.get_value("hello"), Some(42));
+        assert_eq!(dawg.get_value("world"), Some(100));
+        assert_eq!(dawg.get_value("test"), Some(1));
+        assert_eq!(dawg.get_value("unknown"), None);
+
+        // Update value
+        assert!(!dawg.insert_with_value("hello", 999));
+        assert_eq!(dawg.get_value("hello"), Some(999));
+
+        // Verify term count
+        assert_eq!(dawg.term_count(), 3);
+    }
+
+    #[test]
+    fn test_valued_dawg_with_remove() {
+        let dawg: DynamicDawg<String> = DynamicDawg::new();
+
+        dawg.insert_with_value("key1", "value1".to_string());
+        dawg.insert_with_value("key2", "value2".to_string());
+
+        assert_eq!(dawg.get_value("key1"), Some("value1".to_string()));
+
+        // Remove should clear value
+        assert!(dawg.remove("key1"));
+        assert_eq!(dawg.get_value("key1"), None);
+        assert_eq!(dawg.get_value("key2"), Some("value2".to_string()));
+    }
+
+    #[test]
+    fn test_mapped_dictionary_trait() {
+        use crate::dictionary::MappedDictionary;
+
+        let dawg: DynamicDawg<Vec<u32>> = DynamicDawg::new();
+        dawg.insert_with_value("scoped", vec![1, 2, 3]);
+        dawg.insert_with_value("global", vec![0]);
+
+        // Test MappedDictionary::get_value
+        assert_eq!(dawg.get_value("scoped"), Some(vec![1, 2, 3]));
+
+        // Test contains_with_value
+        assert!(dawg.contains_with_value("scoped", |v| v.contains(&2)));
+        assert!(!dawg.contains_with_value("scoped", |v| v.contains(&999)));
+        assert!(!dawg.contains_with_value("unknown", |v| v.contains(&1)));
+    }
+
+    #[test]
     fn test_compact_no_false_positives() {
         // Same test for compact() to establish baseline
-        let dawg = DynamicDawg::new();
+        let dawg: DynamicDawg<()> = DynamicDawg::new();
 
         let inserted_terms = vec!["zebra", "apple", "banana", "apricot", "band", "bandana"];
         let not_inserted_terms = vec!["app", "ban", "zeb", "banan", "apric", "bandanas"];

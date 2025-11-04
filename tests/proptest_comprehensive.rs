@@ -126,7 +126,7 @@ proptest! {
     fn prop_dynamic_dawg_contains(
         dict_words in small_dict_strategy(),
     ) {
-        let dict = DynamicDawg::from_terms(dict_words.clone());
+        let dict: DynamicDawg<()> = DynamicDawg::from_terms(dict_words.clone());
 
         for word in &dict_words {
             prop_assert!(
@@ -169,7 +169,7 @@ proptest! {
     ) {
         let dat = DoubleArrayTrie::from_terms(dict_words.clone());
         let dawg = DawgDictionary::from_iter(dict_words.clone());
-        let dynamic = DynamicDawg::from_terms(dict_words.clone());
+        let dynamic: DynamicDawg<()> = DynamicDawg::from_terms(dict_words.clone());
         let optimized = OptimizedDawg::from_terms(dict_words.clone());
 
         let dat_result = dat.contains(&query);
@@ -203,7 +203,7 @@ proptest! {
     ) {
         let dat = DoubleArrayTrie::from_terms(dict_words.clone());
         let dawg = DawgDictionary::from_iter(dict_words.clone());
-        let dynamic = DynamicDawg::from_terms(dict_words.clone());
+        let dynamic: DynamicDawg<()> = DynamicDawg::from_terms(dict_words.clone());
         let optimized = OptimizedDawg::from_terms(dict_words);
 
         let t_dat = Transducer::new(dat, Algorithm::Standard);
@@ -564,7 +564,7 @@ proptest! {
     ) {
         let cache = create_memo_cache();
         for algorithm in &[Algorithm::Standard, Algorithm::Transposition, Algorithm::MergeAndSplit] {
-            let dict = DynamicDawg::from_terms(dict_words.clone());
+            let dict: DynamicDawg<()> = DynamicDawg::from_terms(dict_words.clone());
             let transducer = Transducer::new(dict, *algorithm);
             let results: Vec<_> = transducer.query(&query, max_dist).collect();
 
@@ -661,7 +661,7 @@ proptest! {
     fn prop_dynamic_dawg_state_machine(
         operations in dict_operations_strategy()
     ) {
-        let dict = DynamicDawg::new();
+        let dict: DynamicDawg<()> = DynamicDawg::new();
         let mut reference: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for op in operations {
@@ -727,7 +727,7 @@ proptest! {
         max_dist in 0usize..=2,
     ) {
         // Build initial dictionary
-        let dict = DynamicDawg::from_terms(initial_words.clone());
+        let dict: DynamicDawg<()> = DynamicDawg::from_terms(initial_words.clone());
         let mut reference: std::collections::HashSet<String> = initial_words.into_iter().collect();
 
         // Apply operations
@@ -785,7 +785,7 @@ proptest! {
         ops1 in dict_operations_strategy(),
         ops2 in dict_operations_strategy(),
     ) {
-        let dict = DynamicDawg::new();
+        let dict: DynamicDawg<()> = DynamicDawg::new();
         let mut reference: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         // Interleave operations from two sequences

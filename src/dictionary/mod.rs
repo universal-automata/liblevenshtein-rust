@@ -321,3 +321,44 @@ pub trait MappedDictionaryNode: DictionaryNode {
     /// Returns `None` if this is not a final node, or if no value is associated.
     fn value(&self) -> Option<Self::Value>;
 }
+
+/// Extension trait for dictionaries that support inserting values.
+///
+/// This trait enables mutation of mapped dictionaries, allowing terms to be
+/// added or updated with associated values. Used by components like
+/// `ContextualCompletionEngine` that need to dynamically add terms.
+///
+/// # Examples
+///
+/// ```ignore
+/// use liblevenshtein::dictionary::{MappedDictionary, MutableMappedDictionary};
+///
+/// # struct MyDict;
+/// # impl Dictionary for MyDict {
+/// #     type Node = ();
+/// #     fn root(&self) -> Self::Node { () }
+/// #     fn len(&self) -> Option<usize> { None }
+/// # }
+/// # impl MappedDictionary for MyDict {
+/// #     type Value = u32;
+/// # }
+/// impl MutableMappedDictionary for MyDict {
+///     fn insert_with_value(&self, term: &str, value: Self::Value) -> bool {
+///         // Add or update term with value
+///         # true
+///     }
+/// }
+/// ```
+pub trait MutableMappedDictionary: MappedDictionary {
+    /// Insert or update a term with an associated value.
+    ///
+    /// # Arguments
+    ///
+    /// * `term` - The term to insert
+    /// * `value` - The value to associate with the term
+    ///
+    /// # Returns
+    ///
+    /// `true` if this is a new term, `false` if updating an existing term's value.
+    fn insert_with_value(&self, term: &str, value: Self::Value) -> bool;
+}

@@ -16,7 +16,7 @@ fn main() {
 
     // Create an empty dynamic DAWG
     println!("1. Creating dynamic DAWG and adding terms...\n");
-    let dawg = DynamicDawg::new();
+    let dawg: DynamicDawg<()> = DynamicDawg::new();
 
     dawg.insert("apple");
     dawg.insert("application");

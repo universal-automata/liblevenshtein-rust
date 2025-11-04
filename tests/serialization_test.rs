@@ -125,14 +125,14 @@ mod serialization_tests {
     #[test]
     fn test_dynamic_dawg_bincode_roundtrip() {
         let terms = test_terms();
-        let dict = DynamicDawg::from_terms(terms.clone());
+        let dict: DynamicDawg<()> = DynamicDawg::from_terms(terms.clone());
 
         // Serialize
         let mut buffer = Vec::new();
         bincode::serialize_into(&mut buffer, &dict).expect("Failed to serialize DynamicDawg");
 
         // Deserialize
-        let deserialized: DynamicDawg =
+        let deserialized: DynamicDawg<()> =
             bincode::deserialize(&buffer).expect("Failed to deserialize DynamicDawg");
 
         // Verify
@@ -277,13 +277,13 @@ mod serialization_tests {
     #[test]
     fn test_dynamic_dawg_json_roundtrip() {
         let terms = test_terms();
-        let dict = DynamicDawg::from_terms(terms.clone());
+        let dict: DynamicDawg<()> = DynamicDawg::from_terms(terms.clone());
 
         // Serialize
         let json = serde_json::to_string(&dict).expect("Failed to serialize DynamicDawg to JSON");
 
         // Deserialize
-        let deserialized: DynamicDawg =
+        let deserialized: DynamicDawg<()> =
             serde_json::from_str(&json).expect("Failed to deserialize DynamicDawg from JSON");
 
         // Verify
@@ -358,7 +358,7 @@ mod serialization_tests {
         let dat = DoubleArrayTrie::from_terms(terms.clone());
         let dawg = DawgDictionary::from_iter(terms.iter().copied());
         let optimized = OptimizedDawg::from_terms(terms.clone());
-        let dynamic = DynamicDawg::from_terms(terms.clone());
+        let dynamic: DynamicDawg<()> = DynamicDawg::from_terms(terms.clone());
 
         // All should contain same terms
         for term in &terms {
@@ -433,7 +433,7 @@ mod serialization_tests {
     #[test]
     fn test_dynamic_dawg_after_modifications() {
         let initial_terms = vec!["apple", "banana"];
-        let dict = DynamicDawg::from_terms(initial_terms);
+        let dict: DynamicDawg<()> = DynamicDawg::from_terms(initial_terms);
 
         // Add more terms
         dict.insert("cherry");
@@ -441,7 +441,7 @@ mod serialization_tests {
 
         // Serialize
         let serialized = bincode::serialize(&dict).unwrap();
-        let deserialized: DynamicDawg = bincode::deserialize(&serialized).unwrap();
+        let deserialized: DynamicDawg<()> = bincode::deserialize(&serialized).unwrap();
 
         // Verify all terms
         assert!(deserialized.contains("apple"));
