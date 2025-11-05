@@ -145,13 +145,6 @@ pub(crate) struct SuffixNode<V: DictionaryValue = ()> {
     /// states where at least one indexed string ends.
     pub(crate) is_final: bool,
 
-    /// Reference count for dynamic deletion (garbage collection).
-    ///
-    /// Tracks how many indexed strings pass through this state.
-    /// Used during compaction to identify unreachable states.
-    #[allow(dead_code)]
-    ref_count: usize,
-
     /// Optional value associated with this state (only for final nodes).
     pub(crate) value: Option<V>,
 }
@@ -164,7 +157,6 @@ impl<V: DictionaryValue> SuffixNode<V> {
             suffix_link: None,
             max_length: 0,
             is_final: false,
-            ref_count: 0,
             value: None,
         }
     }
@@ -176,7 +168,6 @@ impl<V: DictionaryValue> SuffixNode<V> {
             suffix_link: None,
             max_length,
             is_final: false,
-            ref_count: 0,
             value: None,
         }
     }
