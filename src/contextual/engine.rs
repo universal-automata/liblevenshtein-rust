@@ -1201,8 +1201,8 @@ where
         for (i, row) in matrix.iter_mut().enumerate() {
             row[0] = i;
         }
-        for j in 0..=len2 {
-            matrix[0][j] = j;
+        for (j, cell) in matrix[0].iter_mut().enumerate() {
+            *cell = j;
         }
 
         let s1_chars: Vec<char> = s1.chars().collect();

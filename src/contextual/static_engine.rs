@@ -196,7 +196,7 @@ where
     /// Insert a character into the draft buffer.
     pub fn insert_char(&self, context: ContextId, ch: char) -> Result<()> {
         let mut drafts = self.drafts.lock().unwrap();
-        let buffer = drafts.entry(context).or_insert_with(DraftBuffer::new);
+        let buffer = drafts.entry(context).or_default();
         buffer.insert(ch);
         Ok(())
     }
@@ -204,7 +204,7 @@ where
     /// Insert a string into the draft buffer.
     pub fn insert_str(&self, context: ContextId, s: &str) -> Result<()> {
         let mut drafts = self.drafts.lock().unwrap();
-        let buffer = drafts.entry(context).or_insert_with(DraftBuffer::new);
+        let buffer = drafts.entry(context).or_default();
         for ch in s.chars() {
             buffer.insert(ch);
         }
@@ -257,7 +257,7 @@ where
         let mut finalized = self.finalized_terms.write().unwrap();
         finalized
             .entry(term_clone.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(context);
 
         Ok(term_clone)
@@ -425,11 +425,11 @@ where
 
         let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
-        for i in 0..=len1 {
-            matrix[i][0] = i;
+        for (i, row) in matrix.iter_mut().enumerate() {
+            row[0] = i;
         }
-        for j in 0..=len2 {
-            matrix[0][j] = j;
+        for (j, cell) in matrix[0].iter_mut().enumerate() {
+            *cell = j;
         }
 
         let s1_chars: Vec<char> = s1.chars().collect();
