@@ -10,6 +10,7 @@ mod context_tree;
 mod draft_buffer;
 mod engine;
 pub mod error;
+mod static_engine;
 
 pub use checkpoint::{Checkpoint, CheckpointStack};
 pub use completion::Completion;
@@ -17,3 +18,4 @@ pub use context_tree::{ContextId, ContextTree};
 pub use draft_buffer::DraftBuffer;
 pub use engine::{ContextualCompletionEngine, DynamicContextualCompletionEngine};
 pub use error::{ContextError, Result};
+pub use static_engine::StaticContextualCompletionEngine;
