@@ -1,6 +1,6 @@
 # Dictionary Layer
 
-**Navigation**: [← Back to Algorithms](../README.md) | [Next Layer: Automata →](../02-automata-layer/README.md)
+**Navigation**: [← Back to Algorithms](../README.md) | [Next Layer: Automata →](../02-levenshtein-automata/README.md)
 
 ## Overview
 
@@ -488,7 +488,7 @@ let results: Vec<String> = automaton.query(&dict).collect();
 
 The automaton traverses the dictionary graph using `DictionaryNode::transition()` to explore only paths within the distance threshold.
 
-See [Automata Layer](../02-automata-layer/README.md) for details.
+See [Automata Layer](../02-levenshtein-automata/README.md) for details.
 
 ## Thread Safety
 
@@ -587,7 +587,7 @@ See [Serialization Guide](../08-serialization/README.md) for details.
 ## Related Documentation
 
 - [Value Storage](../09-value-storage/README.md) - Term-to-value mappings
-- [Automata Layer](../02-automata-layer/README.md) - Levenshtein automata that query dictionaries
+- [Automata Layer](../02-levenshtein-automata/README.md) - Levenshtein automata that query dictionaries
 - [Zipper Navigation](../06-zipper-navigation/README.md) - Hierarchical navigation pattern
 - [Performance Guide](../performance/README.md) - Detailed benchmarks and optimization tips
 
@@ -629,8 +629,8 @@ See [Serialization Guide](../08-serialization/README.md) for details.
 - **Deep Dive**: Read the [DoubleArrayTrie Implementation Guide](implementations/double-array-trie.md)
 - **Unicode**: Learn about [DoubleArrayTrieChar](implementations/double-array-trie-char.md)
 - **Values**: Explore [Value Storage](../09-value-storage/README.md)
-- **Query**: Understand [Levenshtein Automata](../02-automata-layer/README.md)
+- **Query**: Understand [Levenshtein Automata](../02-levenshtein-automata/README.md)
 
 ---
 
-**Navigation**: [← Back to Algorithms](../README.md) | [Next Layer: Automata →](../02-automata-layer/README.md)
+**Navigation**: [← Back to Algorithms](../README.md) | [Next Layer: Automata →](../02-levenshtein-automata/README.md)

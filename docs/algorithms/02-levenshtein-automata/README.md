@@ -1,6 +1,6 @@
 # Levenshtein Automata Layer
 
-**Navigation**: [← Dictionary Layer](../01-dictionary-layer/README.md) | [Back to Algorithms](../README.md) | [Intersection Layer →](../03-intersection-layer/README.md)
+**Navigation**: [← Dictionary Layer](../01-dictionary-layer/README.md) | [Back to Algorithms](../README.md) | [Intersection Layer →](../03-intersection-traversal/README.md)
 
 ## Table of Contents
 
@@ -591,7 +591,7 @@ What's your use case?
 ## Related Documentation
 
 - [Dictionary Layer](../01-dictionary-layer/README.md) - Data structures traversed by automata
-- [Intersection Layer](../03-intersection-layer/README.md) - How automata traverse dictionaries
+- [Intersection Layer](../03-intersection-traversal/README.md) - How automata traverse dictionaries
 - [SIMD Optimization](../04-simd-layer/README.md) - Vectorized acceleration
 - [Performance Guide](../performance/README.md) - Detailed benchmarks
 
@@ -645,11 +645,11 @@ What's your use case?
 
 ## Next Steps
 
-- **Implementation**: Read about [Intersection Layer](../03-intersection-layer/README.md)
+- **Implementation**: Read about [Intersection Layer](../03-intersection-traversal/README.md)
 - **Optimization**: Explore [SIMD Acceleration](../04-simd-layer/README.md)
 - **Dictionary**: Review [Dictionary Layer](../01-dictionary-layer/README.md)
 - **Practice**: Try the [Usage Examples](../examples/README.md)
 
 ---
 
-**Navigation**: [← Dictionary Layer](../01-dictionary-layer/README.md) | [Back to Algorithms](../README.md) | [Intersection Layer →](../03-intersection-layer/README.md)
+**Navigation**: [← Dictionary Layer](../01-dictionary-layer/README.md) | [Back to Algorithms](../README.md) | [Intersection Layer →](../03-intersection-traversal/README.md)

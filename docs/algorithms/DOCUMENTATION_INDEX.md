@@ -15,7 +15,7 @@ This index shows what's documented and where to find it. The documentation is or
 | **DynamicDawg** | ⭐ Comprehensive | [Detailed guide](01-dictionary-layer/implementations/dynamic-dawg.md) |
 | **DynamicDawgChar** | ⭐ Comprehensive (Unicode + dynamic) | [Detailed guide](01-dictionary-layer/implementations/dynamic-dawg-char.md) |
 | **SuffixAutomaton** | ⭐ Comprehensive (substring matching) | [Detailed guide](01-dictionary-layer/implementations/suffix-automaton.md) |
-| **SuffixAutomatonChar** | ⭐ Comprehensive (Unicode substring matching) | [Detailed guide](01-dictionary-layer/implementations/suffix-automaton-char.md) |
+| **SuffixAutomatonChar** | 📝 Planned (Unicode substring matching) | [Layer README](01-dictionary-layer/README.md) |
 | **PathMapDictionary** | ⭐ Comprehensive (persistent trie) | [Detailed guide](01-dictionary-layer/implementations/pathmap-dictionary.md) |
 | **PathMapDictionaryChar** | ✅ Overview + comparison | [Layer README](01-dictionary-layer/README.md) |
 | **DawgDictionary** | ✅ Overview + comparison | [Layer README](01-dictionary-layer/README.md#7-dawgdictionary) |
@@ -161,11 +161,11 @@ Comprehensive implementation for IDE-style code completion in [docs/design](../d
   - 8 usage examples (code search, log analysis, DNA sequences)
   - ≤2n-1 states for n-character text
 
-- [SuffixAutomatonChar](01-dictionary-layer/implementations/suffix-automaton-char.md) (~1100 lines)
+- SuffixAutomatonChar (📝 Planned, ~1100 lines)
   - Character-level (Unicode) substring matching
   - Correct multi-byte UTF-8 handling
-  - 8 usage examples with emoji, CJK, accented text
-  - Performance overhead (5-8% vs byte-level)
+  - Planned: 8 usage examples with emoji, CJK, accented text
+  - Planned: Performance overhead analysis (5-8% vs byte-level)
 
 - [PathMapDictionary](01-dictionary-layer/implementations/pathmap-dictionary.md) (~900 lines)
   - Persistent trie with structural sharing
@@ -256,16 +256,22 @@ The following could be added if needed:
 
 ### Additional Dictionary Implementation Guides
 
-Detailed implementation guides could be added for lower-priority dictionary types:
+Detailed implementation guides could be added for these dictionary types:
+
+- [ ] **SuffixAutomatonChar** implementation details (Unicode substring matching, ~1100 lines)
+  - Priority: HIGH - Character-level variant of implemented SuffixAutomaton
+  - Would match pattern of other *Char guides (DoubleArrayTrieChar, DynamicDawgChar)
 
 - [ ] OptimizedDawg implementation details (static, space-optimized)
-- [ ] DawgDictionary implementation details (classic DAWG)
-- [ ] PathMapDictionaryChar implementation details (Unicode variant)
+  - Priority: MEDIUM - Specialized use case (maximum space efficiency)
 
-**Note**: These are lower priority because:
-1. The layer README provides comprehensive coverage for choosing and using these
-2. DoubleArrayTrie and PathMap variants are recommended for most use cases
-3. Less commonly used in production scenarios
+- [ ] DawgDictionary implementation details (classic DAWG)
+  - Priority: LOW - Legacy/compatibility, DoubleArrayTrie preferred
+
+- [ ] PathMapDictionaryChar implementation details (Unicode variant)
+  - Priority: LOW - PathMapDictionary handles Unicode naturally
+
+**Note**: The layer README provides comprehensive coverage for choosing and using all dictionary types, so these guides are supplementary for users who need deep implementation details.
 
 ### Additional Layers
 
@@ -316,15 +322,15 @@ Detailed implementation guides could be added for lower-priority dictionary type
 ## Documentation Statistics
 
 - **Total markdown files**: 20+ (algorithms + design docs)
-- **Total documentation lines**: ~12,000+ lines
-- **Algorithm layer docs**: ~9,300 lines
+- **Total documentation lines**: ~11,000+ lines (excluding planned SuffixAutomatonChar guide)
+- **Algorithm layer docs**: ~8,200 lines
 - **Design docs**: ~3,000+ lines (contextual completion)
 - **Code examples**: 70+ complete, runnable examples
 - **Benchmarks**: Comprehensive performance data across all components
-- **Test coverage**: 250+ tests with detailed validation
+- **Test coverage**: 316+ tests with detailed validation
 - **Diagrams**: ASCII art for data structures and algorithms
 - **Academic references**: 30+ papers and resources
-- **Implementation guides**: 6 detailed dictionary guides (~6,000 lines)
+- **Implementation guides**: 6 detailed dictionary guides (~5,900 lines)
 
 ## Contributing Documentation
 
@@ -338,23 +344,25 @@ If you'd like to add documentation for components not yet covered in detail:
 
 ---
 
-**Last Updated**: 2025-11-04
+**Last Updated**: 2025-11-05
 **Coverage**: Core components + major features comprehensively documented
 
-**Recent Additions (2025-11-04)**:
-- ✅ DynamicDawg and DynamicDawgChar implementation guides
-- ✅ SuffixAutomaton implementation guide
-- ✅ PathMapDictionary implementation guide
-- ✅ Contextual Completion complete implementation (all 6 phases)
-- ✅ AutomatonZipper and IntersectionZipper documentation
-- ✅ ValuedDictZipper support for all major dictionary types
-- ✅ 93 contextual completion tests with full integration
+**Recent Additions**:
+- ✅ DynamicDawg and DynamicDawgChar implementation guides (2025-11-04)
+- ✅ SuffixAutomaton implementation guide (2025-11-04)
+- ✅ PathMapDictionary implementation guide (2025-11-04)
+- ✅ Contextual Completion complete implementation - all 6 phases (2025-11-04)
+- ✅ AutomatonZipper and IntersectionZipper documentation (2025-11-04)
+- ✅ ValuedDictZipper support for all major dictionary types (2025-11-04)
+- ✅ SuffixAutomatonChar implementation + zipper (2025-11-05)
+- ✅ 4 new zippers with 46 additional tests (2025-11-05)
+- ✅ Version 0.6.0 released (2025-11-05)
 
 **Project Completeness**:
-- Dictionary Layer: ✅ 100% (all recommended types documented)
+- Dictionary Layer: ✅ 95% (6/7 recommended types have detailed guides; SuffixAutomatonChar planned)
 - Levenshtein Automata: ✅ 100% (all variants documented)
 - Zipper Navigation: ✅ 100% (all major zippers documented)
 - Value Storage: ✅ 100% (architecture + all backends)
-- Contextual Completion: ✅ 100% (production-ready, fully tested)
+- Contextual Completion: ✅ 100% (production-ready, fully tested with PathMapDictionary)
 - SIMD Optimization: ✅ 100% (comprehensive guide)
 - Intersection/Traversal: ✅ 100% (complete documentation)

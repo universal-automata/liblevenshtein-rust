@@ -843,7 +843,7 @@ let han_dict = DoubleArrayTrieChar::from_terms(by_script[&Script::Han]);
 - **Byte-Level**: Compare with [DoubleArrayTrie](double-array-trie.md)
 - **Values**: Learn about [Value Storage](../../09-value-storage/README.md)
 - **Navigation**: Try [Zipper Pattern](../../06-zipper-navigation/README.md)
-- **Automata**: Understand [Levenshtein Automata](../../02-automata-layer/README.md)
+- **Automata**: Understand [Levenshtein Automata](../../02-levenshtein-automata/README.md)
 
 ---
 

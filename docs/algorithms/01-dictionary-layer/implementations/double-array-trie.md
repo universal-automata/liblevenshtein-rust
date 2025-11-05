@@ -408,7 +408,7 @@ let results: Vec<String> = automaton.query(&dict).collect();
 
 **Performance**: ~16.3µs for distance 2, 10,000-term dictionary
 
-See [Levenshtein Automata](../../02-automata-layer/README.md) for details.
+See [Levenshtein Automata](../../02-levenshtein-automata/README.md) for details.
 
 ### Edge Iteration
 
@@ -1025,7 +1025,7 @@ let dict: DoubleArrayTrie = bincode::deserialize(&mmap).unwrap();
 - **Unicode Support**: Learn about [DoubleArrayTrieChar](double-array-trie-char.md)
 - **Dynamic Updates**: Explore [DynamicDawg](dynamic-dawg.md)
 - **Value Storage**: Read the [Value Storage Guide](../../09-value-storage/README.md)
-- **Fuzzy Matching**: Understand [Levenshtein Automata](../../02-automata-layer/README.md)
+- **Fuzzy Matching**: Understand [Levenshtein Automata](../../02-levenshtein-automata/README.md)
 - **Navigation**: Try [Zipper Pattern](../../06-zipper-navigation/README.md)
 
 ---
