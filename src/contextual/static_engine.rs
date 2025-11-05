@@ -32,11 +32,11 @@ use std::sync::{Arc, Mutex, RwLock};
 ///
 /// ```
 /// use liblevenshtein::contextual::StaticContextualCompletionEngine;
-/// use liblevenshtein::dictionary::double_array_trie::DoubleArrayTrie;
+/// use liblevenshtein::dictionary::double_array_trie::{DoubleArrayTrie, DoubleArrayTrieBuilder};
 /// use liblevenshtein::transducer::Algorithm;
 ///
 /// // Build a static dictionary
-/// let mut builder = DoubleArrayTrie::builder();
+/// let mut builder = DoubleArrayTrieBuilder::new();
 /// builder.insert_with_value("std", Some(vec![0]));
 /// builder.insert_with_value("String", Some(vec![0]));
 /// let dict = builder.build();
@@ -84,10 +84,10 @@ impl StaticContextualCompletionEngine<DoubleArrayTrie<Vec<ContextId>>> {
     ///
     /// ```
     /// use liblevenshtein::contextual::StaticContextualCompletionEngine;
-    /// use liblevenshtein::dictionary::double_array_trie::DoubleArrayTrie;
+    /// use liblevenshtein::dictionary::double_array_trie::{DoubleArrayTrie, DoubleArrayTrieBuilder};
     /// use liblevenshtein::transducer::Algorithm;
     ///
-    /// let mut builder = DoubleArrayTrie::builder();
+    /// let mut builder = DoubleArrayTrieBuilder::new();
     /// builder.insert_with_value("test", Some(vec![0]));
     /// let dict = builder.build();
     ///
@@ -123,9 +123,9 @@ impl StaticContextualCompletionEngine<DoubleArrayTrieChar<Vec<ContextId>>> {
     /// use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
     /// use liblevenshtein::transducer::Algorithm;
     ///
-    /// let mut builder = DoubleArrayTrieChar::builder();
-    /// builder.insert_with_value("世界", Some(vec![0]));
-    /// let dict = builder.build();
+    /// let dict = DoubleArrayTrieChar::from_terms_with_values([
+    ///     ("世界", vec![0]),
+    /// ]);
     ///
     /// let engine = StaticContextualCompletionEngine::with_double_array_trie_char(
     ///     dict,
@@ -178,11 +178,7 @@ where
     }
 
     /// Create a child context (nested scope).
-    pub fn create_child_context(
-        &self,
-        parent: ContextId,
-        child: ContextId,
-    ) -> Result<ContextId> {
+    pub fn create_child_context(&self, parent: ContextId, child: ContextId) -> Result<ContextId> {
         let mut tree = self.context_tree.write().unwrap();
         tree.create_child(parent, child)
             .map_err(|_| ContextError::ContextNotFound(parent))?;
@@ -232,10 +228,7 @@ where
     /// Get the current draft text.
     pub fn get_draft(&self, context: ContextId) -> Result<String> {
         let drafts = self.drafts.lock().unwrap();
-        Ok(drafts
-            .get(&context)
-            .map(|b| b.as_str())
-            .unwrap_or_default())
+        Ok(drafts.get(&context).map(|b| b.as_str()).unwrap_or_default())
     }
 
     /// Finalize a draft (store in finalized_terms HashMap, not in dictionary).
@@ -275,17 +268,13 @@ where
         // Query static dictionary (fast!)
         let finalized_dict = self.complete_dictionary(context, query, max_distance)?;
         for completion in finalized_dict {
-            results
-                .entry(completion.term.clone())
-                .or_insert(completion);
+            results.entry(completion.term.clone()).or_insert(completion);
         }
 
         // Query finalized terms HashMap (small, rare)
         let finalized_hash = self.complete_finalized_terms(context, query, max_distance)?;
         for completion in finalized_hash {
-            results
-                .entry(completion.term.clone())
-                .or_insert(completion);
+            results.entry(completion.term.clone()).or_insert(completion);
         }
 
         // Query drafts (in-memory, always fresh)
