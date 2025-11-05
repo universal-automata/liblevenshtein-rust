@@ -10,9 +10,10 @@ use colored::Colorize;
 /// REPL execution phase
 ///
 /// Represents the current state of the REPL's execution cycle.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ReplPhase {
     /// Ready to accept new input
+    #[default]
     Ready,
 
     /// Accepting multi-line input (continuation)
@@ -84,12 +85,6 @@ impl ReplPhase {
             } => "✗".red().to_string(),
             Self::Exiting => "👋".to_string(),
         }
-    }
-}
-
-impl Default for ReplPhase {
-    fn default() -> Self {
-        Self::Ready
     }
 }
 
