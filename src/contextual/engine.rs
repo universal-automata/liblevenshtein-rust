@@ -1,6 +1,6 @@
 //! Contextual completion engine for incremental fuzzy matching with hierarchical scopes.
 //!
-//! This module provides the main `ContextualCompletionEngine` that combines:
+//! This module provides the main `DynamicContextualCompletionEngine` that combines:
 //! - Draft buffer management per context
 //! - Hierarchical context tree for visibility
 //! - Checkpoint-based undo/redo
@@ -9,6 +9,8 @@
 
 use super::error::{ContextError, Result};
 use super::{CheckpointStack, Completion, ContextId, ContextTree, DraftBuffer};
+use crate::dictionary::dynamic_dawg::DynamicDawg;
+use crate::dictionary::dynamic_dawg_char::DynamicDawgChar;
 use crate::dictionary::pathmap::PathMapDictionary;
 use crate::transducer::{Algorithm, Transducer};
 use std::collections::HashMap;
@@ -35,16 +37,16 @@ use std::sync::{Arc, Mutex, RwLock};
 /// # Examples
 ///
 /// ```
-/// use liblevenshtein::contextual::ContextualCompletionEngine;
+/// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
 /// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
 /// use liblevenshtein::transducer::Algorithm;
 ///
 /// // Create engine with default PathMapDictionary backend
-/// let engine = ContextualCompletionEngine::new();
+/// let engine = DynamicContextualCompletionEngine::new();
 ///
 /// // Or create with a specific dictionary
 /// let dict = PathMapDictionary::new();
-/// let engine2 = ContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
+/// let engine2 = DynamicContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
 ///
 /// // Create global context
 /// let global = engine.create_root_context(0);
@@ -56,7 +58,7 @@ use std::sync::{Arc, Mutex, RwLock};
 /// let completions = engine.complete(global, "helo", 1);
 /// assert!(completions.iter().any(|c| c.term == "hello"));
 /// ```
-pub struct ContextualCompletionEngine<D = PathMapDictionary<Vec<ContextId>>>
+pub struct DynamicContextualCompletionEngine<D = PathMapDictionary<Vec<ContextId>>>
 where
     D: crate::dictionary::MutableMappedDictionary<Value = Vec<ContextId>> + Clone,
 {
@@ -74,16 +76,40 @@ where
     transducer: Arc<RwLock<Transducer<D>>>,
 }
 
+/// Deprecated alias for `DynamicContextualCompletionEngine`.
+///
+/// This type was renamed in version 0.7.0 to better distinguish it from the new
+/// `StaticContextualCompletionEngine`. Code using this alias will continue to work
+/// but will receive deprecation warnings.
+///
+/// # Migration
+///
+/// Replace uses of `ContextualCompletionEngine` with `DynamicContextualCompletionEngine`:
+///
+/// ```rust,ignore
+/// // Old (deprecated)
+/// let engine = ContextualCompletionEngine::new();
+///
+/// // New (recommended)
+/// let engine = DynamicContextualCompletionEngine::new();
+/// ```
+#[deprecated(
+    since = "0.7.0",
+    note = "Renamed to `DynamicContextualCompletionEngine`. This alias will be removed in 1.0.0"
+)]
+pub type ContextualCompletionEngine<D = PathMapDictionary<Vec<ContextId>>> =
+    DynamicContextualCompletionEngine<D>;
+
 // Convenience constructors for default PathMapDictionary backend
-impl ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
+impl DynamicContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
     /// Create a new engine with default configuration (PathMapDictionary + Standard algorithm).
     ///
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// ```
     pub fn new() -> Self {
         Self::with_algorithm(Algorithm::Standard)
@@ -98,10 +124,10 @@ impl ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     /// use liblevenshtein::transducer::Algorithm;
     ///
-    /// let engine = ContextualCompletionEngine::with_algorithm(Algorithm::Transposition);
+    /// let engine = DynamicContextualCompletionEngine::with_algorithm(Algorithm::Transposition);
     /// ```
     pub fn with_algorithm(algorithm: Algorithm) -> Self {
         let dictionary = PathMapDictionary::<Vec<ContextId>>::new();
@@ -109,8 +135,59 @@ impl ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
     }
 }
 
+// Convenience constructors for DynamicDawg backend
+impl DynamicContextualCompletionEngine<DynamicDawg<Vec<ContextId>>> {
+    /// Create an engine with DynamicDawg backend (byte-level, supports insert/remove).
+    ///
+    /// DynamicDawg provides faster queries than PathMapDictionary while still supporting
+    /// runtime modifications. Best for applications that need both performance and flexibility.
+    ///
+    /// # Arguments
+    ///
+    /// * `algorithm` - Levenshtein algorithm to use for fuzzy matching
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
+    /// use liblevenshtein::transducer::Algorithm;
+    ///
+    /// let engine = DynamicContextualCompletionEngine::with_dynamic_dawg(Algorithm::Standard);
+    /// ```
+    pub fn with_dynamic_dawg(algorithm: Algorithm) -> Self {
+        let dictionary = DynamicDawg::<Vec<ContextId>>::new();
+        Self::with_dictionary(dictionary, algorithm)
+    }
+}
+
+// Convenience constructors for DynamicDawgChar backend
+impl DynamicContextualCompletionEngine<DynamicDawgChar<Vec<ContextId>>> {
+    /// Create an engine with DynamicDawgChar backend (character-level, full Unicode support).
+    ///
+    /// DynamicDawgChar handles multi-byte UTF-8 characters correctly, making it suitable for
+    /// applications working with emoji, CJK text, or other non-ASCII Unicode characters.
+    /// Provides faster queries than PathMapDictionary with proper Unicode handling.
+    ///
+    /// # Arguments
+    ///
+    /// * `algorithm` - Levenshtein algorithm to use for fuzzy matching
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
+    /// use liblevenshtein::transducer::Algorithm;
+    ///
+    /// let engine = DynamicContextualCompletionEngine::with_dynamic_dawg_char(Algorithm::Standard);
+    /// ```
+    pub fn with_dynamic_dawg_char(algorithm: Algorithm) -> Self {
+        let dictionary = DynamicDawgChar::<Vec<ContextId>>::new();
+        Self::with_dictionary(dictionary, algorithm)
+    }
+}
+
 // Generic implementation for all dictionary backends
-impl<D> ContextualCompletionEngine<D>
+impl<D> DynamicContextualCompletionEngine<D>
 where
     D: crate::dictionary::MutableMappedDictionary<Value = Vec<ContextId>> + Clone,
 {
@@ -124,12 +201,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     /// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
     /// use liblevenshtein::transducer::Algorithm;
     ///
     /// let dict = PathMapDictionary::new();
-    /// let engine = ContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
+    /// let engine = DynamicContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
     /// ```
     pub fn with_dictionary(dictionary: D, algorithm: Algorithm) -> Self {
         let transducer = Transducer::new(dictionary, algorithm);
@@ -162,9 +239,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let global = engine.create_root_context(0);
     /// assert_eq!(global, 0);
     /// ```
@@ -200,9 +277,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let global = engine.create_root_context(0);
     /// let func = engine.create_child_context(1, global).unwrap();
     /// assert_eq!(func, 1);
@@ -236,9 +313,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let global = engine.create_root_context(0);
     /// let func = engine.create_child_context(1, global).unwrap();
     ///
@@ -276,9 +353,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let global = engine.create_root_context(0);
     /// let module = engine.create_child_context(1, global).unwrap();
     /// let func = engine.create_child_context(2, module).unwrap();
@@ -300,9 +377,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// assert!(!engine.context_exists(0));
     ///
     /// let global = engine.create_root_context(0);
@@ -326,9 +403,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// assert_eq!(engine.get_draft(ctx), Some(String::new()));
@@ -354,9 +431,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// assert!(!engine.has_draft(ctx));
@@ -386,9 +463,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_char(ctx, 'h').unwrap();
@@ -423,9 +500,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_str(ctx, "hello").unwrap();
@@ -457,9 +534,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_str(ctx, "hello").unwrap();
@@ -484,9 +561,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_str(ctx, "hello").unwrap();
@@ -524,9 +601,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_str(ctx, "hello").unwrap();
@@ -575,9 +652,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.checkpoint(ctx).unwrap(); // Empty checkpoint
@@ -636,9 +713,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// assert_eq!(engine.checkpoint_count(ctx), 0);
@@ -667,9 +744,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.checkpoint(ctx).unwrap();
@@ -711,9 +788,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_str(ctx, "hello").unwrap();
@@ -783,9 +860,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.finalize_direct(ctx, "function").unwrap();
@@ -829,9 +906,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_str(ctx, "mistake").unwrap();
@@ -867,9 +944,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// assert!(!engine.has_term("hello"));
@@ -895,9 +972,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let global = engine.create_root_context(0);
     /// let func = engine.create_child_context(1, global).unwrap();
     ///
@@ -935,9 +1012,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// // Add finalized terms
@@ -999,9 +1076,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.insert_str(ctx, "hello").unwrap();
@@ -1055,9 +1132,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use liblevenshtein::contextual::ContextualCompletionEngine;
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
     ///
-    /// let engine = ContextualCompletionEngine::new();
+    /// let engine = DynamicContextualCompletionEngine::new();
     /// let ctx = engine.create_root_context(0);
     ///
     /// engine.finalize_direct(ctx, "hello").unwrap();
@@ -1150,7 +1227,7 @@ where
     }
 }
 
-impl Default for ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
+impl Default for DynamicContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>> {
     fn default() -> Self {
         Self::new()
     }
@@ -1162,19 +1239,19 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         assert!(!engine.context_exists(0));
     }
 
     #[test]
     fn test_with_algorithm() {
-        let engine = ContextualCompletionEngine::with_algorithm(Algorithm::Transposition);
+        let engine = DynamicContextualCompletionEngine::with_algorithm(Algorithm::Transposition);
         assert!(!engine.context_exists(0));
     }
 
     #[test]
     fn test_create_root_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
         assert_eq!(ctx, 0);
         assert!(engine.context_exists(0));
@@ -1182,7 +1259,7 @@ mod tests {
 
     #[test]
     fn test_create_child_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let root = engine.create_root_context(0);
         let child = engine.create_child_context(1, root).unwrap();
 
@@ -1192,7 +1269,7 @@ mod tests {
 
     #[test]
     fn test_create_child_invalid_parent() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.create_child_context(1, 999);
 
         assert!(result.is_err());
@@ -1201,7 +1278,7 @@ mod tests {
 
     #[test]
     fn test_remove_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let root = engine.create_root_context(0);
         let child = engine.create_child_context(1, root).unwrap();
 
@@ -1215,7 +1292,7 @@ mod tests {
 
     #[test]
     fn test_remove_context_with_descendants() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let root = engine.create_root_context(0);
         let child1 = engine.create_child_context(1, root).unwrap();
         let child2 = engine.create_child_context(2, child1).unwrap();
@@ -1229,7 +1306,7 @@ mod tests {
 
     #[test]
     fn test_get_visible_contexts() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let global = engine.create_root_context(0);
         let module = engine.create_child_context(1, global).unwrap();
         let func = engine.create_child_context(2, module).unwrap();
@@ -1246,7 +1323,7 @@ mod tests {
 
     #[test]
     fn test_get_draft_empty() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         assert_eq!(engine.get_draft(ctx), Some(String::new()));
@@ -1255,14 +1332,14 @@ mod tests {
 
     #[test]
     fn test_get_draft_nonexistent() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         assert_eq!(engine.get_draft(999), None);
         assert!(!engine.has_draft(999));
     }
 
     #[test]
     fn test_insert_char() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_char(ctx, 'h').unwrap();
@@ -1273,14 +1350,14 @@ mod tests {
 
     #[test]
     fn test_insert_char_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.insert_char(999, 'x');
         assert!(result.is_err());
     }
 
     #[test]
     fn test_insert_str() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_str(ctx, "hello").unwrap();
@@ -1292,7 +1369,7 @@ mod tests {
 
     #[test]
     fn test_insert_str_unicode() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_str(ctx, "Hello 世界").unwrap();
@@ -1304,7 +1381,7 @@ mod tests {
 
     #[test]
     fn test_delete_char() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_str(ctx, "hello").unwrap();
@@ -1317,7 +1394,7 @@ mod tests {
 
     #[test]
     fn test_delete_char_empty() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         assert_eq!(engine.delete_char(ctx), None);
@@ -1325,13 +1402,13 @@ mod tests {
 
     #[test]
     fn test_delete_char_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         assert_eq!(engine.delete_char(999), None);
     }
 
     #[test]
     fn test_clear_draft() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_str(ctx, "hello").unwrap();
@@ -1344,14 +1421,14 @@ mod tests {
 
     #[test]
     fn test_clear_draft_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.clear_draft(999);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_checkpoint_and_undo() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         // Create initial checkpoint (empty)
@@ -1380,7 +1457,7 @@ mod tests {
 
     #[test]
     fn test_undo_no_checkpoints() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         let result = engine.undo(ctx);
@@ -1389,21 +1466,21 @@ mod tests {
 
     #[test]
     fn test_checkpoint_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.checkpoint(999);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_undo_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.undo(999);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_checkpoint_count() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         assert_eq!(engine.checkpoint_count(ctx), 0);
@@ -1420,13 +1497,13 @@ mod tests {
 
     #[test]
     fn test_checkpoint_count_nonexistent() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         assert_eq!(engine.checkpoint_count(999), 0);
     }
 
     #[test]
     fn test_clear_checkpoints() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.checkpoint(ctx).unwrap();
@@ -1439,14 +1516,14 @@ mod tests {
 
     #[test]
     fn test_clear_checkpoints_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.clear_checkpoints(999);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_multiple_undo_steps() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         // Build up checkpoints
@@ -1477,7 +1554,7 @@ mod tests {
 
     #[test]
     fn test_finalize() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_str(ctx, "hello").unwrap();
@@ -1499,7 +1576,7 @@ mod tests {
 
     #[test]
     fn test_finalize_empty_draft() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         let result = engine.finalize(ctx);
@@ -1508,14 +1585,14 @@ mod tests {
 
     #[test]
     fn test_finalize_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.finalize(999);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_finalize_direct() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.finalize_direct(ctx, "function").unwrap();
@@ -1528,7 +1605,7 @@ mod tests {
 
     #[test]
     fn test_finalize_direct_empty_term() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         let result = engine.finalize_direct(ctx, "");
@@ -1537,14 +1614,14 @@ mod tests {
 
     #[test]
     fn test_finalize_direct_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.finalize_direct(999, "test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_discard() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_str(ctx, "mistake").unwrap();
@@ -1564,14 +1641,14 @@ mod tests {
 
     #[test]
     fn test_discard_nonexistent_context() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let result = engine.discard(999);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_has_term() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         assert!(!engine.has_term("test"));
@@ -1582,7 +1659,7 @@ mod tests {
 
     #[test]
     fn test_term_contexts() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let global = engine.create_root_context(0);
         let func = engine.create_child_context(1, global).unwrap();
 
@@ -1601,13 +1678,13 @@ mod tests {
 
     #[test]
     fn test_term_contexts_unknown() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         assert!(engine.term_contexts("unknown").is_empty());
     }
 
     #[test]
     fn test_complete_drafts() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.insert_str(ctx, "hello").unwrap();
@@ -1621,7 +1698,7 @@ mod tests {
 
     #[test]
     fn test_complete_finalized() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.finalize_direct(ctx, "hello").unwrap();
@@ -1636,7 +1713,7 @@ mod tests {
 
     #[test]
     fn test_complete_fusion() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         // Finalized terms
@@ -1657,7 +1734,7 @@ mod tests {
 
     #[test]
     fn test_complete_deduplication() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         // Finalized term
@@ -1676,7 +1753,7 @@ mod tests {
 
     #[test]
     fn test_complete_hierarchical_visibility() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let global = engine.create_root_context(0);
         let func = engine.create_child_context(1, global).unwrap();
 
@@ -1699,7 +1776,7 @@ mod tests {
 
     #[test]
     fn test_complete_sorting() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.finalize_direct(ctx, "test").unwrap(); // distance 0
@@ -1719,7 +1796,7 @@ mod tests {
 
     #[test]
     fn test_complete_empty_query() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.finalize_direct(ctx, "test").unwrap();
@@ -1731,7 +1808,7 @@ mod tests {
 
     #[test]
     fn test_complete_no_matches() {
-        let engine = ContextualCompletionEngine::new();
+        let engine = DynamicContextualCompletionEngine::new();
         let ctx = engine.create_root_context(0);
 
         engine.finalize_direct(ctx, "hello").unwrap();
@@ -1743,7 +1820,7 @@ mod tests {
 
     #[test]
     fn test_levenshtein_distance() {
-        type Engine = ContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>>;
+        type Engine = DynamicContextualCompletionEngine<PathMapDictionary<Vec<ContextId>>>;
 
         assert_eq!(Engine::levenshtein_distance("", ""), 0);
         assert_eq!(Engine::levenshtein_distance("abc", ""), 3);
