@@ -1,5 +1,6 @@
 # liblevenshtein-rust
 
+[![Crates.io](https://img.shields.io/crates/v/liblevenshtein.svg)](https://crates.io/crates/liblevenshtein)
 [![CI](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/ci.yml)
 [![Nightly Tests](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/nightly.yml/badge.svg)](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/nightly.yml)
 [![Release](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/release.yml/badge.svg)](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/release.yml)
@@ -134,6 +135,7 @@ Download pre-built packages from the [GitHub Releases](https://github.com/univer
 - **Debian/Ubuntu**: `.deb` packages
 - **Fedora/RHEL/CentOS**: `.rpm` packages
 - **Arch Linux**: `.pkg.tar.zst` packages
+- **macOS**: `.dmg` disk images for easy installation (x86_64 and ARM64)
 - **Binaries**: `.tar.gz` and `.zip` archives for Linux and macOS (x86_64 and ARM64)
 
 ## Usage
