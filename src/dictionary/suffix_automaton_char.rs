@@ -150,6 +150,7 @@ pub(crate) struct SuffixNodeChar<V: DictionaryValue = ()> {
     ///
     /// Tracks how many indexed strings pass through this state.
     /// Used during compaction to identify unreachable states.
+    #[allow(dead_code)]
     ref_count: usize,
 
     /// Optional value associated with this state (only for final nodes).
