@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Multi-Backend Contextual Completion Support (2025-11-05)
+
+- **DynamicContextualCompletionEngine with multiple dictionary backends**
+  - Renamed `ContextualCompletionEngine` to `DynamicContextualCompletionEngine` for clarity
+  - Added deprecated type alias `ContextualCompletionEngine` for backward compatibility (will be removed in 1.0.0)
+  - Extended support to DynamicDawg and DynamicDawgChar backends (in addition to PathMapDictionary)
+  - Generic over `D: MutableMappedDictionary<Value = Vec<ContextId>>`
+  - Convenience constructors: `with_pathmap()`, `with_pathmap_char()`, `with_dynamic_dawg()`, `with_dynamic_dawg_char()`
+  - Performance benefit: DynamicDawg provides ~2.8x faster queries than PathMapDictionary
+
+- **StaticContextualCompletionEngine for read-only dictionaries**
+  - New engine optimized for pre-built, immutable dictionaries
+  - Supports DoubleArrayTrie and DoubleArrayTrieChar backends
+  - Fastest query performance: ~12-16µs at distance 1 (compared to ~45µs for PathMap)
+  - Finalized terms stored in separate HashMap instead of mutating dictionary
+  - Query fusion architecture: merges results from static dictionary + finalized_terms + drafts
+  - Generic over `D: MappedDictionary<Value = Vec<ContextId>>`
+  - Convenience constructors: `with_double_array_trie()`, `with_double_array_trie_char()`
+  - Ideal for LSP servers with large pre-built standard library dictionaries
+
+- **Comprehensive Unicode support across all backends**
+  - Both engines support byte-level (u8) and character-level (char) dictionary variants
+  - Correct Unicode edit distances for multi-byte UTF-8 sequences
+  - PathMapDictionary + PathMapDictionaryChar (mutable, flexible)
+  - DynamicDawg + DynamicDawgChar (mutable, faster queries)
+  - DoubleArrayTrie + DoubleArrayTrieChar (immutable, fastest queries)
+
+### Changed
+
+- **Contextual completion API evolution**
+  - `ContextualCompletionEngine` is now a deprecated type alias
+  - Users should migrate to `DynamicContextualCompletionEngine` for clarity
+  - No breaking changes: existing code continues to work with deprecation warning
+  - Clear migration path documented in deprecation notice
+
 ## [0.6.0] - 2025-11-04
 
 ### Added
