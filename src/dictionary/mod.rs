@@ -398,4 +398,61 @@ pub trait MutableMappedDictionary: MappedDictionary {
     ///
     /// `true` if this is a new term, `false` if updating an existing term's value.
     fn insert_with_value(&self, term: &str, value: Self::Value) -> bool;
+
+    /// Union this dictionary with another, applying a merge function for conflicting values.
+    ///
+    /// Iterates through all terms in `other` and:
+    /// - Inserts new terms directly
+    /// - For existing terms, merges values using `merge_fn`
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The dictionary to union with
+    /// * `merge_fn` - Function to merge values when term exists in both dictionaries.
+    ///   Takes `(existing_value, other_value)` and returns the merged value.
+    ///
+    /// # Returns
+    ///
+    /// Number of terms processed from `other`
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+    ///
+    /// let dict1 = PathMapDictionary::from_terms_with_values([
+    ///     ("foo", vec![1, 2]),
+    ///     ("bar", vec![1]),
+    /// ]);
+    ///
+    /// let dict2 = PathMapDictionary::from_terms_with_values([
+    ///     ("foo", vec![2, 3]),  // Overlap
+    ///     ("baz", vec![3]),     // New
+    /// ]);
+    ///
+    /// // Union with custom merge (concatenate)
+    /// dict1.union_with(&dict2, |left, right| {
+    ///     let mut merged = left.clone();
+    ///     merged.extend(right.clone());
+    ///     merged.sort();
+    ///     merged.dedup();
+    ///     merged
+    /// });
+    ///
+    /// // Result: foo -> [1,2,3], bar -> [1], baz -> [3]
+    /// ```
+    fn union_with<F>(&self, other: &Self, merge_fn: F) -> usize
+    where
+        F: Fn(&Self::Value, &Self::Value) -> Self::Value,
+        Self::Value: Clone;
+
+    /// Union with another dictionary, keeping the right (other's) value on conflicts.
+    ///
+    /// Convenience method equivalent to `union_with(other, |_, right| right.clone())`.
+    fn union_replace(&self, other: &Self) -> usize
+    where
+        Self::Value: Clone,
+    {
+        self.union_with(other, |_, right| right.clone())
+    }
 }

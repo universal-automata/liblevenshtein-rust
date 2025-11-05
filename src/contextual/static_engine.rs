@@ -166,6 +166,39 @@ where
         }
     }
 
+    /// Get a reference to the underlying transducer.
+    ///
+    /// The transducer is wrapped in `Arc<RwLock<>>` for thread-safe access.
+    /// Use this to access the dictionary for operations like:
+    /// - Cloning the dictionary for serialization
+    /// - Querying the dictionary directly
+    /// - Accessing transducer metadata (algorithm, etc.)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::StaticContextualCompletionEngine;
+    /// use liblevenshtein::dictionary::double_array_trie::{DoubleArrayTrie, DoubleArrayTrieBuilder};
+    /// use liblevenshtein::transducer::Algorithm;
+    ///
+    /// let mut builder = DoubleArrayTrieBuilder::new();
+    /// builder.insert_with_value("test", Some(vec![0]));
+    /// let dict = builder.build();
+    ///
+    /// let engine = StaticContextualCompletionEngine::with_double_array_trie(dict, Algorithm::Standard);
+    ///
+    /// // Access the transducer
+    /// let transducer_ref = engine.transducer();
+    /// let transducer = transducer_ref.read().unwrap();
+    ///
+    /// // Clone the dictionary for serialization
+    /// let dict = transducer.dictionary().clone();
+    /// ```
+    #[inline]
+    pub fn transducer(&self) -> &Arc<RwLock<Transducer<D>>> {
+        &self.transducer
+    }
+
     /// Create a root context (top-level scope).
     pub fn create_root_context(&self, id: ContextId) -> Result<ContextId> {
         let mut tree = self.context_tree.write().unwrap();

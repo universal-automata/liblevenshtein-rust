@@ -206,6 +206,39 @@ impl<D: Dictionary> Transducer<D> {
         &self.dictionary
     }
 
+    /// Extract the underlying dictionary, consuming the transducer.
+    ///
+    /// This is useful when you need to:
+    /// - Serialize the dictionary independently
+    /// - Perform maintenance operations outside the transducer context
+    /// - Reuse the dictionary in another transducer or engine
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::prelude::*;
+    /// use liblevenshtein::transducer::Algorithm;
+    ///
+    /// let dict = PathMapDictionary::from_terms(["test", "testing"]);
+    /// let transducer = Transducer::new(dict, Algorithm::Standard);
+    ///
+    /// // Extract the dictionary
+    /// let dict = transducer.into_inner();
+    /// assert_eq!(dict.len(), Some(2));
+    /// ```
+    #[inline]
+    pub fn into_inner(self) -> D {
+        self.dictionary
+    }
+
+    /// Alias for `into_inner()` - extracts the underlying dictionary.
+    ///
+    /// Provided for semantic clarity when specifically working with dictionaries.
+    #[inline]
+    pub fn into_dictionary(self) -> D {
+        self.dictionary
+    }
+
     /// Create a fluent query builder
     ///
     /// Provides a more ergonomic, self-documenting API for querying.

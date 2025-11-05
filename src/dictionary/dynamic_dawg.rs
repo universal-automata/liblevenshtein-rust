@@ -1442,6 +1442,15 @@ impl<V: DictionaryValue> crate::dictionary::MutableMappedDictionary for DynamicD
         // Delegate to the inherent method
         Self::insert_with_value(self, term, value)
     }
+
+    fn union_with<F>(&self, _other: &Self, _merge_fn: F) -> usize
+    where
+        F: Fn(&Self::Value, &Self::Value) -> Self::Value,
+        Self::Value: Clone,
+    {
+        // TODO: Implement union_with for DynamicDawg
+        unimplemented!("union_with for DynamicDawg not yet implemented")
+    }
 }
 
 #[cfg(test)]

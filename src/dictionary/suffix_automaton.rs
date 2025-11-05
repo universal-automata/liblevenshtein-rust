@@ -1011,6 +1011,15 @@ impl<V: DictionaryValue> MutableMappedDictionary for SuffixAutomaton<V> {
 
         true
     }
+
+    fn union_with<F>(&self, _other: &Self, _merge_fn: F) -> usize
+    where
+        F: Fn(&Self::Value, &Self::Value) -> Self::Value,
+        Self::Value: Clone,
+    {
+        // TODO: Implement union_with for SuffixAutomaton
+        unimplemented!("union_with for SuffixAutomaton not yet implemented")
+    }
 }
 
 #[cfg(test)]

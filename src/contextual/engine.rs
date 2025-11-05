@@ -219,6 +219,33 @@ where
         }
     }
 
+    /// Get a reference to the underlying transducer.
+    ///
+    /// The transducer is wrapped in `Arc<RwLock<>>` for thread-safe access.
+    /// Use this to access the dictionary for operations like:
+    /// - Cloning the dictionary for serialization
+    /// - Querying the dictionary directly
+    /// - Accessing transducer metadata (algorithm, etc.)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use liblevenshtein::contextual::DynamicContextualCompletionEngine;
+    ///
+    /// let engine = DynamicContextualCompletionEngine::new();
+    ///
+    /// // Access the transducer
+    /// let transducer_ref = engine.transducer();
+    /// let transducer = transducer_ref.read().unwrap();
+    ///
+    /// // Clone the dictionary for serialization
+    /// let dict = transducer.dictionary().clone();
+    /// ```
+    #[inline]
+    pub fn transducer(&self) -> &Arc<RwLock<Transducer<D>>> {
+        &self.transducer
+    }
+
     /// Create a root context.
     ///
     /// Root contexts have no parent and serve as top-level scopes

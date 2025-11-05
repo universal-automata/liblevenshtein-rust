@@ -288,6 +288,35 @@ impl<V: DictionaryValue> crate::dictionary::MutableMappedDictionary for PathMapD
     fn insert_with_value(&self, term: &str, value: Self::Value) -> bool {
         PathMapDictionaryChar::insert_with_value(self, term, value)
     }
+
+    fn union_with<F>(&self, other: &Self, merge_fn: F) -> usize
+    where
+        F: Fn(&Self::Value, &Self::Value) -> Self::Value,
+        Self::Value: Clone,
+    {
+        let other_map = other.map.read().unwrap();
+        let mut self_map = self.map.write().unwrap();
+        let mut self_term_count = self.term_count.write().unwrap();
+
+        let mut processed = 0;
+
+        // Iterate over all entries in other
+        for (key_bytes, other_value) in other_map.iter() {
+            processed += 1;
+
+            if let Some(self_value) = self_map.get(&key_bytes) {
+                // Key exists: merge the values
+                let merged = merge_fn(self_value, other_value);
+                self_map.insert(&key_bytes, merged);
+            } else {
+                // Key doesn't exist: insert from other
+                self_map.insert(&key_bytes, other_value.clone());
+                *self_term_count += 1;
+            }
+        }
+
+        processed
+    }
 }
 
 /// Character-level PathMap dictionary node.
