@@ -1,27 +1,30 @@
-//! Parallel Workspace Indexing Example (Conceptual Demonstration)
+//! Parallel Workspace Indexing Example
 //!
-//! This example demonstrates the parallel workspace indexing pattern described in
-//! `docs/algorithms/07-contextual-completion/patterns/parallel-workspace-indexing.md`.
+//! Demonstrates efficient bulk construction of contextual completion dictionaries
+//! using parallel per-document dictionary construction and binary tree reduction.
 //!
-//! NOTE: This is a conceptual demonstration showing the merge strategies.
-//! For production use with rayon parallelism, add:
-//! ```toml
-//! [dev-dependencies]
-//! rayon = "1.11"
-//! num_cpus = "1.16"
-//! ```
+//! This example implements the algorithms described in:
+//! `docs/algorithms/07-contextual-completion/patterns/parallel-workspace-indexing.md`
 //!
 //! # Usage
 //!
 //! ```bash
-//! # Run with defaults (10 docs, 100 terms/doc)
+//! # Run with defaults (100 docs, 1000 terms/doc, both strategies)
 //! cargo run --release --example parallel_workspace_indexing
 //!
 //! # Custom parameters
-//! cargo run --release --example parallel_workspace_indexing -- --num-docs 50 --terms-per-doc 200
+//! cargo run --release --example parallel_workspace_indexing -- \
+//!     --num-docs 200 \
+//!     --terms-per-doc 500 \
+//!     --strategy binary
+//!
+//! # Compare both strategies
+//! cargo run --release --example parallel_workspace_indexing -- \
+//!     --strategy both
 //! ```
 
 use liblevenshtein::prelude::*;
+use rayon::prelude::*;
 use rustc_hash::FxHashSet;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -46,8 +49,8 @@ enum MergeStrategy {
 impl Default for Args {
     fn default() -> Self {
         Self {
-            num_docs: 10,
-            terms_per_doc: 100,
+            num_docs: 100,
+            terms_per_doc: 1000,
             strategy: MergeStrategy::Both,
         }
     }
@@ -92,22 +95,22 @@ fn parse_args() -> Args {
 
 fn print_help() {
     println!(
-        r#"Parallel Workspace Indexing Example (Conceptual)
+        r#"Parallel Workspace Indexing Example
 
-Demonstrates merge strategies for contextual completion dictionaries.
+Demonstrates parallel merge strategies for contextual completion dictionaries.
 
 USAGE:
     parallel_workspace_indexing [OPTIONS]
 
 OPTIONS:
-    --num-docs <N>           Number of documents [default: 10]
-    --terms-per-doc <N>      Terms per document [default: 100]
+    --num-docs <N>           Number of documents [default: 100]
+    --terms-per-doc <N>      Terms per document [default: 1000]
     --strategy <STRATEGY>    sequential, binary, or both [default: both]
     --help, -h               Print help
 
 EXAMPLES:
     cargo run --release --example parallel_workspace_indexing
-    cargo run --release --example parallel_workspace_indexing -- --num-docs 20 --strategy both
+    cargo run --release --example parallel_workspace_indexing -- --num-docs 200 --strategy both
 "#
     );
 }
@@ -147,15 +150,16 @@ fn generate_document_terms(doc_id: ContextId, terms_per_doc: usize) -> Vec<Strin
     terms
 }
 
-/// Build per-document dictionaries (simulates parallel construction)
+/// Build per-document dictionaries in parallel
 fn build_document_dicts(
     num_docs: usize,
     terms_per_doc: usize,
 ) -> Vec<HashMap<String, Vec<ContextId>>> {
-    println!("Building {} per-document dictionaries...", num_docs);
+    println!("Building {} per-document dictionaries in parallel...", num_docs);
     let start = Instant::now();
 
     let dicts: Vec<_> = (0..num_docs)
+        .into_par_iter()  // Parallel iterator
         .map(|doc_id| {
             let doc_id = doc_id as u32;
             let terms = generate_document_terms(doc_id, terms_per_doc);
@@ -168,7 +172,7 @@ fn build_document_dicts(
         })
         .collect();
 
-    println!("  Built in {:?}", start.elapsed());
+    println!("  Built in {:?} ({} cores)", start.elapsed(), num_cpus::get());
     dicts
 }
 
@@ -237,41 +241,43 @@ fn merge_sequential(mut dicts: Vec<HashMap<String, Vec<ContextId>>>) -> HashMap<
     merged
 }
 
-/// Binary tree reduction (optimal parallel strategy - simulated sequentially)
+/// Binary tree reduction with parallel merging
 fn merge_binary_tree(mut dicts: Vec<HashMap<String, Vec<ContextId>>>) -> HashMap<String, Vec<ContextId>> {
     if dicts.is_empty() {
         return HashMap::new();
     }
 
-    println!("\n=== Binary Tree Reduction ===");
+    println!("\n=== Binary Tree Reduction (Parallel) ===");
     let start = Instant::now();
     let mut round = 1;
 
     while dicts.len() > 1 {
-        println!("  Round {}: {} dictionaries", round, dicts.len());
+        print!("\r  Round {}: {} dictionaries", round, dicts.len());
+        std::io::Write::flush(&mut std::io::stdout()).ok();
 
-        let mut next_round = Vec::new();
-
-        // Process pairs (this would be parallel with rayon)
-        for chunk in dicts.chunks(2) {
-            if chunk.len() == 2 {
-                let merged = merge_two_dicts(&chunk[0], &chunk[1]);
-                next_round.push(merged);
-            } else {
-                next_round.push(chunk[0].clone());
-            }
-        }
+        // Parallel merge of pairs
+        let next_round: Vec<_> = dicts
+            .par_chunks(2)
+            .map(|chunk| {
+                if chunk.len() == 2 {
+                    merge_two_dicts(&chunk[0], &chunk[1])
+                } else {
+                    chunk[0].clone()
+                }
+            })
+            .collect();
 
         dicts = next_round;
         round += 1;
     }
 
     let elapsed = start.elapsed();
-    println!("  Completed in {:?}", elapsed);
+    println!("\n  Completed in {:?}", elapsed);
 
     let merged = dicts.into_iter().next().unwrap();
     println!("  Final dictionary: {} terms", merged.len());
     println!("  Total rounds: {}", round - 1);
+    println!("  Parallel efficiency: {} cores utilized", num_cpus::get());
 
     merged
 }
@@ -323,7 +329,7 @@ fn build_final_dawg(dict: HashMap<String, Vec<ContextId>>) -> DynamicDawg<Vec<Co
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  Parallel Workspace Indexing (Conceptual Demonstration)   ║");
+    println!("║  Parallel Workspace Indexing for Contextual Completion    ║");
     println!("╚════════════════════════════════════════════════════════════╝");
 
     let args = parse_args();
@@ -332,6 +338,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Documents:       {}", args.num_docs);
     println!("  Terms per doc:   ~{}", args.terms_per_doc);
     println!("  Merge strategy:  {:?}", args.strategy);
+    println!("  CPU cores:       {}", num_cpus::get());
 
     // Build per-document dictionaries
     let dicts = build_document_dicts(args.num_docs, args.terms_per_doc);
@@ -354,8 +361,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("╚════════════════════════════════════════════════════════════╝");
             println!("\n  Sequential merge:      {:>8.2?}", seq_elapsed);
             println!("  Binary tree reduction: {:>8.2?}", tree_elapsed);
-            println!("  Speedup:               {:>8.1}×",
-                seq_elapsed.as_secs_f64() / tree_elapsed.as_secs_f64().max(0.000001)
+            let speedup = seq_elapsed.as_secs_f64() / tree_elapsed.as_secs_f64().max(0.000001);
+            println!("  Speedup:               {:>8.1}×", speedup);
+            println!(
+                "  Parallel efficiency:   {:>8.1}% ({:.1}× / {} cores)",
+                (speedup / num_cpus::get() as f64) * 100.0,
+                speedup,
+                num_cpus::get()
             );
 
             verify_dictionary(&tree_result, &args);
@@ -382,8 +394,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _final_dawg = build_final_dawg(merged_dict);
 
     println!("\n✨ Example completed successfully!");
-    println!("\nNOTE: This is a sequential simulation of parallel construction.");
-    println!("For production use with rayon parallelism, see:");
+    println!("\nFor theoretical foundations and detailed analysis, see:");
     println!("  docs/algorithms/07-contextual-completion/patterns/parallel-workspace-indexing.md");
 
     Ok(())
