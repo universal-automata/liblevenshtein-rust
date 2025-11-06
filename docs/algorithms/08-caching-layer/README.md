@@ -452,6 +452,113 @@ let l2 = Lru::new(Ttl::new(dict, Duration::from_secs(3600)));
 let l3 = Age::new(dict);
 ```
 
+## Accessor Methods
+
+Eviction wrappers and FuzzyMultiMap provide accessor methods to retrieve underlying components.
+
+### dictionary() - Access Underlying Dictionary
+
+**Available on**: All eviction wrappers and `FuzzyMultiMap`
+
+**Signature**:
+```rust
+pub fn dictionary(&self) -> &D
+```
+
+**Returns**: Reference to the wrapped dictionary
+
+**Use Cases**:
+- Access dictionary-specific methods
+- Perform bulk operations on the dictionary
+- Query dictionary metadata (size, structure)
+- Clone the dictionary for external processing
+
+**Example with Eviction Wrapper**:
+```rust
+use liblevenshtein::cache::eviction::Lru;
+use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+
+let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
+let cached = Lru::new(dict, 100); // LRU cache with 100-entry limit
+
+// Access the underlying dictionary
+let inner_dict = cached.dictionary();
+assert_eq!(inner_dict.term_count(), 3);
+assert!(inner_dict.contains("test"));
+
+// Clone for external use
+let dict_clone = cached.dictionary().clone();
+// Now you can work with the dictionary independently
+```
+
+**Example with FuzzyMultiMap**:
+```rust
+use liblevenshtein::cache::multimap::FuzzyMultiMap;
+use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+use liblevenshtein::transducer::Algorithm;
+use std::collections::HashSet;
+
+let dict: DynamicDawg<HashSet<u32>> = DynamicDawg::new();
+dict.insert_with_value("hello", HashSet::from([1, 2]));
+
+let fuzzy_map = FuzzyMultiMap::new(dict, Algorithm::Standard);
+
+// Access the dictionary
+let inner_dict = fuzzy_map.dictionary();
+assert!(inner_dict.contains("hello"));
+assert_eq!(inner_dict.term_count(), 1);
+
+// Perform dictionary maintenance (e.g., compaction for DynamicDawg)
+let dict_clone = fuzzy_map.dictionary().clone();
+if dict_clone.needs_compaction() {
+    dict_clone.compact();
+}
+```
+
+### algorithm() - Get Algorithm (FuzzyMultiMap only)
+
+**Available on**: `FuzzyMultiMap`
+
+**Signature**:
+```rust
+pub fn algorithm(&self) -> Algorithm
+```
+
+**Returns**: The Levenshtein algorithm being used
+
+**Example**:
+```rust
+use liblevenshtein::cache::multimap::FuzzyMultiMap;
+use liblevenshtein::transducer::Algorithm;
+
+let fuzzy = FuzzyMultiMap::new(dict, Algorithm::Transposition);
+assert_eq!(fuzzy.algorithm(), Algorithm::Transposition);
+```
+
+### Composed Wrapper Access
+
+When composing multiple eviction strategies, you can access each layer:
+
+```rust
+use liblevenshtein::cache::eviction::{Lru, Ttl};
+
+let dict = PathMapDictionary::from_terms(vec!["test"]);
+let with_ttl = Ttl::new(dict, Duration::from_secs(60));
+let with_lru = Lru::new(with_ttl, 100);
+
+// Access outermost layer
+let ttl_wrapper = with_lru.dictionary();
+
+// Access inner dictionary
+let inner_dict = ttl_wrapper.dictionary();
+assert!(inner_dict.contains("test"));
+
+// Or chain in one go
+let dict_ref = with_lru.dictionary().dictionary();
+```
+
+---
+
 ## Testing Eviction Policies
 
 ### Basic Eviction Test

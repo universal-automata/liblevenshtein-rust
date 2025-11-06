@@ -832,6 +832,170 @@ assert_eq!(engine.get_draft(ctx), Some("function".to_string()));
 
 ---
 
+## Accessor Methods
+
+Both engine types provide accessor methods to introspect internal state and access underlying components.
+
+### Accessing Underlying Components
+
+#### transducer() - Get Transducer Reference
+
+Access the underlying `Transducer` that powers fuzzy matching.
+
+**Signature**:
+```rust
+pub fn transducer(&self) -> &Arc<RwLock<Transducer<D>>>
+```
+
+**Returns**: Shared reference to the transducer (wrapped in Arc<RwLock> for thread safety)
+
+**Use Cases**:
+- Access the dictionary via `transducer.read().dictionary()`
+- Query algorithm settings: `transducer.read().algorithm()`
+- Perform low-level transducer operations
+- Clone the dictionary for serialization or external processing
+
+**Example**:
+```rust
+use liblevenshtein::contextual::DynamicContextualCompletionEngine;
+
+let engine = DynamicContextualCompletionEngine::new();
+
+// Access the transducer
+let transducer_ref = engine.transducer();
+
+// Read lock to access transducer methods
+{
+    let transducer = transducer_ref.read();
+
+    // Get the algorithm
+    let algo = transducer.algorithm();
+    println!("Using algorithm: {:?}", algo);
+
+    // Access the dictionary
+    let dict = transducer.dictionary();
+    println!("Dictionary size: {:?}", dict.len());
+}
+
+// Clone the dictionary for external use
+let dict_clone = {
+    let transducer = transducer_ref.read();
+    transducer.dictionary().clone()
+};
+
+// Now you can work with the dictionary independently
+assert_eq!(dict_clone.len(), Some(0));
+```
+
+**Dictionary Access Pattern**:
+```rust
+// Pattern 1: Read-only dictionary access
+let engine = DynamicContextualCompletionEngine::with_dynamic_dawg(Algorithm::Standard);
+engine.finalize_direct(0, "hello")?;
+
+{
+    let transducer = engine.transducer().read();
+    let dict = transducer.dictionary();
+    assert!(dict.contains("hello"));
+    assert_eq!(dict.term_count(), 1);
+}
+
+// Pattern 2: Extract dictionary for maintenance
+let dict_clone = engine.transducer().read().dictionary().clone();
+
+// Perform compaction if needed (for DynamicDawg)
+if dict_clone.needs_compaction() {
+    let removed = dict_clone.compact();
+    println!("Compaction freed {} nodes", removed);
+}
+```
+
+**Thread Safety**:
+- `Arc<RwLock<...>>` allows multiple concurrent readers OR one writer
+- Read lock: `engine.transducer().read()`
+- Write lock (rare): `engine.transducer().write()`
+- Lock held only during block scope - release promptly
+
+**Lock Contention Example**:
+```rust
+use std::thread;
+use std::sync::Arc;
+
+let engine = Arc::new(DynamicContextualCompletionEngine::new());
+
+// Concurrent transducer/dictionary access (safe)
+let handles: Vec<_> = (0..10)
+    .map(|_| {
+        let e = Arc::clone(&engine);
+        thread::spawn(move || {
+            let transducer = e.transducer().read();
+            transducer.dictionary().len()
+        })
+    })
+    .collect();
+
+for h in handles {
+    h.join().unwrap();
+}
+```
+
+---
+
+###  Context State Accessors
+
+**Already documented** in [Context Management](#context-management) section:
+- `context_exists(id)` - Check if context exists
+- `get_visible_contexts(id)` - Get context + ancestor chain
+
+**Already documented** in [Draft Operations](#draft-operations) section:
+- `get_draft(id)` - Retrieve current draft text
+- `has_draft(id)` - Check if draft exists
+
+**Already documented** in [Checkpoint Operations](#checkpoint-operations) section:
+- `checkpoint_count(id)` - Number of undo points available
+
+**Already documented** in [Finalization](#finalization) section:
+- `has_term(term)` - Check if term finalized
+- `term_contexts(term)` - Get contexts defining term
+
+---
+
+### Performance Characteristics
+
+**Accessor Latencies**:
+
+| Method | Latency | Notes |
+|--------|---------|-------|
+| `transducer()` | ~3ns | Returns Arc reference |
+| `transducer().read()` | ~50ns | Acquires read lock |
+| `.dictionary()` | ~2ns | Field access |
+| `.algorithm()` | ~1ns | Copy enum |
+| `context_exists()` | ~100ns | HashMap lookup |
+| `get_visible_contexts()` | ~500ns | Tree traversal (depth-dependent) |
+| `has_draft()` | ~100ns | HashMap lookup |
+| `checkpoint_count()` | ~100ns | Vec len() |
+
+**Best Practices**:
+- Minimize lock hold duration - acquire lock, read data, release
+- Clone data if you need to work with it outside the lock scope
+- Use `{}` blocks to explicitly control lock lifetime
+
+```rust
+// ✓ Good: Lock released immediately
+let dict_len = {
+    let transducer = engine.transducer().read();
+    transducer.dictionary().len()
+}; // Lock released here
+
+// ✗ Bad: Lock held for entire scope
+let transducer = engine.transducer().read();
+// ... lots of code ...
+let dict_len = transducer.dictionary().len();
+// Lock still held!
+```
+
+---
+
 ## Implementation Notes
 
 ### Why Two Engine Types?
