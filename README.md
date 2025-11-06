@@ -6,7 +6,9 @@
 [![Release](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/release.yml/badge.svg)](https://github.com/universal-automata/liblevenshtein-rust/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-A Rust port of [liblevenshtein](https://github.com/universal-automata/liblevenshtein-cpp) for fast approximate string matching using Levenshtein automata (Universal Levenshtein Automata).
+A Rust implementation of [liblevenshtein](https://github.com/universal-automata/liblevenshtein-cpp) for fast approximate string matching using **Levenshtein Automata**—deterministic finite automata that enable O(|W|) construction complexity for error-tolerant dictionary queries.
+
+Based on "Fast String Correction with Levenshtein-Automata" (Schulz & Mihov, 2002).
 
 > **Note:** Ready for crates.io publication (PathMap dependency is now optional).
 
@@ -46,13 +48,80 @@ See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
 This library provides efficient fuzzy string matching against large dictionaries using finite state automata. It supports multiple Levenshtein distance algorithms and pluggable dictionary backends.
 
+## What Makes This Library Fast
+
+Unlike naive approaches that compute Levenshtein distance for every dictionary word (O(|D| × |W| × |V|)), this library uses **Levenshtein Automata**—a deterministic finite automaton that accepts exactly all words within distance n from a query word.
+
+### Key Algorithmic Advantages
+
+1. **O(|W|) Automaton Construction** - Linear in query word length for fixed error bound n
+2. **O(|D|) Dictionary Traversal** - Single pass through dictionary (measured as total edges)
+3. **No Distance Recomputation** - Automaton guides search, avoiding per-word calculations
+4. **Proven Correctness** - Accepts exactly L_Lev(n,W) = {V | d_L(W,V) ≤ n}
+
+**Result:** Query time is effectively independent of dictionary size for well-distributed tries!
+
+**Theory:** Based on "Fast String Correction with Levenshtein-Automata" (Schulz & Mihov, 2002). See [complete algorithm documentation](docs/research/levenshtein-automata/) for algorithmic details including Position structures, Subsumption relations, and Characteristic vectors.
+
+## Theoretical Background
+
+### How Levenshtein Automata Work
+
+Traditional approaches compute edit distance for every dictionary word, requiring O(|D| × |W| × |V|) operations. This library uses **Levenshtein Automata**—deterministic finite automata that accept exactly all words within distance n from query word W:
+
+```
+LEV_n(W) accepts L_Lev(n,W) = {V | d_L(W,V) ≤ n}
+```
+
+### Key Concepts
+
+**Position (i#e)**: Represents "matched i characters of W with e errors"
+- Example: 3#1 means "matched 3 characters, used 1 error"
+- Range: 0 ≤ i ≤ |W|, 0 ≤ e ≤ n
+
+**Subsumption (⊑)**: Eliminates redundant positions for minimal state sets
+- Position i#e subsumes j#f if: (e < f) ∧ (|j-i| ≤ f-e)
+- Any word accepted from j#f is also accepted from i#e
+
+**Characteristic Vectors (χ)**: Encode where characters appear in query word
+- χ(x,W) = ⟨b₁,...,b_w⟩ where b_i = 1 if W[i] = x
+- Used to determine valid transitions without recomputing distances
+
+**Elementary Transitions**: Move between positions based on dictionary character
+- Defined in Tables 4.1, 7.1, 8.1 of the paper for each algorithm variant
+- Enable O(1) state updates during traversal
+
+**Result:** Automaton construction is O(|W|), dictionary traversal is O(|D|), regardless of dictionary size!
+
+### Foundational Papers
+
+**Core Algorithm:**
+- Schulz, Klaus U., and Stoyan Mihov. "Fast string correction with Levenshtein automata." *International Journal on Document Analysis and Recognition* 5.1 (2002): 67-85.
+
+**Extensions:**
+- Mitankin, Petar, Stoyan Mihov, and Klaus Schulz. "Universal Levenshtein Automata. Building and Properties." *Information Processing & Management* 41.4 (2005): 687-702.
+
+### Documentation
+
+- [Complete Algorithm Documentation](docs/research/levenshtein-automata/README.md) - Detailed paper summary
+- [Implementation Mapping](docs/research/levenshtein-automata/implementation-mapping.md) - Code-to-paper correspondence
+- [Glossary](docs/research/levenshtein-automata/glossary.md) - Terms and notation reference
+- [Universal Levenshtein Automata Research](docs/research/universal-levenshtein/) - Restricted substitutions
+- [Weighted Distance Research](docs/research/weighted-levenshtein-automata/) - Variable operation costs
+
 ### Features
 
-- **Fast approximate string matching** using Universal Levenshtein Automata
-- **Multiple algorithms**:
-  - `Standard`: insert, delete, substitute operations
-  - `Transposition`: adds character transposition (swap adjacent chars)
-  - `MergeAndSplit`: adds merge and split operations
+- **Fast approximate string matching** using Levenshtein Automata with **O(|W|) construction** complexity
+- **Multiple algorithms** (all maintaining O(|W|) construction complexity):
+  - `Standard`: Insert, delete, substitute operations (Chapters 4-6 of foundational paper)
+    - Example: "hello" → "helo" (delete), "helo" → "hello" (insert), "hello" → "hallo" (substitute)
+    - Use for: General fuzzy matching, spell checking
+  - `Transposition`: Adds adjacent character swaps (Chapter 7) - Damerau-Levenshtein distance
+    - Example: "teh" → "the" costs 1 (not 2), "recieve" → "receive" costs 1
+    - Use for: Typing errors, keyboard input corrections
+  - `MergeAndSplit`: Adds two-character ↔ one-character operations (Chapter 8)
+    - Example: "rn" ↔ "m", "vv" ↔ "w" (common in OCR)
+    - Use for: Scanned documents, character recognition systems
 - **Multiple dictionary backends**:
   - **DoubleArrayTrie** (recommended, default) - O(1) transitions with excellent cache locality and minimal memory footprint
   - **DoubleArrayTrieChar** - Character-level variant for correct Unicode Levenshtein distances
@@ -403,6 +472,14 @@ Distance 2:       DAT: 16.3µs  DAWG: 2,150µs    PathMap: 5,919µs
 Memory/state:     DAT: ~8B     OptDawg: ~13B    DAWG: ~32B
 ```
 
+**Why DoubleArrayTrie is Fastest:**
+- **O(1) transitions** - Direct array indexing vs pointer chasing
+- **Excellent cache locality** - Sequential memory layout minimizes cache misses
+- **Minimal memory footprint** - ~8 bytes per state (vs 32 bytes for DAWG)
+- **Perfect for parallel traversal** - Optimal implementation of dictionary automaton A^D from paper
+
+All backends implement the dictionary automaton A^D that is traversed in parallel with the Levenshtein automaton LEV_n(W) during queries. The choice of backend affects the constant factors in the O(|D|) query complexity, with DoubleArrayTrie providing the smallest constants due to hardware-friendly memory access patterns.
+
 **Prefix Matching Support**: All backends except `SuffixAutomaton` support efficient prefix matching through the `.prefix()` method, making them ideal for code completion and autocomplete applications.
 
 **When to use each backend**:
@@ -677,11 +754,45 @@ for term in transducer.query_filtered("var", 1, |scope_id| *scope_id <= 1) {
 - **[Publishing Guide](docs/developer-guide/publishing.md)** - Requirements for publishing to crates.io
 - **[Changelog](CHANGELOG.md)** - Version history and release notes
 
+## How Code Maps to Theory
+
+For developers wanting to understand the implementation or extend the algorithms:
+
+| Paper Concept | Code Location | Description |
+|---------------|---------------|-------------|
+| **Position (i#e)** | [`src/transducer/position.rs:11-35`](src/transducer/position.rs#L11-L35) | Index + error count structure |
+| **Subsumption (⊑)** | [`src/transducer/position.rs:231-269`](src/transducer/position.rs#L231-L269) | Position redundancy elimination |
+| **Characteristic Vector (χ)** | [`src/transducer/position.rs`](src/transducer/position.rs) | Character occurrence encoding |
+| **Elementary Transitions (δ)** | [`src/transducer/transition.rs:119-438`](src/transducer/transition.rs#L119-L438) | Table 4.1, 7.1, 8.1 from paper |
+| **State Transitions (Δ)** | [`src/transducer/query.rs`](src/transducer/query.rs) | Parallel traversal implementation |
+| **Algorithm Variants** | [`src/transducer/algorithm.rs`](src/transducer/algorithm.rs) | Standard/Transposition/MergeAndSplit |
+| **Imitation Method** | [`src/transducer/query.rs:86-188`](src/transducer/query.rs#L86-L188) | Chapter 6 - on-demand state generation |
+| **Dictionary Automaton (A^D)** | [`src/dictionary/`](src/dictionary/) | Multiple backend implementations |
+
+**Key Implementation Patterns:**
+
+- **Position Structure**: Tracks (term_index, num_errors, is_special) corresponding to i#e_t or i#e_s in the paper
+- **Subsumption Checking**: Ensures minimal state sets by eliminating redundant positions
+- **Transition Functions**: Implement the case analysis from Tables 4.1, 7.1, and 8.1
+- **Parallel Traversal**: Simultaneously navigate dictionary automaton A^D and Levenshtein automaton LEV_n(W)
+
+See [Implementation Mapping](docs/research/levenshtein-automata/implementation-mapping.md) for detailed code-to-paper correspondence with examples.
+
 ## Performance
 
-The library is highly optimized for performance:
+The library maintains the theoretical guarantees from the foundational paper while adding practical optimizations:
+
+### Theoretical Complexity
+
+- **Construction:** O(|W|) time for automaton construction (Theorem 5.2.1)
+- **Query:** O(|D|) time for dictionary traversal where |D| is total edges (Chapter 3)
+- **Space:** O(|W|) states for fixed error bound n (Theorem 4.0.32)
+
+**vs Naive Approach:** Computing Levenshtein distance for every dictionary entry requires O(|D| × |W| × |V|) operations. This library achieves **100-1000× speedup** on large dictionaries by avoiding per-word distance calculations through automata-guided search.
 
 ### Core Optimizations
+
+Beyond the algorithmic foundations, the implementation includes:
 
 - **Arc Path Sharing**: Eliminated expensive cloning operations during traversal
 - **StatePool**: Object pool pattern for state reuse with exceptional performance gains
@@ -726,11 +837,47 @@ When to use:
 - ✅ Use `*Char` variants for multi-language dictionaries with non-ASCII Unicode
 - ✅ Use byte-level variants (`DoubleArrayTrie`, `PathMapDictionary`) for ASCII/Latin-1 content
 
-## Theoretical Background
+## Research & Planned Features
 
-This implementation is based on the paper:
+This library includes extensive research documentation on potential enhancements:
 
-- Schulz, Klaus U., and Stoyan Mihov. "Fast string correction with Levenshtein automata." International Journal on Document Analysis and Recognition 5.1 (2002): 67-85.
+### Universal Levenshtein Automata (Planned)
+
+Support for **restricted substitutions** where only specific character pairs can be substituted:
+
+**Use Cases:**
+- **Keyboard proximity** - Only adjacent keys allowed (QWERTY/AZERTY/Dvorak layouts)
+  - Example: 'a' ↔ 's' ↔ 'd' (adjacent on QWERTY)
+- **OCR error modeling** - Visual similarity constraints
+  - Example: 'l' ↔ 'I' ↔ '1', 'O' ↔ '0', 'rn' ↔ 'm'
+- **Phonetic matching** - Sound-alike rules
+  - Example: 'f' ↔ 'ph', 'k' ↔ 'c', 's' ↔ 'z'
+
+**Theory:** Based on "Universal Levenshtein Automata. Building and Properties" (Mitankin, Mihov, Schulz, 2005). Maintains O(|W|) construction complexity with restricted substitution set S ⊆ Σ × Σ.
+
+**Status:** Research complete, implementation planned. See [Universal Levenshtein Automata Documentation](docs/research/universal-levenshtein/) for complete details.
+
+### Weighted Operations (Research Phase)
+
+Support for variable operation costs through discretization:
+
+**Use Cases:**
+- **Keyboard distance costs** - Closer keys cost less (adjacent: 0.5, same row: 1.0, different rows: 1.5)
+- **Context-dependent costs** - Position-aware error penalties (beginning/end of word)
+- **Frequency-based costs** - Common errors cost less than rare ones
+
+**Complexity:** O(|W| × max_cost/precision) through cost discretization—still linear in query length when cost range and precision are fixed.
+
+**Status:** Methodology documented, implementation research phase. See [Weighted Levenshtein Automata Research](docs/research/weighted-levenshtein-automata/) for feasibility analysis and implementation approach.
+
+### Contributing Research
+
+Interested in implementing these features or researching new extensions? See:
+- [Contributing Guidelines](docs/developer-guide/contributing.md)
+- [Research Documentation Index](docs/research/)
+- [Implementation Mapping](docs/research/levenshtein-automata/implementation-mapping.md)
+
+The research documentation provides complete theoretical foundations and implementation roadmaps for extending the library.
 
 ## License
 

@@ -101,34 +101,34 @@ let engine = DynamicContextualCompletionEngine::with_dictionary(
 ### Components
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Workspace Indexing Pipeline                            │
-│                                                          │
-│  ┌─────────────┐                                        │
-│  │  Documents  │ (n files)                              │
-│  └──────┬──────┘                                        │
-│         │                                                │
-│         ├─ Parallel ─────────────────────────┐          │
-│         ↓           ↓           ↓            ↓          │
+┌───────────────────────────────────────────────────────┐
+│  Workspace Indexing Pipeline                          │
+│                                                       │
+│  ┌─────────────┐                                      │
+│  │  Documents  │ (n files)                            │
+│  └──────┬──────┘                                      │
+│         │                                             │
+│         ├─ Parallel ┬───────────┬────────────┐        │
+│         ↓           ↓           ↓            ↓        │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
 │  │  Dict 1  │ │  Dict 2  │ │  Dict 3  │ │  Dict n  │  │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘  │
-│       │            │             │            │         │
-│       └────────────┴─────────────┴────────────┘         │
-│                     │                                    │
-│              Binary Tree Merge                           │
-│             (log₂ n rounds)                              │
-│                     │                                    │
-│                     ↓                                    │
-│            ┌─────────────────┐                          │
-│            │  Merged  Dictionary │                          │
-│            │  (Vec<ContextId>) │                          │
-│            └────────┬──────────┘                          │
-│                     │                                    │
-│                     ↓                                    │
-│         DynamicContextualCompletionEngine                │
-│         with_dictionary(merged, algorithm)               │
-└──────────────────────────────────────────────────────────┘
+│       │            │            │            │        │
+│       └────────────┴┬───────────┴────────────┘        │
+│                     │                                 │
+│              Binary Tree Merge                        │
+│             (log₂ n rounds)                           │
+│                     │                                 │
+│                     ↓                                 │
+│            ┌─────────────────────┐                    │
+│            │  Merged  Dictionary │                    │
+│            │  (Vec<ContextId>)   │                    │
+│            └────────┬────────────┘                    │
+│                     │                                 │
+│                     ↓                                 │
+│         DynamicContextualCompletionEngine             │
+│         with_dictionary(merged, algorithm)            │
+└───────────────────────────────────────────────────────┘
 ```
 
 ### Data Flow
