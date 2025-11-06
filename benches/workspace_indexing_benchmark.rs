@@ -267,11 +267,7 @@ fn bench_end_to_end(c: &mut Criterion) {
     group.plot_config(PlotConfiguration::default());
     group.sample_size(10);
 
-    for (num_docs, terms_per_doc) in [
-        (50, 500),
-        (100, 1000),
-        (200, 500),
-    ].iter() {
+    for (num_docs, terms_per_doc) in [(50, 500), (100, 1000), (200, 500)].iter() {
         group.throughput(Throughput::Elements((num_docs * terms_per_doc) as u64));
 
         group.bench_with_input(
@@ -348,16 +344,12 @@ fn bench_merge_rounds(c: &mut Criterion) {
             })
             .collect();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(num_docs),
-            num_docs,
-            |b, _| {
-                b.iter(|| {
-                    let result = merge_binary_tree(dicts.clone());
-                    black_box(result);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(num_docs), num_docs, |b, _| {
+            b.iter(|| {
+                let result = merge_binary_tree(dicts.clone());
+                black_box(result);
+            });
+        });
     }
 
     group.finish();
@@ -372,16 +364,12 @@ fn bench_deduplication_strategy(c: &mut Criterion) {
         let left: Vec<u32> = (0..*size).collect();
         let right: Vec<u32> = (*size / 2..*size + *size / 2).collect();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    let result = merge_contexts(&left, &right);
-                    black_box(result);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
+            b.iter(|| {
+                let result = merge_contexts(&left, &right);
+                black_box(result);
+            });
+        });
     }
 
     group.finish();

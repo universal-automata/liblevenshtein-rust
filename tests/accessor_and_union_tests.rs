@@ -2,11 +2,11 @@
 
 #[cfg(feature = "pathmap-backend")]
 mod pathmap_tests {
+    use liblevenshtein::contextual::{ContextId, DynamicContextualCompletionEngine};
     use liblevenshtein::dictionary::pathmap::PathMapDictionary;
     use liblevenshtein::dictionary::pathmap_char::PathMapDictionaryChar;
     use liblevenshtein::dictionary::{Dictionary, MutableMappedDictionary};
     use liblevenshtein::transducer::{Algorithm, Transducer};
-    use liblevenshtein::contextual::{ContextId, DynamicContextualCompletionEngine};
 
     #[test]
     fn test_transducer_into_inner() {
@@ -30,10 +30,8 @@ mod pathmap_tests {
 
     #[test]
     fn test_transducer_into_dictionary() {
-        let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(vec![
-            ("foo", 10),
-            ("bar", 20),
-        ]);
+        let dict: PathMapDictionary<u32> =
+            PathMapDictionary::from_terms_with_values(vec![("foo", 10), ("bar", 20)]);
 
         let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
@@ -210,10 +208,8 @@ mod pathmap_tests {
 
     #[test]
     fn test_serialization_after_extraction() {
-        let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(vec![
-            ("hello", 1),
-            ("world", 2),
-        ]);
+        let dict: PathMapDictionary<u32> =
+            PathMapDictionary::from_terms_with_values(vec![("hello", 1), ("world", 2)]);
 
         let transducer = Transducer::new(dict.clone(), Algorithm::Standard);
 
@@ -230,7 +226,6 @@ mod pathmap_tests {
         let results: Vec<_> = new_transducer.query("helo", 1).collect();
         assert!(results.contains(&"hello".to_string()));
     }
-
 }
 
 #[cfg(test)]

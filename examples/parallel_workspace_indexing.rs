@@ -155,11 +155,14 @@ fn build_document_dicts(
     num_docs: usize,
     terms_per_doc: usize,
 ) -> Vec<HashMap<String, Vec<ContextId>>> {
-    println!("Building {} per-document dictionaries in parallel...", num_docs);
+    println!(
+        "Building {} per-document dictionaries in parallel...",
+        num_docs
+    );
     let start = Instant::now();
 
     let dicts: Vec<_> = (0..num_docs)
-        .into_par_iter()  // Parallel iterator
+        .into_par_iter() // Parallel iterator
         .map(|doc_id| {
             let doc_id = doc_id as u32;
             let terms = generate_document_terms(doc_id, terms_per_doc);
@@ -172,7 +175,11 @@ fn build_document_dicts(
         })
         .collect();
 
-    println!("  Built in {:?} ({} cores)", start.elapsed(), num_cpus::get());
+    println!(
+        "  Built in {:?} ({} cores)",
+        start.elapsed(),
+        num_cpus::get()
+    );
     dicts
 }
 
@@ -215,7 +222,9 @@ fn merge_two_dicts(
 }
 
 /// Sequential merge strategy (baseline)
-fn merge_sequential(mut dicts: Vec<HashMap<String, Vec<ContextId>>>) -> HashMap<String, Vec<ContextId>> {
+fn merge_sequential(
+    mut dicts: Vec<HashMap<String, Vec<ContextId>>>,
+) -> HashMap<String, Vec<ContextId>> {
     if dicts.is_empty() {
         return HashMap::new();
     }
@@ -242,7 +251,9 @@ fn merge_sequential(mut dicts: Vec<HashMap<String, Vec<ContextId>>>) -> HashMap<
 }
 
 /// Binary tree reduction with parallel merging
-fn merge_binary_tree(mut dicts: Vec<HashMap<String, Vec<ContextId>>>) -> HashMap<String, Vec<ContextId>> {
+fn merge_binary_tree(
+    mut dicts: Vec<HashMap<String, Vec<ContextId>>>,
+) -> HashMap<String, Vec<ContextId>> {
     if dicts.is_empty() {
         return HashMap::new();
     }
