@@ -216,15 +216,19 @@ impl<D: Dictionary> Transducer<D> {
     /// # Examples
     ///
     /// ```rust
+    /// # #[cfg(feature = "pathmap-backend")]
+    /// # {
     /// use liblevenshtein::prelude::*;
+    /// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
     /// use liblevenshtein::transducer::Algorithm;
     ///
-    /// let dict = PathMapDictionary::from_terms(["test", "testing"]);
+    /// let dict: PathMapDictionary = PathMapDictionary::from_terms(["test", "testing"]);
     /// let transducer = Transducer::new(dict, Algorithm::Standard);
     ///
     /// // Extract the dictionary
     /// let dict = transducer.into_inner();
     /// assert_eq!(dict.len(), Some(2));
+    /// # }
     /// ```
     #[inline]
     pub fn into_inner(self) -> D {
