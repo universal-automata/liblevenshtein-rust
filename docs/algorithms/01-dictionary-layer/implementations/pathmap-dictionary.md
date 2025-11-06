@@ -9,11 +9,12 @@
 3. [PathMap Library](#pathmap-library)
 4. [Data Structure](#data-structure)
 5. [Construction Methods](#construction-methods)
-6. [Union Operations](#union-operations)
-7. [Usage Examples](#usage-examples)
-8. [Performance Analysis](#performance-analysis)
-9. [When to Use](#when-to-use)
-10. [References](#references)
+6. [Accessor Methods](#accessor-methods)
+7. [Union Operations](#union-operations)
+8. [Usage Examples](#usage-examples)
+9. [Performance Analysis](#performance-analysis)
+10. [When to Use](#when-to-use)
+11. [References](#references)
 
 ## Overview
 
@@ -675,6 +676,126 @@ let engine = DynamicContextualCompletionEngine::with_dictionary(
 ```
 
 **Performance note**: Parallel construction still beneficial despite slower per-dictionary speed - wall-clock time reduced by ~8× on 8 cores.
+
+## Accessor Methods
+
+PathMapDictionary provides the same core accessor methods as other dictionary backends, with simplicity as the primary design goal.
+
+**→ See**: [DynamicDawg Accessor Methods](dynamic-dawg.md#accessor-methods) for comprehensive documentation.
+
+### Key Differences from DynamicDawg
+
+PathMapDictionary accessor methods have **simpler** implementations but **slower** performance:
+
+| Method | PathMapDictionary | DynamicDawg | Performance Impact |
+|--------|-------------------|-------------|---------------------|
+| `contains(term)` | `O(m·log k)` | `O(m)` | ~2-3× slower |
+| `get_value(term)` | `O(m·log k)` | `O(m)` | ~2-3× slower |
+| `term_count()` | `O(1)` | `O(1)` | Similar |
+| `len()` / `is_empty()` | `O(1)` | `O(1)` | Similar |
+
+*Where*: `m` = term length, `k` = average branching factor (~26 for English)
+
+### Quick Reference
+
+```rust
+use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+
+let dict = PathMapDictionary::from_terms(vec!["test", "testing", "tested"]);
+
+// Term existence (slower than DynamicDawg, simpler code)
+assert!(dict.contains("test"));
+assert!(dict.contains("testing"));
+assert!(!dict.contains("unknown"));
+
+// Value retrieval
+let dict_valued: PathMapDictionary<u32> = PathMapDictionary::new();
+dict_valued.insert_with_value("key", 42);
+assert_eq!(dict_valued.get_value("key"), Some(42));
+
+// Size queries (O(1), same as Dynamic Dawg)
+assert_eq!(dict.term_count(), 3);
+assert_eq!(dict.len(), Some(3));
+assert!(!dict.is_empty());
+
+// No compaction needed (persistent structure doesn't fragment)
+// No node_count() method (implementation detail differs)
+// No needs_compaction() (not applicable to PathMap)
+
+// Traversal (via Dictionary trait)
+use liblevenshtein::dictionary::{Dictionary, DictionaryNode};
+let root = dict.root();
+// ... navigate via transition() as with other backends
+```
+
+### Performance Characteristics
+
+**Accessor Latencies** (10K term dictionary):
+
+| Method | PathMapDictionary | DynamicDawg | PathMap/DynamicDawg Ratio |
+|--------|-------------------|-------------|---------------------------|
+| `contains()` | ~700ns | ~250ns | 2.8× slower |
+| `get_value()` | ~750ns | ~260ns | 2.9× slower |
+| `term_count()` | ~5ns | ~5ns | Same |
+| `len()` / `is_empty()` | ~5ns | ~5ns | Same |
+
+**Why slower?**:
+- PathMap uses **tree traversal** with log(k) comparisons per level
+- DynamicDawg uses **direct indexing** via edge lookup
+
+**Trade-off**: Simplicity and persistent semantics vs performance.
+
+### Persistent Semantics
+
+PathMapDictionary accessor methods benefit from **structural sharing**:
+
+```rust
+let dict1 = PathMapDictionary::from_terms(vec!["test", "testing"]);
+let dict2 = dict1.clone(); // Shallow clone (Arc increment)
+
+// Both share same underlying structure
+assert!(dict1.contains("test"));
+assert!(dict2.contains("test"));
+
+// Modifications create new structure (copy-on-write)
+dict2.insert("new_term");
+assert!(!dict1.contains("new_term")); // Original unchanged
+assert!(dict2.contains("new_term"));  // New version has it
+
+// Accessor methods see correct version
+assert_eq!(dict1.term_count(), 2);
+assert_eq!(dict2.term_count(), 3);
+```
+
+### Thread Safety
+
+PathMapDictionary accessors are thread-safe via Arc-based sharing:
+
+```rust
+use std::sync::Arc;
+use std::thread;
+
+let dict = Arc::new(PathMapDictionary::from_terms(vec!["hello", "world"]));
+
+// Concurrent reads safe
+let handles: Vec<_> = (0..10)
+    .map(|_| {
+        let d = Arc::clone(&dict);
+        thread::spawn(move || d.contains("hello"))
+    })
+    .collect();
+
+for h in handles {
+    assert!(h.join().unwrap());
+}
+
+// Mutations create new versions (no locks needed)
+let dict2 = Arc::new((*dict).clone());
+dict2.insert("new");
+// Original dict unchanged, dict2 has new term
+```
+
+---
 
 ## Union Operations
 
