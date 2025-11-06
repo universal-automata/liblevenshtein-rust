@@ -746,6 +746,7 @@ for term in transducer.query_filtered("var", 1, |scope_id| *scope_id <= 1) {
 
 ## Documentation
 
+- **[Technical Glossary](docs/GLOSSARY.md)** - Comprehensive reference for all technical terms (70+ entries)
 - **[User Guide](docs/user-guide/)** - Getting started, algorithms, backends, and features
 - **[Developer Guide](docs/developer-guide/)** - Architecture, building, contributing, and performance
 - **[Building and Testing](docs/developer-guide/building.md)** - Comprehensive build instructions and CLI usage

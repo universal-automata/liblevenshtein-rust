@@ -6,6 +6,10 @@
 
 ---
 
+> **Note:** This glossary covers **theoretical algorithm concepts** from the foundational papers. For **implementation details, performance optimizations, and user-facing features**, see the [Technical Glossary](../../GLOSSARY.md) which covers 70+ additional terms including data structures, SIMD operations, caching strategies, and API features.
+
+---
+
 ## Mathematical Notation
 
 ### Alphabet and Strings
