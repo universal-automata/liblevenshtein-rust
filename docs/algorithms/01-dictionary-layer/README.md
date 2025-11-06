@@ -295,6 +295,7 @@ Start: What do you need?
 | **Construction** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
 | **Insert** | ✅ Append | ✅ Append | ✅ Full | ✅ Full | ✅ Full | ✅ Full |
 | **Remove** | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| **Union** | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ |
 | **Unicode** | Byte | ✅ Char | Byte | ✅ Char | Byte | Byte |
 | **Thread-Safe** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Use Case** | General | Unicode | Dynamic | Dyn+Unicode | Simple | Substring |
@@ -465,6 +466,59 @@ let results = fuzzy_search(&dict, "quik", 1);  // Finds "quick"
 ```
 
 **Why**: Matches substrings anywhere in text, not just prefixes.
+
+### 6. Merging User and System Dictionaries
+
+**Recommendation**: `DynamicDawg` or `PathMapDictionary` with values
+
+```rust
+use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+use liblevenshtein::dictionary::MutableMappedDictionary;
+
+// System-wide default frequencies
+let system_dict: DynamicDawg<u32> = DynamicDawg::new();
+system_dict.insert_with_value("algorithm", 1000);
+system_dict.insert_with_value("database", 800);
+
+// User-specific word frequencies
+let user_dict: DynamicDawg<u32> = DynamicDawg::new();
+user_dict.insert_with_value("algorithm", 50);  // User types this often
+user_dict.insert_with_value("refactoring", 30); // User-specific term
+
+// Merge: prioritize user frequencies but include system terms
+system_dict.union_with(&user_dict, |system_freq, user_freq| {
+    // Boost user terms by 10x for better autocomplete ranking
+    user_freq * 10 + system_freq
+});
+
+// Result: "algorithm" = 1500 (50*10 + 1000)
+//         "refactoring" = 300 (30*10 + 0)
+//         "database" = 800 (unchanged)
+```
+
+**Why**: Union operations enable personalized autocomplete by combining user patterns with system defaults, custom merge logic for ranking.
+
+**Alternative with Configuration Layers**:
+```rust
+use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+use liblevenshtein::dictionary::MutableMappedDictionary;
+
+// Default application settings
+let defaults: PathMapDictionary<String> = PathMapDictionary::new();
+defaults.insert_with_value("theme", "light".to_string());
+defaults.insert_with_value("language", "en".to_string());
+
+// User preferences
+let user_prefs: PathMapDictionary<String> = PathMapDictionary::new();
+user_prefs.insert_with_value("theme", "dark".to_string()); // Override
+
+// Merge: user preferences override defaults (last-writer-wins)
+defaults.union_replace(&user_prefs);
+
+// Effective config: theme=dark, language=en
+```
+
+**Why**: PathMapDictionary's structural sharing makes it ideal for configuration layers with frequent snapshots.
 
 ## Integration with Levenshtein Automata
 
