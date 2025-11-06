@@ -674,7 +674,7 @@ if let Some(freq) = dict.get_value("the") {
 
 ### Constructor Comparison
 
-**Performance** (10,000 terms, AMD Ryzen 9 5950X):
+**Performance** (10,000 terms, Intel Xeon E5-2699 v3 @ 2.30GHz):
 
 | Method | Time | Memory Peak | Notes |
 |--------|------|-------------|-------|
@@ -1569,7 +1569,7 @@ Peak allocation: O(m) for path accumulation
 No heap allocations during traversal (Vec reused)
 ```
 
-**Benchmark Results** (AMD Ryzen 9 5950X):
+**Benchmark Results** (Intel Xeon E5-2699 v3 @ 2.30GHz):
 
 | Dictionary Size | union_with() | Throughput |
 |----------------|-------------|------------|

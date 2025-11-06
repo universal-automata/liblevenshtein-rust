@@ -67,7 +67,7 @@ Long strings (50 chars):    ~5 µs    = 0.005 ms (estimated)
 
 **Throughput**:
 - Single CPU core: ~10,000 short string pairs/second
-- With 16 cores: ~160,000 pairs/second (parallel)
+- With 36 cores: ~360,000 pairs/second (parallel)
 
 ### GPU Performance (Theoretical)
 
@@ -94,9 +94,9 @@ Long strings (50 chars):    ~5 µs    = 0.005 ms (estimated)
 10,000 pairs × 5 µs = 50 ms
 ```
 
-**CPU (16 cores, parallel)**:
+**CPU (36 cores, parallel)**:
 ```
-50 ms / 16 = 3.1 ms
+50 ms / 36 = 1.39 ms
 ```
 
 **GPU (NVIDIA)**:

@@ -435,7 +435,7 @@ Where:
 
 ### Benchmark Results
 
-**Setup**: AMD Ryzen 9 5950X (16 cores), 64GB RAM
+**Setup**: Intel Xeon E5-2699 v3 @ 2.30GHz (36 cores)
 
 **Test**: 100 documents, 1,000 terms each, average length 10 bytes
 
@@ -443,7 +443,7 @@ Where:
 |--------|------|---------|-----------|
 | Sequential Insert | ~50s | 1× | 6% (1 core) |
 | Parallel Build + Sequential Merge | ~5s | 10× | 50% (8 cores) |
-| **Parallel Build + Binary Tree** | **~0.3s** | **~167×** | **95% (16 cores)** |
+| **Parallel Build + Binary Tree** | **~0.3s** | **~167×** | **95% (36 cores)** |
 
 **Memory Profile**:
 ```
@@ -751,8 +751,8 @@ Cache miss rate: **O(N²·n)** - accumulated dictionary exceeds cache!
 
 **Binary Tree**:
 ```
-Round 1: Each merge accesses 2n terms (fits in L2 cache: ~256KB)
-Round 2: Each merge accesses 4n terms (may fit in L3 cache: ~16MB)
+Round 1: Each merge accesses 2n terms (fits in L2 cache: ~9MB)
+Round 2: Each merge accesses 4n terms (fits in L3 cache: ~45MB)
 Round 3: Larger merges (may spill to RAM)
 ```
 Cache miss rate: **O(N·n·log N)** - each round's data fits in progressively larger cache levels!

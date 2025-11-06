@@ -663,7 +663,7 @@ for ch in query_sequence {
 
 ### Benchmark Results
 
-**Test Environment**: AMD Ryzen 9 5950X, 32GB RAM, Rust 1.75, release build
+**Test Environment**: Intel Xeon E5-2699 v3 @ 2.30GHz, Rust 1.75, release build
 
 | Operation | Time | Throughput |
 |-----------|------|------------|

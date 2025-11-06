@@ -543,7 +543,7 @@ assert_eq!(editor.buffer.as_str(), "hi");
 
 ### Benchmarks
 
-**Test Environment**: AMD Ryzen 9 5950X, Rust 1.75, release build
+**Test Environment**: Intel Xeon E5-2699 v3 @ 2.30GHz, Rust 1.75, release build
 
 | Operation | Time (ns) | Throughput |
 |-----------|-----------|------------|

@@ -555,7 +555,7 @@ let config_dict: PathMapDictionary<String> = PathMapDictionary::from_terms_with_
 
 ### Constructor Comparison
 
-**Performance** (10,000 terms, AMD Ryzen 9 5950X):
+**Performance** (10,000 terms, Intel Xeon E5-2699 v3 @ 2.30GHz):
 
 | Method | Time | Memory | vs DynamicDawg |
 |--------|------|--------|----------------|
@@ -675,7 +675,7 @@ let engine = DynamicContextualCompletionEngine::with_dictionary(
 );
 ```
 
-**Performance note**: Parallel construction still beneficial despite slower per-dictionary speed - wall-clock time reduced by ~8× on 8 cores.
+**Performance note**: Parallel construction still beneficial despite slower per-dictionary speed - wall-clock time scales with available CPU cores.
 
 ## Accessor Methods
 
@@ -1057,7 +1057,7 @@ Reason: PathMap insertion is O(log m) vs DAWG's O(m)
 Trade-off: PathMap offers structural sharing and immutability
 ```
 
-**Benchmark Results** (AMD Ryzen 9 5950X):
+**Benchmark Results** (Intel Xeon E5-2699 v3 @ 2.30GHz):
 
 | Dictionary Size | union_with() | Throughput |
 |----------------|-------------|------------|

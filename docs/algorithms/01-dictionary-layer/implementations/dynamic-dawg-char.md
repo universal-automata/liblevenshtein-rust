@@ -524,7 +524,7 @@ if let Some(contexts) = dict.get_value("α") {
 
 ### Constructor Comparison
 
-**Performance** (10,000 terms, average 10 characters, AMD Ryzen 9 5950X):
+**Performance** (10,000 terms, average 10 characters, Intel Xeon E5-2699 v3 @ 2.30GHz):
 
 | Method | Time | Memory | vs DynamicDawg |
 |--------|------|--------|----------------|
@@ -1079,7 +1079,7 @@ Reason: 4-byte char storage vs 1-4 byte UTF-8 encoding
 Benefit: Correct Unicode distance calculations
 ```
 
-**Benchmark Results** (AMD Ryzen 9 5950X, Unicode text):
+**Benchmark Results** (Intel Xeon E5-2699 v3 @ 2.30GHz, Unicode text):
 
 | Dictionary Size | union_with() | Throughput |
 |----------------|-------------|------------|
