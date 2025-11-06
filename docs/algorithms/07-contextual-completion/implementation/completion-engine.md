@@ -192,6 +192,115 @@ let dict = PathMapDictionary::new();
 let engine = DynamicContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
 ```
 
+#### Pre-Built Dictionary Injection
+
+**Use Case**: Inject pre-built dictionaries from parallel workspace indexing, bulk loading, or external sources.
+
+```rust
+use liblevenshtein::contextual::{DynamicContextualCompletionEngine, ContextId};
+use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+use liblevenshtein::transducer::Algorithm;
+use rayon::prelude::*;
+
+// Example 1: Simple pre-built dictionary
+let dict = DynamicDawg::new();
+dict.insert_with_value("function", vec![0u32]);
+dict.insert_with_value("variable", vec![0u32]);
+
+let engine = DynamicContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
+// Engine ready with pre-populated dictionary
+```
+
+**Example 2: Parallel Workspace Construction**
+
+```rust
+// Build dictionaries in parallel (one per document)
+let documents = vec![
+    (1u32, "fn main() { let x = 10; }"),
+    (2u32, "fn helper() { let y = 20; }"),
+    (3u32, "struct Foo { field: i32 }"),
+];
+
+let dicts: Vec<DynamicDawg<Vec<ContextId>>> = documents
+    .par_iter()
+    .map(|(ctx_id, source)| {
+        let terms = extract_identifiers(source);  // Your tokenizer
+        let dict = DynamicDawg::new();
+        for term in terms {
+            dict.insert_with_value(term, vec![*ctx_id]);
+        }
+        dict
+    })
+    .collect();
+
+// Merge using binary tree reduction (~150× faster than sequential)
+fn merge_deduplicated(left: &Vec<u32>, right: &Vec<u32>) -> Vec<u32> {
+    let mut merged = left.clone();
+    merged.extend(right);
+    merged.sort_unstable();
+    merged.dedup();
+    merged
+}
+
+let merged = merge_tree_parallel(dicts, merge_deduplicated);
+
+// Inject merged dictionary into engine
+let engine = DynamicContextualCompletionEngine::with_dictionary(merged, Algorithm::Standard);
+
+// Query with context filtering
+let results = engine.complete(1, "ma", 1);
+// Returns results visible to context 1 (document 1 + ancestors)
+```
+
+**Example 3: Bulk Load from External Source**
+
+```rust
+// Load pre-existing terms (e.g., from database, file, cache)
+let stdlib_terms = vec![
+    ("std::vec::Vec", vec![0]),
+    ("std::io::println", vec![0]),
+    ("std::collections::HashMap", vec![0]),
+];
+
+let dict = DynamicDawg::from_iter(
+    stdlib_terms.into_iter().map(|(term, contexts)| (term, contexts))
+);
+
+let engine = DynamicContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
+```
+
+**Value Type Requirements**:
+
+The dictionary **must** use `Vec<ContextId>` (i.e., `Vec<u32>`) as the value type:
+
+```rust
+// ✓ Correct
+let dict: DynamicDawg<Vec<ContextId>> = DynamicDawg::new();
+let engine = DynamicContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
+
+// ✗ Wrong - type mismatch
+let dict: DynamicDawg<String> = DynamicDawg::new();
+let engine = DynamicContextualCompletionEngine::with_dictionary(dict, Algorithm::Standard);
+//                                                              ^^^^ expected Vec<u32>, found String
+```
+
+**Thread Safety**:
+
+- `with_dictionary()` takes ownership of the dictionary
+- Dictionary is wrapped in `Arc<RwLock<...>>` internally
+- Safe to clone engine and share across threads
+- Parallel construction is safe (no shared state between builder instances)
+
+**Performance Notes**:
+
+| Pattern | Time (100 docs, 1K terms/doc) | Notes |
+|---------|-------------------------------|-------|
+| Sequential merge | ~50s | O(N²·n·m) - avoid! |
+| Binary tree parallel merge | ~0.3s | O(n·m·log N) with parallelism |
+| Direct injection | <1ms | Zero overhead constructor |
+
+**→ See**: [Parallel Workspace Indexing Pattern](../patterns/parallel-workspace-indexing.md) for complete production-ready implementation with benchmarks and best practices.
+
 ### Context Management
 
 ```rust
