@@ -180,6 +180,195 @@ struct DawgNodeChar<V: DictionaryValue> {
 
 **Reason**: char (4 bytes) vs u8 (1 byte) for edge labels
 
+### Clone Behavior & Memory Semantics
+
+`DynamicDawgChar` uses `Arc<RwLock<...>>` internally, making `.clone()` a **shallow copy** that shares all underlying data structures between clones. The clone behavior is **identical** to `DynamicDawg` - only the edge label types differ (char vs u8).
+
+```rust
+use liblevenshtein::dictionary::dynamic_dawg_char::DynamicDawgChar;
+
+let dict1 = DynamicDawgChar::from_iter(vec!["café", "naïve"]);
+let dict2 = dict1.clone();  // O(1) - only increments Arc refcount
+
+// Both dict1 and dict2 point to the SAME underlying data
+dict1.insert("résumé");
+assert!(dict2.contains("résumé"));  // ✅ Mutations visible through dict2!
+
+// Term count reflects changes made via either clone
+assert_eq!(dict1.len(), Some(3));
+assert_eq!(dict2.len(), Some(3));  // Same count
+```
+
+#### Characteristics
+
+| Property | Behavior | Impact |
+|----------|----------|--------|
+| **Time Complexity** | O(1) | Single atomic increment |
+| **Space Complexity** | O(1) | ~16 bytes (Arc pointer only) |
+| **Data Sharing** | ✅ Complete | All clones share same node graph |
+| **Mutation Visibility** | ✅ Global | Changes via any clone affect all |
+| **Thread Safety** | ✅ RwLock | Multiple readers OR single writer |
+| **Independence** | ❌ None | No isolation between clones |
+
+#### Unicode Considerations
+
+Clone behavior is **independent of Unicode complexity**. Whether working with ASCII, multi-byte characters, emoji, or combining diacritics, the clone operation remains O(1):
+
+```rust
+// Simple ASCII
+let dict1 = DynamicDawgChar::from_iter(vec!["hello"]);
+let dict2 = dict1.clone();  // O(1)
+
+// Multi-byte characters (CJK)
+let dict3 = DynamicDawgChar::from_iter(vec!["日本", "東京"]);
+let dict4 = dict3.clone();  // Still O(1) - no character iteration
+
+// Emoji (4-byte characters)
+let dict5 = DynamicDawgChar::from_iter(vec!["👋", "🎉"]);
+let dict6 = dict5.clone();  // Still O(1)
+```
+
+**Why?** Clone only increments Arc's reference counter - it never traverses terms or characters.
+
+#### When to Use Cloning
+
+✅ **Good use cases:**
+
+1. **Multi-threaded Unicode processing:**
+   ```rust
+   use std::thread;
+
+   let dict = DynamicDawgChar::from_iter(vec!["café", "naïve", "über"]);
+
+   let handles: Vec<_> = (0..4).map(|_| {
+       let dict_clone = dict.clone();
+       thread::spawn(move || {
+           dict_clone.contains("café")  // Safe concurrent access
+       })
+   }).collect();
+   ```
+
+2. **International text processing:**
+   ```rust
+   let multilingual_dict = DynamicDawgChar::from_iter(vec![
+       "hello",   // English
+       "こんにちは", // Japanese
+       "مرحبا",   // Arabic
+       "привет",  // Russian
+   ]);
+
+   // Share across processing pipelines
+   let pipeline1 = multilingual_dict.clone();
+   let pipeline2 = multilingual_dict.clone();
+   ```
+
+❌ **Bad use cases (common mistakes):**
+
+1. **Expecting independent copies for different character sets:**
+   ```rust
+   let dict1 = DynamicDawgChar::from_iter(vec!["café"]);
+   let dict2 = dict1.clone();  // ❌ Still shares data!
+
+   dict1.insert("naïve");
+   // dict2 also contains "naïve" - clone doesn't isolate character sets
+   ```
+
+2. **Creating language-specific snapshots:**
+   ```rust
+   let dict = DynamicDawgChar::from_iter(vec!["hello", "world"]);
+   let english_snapshot = dict.clone();  // ❌ NOT a snapshot!
+
+   dict.insert("こんにちは");  // Add Japanese
+   // "english_snapshot" now also contains Japanese - not isolated
+   ```
+
+#### Alternative: True Independence
+
+For **independent copies** with Unicode data:
+
+**Option 1: Serialize/Deserialize**
+```rust
+use serde::{Serialize, Deserialize};
+
+// Works with all Unicode data
+let bytes = bincode::serialize(&dict1)?;
+let dict2: DynamicDawgChar = bincode::deserialize(&bytes)?;
+
+dict1.insert("新しい");  // Japanese: "new"
+assert!(!dict2.contains("新しい"));  // ✅ Independent
+```
+
+**Option 2: Rebuild from terms**
+```rust
+// Extract all Unicode terms
+let terms: Vec<String> = dict1.iter().collect();
+
+// Build new independent dictionary
+let dict2 = DynamicDawgChar::from_iter(terms);
+```
+
+**Unicode-specific cost considerations:**
+
+| Method | Time | Space | Notes |
+|--------|------|-------|-------|
+| `.clone()` | O(1) | O(1) | Regardless of character encoding |
+| Serialize/Deserialize | O(n) | O(n) | Includes Unicode normalization overhead |
+| Rebuild from terms | O(n·m) | O(n) | m = average chars per term (not bytes!) |
+
+**Important:** Rebuilding from terms with DynamicDawgChar is faster than DynamicDawg for the same visual length because it operates on character boundaries, not byte boundaries.
+
+#### Comparison with Byte-Level DynamicDawg
+
+| Aspect | DynamicDawg (byte) | DynamicDawgChar (char) |
+|--------|-------------------|------------------------|
+| **Clone type** | Shallow (Arc) | Shallow (Arc) - **identical** |
+| **Clone cost** | O(1) | O(1) - **identical** |
+| **Data sharing** | ✅ Yes | ✅ Yes - **identical** |
+| **Memory per node** | ~25 bytes | ~49 bytes (char vs u8 labels) |
+| **Use case** | ASCII, raw bytes | Unicode, multi-language |
+
+**Key insight:** Clone behavior is **architecturally identical** - the char vs u8 difference only affects node storage, not ownership semantics.
+
+#### Thread Safety with Unicode
+
+Unicode processing adds no additional complexity to thread safety:
+
+```rust
+use std::thread;
+
+let dict = DynamicDawgChar::from_iter(vec!["café", "日本"]);
+
+// Concurrent readers (safe for any Unicode data)
+let readers: Vec<_> = (0..10).map(|i| {
+    let dict = dict.clone();
+    thread::spawn(move || {
+        dict.contains("café")  // Unicode comparison still thread-safe
+    })
+}).collect();
+
+// Single writer
+let writer = {
+    let dict = dict.clone();
+    thread::spawn(move || {
+        dict.insert("新しい語")  // Unicode insertion still exclusive
+    })
+};
+```
+
+**RwLock guarantees remain the same:**
+- Multiple concurrent readers (fast)
+- Single exclusive writer (blocks readers)
+- No data races regardless of character encoding
+
+#### Summary
+
+**Key Takeaways:**
+1. 🔗 Clone behavior is **identical** to byte-level DynamicDawg
+2. 🚀 **O(1)** regardless of Unicode complexity (ASCII, CJK, emoji, etc.)
+3. 🔄 **Mutations visible** across all clones for all character types
+4. 🌍 **Unicode-safe** thread synchronization through RwLock
+5. 📊 For **independence**, use serialization or rebuild (same as byte-level)
+
 ## Key Differences from DynamicDawg
 
 ### 1. Edge Labels

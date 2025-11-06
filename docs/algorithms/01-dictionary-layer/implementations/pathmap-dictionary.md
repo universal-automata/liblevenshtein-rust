@@ -162,6 +162,291 @@ PathMapDictionary is a thin wrapper that:
 
 **Example**: 10,000-term dictionary ≈ 320 KB
 
+### Clone Behavior & Memory Semantics
+
+`PathMapDictionary` uses **two separate** `Arc<RwLock<...>>` instances internally, making `.clone()` a **shallow copy** that shares all underlying data. The clone behavior is similar to `DynamicDawg`, but with dual Arc-wrapped components:
+
+```rust
+use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+
+let dict1: PathMapDictionary = PathMapDictionary::from_terms(vec!["test", "testing"]);
+let dict2 = dict1.clone();  // O(1) - increments TWO Arc refcounts
+
+// Both dict1 and dict2 share the SAME underlying PathMap and term count
+dict1.insert("new_term");
+assert!(dict2.contains("new_term"));  // ✅ Mutations visible through dict2!
+
+// Term count is also shared
+assert_eq!(dict1.len(), Some(3));
+assert_eq!(dict2.len(), Some(3));  // Same count
+```
+
+#### Characteristics
+
+| Property | Behavior | Impact |
+|----------|----------|--------|
+| **Time Complexity** | O(1) | Two atomic increments |
+| **Space Complexity** | O(1) | ~32 bytes (two Arc pointers) |
+| **Data Sharing** | ✅ Complete | All clones share PathMap + term count |
+| **Mutation Visibility** | ✅ Global | Changes via any clone affect all |
+| **Thread Safety** | ✅ RwLock | Multiple readers OR single writer |
+| **Independence** | ❌ None | No isolation between clones |
+
+#### How Clone Works
+
+The clone operation increments **two** atomic reference counters:
+
+```rust
+pub struct PathMapDictionary<V> {
+    map: Arc<RwLock<PathMap<V>>>,       // ← Arc #1
+    term_count: Arc<RwLock<usize>>,     // ← Arc #2
+}
+
+// Cloning increments both Arc refcounts
+let dict2 = dict1.clone();
+// Equivalent to:
+// Arc::clone(&dict1.map) + Arc::clone(&dict1.term_count)
+// Cost: ~2-4 CPU cycles (two atomic increments)
+```
+
+**What gets cloned:**
+- ✅ Arc smart pointer for PathMap (~16 bytes on stack)
+- ✅ Arc smart pointer for term_count (~16 bytes on stack)
+- ❌ NOT the RwLocks
+- ❌ NOT the PathMap trie structure
+- ❌ NOT the term count value itself
+
+**Memory allocation:**
+- Zero heap allocation
+- Only stack space for two Arc pointers (~32 bytes)
+- All data remains shared
+
+#### Dual-Arc Design
+
+PathMapDictionary's dual-Arc design enables independent locking of map and count:
+
+```rust
+// Concurrent readers can lock map and count independently
+let map_lock = self.map.read();      // Lock PathMap
+let count_lock = self.term_count.read();  // Lock count separately
+
+// Reduces lock contention compared to single lock
+```
+
+**Why two Arcs?**
+- **Flexibility**: Can read count without locking PathMap
+- **Granularity**: Finer-grained synchronization
+- **Cost trade-off**: Slightly more expensive clone (2 increments vs 1)
+
+#### Structural Sharing vs Arc Sharing
+
+**Important distinction** - PathMapDictionary has TWO types of sharing:
+
+1. **Arc-based sharing (clone behavior):**
+   ```rust
+   let dict2 = dict1.clone();
+   // dict1 and dict2 share the SAME PathMap instance
+   dict1.insert("new");
+   assert!(dict2.contains("new"));  // ✅ Visible
+   ```
+
+2. **PathMap structural sharing (persistent data structure):**
+   ```rust
+   let mut map1 = PathMap::new();
+   map1.insert(b"test", 1);
+
+   let mut map2 = map1.clone();  // PathMap's clone creates new version
+   map2.insert(b"new", 2);
+
+   // map1 and map2 share internal trie nodes where possible
+   // But are independent: map1 doesn't see "new"
+   ```
+
+**For PathMapDictionary:**
+- `.clone()` creates Arc-based sharing (visible mutations)
+- PathMap's internal structural sharing is orthogonal (optimization)
+
+#### When to Use Cloning
+
+✅ **Good use cases:**
+
+1. **Multi-threaded access:**
+   ```rust
+   use std::thread;
+
+   let dict: PathMapDictionary = PathMapDictionary::from_terms(vec!["hello", "world"]);
+
+   let handles: Vec<_> = (0..4).map(|_| {
+       let dict_clone = dict.clone();
+       thread::spawn(move || {
+           dict_clone.contains("hello")
+       })
+   }).collect();
+   ```
+
+2. **Configuration management:**
+   ```rust
+   let config_dict: PathMapDictionary<String> = load_config();
+
+   // Share across services
+   let service1_dict = config_dict.clone();
+   let service2_dict = config_dict.clone();
+
+   // All see updates when config reloads
+   reload_config_into(&config_dict);
+   ```
+
+3. **Caching and lookup tables:**
+   ```rust
+   let cache: PathMapDictionary<CachedValue> = build_cache();
+
+   // Share cache across request handlers
+   for _ in 0..10 {
+       let handler_cache = cache.clone();
+       spawn_handler(handler_cache);
+   }
+   ```
+
+❌ **Bad use cases (common mistakes):**
+
+1. **Expecting independent copies:**
+   ```rust
+   let dict1: PathMapDictionary = PathMapDictionary::from_terms(vec!["original"]);
+   let dict2 = dict1.clone();
+
+   dict1.insert("modified");
+   // ❌ WRONG: Expecting dict2 unchanged
+   // ✅ REALITY: dict2 also contains "modified"
+   ```
+
+2. **Creating versioned snapshots:**
+   ```rust
+   let dict: PathMapDictionary<u32> = load_data();
+   let v1 = dict.clone();  // ❌ NOT a snapshot!
+
+   dict.insert("v2_data");
+   // v1 now also contains v2_data - not versioned
+   ```
+
+3. **Isolating test fixtures:**
+   ```rust
+   let base_fixture: PathMapDictionary = create_test_data();
+   let test1_dict = base_fixture.clone();  // ❌ Shared!
+   let test2_dict = base_fixture.clone();  // ❌ Shared!
+
+   // Modifications in test1 affect test2!
+   ```
+
+#### Alternative: True Independence
+
+For **independent copies** where mutations don't affect other instances:
+
+**Option 1: Serialize/Deserialize**
+```rust
+use serde::{Serialize, Deserialize};
+
+// Create deep copy via serialization
+let bytes = bincode::serialize(&dict1)?;
+let dict2: PathMapDictionary = bincode::deserialize(&bytes)?;
+
+// Now independent
+dict1.insert("new");
+assert!(!dict2.contains("new"));  // ✅ Independent
+```
+
+**Option 2: Rebuild from terms**
+```rust
+// Extract all terms
+let terms: Vec<String> = dict1.iter().collect();
+
+// Build new independent dictionary
+let dict2: PathMapDictionary = PathMapDictionary::from_terms(terms);
+```
+
+**Option 3: Extract with values**
+```rust
+// For dictionaries with values
+let entries: Vec<(String, V)> = dict1
+    .iter()
+    .filter_map(|term| dict1.get_value(term).map(|v| (term.clone(), v)))
+    .collect();
+
+let dict2: PathMapDictionary<V> = PathMapDictionary::from_terms_with_values(entries);
+```
+
+**Cost comparison:**
+
+| Method | Time | Space | Independence |
+|--------|------|-------|--------------|
+| `.clone()` | O(1) | O(1) | ❌ Shared |
+| Serialize/Deserialize | O(n) | O(n) | ✅ Full |
+| Rebuild from terms | O(n·log m) | O(n) | ✅ Full |
+| Rebuild with values | O(n·log m) | O(n) | ✅ Full |
+
+#### Comparison with Other Dictionaries
+
+| Dictionary | Arc Count | Clone Cost | Shared Data? |
+|------------|-----------|------------|--------------|
+| **PathMapDictionary** | 2 (map + count) | O(1) | ✅ Yes |
+| **DynamicDawg** | 1 (inner) | O(1) | ✅ Yes |
+| **DynamicDawgChar** | 1 (inner) | O(1) | ✅ Yes |
+| **DoubleArrayTrie** | 0 (no Arc) | O(n) | ❌ No |
+| **DoubleArrayTrieChar** | 0 (no Arc) | O(n) | ❌ No |
+
+**Key differences:**
+- PathMapDictionary: Two Arc increments (map + count)
+- DynamicDawg variants: One Arc increment (inner struct contains count)
+- DoubleArrayTrie: Full deep copy (immutable, no Arc needed)
+
+#### Thread Safety Considerations
+
+PathMapDictionary's dual-Arc design provides flexible locking:
+
+```rust
+use std::thread;
+
+let dict: PathMapDictionary<u32> = PathMapDictionary::from_terms_with_values(vec![
+    ("key1", 100),
+    ("key2", 200),
+]);
+
+// Multiple concurrent readers
+let readers: Vec<_> = (0..10).map(|i| {
+    let dict = dict.clone();
+    thread::spawn(move || {
+        dict.get_value(&format!("key{}", i))
+    })
+}).collect();
+
+// Single writer (blocks all readers)
+let writer = {
+    let dict = dict.clone();
+    thread::spawn(move || {
+        dict.insert_with_value("key3", 300)
+    })
+};
+```
+
+**RwLock semantics:**
+- **Read operations**: `contains()`, `get_value()`, `len()`, iteration
+- **Write operations**: `insert()`, `insert_with_value()`, `remove()`, `union_with()`
+- **Lock granularity**: Map and count can be locked independently for reads
+
+**Performance implications:**
+- Read lock overhead: ~10-20ns per operation
+- Write lock overhead: ~50-100ns + contention costs
+- Dual-Arc trade-off: More flexible locking, slightly higher clone cost
+
+#### Summary
+
+**Key Takeaways:**
+1. 🔗 `.clone()` creates **shallow copy** with two Arc increments (map + count)
+2. 🚀 **O(1)** time and space - just atomic reference counting
+3. 🔄 **Mutations visible** across all clones (Arc-based sharing)
+4. 🌳 **Structural sharing** is separate (PathMap's persistent trie optimization)
+5. 🔒 **Thread-safe** with dual RwLocks for flexible granularity
+6. 📊 For **independence**, use serialization or rebuild from terms (O(n) cost)
+
 ## Union Operations
 
 ### Overview

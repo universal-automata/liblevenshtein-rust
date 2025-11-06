@@ -241,6 +241,227 @@ struct DawgNode<V: DictionaryValue> {
 
 **Example**: 10,000-term dictionary ≈ 250KB (nodes) + 32KB (suffix cache)
 
+### Clone Behavior & Memory Semantics
+
+`DynamicDawg` uses `Arc<RwLock<...>>` internally, making `.clone()` a **shallow copy** that shares all underlying data structures between clones:
+
+```rust
+use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+
+let dict1 = DynamicDawg::from_iter(vec!["test", "testing"]);
+let dict2 = dict1.clone();  // O(1) - only increments Arc refcount
+
+// Both dict1 and dict2 point to the SAME underlying data
+dict1.insert("new_term");
+assert!(dict2.contains("new_term"));  // ✅ Mutations visible through dict2!
+
+// Term count reflects changes made via either clone
+assert_eq!(dict1.len(), Some(3));
+assert_eq!(dict2.len(), Some(3));  // Same count
+```
+
+#### Characteristics
+
+| Property | Behavior | Impact |
+|----------|----------|--------|
+| **Time Complexity** | O(1) | Single atomic increment |
+| **Space Complexity** | O(1) | ~16 bytes (Arc pointer only) |
+| **Data Sharing** | ✅ Complete | All clones share same node graph |
+| **Mutation Visibility** | ✅ Global | Changes via any clone affect all |
+| **Thread Safety** | ✅ RwLock | Multiple readers OR single writer |
+| **Independence** | ❌ None | No isolation between clones |
+
+#### How Clone Works
+
+The clone operation only increments an atomic reference counter:
+
+```rust
+pub struct DynamicDawg<V> {
+    inner: Arc<RwLock<DynamicDawgInner<V>>>,  // ← Single Arc
+}
+
+// Cloning increments Arc's atomic refcount
+let dict2 = dict1.clone();
+// Equivalent to: Arc::clone(&dict1.inner)
+// Cost: ~1-2 CPU cycles (atomic increment)
+```
+
+**What gets cloned:**
+- ✅ Arc smart pointer (~16 bytes on stack)
+- ❌ NOT the RwLock
+- ❌ NOT the node graph (Vec<DawgNode>)
+- ❌ NOT the suffix cache or bloom filter
+- ❌ NOT any internal structures
+
+**Memory allocation:**
+- Zero heap allocation
+- Only stack space for new Arc pointer
+- All data remains shared
+
+#### When to Use Cloning
+
+✅ **Good use cases:**
+
+1. **Multi-threaded access** - Share across threads:
+   ```rust
+   use std::thread;
+
+   let dict = DynamicDawg::from_iter(vec!["hello", "world"]);
+
+   let handles: Vec<_> = (0..4).map(|_| {
+       let dict_clone = dict.clone();  // Cheap clone for each thread
+       thread::spawn(move || {
+           // Each thread can read concurrently
+           dict_clone.contains("hello")
+       })
+   }).collect();
+   ```
+
+2. **Storing in multiple data structures:**
+   ```rust
+   let mut map1 = HashMap::new();
+   let mut map2 = HashMap::new();
+
+   let dict = DynamicDawg::from_iter(vec!["term1", "term2"]);
+   map1.insert("key1", dict.clone());
+   map2.insert("key2", dict.clone());  // Same underlying data
+   ```
+
+3. **Convenience aliases:**
+   ```rust
+   let system_dict = DynamicDawg::from_iter(vec!["system"]);
+   let dict = system_dict.clone();  // Short alias
+   ```
+
+❌ **Bad use cases (common mistakes):**
+
+1. **Expecting independent copies:**
+   ```rust
+   let dict1 = DynamicDawg::from_iter(vec!["original"]);
+   let dict2 = dict1.clone();
+
+   dict1.insert("modified");
+   // ❌ WRONG: Expecting dict2 to still have only "original"
+   // ✅ REALITY: dict2 also contains "modified"
+   ```
+
+2. **Avoiding mutation visibility:**
+   ```rust
+   let dict1 = build_dictionary();
+   let dict2 = dict1.clone();  // ❌ Won't create independent copy
+
+   modify_dictionary(&dict1);
+   // dict2 sees all modifications - they share data!
+   ```
+
+3. **Creating snapshots:**
+   ```rust
+   let dict = DynamicDawg::from_iter(vec!["v1"]);
+   let snapshot = dict.clone();  // ❌ NOT a snapshot!
+
+   dict.insert("v2");
+   // "snapshot" now also contains "v2" - not a true snapshot
+   ```
+
+#### Alternative: True Independence
+
+If you need **independent copies** where modifications don't affect other instances, `clone()` is insufficient. Options include:
+
+**Option 1: Serialize/Deserialize**
+```rust
+use serde::{Serialize, Deserialize};
+
+// Create deep copy via serialization
+let bytes = bincode::serialize(&dict1)?;
+let dict2: DynamicDawg = bincode::deserialize(&bytes)?;
+
+// Now dict1 and dict2 are truly independent
+dict1.insert("new");
+assert!(!dict2.contains("new"));  // ✅ Independent
+```
+
+**Option 2: Rebuild from terms**
+```rust
+// Extract all terms
+let terms: Vec<String> = dict1.iter().collect();
+
+// Build new independent dictionary
+let dict2 = DynamicDawg::from_iter(terms);
+
+// dict2 is now completely independent
+```
+
+**Cost comparison:**
+
+| Method | Time | Space | Independence |
+|--------|------|-------|--------------|
+| `.clone()` | O(1) | O(1) | ❌ Shared |
+| Serialize/Deserialize | O(n) | O(n) | ✅ Full |
+| Rebuild from terms | O(n·m) | O(n) | ✅ Full |
+
+#### Comparison with Other Dictionaries
+
+Different dictionary implementations have different clone semantics:
+
+| Dictionary | Clone Type | Cost | Shared Data? |
+|------------|------------|------|--------------|
+| **DynamicDawg** | Shallow (Arc) | O(1) | ✅ Yes |
+| **DynamicDawgChar** | Shallow (Arc) | O(1) | ✅ Yes |
+| **PathMapDictionary** | Shallow (Arc) | O(1) | ✅ Yes |
+| **DoubleArrayTrie** | Deep copy | O(n) | ❌ No |
+| **DoubleArrayTrieChar** | Deep copy | O(n) | ❌ No |
+
+**Why the difference?**
+- **Mutable dictionaries** (DynamicDawg, PathMap) use Arc for shared ownership with interior mutability
+- **Immutable dictionaries** (DoubleArrayTrie) don't use Arc, so clone creates full independent copies
+
+#### Thread Safety Considerations
+
+The Arc-based clone enables safe concurrent access patterns:
+
+```rust
+use std::sync::Arc;
+use std::thread;
+
+let dict = DynamicDawg::from_iter(vec!["concurrent", "access"]);
+
+// Multiple concurrent readers (fast - no blocking)
+let readers: Vec<_> = (0..10).map(|i| {
+    let dict = dict.clone();
+    thread::spawn(move || {
+        dict.contains(&format!("term{}", i))  // Many readers OK
+    })
+}).collect();
+
+// Single writer (blocks readers during write)
+let writer = {
+    let dict = dict.clone();
+    thread::spawn(move || {
+        dict.insert("new_term")  // Exclusive write access
+    })
+};
+```
+
+**RwLock semantics:**
+- **Multiple readers** can access simultaneously (read locks don't block each other)
+- **Single writer** gets exclusive access (write lock blocks all readers and other writers)
+- Write operations: `insert()`, `remove()`, `union_with()`, `compact()`
+- Read operations: `contains()`, `get_value()`, `len()`, iteration
+
+**Performance impact:**
+- Read locks: ~10-20ns overhead (atomic operations)
+- Write locks: ~50-100ns + potential thread wake-up costs
+- Contention: High write frequency can create bottlenecks
+
+#### Summary
+
+**Key Takeaways:**
+1. 🔗 `.clone()` creates a **shallow copy** - all clones share the same data
+2. 🚀 **O(1)** time and space - just increments atomic reference count
+3. 🔄 **Mutations are visible** across all clones (by design)
+4. 🔒 **Thread-safe** through RwLock (multiple readers, single writer)
+5. 📊 For **independence**, use serialization or rebuild from terms (O(n) cost)
+
 ### Optimizations
 
 #### 1. SmallVec for Edges

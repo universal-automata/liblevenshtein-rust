@@ -296,6 +296,8 @@ Start: What do you need?
 | **Insert** | ✅ Append | ✅ Append | ✅ Full | ✅ Full | ✅ Full | ✅ Full |
 | **Remove** | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Union** | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Clone Cost** | O(n) | O(n) | O(1) | O(1) | O(1) | N/A |
+| **Clone Sharing** | ❌ Deep | ❌ Deep | ✅ Arc | ✅ Arc | ✅ Arc×2 | N/A |
 | **Unicode** | Byte | ✅ Char | Byte | ✅ Char | Byte | Byte |
 | **Thread-Safe** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Use Case** | General | Unicode | Dynamic | Dyn+Unicode | Simple | Substring |
