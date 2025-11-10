@@ -143,6 +143,7 @@ pub mod pathmap;
 pub mod pathmap_char;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap_zipper;
+pub mod prefix_zipper;
 pub mod suffix_automaton;
 pub mod suffix_automaton_char;
 pub mod suffix_automaton_char_zipper;

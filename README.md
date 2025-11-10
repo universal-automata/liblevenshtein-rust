@@ -658,6 +658,79 @@ let results = engine.complete(block, "loc", 1);
 
 See [`examples/contextual_completion.rs`](examples/contextual_completion.rs) for a complete example.
 
+### Prefix-Based Iteration (PrefixZipper)
+
+For efficient autocomplete and code completion scenarios, use the `PrefixZipper` trait to navigate directly to a prefix and iterate only matching terms. This is **5-10× faster** than full dictionary iteration with filtering when the prefix matches a small subset of terms.
+
+**Performance**: O(k) navigation + O(m) iteration, where k = prefix length, m = matching terms.
+
+```rust
+use liblevenshtein::prelude::*;
+use liblevenshtein::dictionary::prefix_zipper::PrefixZipper;
+use liblevenshtein::dictionary::double_array_trie_zipper::DoubleArrayTrieZipper;
+
+let terms = vec!["process", "processUser", "produce", "product", "apple"];
+let dict = DoubleArrayTrie::from_terms(terms.iter());
+
+// Create zipper and navigate to prefix
+let zipper = DoubleArrayTrieZipper::new_from_dict(&dict);
+if let Some(iter) = zipper.with_prefix(b"proc") {
+    for (path, _zipper) in iter {
+        let term = String::from_utf8(path).unwrap();
+        println!("Found: {}", term);
+        // Prints only: "process" and "processUser" (not all 5 terms!)
+    }
+}
+```
+
+**Unicode support** (character-level):
+
+```rust
+use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+use liblevenshtein::dictionary::double_array_trie_char_zipper::DoubleArrayTrieCharZipper;
+use liblevenshtein::dictionary::prefix_zipper::PrefixZipper;
+
+let terms = vec!["café", "cafétéria", "naïve"];
+let dict = DoubleArrayTrieChar::from_terms(terms.iter());
+
+let zipper = DoubleArrayTrieCharZipper::new_from_dict(&dict);
+let prefix: Vec<char> = "caf".chars().collect();
+
+if let Some(iter) = zipper.with_prefix(&prefix) {
+    for (path, _) in iter {
+        let term: String = path.iter().collect();
+        println!("Found: {}", term);
+    }
+}
+```
+
+**Valued dictionaries** (for metadata like scope IDs, frequencies, etc.):
+
+```rust
+use liblevenshtein::dictionary::prefix_zipper::ValuedPrefixZipper;
+
+let dict = DoubleArrayTrie::from_terms_with_values(
+    vec![("cat", 1), ("cats", 2), ("dog", 3)].into_iter()
+);
+
+let zipper = DoubleArrayTrieZipper::new_from_dict(&dict);
+if let Some(iter) = zipper.with_prefix_values(b"cat") {
+    for (path, value) in iter {
+        let term = String::from_utf8(path).unwrap();
+        println!("{} -> {}", term, value);
+        // Prints: "cat -> 1", "cats -> 2"
+    }
+}
+```
+
+**Use cases**:
+- Code completion / autocomplete
+- Prefix search in large dictionaries
+- Pattern-aware completion (LSP servers)
+- Any scenario requiring "terms starting with X"
+
+**Backend support**: All dictionary backends support `PrefixZipper` (DoubleArrayTrie, DynamicDawg, PathMap, etc.) through blanket trait implementation.
+
 ### Advanced: Direct Zipper API
 
 For fine-grained control over traversal, use the zipper API directly:

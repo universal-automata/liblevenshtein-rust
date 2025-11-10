@@ -52,7 +52,8 @@ pub mod cli;
 /// Test corpus utilities
 ///
 /// This module provides parsers and generators for standard spelling
-/// correction test corpora. It requires the `rand` dev-dependency.
+/// correction test corpora. It requires the `rand` feature.
+#[cfg(feature = "rand")]
 #[doc(hidden)]
 pub mod corpus;
 

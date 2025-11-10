@@ -311,3 +311,8 @@ harness = false
 [[bench]]
 name = "corpus_benchmarks"
 harness = false
+required-features = ["rand"]
+
+[[test]]
+name = "corpus_validation"
+required-features = ["rand"]
