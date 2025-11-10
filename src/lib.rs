@@ -49,6 +49,13 @@ pub mod repl;
 #[cfg(feature = "cli")]
 pub mod cli;
 
+/// Test corpus utilities
+///
+/// This module provides parsers and generators for standard spelling
+/// correction test corpora. It requires the `rand` dev-dependency.
+#[doc(hidden)]
+pub mod corpus;
+
 /// Common imports for convenient usage
 pub mod prelude {
     pub use crate::dictionary::dawg::DawgDictionary;

@@ -65,3 +65,10 @@ benchmark_*.sh
 *latex*.py
 generate_latex_doc.py
 liblevenshtein-rust-doc.pdf
+
+# Test corpora (downloaded on-demand, not committed)
+data/corpora/*.txt
+data/corpora/*.dat
+data/corpora/*.zip
+data/corpora/birkbeck/
+data/generated/

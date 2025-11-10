@@ -41,6 +41,8 @@ anyhow = { version = "1.0", optional = true }
 rustyline = { version = "13.0", optional = true }
 colored = { version = "2.0", optional = true }
 dirs = { version = "5.0", optional = true }
+# Random number generation for corpus utilities (test/benchmark use)
+rand = { version = "0.8", optional = true }
 # SIMD optimization uses std::arch (no external dependencies needed)
 
 [dev-dependencies]
@@ -304,4 +306,8 @@ harness = false
 
 [[bench]]
 name = "compact_benchmark"
+harness = false
+
+[[bench]]
+name = "corpus_benchmarks"
 harness = false

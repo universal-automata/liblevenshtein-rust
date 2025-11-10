@@ -1,0 +1,40 @@
+# This is a SNIPPET for adding corpus caching to CI workflows
+# To use: Insert these steps after the "Checkout repository" step in ci.yml
+
+    - name: Cache test corpora
+      uses: actions/cache@v4
+      id: corpus-cache
+      with:
+        path: data/corpora
+        key: corpora-v1-${{ hashFiles('scripts/download_corpora.sh') }}
+        restore-keys: |
+          corpora-v1-
+
+    - name: Download test corpora
+      if: steps.corpus-cache.outputs.cache-hit != 'true'
+      run: |
+        echo "::group::Downloading test corpora"
+        ./scripts/download_corpora.sh
+        echo "::endgroup::"
+
+    - name: Extract Birkbeck corpus
+      run: |
+        if [ -f data/corpora/birkbeck.zip ] && [ ! -d data/corpora/birkbeck ]; then
+          echo "::group::Extracting Birkbeck corpus"
+          unzip -q data/corpora/birkbeck.zip -d data/corpora/birkbeck/
+          echo "::endgroup::"
+        fi
+
+# To use corpus validation tests in CI, add this step after "Run unit tests":
+
+    - name: Run corpus validation tests
+      if: matrix.rust == 'stable'  # Only run on stable to save CI time
+      env:
+        RUSTFLAGS: ${{ matrix.platform.rustflags }}
+      run: |
+        echo "::group::Running corpus validation tests"
+        cargo test --test corpus_validation --features rand -- --ignored --test-threads=1
+        echo "::endgroup::"
+
+# Cache size: ~7.5 MB (big.txt 6.5MB + holbrook/aspell/wikipedia <1MB)
+# Cache expiry: When scripts/download_corpora.sh changes
