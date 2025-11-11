@@ -1,13 +1,122 @@
-# Universal Levenshtein Automata - Implementation Research
+# Universal Levenshtein Automata - Complete Documentation
 
-**Date**: 2025-11-06
-**Status**: Research & Planning Phase
+**Last Updated**: 2025-11-11
+**Status**: Comprehensive Theory Documentation + Implementation Planning
 
 ---
 
 ## Overview
 
-**Universal Levenshtein Automata** extends the standard Levenshtein distance by allowing **restricted substitutions** - where certain character pairs cannot be substituted for each other. This directory contains research, analysis, and implementation planning for adding restricted substitutions to liblevenshtein-rust.
+This directory contains **complete documentation** of Universal Levenshtein Automata, including:
+
+1. **Theoretical Foundations** - Complete analysis of Mitankin's 2005 thesis (77 pages)
+2. **Implementation Planning** - Practical integration with liblevenshtein-rust
+3. **Algorithm Details** - Full pseudocode and construction algorithms
+4. **Cross-Reference Materials** - Bridging theory to practice
+
+**Universal Levenshtein Automata** are parameter-free, deterministic finite automata that recognize the Levenshtein neighborhood L^χ_{Lev}(n, w) for **any word w** without modification. This directory covers both the core theory and planned extensions (restricted substitutions).
+
+---
+
+## Core Theory Documentation
+
+### Primary Sources
+
+**Core Thesis** (2005):
+- **Title**: "Universal Levenshtein Automata - Building and Properties"
+- **Author**: Petar Nikolaev Mitankin (Master's Thesis, Sofia University)
+- **Supervisor**: Dr. Stoyan Mihov
+- **Location**: `/home/dylon/Papers/Approximate String Matching/Universal Levenshtein Automata - Building and Properties/`
+- **Pages**: 77 pages (split into pg_0001.pdf through pg_0077.pdf)
+- **Status**: ✅ **Fully documented** (2025-11-11)
+
+**Extension Paper** (2009):
+- **Title**: "Universal Levenshtein Automata for a Generalization of the Levenshtein Distance"
+- **Authors**: Petar Mitankin, Stoyan Mihov, Klaus U. Schulz
+- **Published**: Annuaire de l'Université de Sofia "St. Kliment Ohridski", Tome 99, 2009, pages 5-23
+- **Location**: `/home/dylon/Papers/Approximate String Matching/Universal Levenshtein Automata for a Generalization of the Levenshtein Distance.pdf`
+- **Topic**: Restricted substitutions (implementation planning in progress)
+
+### Complete Documentation Index
+
+#### Theory Documents (Core Thesis)
+
+1. **[PAPER_SUMMARY.md](./PAPER_SUMMARY.md)** (~2000 lines) ⭐
+   - Complete chapter-by-chapter analysis of all 77 pages
+   - Every definition, theorem, lemma, proposition with proofs
+   - Section-by-section narrative flow
+   - All examples worked through step-by-step
+   - **Start here** for comprehensive understanding
+
+2. **[GLOSSARY.md](./GLOSSARY.md)** (~650 lines)
+   - Complete notation reference for all symbols
+   - Quick lookup table with 50+ symbols and page numbers
+   - Organized by category (metasymbols, distances, positions, automata, functions)
+   - Usage tips for reading paper and implementing
+   - Common confusions explained
+   - **Use this** while reading PAPER_SUMMARY.md or thesis
+
+3. **[ALGORITHMS.md](./ALGORITHMS.md)** (~1500 lines)
+   - Section 6 (Building Algorithms) fully extracted
+   - Summarized and detailed pseudocode
+   - Complete type definitions and API functions
+   - All helper functions (Delta, Delta_E, Delta_E_D, etc.)
+   - Complexity analysis with exact formulas
+   - **Use this** for implementation reference
+
+4. **[THEORETICAL_FOUNDATIONS.md](./THEORETICAL_FOUNDATIONS.md)** (~1400 lines)
+   - All definitions, propositions, lemmas, theorems
+   - Complete proofs and proof sketches
+   - Organized by section (Distance Properties, NFAs, DFAs, Universal Automata, Minimality)
+   - Cross-reference index
+   - Critical warnings (triangle inequality violation!)
+   - **Use this** for mathematical rigor
+
+5. **[IMPLEMENTATION_MAPPING.md](./IMPLEMENTATION_MAPPING.md)** (To be created)
+   - Maps theoretical definitions to Rust code structures
+   - Bridges ALGORITHMS.md to actual liblevenshtein-rust implementation
+   - Design patterns for universal positions, subsumption, bit vectors
+   - **Use this** when implementing in Rust
+
+#### Implementation Planning Documents
+
+See [Implementation Strategy](#implementation-strategy) section below for details on:
+- **technical-analysis.md** - Current codebase analysis
+- **use-cases.md** - Practical applications
+- **implementation-plan.md** - Phase-by-phase roadmap
+- **decision-matrix.md** - Approach comparison
+- **architectural-sketches.md** - Code designs
+
+### Key Theoretical Contributions
+
+From Mitankin's 2005 thesis:
+
+1. **Parameter-Free Automaton**: A^{∀,χ}_n works for **any word length** without modification
+2. **Three Distance Variants**:
+   - χ = ε (standard Levenshtein)
+   - χ = t (with transposition)
+   - χ = ms (with merge/split)
+3. **Bit Vector Encoding**: h_n(w, x) converts word pairs to bit vector sequences
+4. **Universal Positions**: I + i#e and M + i#e with parameters I, M
+5. **Subsumption Relation**: ≤^χ_s for state minimization
+6. **Minimality Proof**: A^{∀,χ}_n has minimum states (Section 7)
+7. **O(n²) State Complexity**: Exact formulas and bounds (Section 6.3)
+
+### Critical Warnings
+
+⚠️ **Triangle Inequality Violation** (Page 3):
+```
+d^t_L does NOT satisfy the triangle inequality!
+```
+
+Counterexample: v="ac", w="ca", x="aa"
+- d^t_L(v,x) = 2 > d^t_L(v,w) + d^t_L(w,x) = 1 + 1
+
+**Implication**: Cannot use triangle inequality for pruning with transposition variant.
+
+---
+
+## Application: Restricted Substitutions
 
 ### What Problem Does It Solve?
 
