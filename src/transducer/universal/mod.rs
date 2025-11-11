@@ -47,11 +47,14 @@
 //! assert!(!automaton.accepts("test", "hello")); // distance > 2
 //! ```
 
+pub mod bit_vector;
 pub mod position;
 pub mod state;
 pub mod subsumption;
 
 // Re-exports
+pub use bit_vector::{CharacteristicVector, characteristic_vector, encode_word_pair};
+
 pub use position::{
     UniversalPosition,
     PositionVariant,
