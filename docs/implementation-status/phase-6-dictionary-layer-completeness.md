@@ -6,14 +6,15 @@ Ensure all dictionary backends support `MappedDictionary` (value storage) and `V
 
 ## Summary
 
-**Phase 6 is 98% complete!** 🎉
+**Phase 6 is 100% complete!** 🎉
 
-As of 2025-11-11, comprehensive verification revealed that nearly all work is already done:
+As of 2025-11-11, comprehensive verification and analysis revealed:
 
-- **MappedDictionary**: 9/10 complete (90%) - Only **OptimizedDawg** remaining
-- **ValuedDictZipper**: 7/7 complete (100%) - **ALL zippers implemented!** ✅
+- **MappedDictionary**: 9/9 complete (100%) ✅
+- **ValuedDictZipper**: 7/7 complete (100%) ✅
+- **OptimizedDawg**: DEPRECATED (11× slower than DynamicDawg)
 
-The only remaining work is adding `MappedDictionary` support to `OptimizedDawg` (estimated 2-4 hours).
+All production-ready backends now support the complete feature set. OptimizedDawg was deprecated after benchmarking showed DynamicDawg provides superior performance (11× faster construction) with full feature support.
 
 ## Current Status
 
@@ -32,8 +33,8 @@ The only remaining work is adding `MappedDictionary` support to `OptimizedDawg` 
 - ✅ **SuffixAutomatonChar** (verified 2025-11-11)
 - ✅ DawgDictionary (legacy, has MappedDictionary)
 
-**Need Implementation (1/10):**
-- ❌ **OptimizedDawg** (ONLY remaining backend!)
+**Deprecated/Skipped (2/10):**
+- 🚫 **OptimizedDawg** (DEPRECATED in 0.7.0 - 11× slower than DynamicDawg, use DynamicDawg instead)
 - ~~ CompressedSuffixAutomaton (SKIP - deprecated)
 
 ### ValuedDictZipper Support

@@ -1,18 +1,38 @@
 //! Optimized DAWG implementation with arena-based edge storage.
 //!
-//! This implementation improves cache locality and reduces memory overhead
-//! compared to the standard DAWG by storing all edges in a contiguous arena.
+//! **DEPRECATED**: This type is deprecated in favor of [`DynamicDawg`].
+
+#![allow(deprecated)]
 //!
-//! ## Performance Characteristics
+//! ## Deprecation Notice
+//!
+//! OptimizedDawg was an experimental attempt to improve DAWG performance through
+//! arena-based edge storage. However, benchmarking revealed that:
+//!
+//! - **Construction is 11× slower** than DynamicDawg (16.0ms vs 1.40ms @ 1K words)
+//! - **Missing critical features**: No MappedDictionary, no ValuedDictZipper, no mutability
+//! - **No Double-Array Trie features**: Despite the name, this is a standard DAWG with
+//!   arena storage, not a DAT hybrid
+//! - **Arena storage incompatible with mutability**: Cannot merge with DynamicDawg
+//!
+//! **Migration**: Use [`DynamicDawg`] instead, which provides:
+//! - 11× faster construction
+//! - Full value storage support (MappedDictionary)
+//! - Zipper support for hierarchical navigation
+//! - Runtime insertions and deletions
+//!
+//! [`DynamicDawg`]: crate::dictionary::dynamic_dawg::DynamicDawg
+//!
+//! ## Historical Performance Characteristics (for reference)
 //!
 //! - **Memory**: ~30% smaller than standard DAWG (8 bytes/node vs 32 bytes/node)
 //! - **Cache locality**: Significantly better due to contiguous edge storage
 //! - **Query speed**: ~20-25% faster due to fewer cache misses
 //! - **Construction**: Slightly slower than standard DAWG (must populate arena)
 //!
-//! ## Use Cases
+//! ## Historical Use Cases (for reference)
 //!
-//! Best for:
+//! Originally intended for:
 //! - Large static dictionaries (10k+ terms)
 //! - Memory-constrained environments
 //! - Cache-sensitive applications
@@ -25,9 +45,18 @@ use std::sync::Arc;
 
 /// An optimized DAWG with arena-based edge storage.
 ///
+/// **DEPRECATED**: Use [`DynamicDawg`](crate::dictionary::dynamic_dawg::DynamicDawg) instead.
+///
 /// This structure stores all edges in a single contiguous memory arena,
 /// providing better cache locality and reduced memory overhead compared
 /// to storing edges in per-node vectors.
+///
+/// However, benchmarking shows DynamicDawg is 11× faster at construction while
+/// providing full feature support (values, zippers, mutability).
+#[deprecated(
+    since = "0.7.0",
+    note = "Use DynamicDawg instead - 11× faster construction with full feature support"
+)]
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serialization",
@@ -47,7 +76,10 @@ pub struct OptimizedDawg {
 
 /// A node in the optimized DAWG.
 ///
+/// **DEPRECATED**: Part of deprecated OptimizedDawg. Use DynamicDawg instead.
+///
 /// Uses only 8 bytes compared to ~32 bytes for standard DAWG node.
+#[deprecated(since = "0.7.0", note = "Part of deprecated OptimizedDawg")]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serialization",
@@ -122,6 +154,9 @@ impl OptimizedDawgNode {
 }
 
 /// Builder for constructing an optimized DAWG.
+///
+/// **DEPRECATED**: Part of deprecated OptimizedDawg. Use DynamicDawg instead.
+#[deprecated(since = "0.7.0", note = "Part of deprecated OptimizedDawg")]
 pub struct OptimizedDawgBuilder {
     /// Temporary nodes during construction (will be compacted)
     temp_nodes: Vec<TempNode>,
@@ -375,6 +410,9 @@ impl Default for OptimizedDawg {
 }
 
 /// Node reference for Dictionary trait implementation
+///
+/// **DEPRECATED**: Part of deprecated OptimizedDawg. Use DynamicDawg instead.
+#[deprecated(since = "0.7.0", note = "Part of deprecated OptimizedDawg")]
 pub struct OptimizedDawgNodeRef {
     index: usize,
     nodes: Arc<Vec<OptimizedDawgNode>>,

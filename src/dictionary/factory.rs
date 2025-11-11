@@ -165,6 +165,7 @@ impl DictionaryFactory {
                 DictionaryContainer::PathMap(PathMapDictionary::from_terms(terms))
             }
             DictionaryBackend::Dawg => DictionaryContainer::Dawg(DawgDictionary::from_iter(terms)),
+            #[allow(deprecated)]
             DictionaryBackend::OptimizedDawg => {
                 DictionaryContainer::OptimizedDawg(OptimizedDawg::from_terms(terms))
             }
@@ -203,6 +204,7 @@ impl DictionaryFactory {
             #[cfg(feature = "pathmap-backend")]
             DictionaryBackend::PathMap => DictionaryContainer::PathMap(PathMapDictionary::new()),
             DictionaryBackend::Dawg => DictionaryContainer::Dawg(DawgDictionary::new()),
+            #[allow(deprecated)]
             DictionaryBackend::OptimizedDawg => {
                 DictionaryContainer::OptimizedDawg(OptimizedDawg::new())
             }
