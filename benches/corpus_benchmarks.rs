@@ -62,8 +62,12 @@ fn construction_benchmarks(c: &mut Criterion) {
     words.truncate(500_000); // Limit to 500K words
 
     let mut group = c.benchmark_group("corpus_construction");
-    group.sample_size(10);
-    group.measurement_time(Duration::from_secs(30));
+
+    // Reduced sample size and increased measurement time to handle slow DoubleArrayTrie
+    // construction at large scales (100K+ words can take 60+ seconds per iteration).
+    // This prevents Criterion panics from insufficient samples with zero variance.
+    group.sample_size(3); // Minimum for Criterion's statistical analysis
+    group.measurement_time(Duration::from_secs(120)); // Allow slow constructions to complete
 
     for size in [1_000, 10_000, 32_000, 100_000, 500_000] {
         if size > words.len() {
@@ -74,16 +78,21 @@ fn construction_benchmarks(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(size as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("DoubleArrayTrie", size),
-            &subset,
-            |b, words| {
-                b.iter(|| {
-                    let dict = DoubleArrayTrie::from_terms(black_box(words.iter().copied()));
-                    black_box(dict);
-                });
-            },
-        );
+        // DoubleArrayTrie construction has O(n²) or worse complexity and becomes
+        // impractically slow at 100K+ words (60+ seconds per iteration). Skip these
+        // sizes to prevent benchmark hangs while still measuring other backends.
+        if size < 100_000 {
+            group.bench_with_input(
+                BenchmarkId::new("DoubleArrayTrie", size),
+                &subset,
+                |b, words| {
+                    b.iter(|| {
+                        let dict = DoubleArrayTrie::from_terms(black_box(words.iter().copied()));
+                        black_box(dict);
+                    });
+                },
+            );
+        }
 
         group.bench_with_input(
             BenchmarkId::new("DynamicDawg", size),

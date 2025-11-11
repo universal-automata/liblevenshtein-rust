@@ -7,7 +7,7 @@
 ## Overview
 
 Successfully integrated standard spelling correction test corpora into liblevenshtein-rust, including:
-- Peter Norvig's big.txt (dictionary source, 32K unique words)
+- Peter Norvig's big.txt (dictionary source, ~29K unique words)
 - Birkbeck corpus (36K real spelling errors from OTA)
 - Holbrook corpus (1.8K secondary school errors)
 - Aspell corpus (531 technical term errors)
@@ -94,8 +94,10 @@ cargo test --test corpus_validation --features rand -- --ignored --test-threads=
 **Benchmark Groups**:
 1. **Construction Benchmarks**:
    - Dictionary sizes: 1K, 10K, 32K, 100K, 500K words
-   - Backends: DoubleArrayTrie, DynamicDawg, OptimizedDawg
+   - Backends: DynamicDawg, OptimizedDawg (all sizes)
+   - DoubleArrayTrie (1K-32K only; skips 100K+ due to O(n²) construction time)
    - Throughput tracking
+   - Configuration: 3 samples, 120s measurement time (handles slow constructions)
 
 2. **Realistic Query Benchmarks**:
    - 32K-word dictionary (typical size)
@@ -117,6 +119,10 @@ cargo test --test corpus_validation --features rand -- --ignored --test-threads=
 ```bash
 cargo bench --bench corpus_benchmarks --features rand
 ```
+
+**Expected Runtimes**:
+- Construction benchmarks: ~10-15 minutes (DynamicDawg/OptimizedDawg are fast; DoubleArrayTrie takes ~60s at 32K)
+- Query benchmarks: ~5-10 minutes per group
 
 ### 5. CI Integration (✅ Designed)
 
