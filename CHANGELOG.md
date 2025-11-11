@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+#### OptimizedDawg (2025-11-11)
+- **OptimizedDawg deprecated in favor of DynamicDawg**
+  - Comprehensive benchmarking revealed OptimizedDawg is **5-12× slower** than DynamicDawg across all scales:
+    - 1K words: 11.5× slower (16.1ms vs 1.40ms)
+    - 10K words: 5.5× slower (307ms vs 55.5ms)
+    - 32K words: 5.7× slower (781ms vs 137ms)
+    - 100K words: 6.2× slower (2,555ms vs 409ms)
+  - Missing critical features not available in OptimizedDawg:
+    - MappedDictionary trait (no value storage support)
+    - ValuedDictZipper trait (no hierarchical navigation)
+    - Runtime mutations (no insert/remove operations)
+    - Bloom filter optimization
+    - Suffix caching
+  - Analysis showed no Double-Array Trie features despite original hypothesis
+  - Arena-based edge storage incompatible with DynamicDawg's mutability (cannot merge implementations)
+  - Performance regression detected: OptimizedDawg showing 2-4% degradation while DynamicDawg shows 17-18% improvement
+  - Migration: Simple drop-in replacement - change `OptimizedDawg::from_terms()` to `DynamicDawg::from_terms()`
+  - Comprehensive deprecation notice: `docs/deprecations/OPTIMIZED_DAWG_DEPRECATION.md`
+  - Backward compatibility maintained: Type remains available with deprecation warnings
+  - Removed from default benchmark suite to reduce CI time
+
+### Changed
+
+#### Phase 6: Dictionary Layer Completeness (2025-11-11)
+- **Phase 6 is now 100% complete** 🎉
+  - All 9 production-ready dictionary backends support complete feature set
+  - **MappedDictionary support**: 9/9 backends (100%)
+    - PathMapDictionary, PathMapDictionaryChar
+    - DynamicDawg, DynamicDawgChar
+    - DoubleArrayTrie, DoubleArrayTrieChar
+    - SuffixAutomaton, SuffixAutomatonChar
+    - DawgDictionary (legacy)
+  - **ValuedDictZipper support**: 7/7 backends (100%)
+    - PathMapZipper
+    - DoubleArrayTrieZipper, DoubleArrayTrieCharZipper
+    - DynamicDawgZipper, DynamicDawgCharZipper
+    - SuffixAutomatonZipper, SuffixAutomatonCharZipper
+  - OptimizedDawg excluded from counts as deprecated
+  - Updated implementation status: `docs/implementation-status/phase-6-dictionary-layer-completeness.md`
+
 ### Added
 
 #### Multi-Backend Contextual Completion Support (2025-11-05)

@@ -104,17 +104,6 @@ fn construction_benchmarks(c: &mut Criterion) {
                 });
             },
         );
-
-        group.bench_with_input(
-            BenchmarkId::new("OptimizedDawg", size),
-            &subset,
-            |b, words| {
-                b.iter(|| {
-                    let dict = OptimizedDawg::from_terms(black_box(words.iter().copied()));
-                    black_box(dict);
-                });
-            },
-        );
     }
 
     group.finish();
@@ -214,11 +203,9 @@ fn backend_comparison_realistic_workload(c: &mut Criterion) {
 
     let dat = DoubleArrayTrie::from_terms(words.iter().copied());
     let dawg: DynamicDawg = DynamicDawg::from_terms(words.iter().copied());
-    let optimized = OptimizedDawg::from_terms(words.iter().copied());
 
     let transducer_dat = Transducer::new(dat, Algorithm::Standard);
     let transducer_dawg = Transducer::new(dawg, Algorithm::Standard);
-    let transducer_optimized = Transducer::new(optimized, Algorithm::Standard);
 
     // Generate realistic queries
     let workload = QueryWorkload::from_frequencies(&corpus.frequencies, corpus.total, 100, SEED);
@@ -244,18 +231,6 @@ fn backend_comparison_realistic_workload(c: &mut Criterion) {
         b.iter(|| {
             let query = queries[idx % queries.len()];
             let results: Vec<_> = transducer_dawg.query(black_box(query), distance).collect();
-            idx = (idx + 1) % queries.len();
-            black_box(results);
-        });
-    });
-
-    group.bench_function("OptimizedDawg", |b| {
-        let mut idx = 0;
-        b.iter(|| {
-            let query = queries[idx % queries.len()];
-            let results: Vec<_> = transducer_optimized
-                .query(black_box(query), distance)
-                .collect();
             idx = (idx + 1) % queries.len();
             black_box(results);
         });
