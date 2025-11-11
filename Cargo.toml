@@ -316,3 +316,7 @@ required-features = ["rand"]
 [[test]]
 name = "corpus_validation"
 required-features = ["rand"]
+
+[[bench]]
+name = "prefix_zipper_benchmarks"
+harness = false
