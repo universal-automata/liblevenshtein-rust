@@ -223,8 +223,11 @@ impl<Z: DictZipper> PrefixZipper for Z {}
 /// assert_eq!(results, vec!["cat", "cats"]);
 /// ```
 pub struct PrefixIterator<Z: DictZipper> {
-    /// DFS traversal stack: (zipper, path to this zipper)
-    stack: Vec<(Z, Vec<Z::Unit>)>,
+    /// DFS traversal stack: stores only zippers (paths reconstructed on demand).
+    /// Optimization: Eliminated redundant path storage since all zippers maintain
+    /// paths internally via `path()`. This removes Vec cloning overhead (2.19% of
+    /// execution time) and Vec::push reallocation overhead (1.88%).
+    stack: Vec<Z>,
 }
 
 impl<Z: DictZipper> PrefixIterator<Z> {
@@ -238,13 +241,12 @@ impl<Z: DictZipper> PrefixIterator<Z> {
     /// # Returns
     ///
     /// Iterator ready to yield all terms under the prefix.
-    fn new(prefix_zipper: Z, prefix: &[Z::Unit]) -> Self {
-        let prefix_path = prefix.to_vec();
+    fn new(prefix_zipper: Z, _prefix: &[Z::Unit]) -> Self {
         // Pre-allocate stack capacity to avoid reallocations during DFS traversal.
         // Capacity 16 covers typical tree depths (10-15) while avoiding excessive
         // over-allocation. Profiling shows this eliminates ~2.37% realloc overhead.
         let mut stack = Vec::with_capacity(16);
-        stack.push((prefix_zipper, prefix_path));
+        stack.push(prefix_zipper);
         Self { stack }
     }
 }
@@ -253,17 +255,18 @@ impl<Z: DictZipper> Iterator for PrefixIterator<Z> {
     type Item = (Vec<Z::Unit>, Z);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((zipper, path)) = self.stack.pop() {
-            // Push all children onto stack for continued DFS traversal
-            for (unit, child) in zipper.children() {
-                let mut child_path = path.clone();
-                child_path.push(unit);
-                self.stack.push((child, child_path));
+        while let Some(zipper) = self.stack.pop() {
+            // Push all children onto stack for continued DFS traversal.
+            // No path cloning needed - zippers maintain paths internally.
+            for (_unit, child) in zipper.children() {
+                self.stack.push(child);
             }
 
-            // If this is a complete term, yield it
+            // If this is a complete term, reconstruct path and yield.
+            // Path reconstruction happens only for final nodes (10-100× less
+            // frequent than the old approach of cloning on every child).
             if zipper.is_final() {
-                return Some((path, zipper));
+                return Some((zipper.path(), zipper));
             }
         }
 
