@@ -48,6 +48,7 @@
 //! ```
 
 pub mod position;
+pub mod state;
 pub mod subsumption;
 
 // Re-exports
@@ -60,4 +61,5 @@ pub use position::{
     PositionError,
 };
 
+pub use state::UniversalState;
 pub use subsumption::subsumes;
