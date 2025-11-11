@@ -17,6 +17,7 @@ mod query;
 mod query_result;
 mod state;
 pub mod transition;
+pub mod universal;
 mod value_filtered_query;
 mod zipper_query_iterator;
 
