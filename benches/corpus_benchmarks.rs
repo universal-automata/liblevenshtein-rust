@@ -66,7 +66,7 @@ fn construction_benchmarks(c: &mut Criterion) {
     // Reduced sample size and increased measurement time to handle slow DoubleArrayTrie
     // construction at large scales (100K+ words can take 60+ seconds per iteration).
     // This prevents Criterion panics from insufficient samples with zero variance.
-    group.sample_size(3); // Minimum for Criterion's statistical analysis
+    group.sample_size(10); // Criterion minimum
     group.measurement_time(Duration::from_secs(120)); // Allow slow constructions to complete
 
     for size in [1_000, 10_000, 32_000, 100_000, 500_000] {
