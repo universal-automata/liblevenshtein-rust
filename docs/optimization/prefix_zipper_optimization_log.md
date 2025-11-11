@@ -246,16 +246,29 @@ Benchmark: [name]
 | # | Name | Impact | Status | Commit |
 |---|------|--------|--------|--------|
 | - | (baseline) | - | ✅ Measured | 39b727f |
+| 1 | Pre-allocate stack capacity | -22.0% time (4.24 µs) | ✅ Accepted | f22598f |
 
 ---
 
 ## Lessons Learned
 
-*(To be updated as we progress)*
+### 1. Profiling Reveals More Than Expected
+Pre-allocating stack capacity showed 22% improvement vs predicted 3%. This teaches us that:
+- Memory allocation optimizations have cascading benefits (cache locality, fragmentation reduction)
+- Flamegraph percentages underestimate impact when benchmark infrastructure adds overhead
+- Always measure actual improvement, don't rely solely on profiler percentages
 
-1. TBD
-2. TBD
-3. TBD
+### 2. Scientific Method Prevents Premature Optimization
+Initial analysis suggested removing redundant path tracking as the #1 priority. However:
+- Baseline measurement showed backend differences were negligible (hypothesis H3 rejected)
+- Pre-allocation was lower risk and yielded significant gains
+- Data-driven approach prevented wasted effort on incorrect optimizations
+
+### 3. Benchmark Infrastructure Overhead Matters
+Criterion + rayon + math functions consumed ~26% of profile time:
+- Raw algorithm performance is better than flamegraph suggests
+- Need to account for benchmark overhead when interpreting profiles
+- Real-world performance likely better than benchmark numbers indicate
 
 ---
 
