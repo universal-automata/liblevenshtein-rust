@@ -507,3 +507,21 @@ mod tests {
 - Update serialization to handle generic values
 - Add comprehensive tests for value operations
 - Consider performance implications of cloning values
+
+---
+
+## What's Next: Advanced Research Initiatives
+
+**Phase 6 is complete!** All production backends now support full feature sets (MappedDictionary + ValuedDictZipper).
+
+### Future Optimizations
+
+With the dictionary layer complete, three research initiatives have been identified for advanced optimization:
+
+1. **SIMD Edge Search** (2-4 weeks) - Extract SIMD optimization from deprecated OptimizedDawg
+2. **Hybrid Storage** (4-6 weeks) - Arena/per-node hybrid for immutable dictionaries
+3. **DAT/DAWG Hybrid** (8-12 weeks) - Novel BASE+CHECK + suffix sharing algorithm
+
+**See**: [Research Initiatives](../research/RESEARCH_INITIATIVES.md) for detailed plans and methodology.
+
+These represent substantial multi-week research projects with phased approaches and early exit criteria based on empirical data. Each follows the scientific method with hypothesis formation, controlled experiments, and data-driven decisions.
