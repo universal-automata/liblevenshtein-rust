@@ -50,7 +50,7 @@
 //! state.add_position(UniversalPosition::new_i(1, 1, 2)?);
 //! ```
 
-use smallvec::SmallVec;
+use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::transducer::universal::position::{PositionVariant, UniversalPosition};
@@ -73,17 +73,14 @@ use crate::transducer::universal::subsumption::subsumes;
 ///
 /// # Implementation Note
 ///
-/// Uses SmallVec with stack allocation for ≤8 positions (typical case).
-/// Maintains sorted order manually via binary search + insertion.
-/// This provides:
-/// - Stack allocation for 90%+ of states
-/// - Excellent cache locality (contiguous memory)
-/// - Online subsumption during insertion
+/// Uses BTreeSet instead of HashSet to maintain sorted order by (errors, offset).
+/// This enables early termination in subsumption checks:
+/// - When checking if new position subsumes existing: skip positions with errors ≤ new.errors
+/// - When checking if existing subsumes new: stop at first position with errors ≥ new.errors
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UniversalState<V: PositionVariant> {
-    /// Set of positions (anti-chain), maintained in sorted order
-    /// SmallVec avoids heap allocation for states with ≤8 positions
-    positions: SmallVec<[UniversalPosition<V>; 8]>,
+    /// Set of positions (anti-chain), sorted by (errors, offset)
+    positions: BTreeSet<UniversalPosition<V>>,
 
     /// Maximum edit distance n
     max_distance: u8,
@@ -104,7 +101,7 @@ impl<V: PositionVariant> UniversalState<V> {
     /// ```
     pub fn new(max_distance: u8) -> Self {
         Self {
-            positions: SmallVec::new(),
+            positions: BTreeSet::new(),
             max_distance,
         }
     }
@@ -129,7 +126,7 @@ impl<V: PositionVariant> UniversalState<V> {
         // I + 0#0 always satisfies invariant, so unwrap is safe
         let initial_pos = UniversalPosition::new_i(0, 0, max_distance)
             .expect("I + 0#0 should always be valid");
-        state.positions.push(initial_pos);
+        state.positions.insert(initial_pos);
         state
     }
 
@@ -156,23 +153,32 @@ impl<V: PositionVariant> UniversalState<V> {
     /// state.add_position(UniversalPosition::new_i(1, 1, 2)?);
     /// ```
     pub fn add_position(&mut self, pos: UniversalPosition<V>) {
-        // Check if this position is subsumed by an existing one
-        for existing in &self.positions {
-            if subsumes(existing, &pos, self.max_distance) {
-                return; // Already covered by existing position
+        let pos_errors = pos.errors();
+
+        // Step 1: Remove any existing positions that are subsumed by the new position
+        // If pos subsumes p, then p is worse and should be removed
+        // Optimization: Only positions with MORE errors than pos can be subsumed by pos
+        // Since BTreeSet is sorted by (errors, offset), we can use retain which is efficient
+        self.positions.retain(|p| {
+            // Early termination: if p.errors <= pos.errors, pos cannot subsume p
+            if p.errors() <= pos_errors {
+                true  // Keep this position
+            } else {
+                // Check full subsumption condition
+                !subsumes(&pos, p, self.max_distance)
             }
+        });
+
+        // Step 2: Add the new position only if it's not subsumed by any remaining position
+        // If p subsumes pos for some p, then pos is worse and should be rejected
+        // Optimization: Only positions with FEWER errors than pos can subsume pos
+        let is_subsumed = self.positions.iter()
+            .take_while(|p| p.errors() < pos_errors)  // Early termination: stop when errors >= pos.errors
+            .any(|p| subsumes(p, &pos, self.max_distance));
+
+        if !is_subsumed {
+            self.positions.insert(pos);
         }
-
-        // Remove any positions that this new position subsumes
-        self.positions
-            .retain(|p| !subsumes(&pos, p, self.max_distance));
-
-        // Insert in sorted position (binary search)
-        let insert_pos = self
-            .positions
-            .binary_search(&pos)
-            .unwrap_or_else(|pos| pos);
-        self.positions.insert(insert_pos, pos);
     }
 
     /// Check if state is empty
@@ -192,7 +198,7 @@ impl<V: PositionVariant> UniversalState<V> {
 
     /// Check if state contains a position
     pub fn contains(&self, pos: &UniversalPosition<V>) -> bool {
-        self.positions.iter().any(|p| p == pos)
+        self.positions.contains(pos)
     }
 
     /// Check if state is final
@@ -597,7 +603,7 @@ mod tests {
         state.add_position(pos1.clone());
         state.add_position(pos2.clone());
 
-        let positions: Vec<_> = state.positions().cloned().collect();
+        let positions: BTreeSet<_> = state.positions().cloned().collect();
         assert_eq!(positions.len(), 2);
         assert!(positions.contains(&pos1));
         assert!(positions.contains(&pos2));
