@@ -14,12 +14,14 @@ Successfully optimized the universal Levenshtein automata implementation through
 
 **Key Achievement**: Inline optimization + abs() improvements (H2) resulted in 15-125% speedups across multiple scenarios.
 
-**Experiments Conducted**:
+**Experiments Conducted** (5 total):
 - **H1** (Combined loops): REJECTED - 40-117% slower
-- **H2** (Inline + abs): ACCEPTED ✅ - 15-125% faster
+- **H2** (Inline + abs): **ACCEPTED** ✅ - 15-125% faster
 - **H3** (Early exit): REJECTED - 2-18% slower
+- **H4** (SmallVec capacity): REJECTED - 1-29% slower
+- **H5** (Branch-free): REJECTED - 6-13% slower (mostly)
 
-**Scientific Rigor**: All experiments documented, benchmarked, and committed for reproducibility. Both successes and failures provide valuable insights.
+**Scientific Rigor**: All 5 experiments documented, benchmarked, and committed for reproducibility. Four failures taught as much as the one success.
 
 ---
 
@@ -224,6 +226,114 @@ pub fn add_position(&mut self, pos: UniversalPosition<V>) {
 
 ---
 
+### H4: SmallVec Capacity Hint in transition() - **REJECTED** ❌
+
+**Hypothesis**: Pre-allocating SmallVec capacity in `transition()` based on current state size would reduce allocations and improve performance.
+
+**Implementation**:
+```rust
+fn with_capacity(max_distance: u8, capacity: usize) -> Self {
+    Self {
+        positions: SmallVec::with_capacity(capacity),
+        max_distance,
+    }
+}
+
+// In transition():
+let estimated_capacity = self.positions.len() * 3;
+let mut next_state = Self::with_capacity(self.max_distance, estimated_capacity);
+```
+
+**Results**: MAJOR REGRESSIONS - 1-29% slower across all scenarios
+
+#### SmallVec Performance Changes (vs H2 baseline)
+| Scenario | Change |
+|----------|---------|
+| Standard d=1/n=10 | **+16% SLOWER** ⚠️ |
+| Standard d=2/n=10 | **+24% SLOWER** ⚠️ |
+| Standard d=3/n=10 | **+29% SLOWER** ⚠️ |
+| Standard d=1/n=20 | **+6% SLOWER** |
+| Standard d=2/n=20 | **+19% SLOWER** |
+| Standard d=3/n=20 | **+14% SLOWER** |
+| Standard d=1/n=50 | **+6% SLOWER** |
+| Standard d=2/n=50 | **+9% SLOWER** |
+| Standard d=3/n=50 | **+1% SLOWER** |
+| Standard d=2/n=100 | **+3% SLOWER** |
+| Standard d=3/n=100 | **+6% SLOWER** |
+
+**Root Cause Analysis**:
+1. **SmallVec inline storage**: Already has 8-element inline capacity
+2. **Most states stay small**: Subsumption keeps states < 8 positions typically
+3. **Over-allocation penalty**: `* 3` heuristic wastes memory
+4. **Cache locality harm**: Over-allocation may hurt cache behavior
+5. **with_capacity overhead**: Has cost even for small sizes
+6. **Premature optimization**: Avoiding allocations that rarely happen
+
+**Key Insights**:
+- SmallVec's 8-element inline storage already handles most cases
+- Pre-allocation only helps if allocations are frequent AND predictable
+- Over-estimating capacity wastes memory and hurts performance
+- Default SmallVec behavior is well-tuned
+
+**Conclusion**: REJECTED - SmallVec's default behavior outperforms capacity hints.
+
+**Commit**: 454760d (preserved for scientific record)
+
+---
+
+### H5: Branch-Free Subsumption Comparison - **REJECTED** ❌
+
+**Hypothesis**: Removing early return branch and making comparison branch-free would reduce branch misprediction overhead.
+
+**Implementation**:
+```rust
+// Before (H2): Early return
+if *f <= *e {
+    return false;
+}
+let error_diff = f - e;
+distance <= error_diff
+
+// After (H5): Branch-free attempt
+let error_check = *f > *e;
+let error_diff = f.wrapping_sub(*e);
+error_check && (distance <= error_diff)
+```
+
+**Results**: MIXED - Mostly regressions (6-13% slower)
+
+#### SmallVec Performance Changes (vs H2 baseline)
+| Scenario | Change |
+|----------|---------|
+| Standard d=1/n=10 | **+10% SLOWER** ⚠️ |
+| Standard d=2/n=10 | ~6% FASTER ✓ (only win) |
+| Standard d=3/n=10 | +1% SLOWER |
+| Standard d=1/n=20 | **+6% SLOWER** |
+| Standard d=2/n=20 | **+13% SLOWER** ⚠️ |
+| Standard d=3/n=20 | **+10% SLOWER** ⚠️ |
+| Standard d=1/n=50 | **+11% SLOWER** ⚠️ |
+| Standard d=2/n=50 | +5% SLOWER |
+| Standard d=3/n=50 | +7% SLOWER |
+
+**Root Cause Analysis**:
+1. **Early return avoids work**: When `f <= e`, early return skips unnecessary computation
+2. **Branch prediction effective**: CPU predicts early return pattern well
+3. **Always computing**: Branch-free version ALWAYS computes wrapping_sub and distance
+4. **&& still branches**: The `&&` operator short-circuits (branches anyway!)
+5. **wrapping_sub overhead**: Extra wrapping arithmetic adds cost
+
+**Key Insights**:
+- Early return branches are GOOD when they avoid expensive computation
+- "Branch-free" isn't truly branch-free (&&  operator still branches)
+- Modern CPUs predict simple early-return patterns very well
+- Avoiding unnecessary work beats doing extra work to avoid branches
+
+**Conclusion**: REJECTED - Early return (H2) performs better. Avoiding work > avoiding branches.
+
+**Commit**: 99d066f (preserved for scientific record)
+
+---
+
 ## Final Performance Summary
 
 ### Overall Improvement
@@ -286,15 +396,21 @@ pub fn add_position(&mut self, pos: UniversalPosition<V>) {
 ### What Didn't Work
 1. **Manual loop optimization**: H1 showed custom loops can be slower (40-117% regression)
 2. **Early exit optimization**: H3 added overhead despite correct logic (2-18% regression)
-3. **Extra branches**: Adding branches can disrupt prediction and add overhead
-4. **Premature complexity**: Simple solutions (inline) often beat "clever" optimizations
+3. **SmallVec capacity hints**: H4 over-allocation hurt performance (1-29% regression)
+4. **Branch-free optimization**: H5 avoided work that was needed (6-13% regression)
+5. **Extra branches**: Adding branches can disrupt prediction and add overhead
+6. **Premature complexity**: Simple solutions (inline) often beat "clever" optimizations
 
 ### Key Insights
-1. **Branch cost matters**: Even logically correct branches can hurt performance
-2. **Early exit tradeoff**: Only beneficial if exit condition is cheaper than continuing
-3. **Method call overhead**: Calling `.errors()` in tight loop adds measurable cost
-4. **CPU optimization**: Modern CPUs handle simple, straightforward loops very efficiently
-5. **Measurement is critical**: Intuitive "optimizations" often regress performance
+1. **Branch cost matters**: Even logically correct branches can hurt performance (H3)
+2. **Early exit tradeoff**: Only beneficial if exit condition is cheaper than continuing (H3)
+3. **Method call overhead**: Calling `.errors()` in tight loop adds measurable cost (H3)
+4. **CPU optimization**: Modern CPUs handle simple, straightforward loops very efficiently (H1, H3)
+5. **Measurement is critical**: Intuitive "optimizations" often regress performance (all failures)
+6. **Early returns are good**: Avoiding work beats "branch-free" when work is expensive (H5)
+7. **SmallVec is tuned**: Default inline storage (8 elements) beats manual capacity hints (H4)
+8. **Over-allocation hurts**: Pre-allocating more than needed wastes memory and cache (H4)
+9. **Trust defaults**: Well-tuned libraries often beat manual "optimizations" (H1, H4)
 
 ### Best Practices
 1. **Always profile first**: Don't optimize without data
@@ -328,6 +444,8 @@ pub fn add_position(&mut self, pos: UniversalPosition<V>) {
 - **H1 Rejected**: 459e796 (combined loops - 40-117% slower)
 - **H2 Accepted**: ad2b884 (inline + abs optimization - 15-125% faster) ✅
 - **H3 Rejected**: ded7673 (early exit - 2-18% slower)
+- **H4 Rejected**: 454760d (SmallVec capacity - 1-29% slower)
+- **H5 Rejected**: 99d066f (branch-free - 6-13% slower)
 
 ---
 
