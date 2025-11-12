@@ -278,6 +278,101 @@ impl SubstitutionSet {
     // Preset Builders
     // ========================================================================
 
+    // Const arrays for optimized preset initialization (15-28% faster)
+    // See: docs/optimization/substitution-set/02-hypothesis1-const-arrays.md
+
+    /// Phonetic substitutions as a const array.
+    const PHONETIC_PAIRS: &[(u8, u8)] = &[
+        // f/ph equivalence (bidirectional)
+        (b'f', b'p'), (b'p', b'f'),
+        // c/k equivalence (bidirectional)
+        (b'c', b'k'), (b'k', b'c'),
+        // c/s equivalence (bidirectional)
+        (b'c', b's'), (b's', b'c'),
+        // s/z equivalence (bidirectional)
+        (b's', b'z'), (b'z', b's'),
+        // Common vowel confusions
+        (b'a', b'e'), (b'e', b'a'),
+        (b'i', b'y'), (b'y', b'i'),
+        // Silent letters (allow omission)
+        (b'h', b'\0'),
+        (b'k', b'\0'),
+    ];
+
+    /// QWERTY keyboard substitutions as a const array.
+    const KEYBOARD_PAIRS: &[(u8, u8)] = &[
+        // Top row
+        (b'q', b'w'), (b'w', b'q'),
+        (b'w', b'e'), (b'e', b'w'),
+        (b'e', b'r'), (b'r', b'e'),
+        (b'r', b't'), (b't', b'r'),
+        (b't', b'y'), (b'y', b't'),
+        (b'y', b'u'), (b'u', b'y'),
+        (b'u', b'i'), (b'i', b'u'),
+        (b'i', b'o'), (b'o', b'i'),
+        (b'o', b'p'), (b'p', b'o'),
+        // Middle row
+        (b'a', b's'), (b's', b'a'),
+        (b's', b'd'), (b'd', b's'),
+        (b'd', b'f'), (b'f', b'd'),
+        (b'f', b'g'), (b'g', b'f'),
+        (b'g', b'h'), (b'h', b'g'),
+        (b'h', b'j'), (b'j', b'h'),
+        (b'j', b'k'), (b'k', b'j'),
+        (b'k', b'l'), (b'l', b'k'),
+        // Bottom row
+        (b'z', b'x'), (b'x', b'z'),
+        (b'x', b'c'), (b'c', b'x'),
+        (b'c', b'v'), (b'v', b'c'),
+        (b'v', b'b'), (b'b', b'v'),
+        (b'b', b'n'), (b'n', b'b'),
+        (b'n', b'm'), (b'm', b'n'),
+        // Vertical adjacencies (selected)
+        (b'q', b'a'), (b'a', b'q'),
+        (b'w', b's'), (b's', b'w'),
+        (b'e', b'd'), (b'd', b'e'),
+        (b'r', b'f'), (b'f', b'r'),
+        (b't', b'g'), (b'g', b't'),
+        (b'y', b'h'), (b'h', b'y'),
+        (b'u', b'j'), (b'j', b'u'),
+        (b'i', b'k'), (b'k', b'i'),
+        (b'o', b'l'), (b'l', b'o'),
+    ];
+
+    /// Leetspeak substitutions as a const array.
+    const LEET_PAIRS: &[(u8, u8)] = &[
+        (b'e', b'3'), (b'3', b'e'),
+        (b'a', b'@'), (b'@', b'a'),
+        (b'a', b'4'), (b'4', b'a'),
+        (b'o', b'0'), (b'0', b'o'),
+        (b'i', b'1'), (b'1', b'i'),
+        (b'l', b'1'), (b'1', b'l'),
+        (b's', b'$'), (b'$', b's'),
+        (b's', b'5'), (b'5', b's'),
+        (b't', b'7'), (b'7', b't'),
+        (b'b', b'8'), (b'8', b'b'),
+        (b'g', b'9'), (b'9', b'g'),
+    ];
+
+    /// OCR-friendly substitutions as a const array.
+    const OCR_PAIRS: &[(u8, u8)] = &[
+        // 0/O confusion
+        (b'0', b'O'), (b'O', b'0'),
+        (b'0', b'o'), (b'o', b'0'),
+        // 1/I/l confusion
+        (b'1', b'I'), (b'I', b'1'),
+        (b'1', b'l'), (b'l', b'1'),
+        (b'I', b'l'), (b'l', b'I'),
+        // 8/B confusion
+        (b'8', b'B'), (b'B', b'8'),
+        // 5/S confusion
+        (b'5', b'S'), (b'S', b'5'),
+        // 6/G confusion
+        (b'6', b'G'), (b'G', b'6'),
+        // 2/Z confusion
+        (b'2', b'Z'), (b'Z', b'2'),
+    ];
+
     /// Common phonetic equivalences for English.
     ///
     /// Includes bidirectional substitutions for phonetically similar sounds:
@@ -310,22 +405,11 @@ impl SubstitutionSet {
     /// assert!(results.contains(&"phone"));
     /// ```
     pub fn phonetic_basic() -> Self {
-        Self::from_pairs(&[
-            // f/ph equivalence (bidirectional)
-            ('f', 'p'), ('p', 'f'),
-            // c/k equivalence (bidirectional)
-            ('c', 'k'), ('k', 'c'),
-            // c/s equivalence (bidirectional)
-            ('c', 's'), ('s', 'c'),
-            // s/z equivalence (bidirectional)
-            ('s', 'z'), ('z', 's'),
-            // Common vowel confusions
-            ('a', 'e'), ('e', 'a'),
-            ('i', 'y'), ('y', 'i'),
-            // Silent letters (allow omission)
-            ('h', '\0'),  // Hour → our
-            ('k', '\0'),  // Knight → night (when followed by 'n')
-        ])
+        let mut set = Self::with_capacity(Self::PHONETIC_PAIRS.len());
+        for &(a, b) in Self::PHONETIC_PAIRS {
+            set.allow_byte(a, b);
+        }
+        set
     }
 
     /// QWERTY keyboard proximity substitutions.
@@ -345,44 +429,11 @@ impl SubstitutionSet {
     /// assert!(keyboard.contains(b'q', b'w') || keyboard.contains(b'w', b'q'));
     /// ```
     pub fn keyboard_qwerty() -> Self {
-        Self::from_pairs(&[
-            // Top row
-            ('q', 'w'), ('w', 'q'),
-            ('w', 'e'), ('e', 'w'),
-            ('e', 'r'), ('r', 'e'),
-            ('r', 't'), ('t', 'r'),
-            ('t', 'y'), ('y', 't'),
-            ('y', 'u'), ('u', 'y'),
-            ('u', 'i'), ('i', 'u'),
-            ('i', 'o'), ('o', 'i'),
-            ('o', 'p'), ('p', 'o'),
-            // Middle row
-            ('a', 's'), ('s', 'a'),
-            ('s', 'd'), ('d', 's'),
-            ('d', 'f'), ('f', 'd'),
-            ('f', 'g'), ('g', 'f'),
-            ('g', 'h'), ('h', 'g'),
-            ('h', 'j'), ('j', 'h'),
-            ('j', 'k'), ('k', 'j'),
-            ('k', 'l'), ('l', 'k'),
-            // Bottom row
-            ('z', 'x'), ('x', 'z'),
-            ('x', 'c'), ('c', 'x'),
-            ('c', 'v'), ('v', 'c'),
-            ('v', 'b'), ('b', 'v'),
-            ('b', 'n'), ('n', 'b'),
-            ('n', 'm'), ('m', 'n'),
-            // Vertical adjacencies (selected)
-            ('q', 'a'), ('a', 'q'),
-            ('w', 's'), ('s', 'w'),
-            ('e', 'd'), ('d', 'e'),
-            ('r', 'f'), ('f', 'r'),
-            ('t', 'g'), ('g', 't'),
-            ('y', 'h'), ('h', 'y'),
-            ('u', 'j'), ('j', 'u'),
-            ('i', 'k'), ('k', 'i'),
-            ('o', 'l'), ('l', 'o'),
-        ])
+        let mut set = Self::with_capacity(Self::KEYBOARD_PAIRS.len());
+        for &(a, b) in Self::KEYBOARD_PAIRS {
+            set.allow_byte(a, b);
+        }
+        set
     }
 
     /// Common leetspeak substitutions.
@@ -408,19 +459,11 @@ impl SubstitutionSet {
     /// assert!(leet.contains(b'3', b'e'));
     /// ```
     pub fn leet_speak() -> Self {
-        Self::from_pairs(&[
-            ('e', '3'), ('3', 'e'),
-            ('a', '@'), ('@', 'a'),
-            ('a', '4'), ('4', 'a'),
-            ('o', '0'), ('0', 'o'),
-            ('i', '1'), ('1', 'i'),
-            ('l', '1'), ('1', 'l'),
-            ('s', '$'), ('$', 's'),
-            ('s', '5'), ('5', 's'),
-            ('t', '7'), ('7', 't'),
-            ('b', '8'), ('8', 'b'),
-            ('g', '9'), ('9', 'g'),
-        ])
+        let mut set = Self::with_capacity(Self::LEET_PAIRS.len());
+        for &(a, b) in Self::LEET_PAIRS {
+            set.allow_byte(a, b);
+        }
+        set
     }
 
     /// OCR-friendly substitutions for commonly confused characters.
@@ -442,23 +485,11 @@ impl SubstitutionSet {
     /// assert!(ocr.contains(b'0', b'O') || ocr.contains(b'O', b'0'));
     /// ```
     pub fn ocr_friendly() -> Self {
-        Self::from_pairs(&[
-            // 0/O confusion
-            ('0', 'O'), ('O', '0'),
-            ('0', 'o'), ('o', '0'),
-            // 1/I/l confusion
-            ('1', 'I'), ('I', '1'),
-            ('1', 'l'), ('l', '1'),
-            ('I', 'l'), ('l', 'I'),
-            // 8/B confusion
-            ('8', 'B'), ('B', '8'),
-            // 5/S confusion
-            ('5', 'S'), ('S', '5'),
-            // 6/G confusion
-            ('6', 'G'), ('G', '6'),
-            // 2/Z confusion
-            ('2', 'Z'), ('Z', '2'),
-        ])
+        let mut set = Self::with_capacity(Self::OCR_PAIRS.len());
+        for &(a, b) in Self::OCR_PAIRS {
+            set.allow_byte(a, b);
+        }
+        set
     }
 }
 

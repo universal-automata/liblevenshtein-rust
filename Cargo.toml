@@ -328,3 +328,12 @@ required-features = ["rand"]
 [[bench]]
 name = "prefix_zipper_benchmarks"
 harness = false
+
+[[bench]]
+name = "substitution_set_microbench"
+harness = false
+required-features = ["rand"]
+
+[[bench]]
+name = "substitution_integration_bench"
+harness = false
