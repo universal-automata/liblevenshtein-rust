@@ -89,6 +89,7 @@ use crate::transducer::universal::position::{
 /// let pos2 = UniversalPosition::<Standard>::new_i(5, 2, 3)?;
 /// assert!(subsumes(&pos1, &pos2, 3));  // 4#1 <^ε_s 5#2
 /// ```
+#[inline(always)]
 pub fn subsumes<V: PositionVariant>(
     pos1: &UniversalPosition<V>,
     pos2: &UniversalPosition<V>,
@@ -102,6 +103,7 @@ pub fn subsumes<V: PositionVariant>(
 ///
 /// For Standard variant, subsumption is straightforward:
 /// i#e ≤^ε_s j#f ⇔ f > e ∧ |j - i| ≤ f - e
+#[inline(always)]
 fn subsumes_impl<V: PositionVariant>(
     pos1: &UniversalPosition<V>,
     pos2: &UniversalPosition<V>,
@@ -113,12 +115,19 @@ fn subsumes_impl<V: PositionVariant>(
         // I-type subsumption: both must be I-type
         (INonFinal { offset: i, errors: e, .. }, INonFinal { offset: j, errors: f, .. }) => {
             // Definition 11: f > e ∧ |j - i| ≤ f - e
+            // Early exit on error check
             if *f <= *e {
-                return false;  // Not strictly greater errors
+                return false;
             }
 
-            let distance = (j - i).abs() as u8;
+            // Optimize abs: compute unsigned distance without branching
             let error_diff = f - e;
+            let dist_raw = j - i;
+            let distance = if dist_raw >= 0 {
+                dist_raw as u8
+            } else {
+                (-dist_raw) as u8
+            };
 
             distance <= error_diff
         }
@@ -130,8 +139,13 @@ fn subsumes_impl<V: PositionVariant>(
                 return false;
             }
 
-            let distance = (j - i).abs() as u8;
             let error_diff = f - e;
+            let dist_raw = j - i;
+            let distance = if dist_raw >= 0 {
+                dist_raw as u8
+            } else {
+                (-dist_raw) as u8
+            };
 
             distance <= error_diff
         }
