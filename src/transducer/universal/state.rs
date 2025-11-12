@@ -156,23 +156,45 @@ impl<V: PositionVariant> UniversalState<V> {
     /// state.add_position(UniversalPosition::new_i(1, 1, 2)?);
     /// ```
     pub fn add_position(&mut self, pos: UniversalPosition<V>) {
-        // Check if this position is subsumed by an existing one
-        for existing in &self.positions {
-            if subsumes(existing, &pos, self.max_distance) {
-                return; // Already covered by existing position
+        // Single-pass: check subsumption and remove subsumed positions
+        let mut insert_idx = 0;
+        let mut is_subsumed = false;
+        let mut write_idx = 0;
+
+        // Single pass through existing positions
+        for read_idx in 0..self.positions.len() {
+            let existing = &self.positions[read_idx];
+
+            // Check if new position is subsumed by existing
+            if !is_subsumed && subsumes(existing, &pos, self.max_distance) {
+                is_subsumed = true;
             }
+
+            // Check if existing is subsumed by new position
+            if subsumes(&pos, existing, self.max_distance) {
+                // Skip this position (don't write it)
+                continue;
+            }
+
+            // Track insertion point while we haven't found it yet
+            if !is_subsumed && write_idx == insert_idx && existing < &pos {
+                insert_idx = write_idx + 1;
+            }
+
+            // Keep this position
+            if write_idx != read_idx {
+                self.positions.swap(write_idx, read_idx);
+            }
+            write_idx += 1;
         }
 
-        // Remove any positions that this new position subsumes
-        self.positions
-            .retain(|p| !subsumes(&pos, p, self.max_distance));
+        // Truncate removed positions
+        self.positions.truncate(write_idx);
 
-        // Insert in sorted position (binary search)
-        let insert_pos = self
-            .positions
-            .binary_search(&pos)
-            .unwrap_or_else(|pos| pos);
-        self.positions.insert(insert_pos, pos);
+        // Only insert if not subsumed
+        if !is_subsumed {
+            self.positions.insert(insert_idx, pos);
+        }
     }
 
     /// Check if state is empty
