@@ -115,13 +115,9 @@ fn subsumes_impl<V: PositionVariant>(
         // I-type subsumption: both must be I-type
         (INonFinal { offset: i, errors: e, .. }, INonFinal { offset: j, errors: f, .. }) => {
             // Definition 11: f > e ∧ |j - i| ≤ f - e
-            // Early exit on error check
-            if *f <= *e {
-                return false;
-            }
-
-            // Optimize abs: compute unsigned distance without branching
-            let error_diff = f - e;
+            // Branch-free: compute both conditions and combine with &&
+            let error_check = *f > *e;
+            let error_diff = f.wrapping_sub(*e);  // Safe even if f <= e
             let dist_raw = j - i;
             let distance = if dist_raw >= 0 {
                 dist_raw as u8
@@ -129,17 +125,15 @@ fn subsumes_impl<V: PositionVariant>(
                 (-dist_raw) as u8
             };
 
-            distance <= error_diff
+            error_check && (distance <= error_diff)
         }
 
         // M-type subsumption: both must be M-type
         (MFinal { offset: i, errors: e, .. }, MFinal { offset: j, errors: f, .. }) => {
             // Same formula as I-type: f > e ∧ |j - i| ≤ f - e
-            if *f <= *e {
-                return false;
-            }
-
-            let error_diff = f - e;
+            // Branch-free: compute both conditions and combine with &&
+            let error_check = *f > *e;
+            let error_diff = f.wrapping_sub(*e);  // Safe even if f <= e
             let dist_raw = j - i;
             let distance = if dist_raw >= 0 {
                 dist_raw as u8
@@ -147,7 +141,7 @@ fn subsumes_impl<V: PositionVariant>(
                 (-dist_raw) as u8
             };
 
-            distance <= error_diff
+            error_check && (distance <= error_diff)
         }
 
         // Different parameter types: no subsumption
