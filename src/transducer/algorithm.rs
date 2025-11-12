@@ -1,5 +1,7 @@
 //! Levenshtein distance algorithm variants.
 
+use crate::transducer::OperationSet;
+
 /// Levenshtein distance algorithm type.
 ///
 /// Different algorithms support different edit operations and are
@@ -59,6 +61,35 @@ impl Algorithm {
     pub fn supports_merge_split(&self) -> bool {
         matches!(self, Algorithm::MergeAndSplit)
     }
+
+    /// Convert this algorithm to an OperationSet
+    ///
+    /// Maps the enum variant to the corresponding operation set configuration.
+    /// This enables backward compatibility with the generalized operations framework.
+    ///
+    /// # Returns
+    ///
+    /// An `OperationSet` containing the operations for this algorithm.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use liblevenshtein::transducer::Algorithm;
+    /// let alg = Algorithm::Standard;
+    /// let ops = alg.to_operation_set();
+    /// assert_eq!(ops.len(), 4);  // Match, Substitute, Insert, Delete
+    ///
+    /// let alg = Algorithm::Transposition;
+    /// let ops = alg.to_operation_set();
+    /// assert_eq!(ops.len(), 5);  // Standard + Transposition
+    /// ```
+    pub fn to_operation_set(&self) -> OperationSet {
+        match self {
+            Algorithm::Standard => OperationSet::standard(),
+            Algorithm::Transposition => OperationSet::with_transposition(),
+            Algorithm::MergeAndSplit => OperationSet::with_merge_split(),
+        }
+    }
 }
 
 impl std::fmt::Display for Algorithm {
@@ -80,5 +111,58 @@ impl std::str::FromStr for Algorithm {
                 s
             )),
         }
+    }
+}
+
+impl From<Algorithm> for OperationSet {
+    /// Convert an Algorithm to an OperationSet
+    ///
+    /// Enables seamless conversion from the legacy enum-based API to the
+    /// generalized operations framework. This is the preferred conversion path.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use liblevenshtein::transducer::{Algorithm, OperationSet};
+    /// let ops: OperationSet = Algorithm::Standard.into();
+    /// assert_eq!(ops.len(), 4);
+    /// ```
+    fn from(algorithm: Algorithm) -> Self {
+        algorithm.to_operation_set()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_operation_set_standard() {
+        let ops = Algorithm::Standard.to_operation_set();
+        assert_eq!(ops.len(), 4);  // Match, Substitute, Insert, Delete
+    }
+
+    #[test]
+    fn test_to_operation_set_transposition() {
+        let ops = Algorithm::Transposition.to_operation_set();
+        assert_eq!(ops.len(), 5);  // Standard + Transposition
+    }
+
+    #[test]
+    fn test_to_operation_set_merge_split() {
+        let ops = Algorithm::MergeAndSplit.to_operation_set();
+        assert_eq!(ops.len(), 6);  // Standard + Merge + Split
+    }
+
+    #[test]
+    fn test_from_algorithm_to_operation_set() {
+        let ops: OperationSet = Algorithm::Standard.into();
+        assert_eq!(ops.len(), 4);
+
+        let ops: OperationSet = Algorithm::Transposition.into();
+        assert_eq!(ops.len(), 5);
+
+        let ops: OperationSet = Algorithm::MergeAndSplit.into();
+        assert_eq!(ops.len(), 6);
     }
 }
