@@ -109,6 +109,19 @@ impl<V: PositionVariant> UniversalState<V> {
         }
     }
 
+    /// Create new state with capacity hint
+    ///
+    /// # Arguments
+    ///
+    /// - `max_distance`: Maximum edit distance n
+    /// - `capacity`: Expected number of positions
+    fn with_capacity(max_distance: u8, capacity: usize) -> Self {
+        Self {
+            positions: SmallVec::with_capacity(capacity),
+            max_distance,
+        }
+    }
+
     /// Create initial state {I + 0#0}
     ///
     /// From thesis page 38: Initial state I^∀,χ = {I + 0#0}
@@ -288,7 +301,10 @@ impl<V: PositionVariant> UniversalState<V> {
         }
 
         // Create new state for successors (Δ)
-        let mut next_state = Self::new(self.max_distance);
+        // Hint capacity based on current state size (each position may produce multiple successors)
+        // Use current size * 3 as heuristic (match + insert + delete for each position)
+        let estimated_capacity = self.positions.len() * 3;
+        let mut next_state = Self::with_capacity(self.max_distance, estimated_capacity);
 
         // For each position π in current state Q
         for pos in &self.positions {
