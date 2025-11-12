@@ -59,8 +59,11 @@
 //! ```
 
 use crate::transducer::universal::position::{
-    MergeAndSplit, PositionVariant, Standard, Transposition, UniversalPosition,
+    MergeAndSplit, PositionVariant, Transposition, UniversalPosition,
 };
+
+#[cfg(test)]
+use crate::transducer::universal::position::Standard;
 
 /// Check if pos1 strictly subsumes pos2 (pos1 <^χ_s pos2)
 ///

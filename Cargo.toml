@@ -215,6 +215,10 @@ harness = false
 name = "universal_state_comparison"
 harness = false
 
+[[bench]]
+name = "parameterized_vs_universal_comparison"
+harness = false
+
 [[bin]]
 name = "liblevenshtein"
 path = "src/bin/liblevenshtein.rs"

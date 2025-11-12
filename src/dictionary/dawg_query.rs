@@ -6,7 +6,7 @@
 
 use super::dawg::DawgNode;
 use crate::transducer::transition::{initial_state, transition_state_pooled};
-use crate::transducer::{Algorithm, PathNode, State, StatePool};
+use crate::transducer::{Algorithm, PathNode, State, StatePool, Unrestricted};
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -184,6 +184,7 @@ impl DawgQueryIterator {
             if let Some(next_state) = transition_state_pooled(
                 &intersection.state,
                 &mut self.state_pool,
+                Unrestricted, // Default policy: allow all substitutions
                 label,
                 &self.query,
                 self.max_distance,

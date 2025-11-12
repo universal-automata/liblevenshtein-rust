@@ -1,15 +1,17 @@
 //! State transition logic for Levenshtein automata.
 
-use super::{Algorithm, Position, State, StatePool};
+use super::{Algorithm, Position, State, StatePool, SubstitutionPolicy, SubstitutionPolicyFor};
 use crate::dictionary::CharUnit;
 use smallvec::SmallVec;
 
 /// Compute the characteristic vector for a position in the query.
 ///
 /// The characteristic vector indicates which characters in a window
-/// of the query term match the given dictionary character.
+/// of the query term can be consumed without error when matching the
+/// dictionary character.
 ///
 /// # Arguments
+/// * `policy` - Substitution policy for character matching
 /// * `dict_unit` - Character unit from the dictionary edge
 /// * `query` - Query term units (bytes or chars)
 /// * `window_size` - Size of the window (typically max_distance + 1)
@@ -17,10 +19,24 @@ use smallvec::SmallVec;
 /// * `buffer` - Stack-allocated buffer to write results into
 ///
 /// # Returns
-/// Slice of booleans indicating matches at each position in window.
+/// Slice of booleans indicating positions where characters can match without error.
+/// This includes both exact matches AND policy-allowed substitutions.
 /// Uses stack-allocated array (max 8 elements) to avoid heap allocations.
+///
+/// # Semantics
+///
+/// For unrestricted policies, only exact character matches are allowed (traditional Levenshtein).
+/// For restricted policies, the policy determines if a substitution should be cost-free.
+/// This treats policy-allowed substitutions as "equivalences" rather than edits.
+///
+/// # Performance
+///
+/// The substitution policy check is monomorphized, so the `Unrestricted`
+/// policy compiles to identical code as the pre-generic implementation
+/// (zero overhead).
 #[inline]
-fn characteristic_vector<'a, U: CharUnit>(
+fn characteristic_vector<'a, U: CharUnit, P: SubstitutionPolicy + SubstitutionPolicyFor<U>>(
+    policy: P,
     dict_unit: U,
     query: &[U],
     window_size: usize,
@@ -29,11 +45,52 @@ fn characteristic_vector<'a, U: CharUnit>(
 ) -> &'a [bool] {
     // Most queries use max_distance ≤ 7, so window_size ≤ 8
     let len = window_size.min(8);
+
+    // The characteristic vector shows which query positions can consume dict_unit without error.
+    // This includes:
+    // 1. Exact character matches (query[i] == dict_unit)
+    // 2. Policy-allowed substitutions (policy.is_allowed(...))
+    //
+    // For Unrestricted policy: is_allowed always returns false (no zero-cost substitutions)
+    // For Restricted policy: is_allowed checks the substitution set
+
     for (i, item) in buffer.iter_mut().enumerate().take(len) {
         let query_idx = offset + i;
-        *item = query_idx < query.len() && query[query_idx] == dict_unit;
+        if query_idx < query.len() {
+            let query_unit = query[query_idx];
+            *item = query_unit == dict_unit
+                || is_substitution_allowed(&policy, dict_unit, query_unit);
+        } else {
+            *item = false;
+        }
     }
     &buffer[..len]
+}
+
+/// Helper function to check if a substitution is allowed.
+///
+/// This function uses the `SubstitutionPolicyFor` marker trait to safely
+/// check substitutions for both byte-level (u8) and character-level (char) operations.
+///
+/// # Type Safety
+///
+/// The `P: SubstitutionPolicyFor<U>` bound ensures compile-time type safety:
+/// - `Restricted<'a>` can only be used with `U = u8`
+/// - `RestrictedChar<'a>` can only be used with `U = char`
+/// - `Unrestricted` works with both `u8` and `char`
+///
+/// # Zero-Cost Abstraction
+///
+/// For `Unrestricted` policy, this function compiles to a constant `false` and
+/// is optimized away entirely by the compiler through inlining and constant propagation.
+#[inline(always)]
+fn is_substitution_allowed<U: CharUnit, P: SubstitutionPolicy + SubstitutionPolicyFor<U>>(
+    policy: &P,
+    dict_unit: U,
+    query_unit: U,
+) -> bool {
+    // Safe! No transmute needed - uses the correct trait method for the unit type
+    policy.is_allowed_for(dict_unit, query_unit)
 }
 
 /// Transition a position given a characteristic vector.
@@ -518,8 +575,9 @@ fn epsilon_closure_into(
 ///
 /// Computes the next state by transitioning all positions in the
 /// current state and merging the results.
-pub fn transition_state<U: CharUnit>(
+pub fn transition_state<U: CharUnit, P: SubstitutionPolicy + SubstitutionPolicyFor<U>>(
     state: &State,
+    policy: P,
     dict_unit: U,
     query: &[U],
     max_distance: usize,
@@ -539,7 +597,7 @@ pub fn transition_state<U: CharUnit>(
 
     for position in expanded_state.positions() {
         let offset = position.term_index;
-        let cv = characteristic_vector(dict_unit, query, window_size, offset, &mut cv_buffer);
+        let cv = characteristic_vector(policy, dict_unit, query, window_size, offset, &mut cv_buffer);
 
         let next_positions = transition_position(
             position,
@@ -578,6 +636,7 @@ pub fn transition_state<U: CharUnit>(
 ///
 /// * `state` - Current automaton state
 /// * `pool` - State pool for allocation reuse
+/// * `policy` - Substitution policy for character matching
 /// * `dict_unit` - Dictionary character unit to transition on
 /// * `query` - Query term units (bytes or chars)
 /// * `max_distance` - Maximum edit distance
@@ -589,9 +648,10 @@ pub fn transition_state<U: CharUnit>(
 /// The next state after transitioning, or None if no valid transitions exist.
 /// The returned state is acquired from the pool (caller should release it when done).
 #[inline]
-pub fn transition_state_pooled<U: CharUnit>(
+pub fn transition_state_pooled<U: CharUnit, P: SubstitutionPolicy + SubstitutionPolicyFor<U>>(
     state: &State,
     pool: &mut StatePool,
+    policy: P,
     dict_unit: U,
     query: &[U],
     max_distance: usize,
@@ -621,7 +681,7 @@ pub fn transition_state_pooled<U: CharUnit>(
 
     for position in expanded_state.positions() {
         let offset = position.term_index;
-        let cv = characteristic_vector(dict_unit, query, window_size, offset, &mut cv_buffer);
+        let cv = characteristic_vector(policy, dict_unit, query, window_size, offset, &mut cv_buffer);
 
         let next_positions = transition_position(
             position,
@@ -670,19 +730,21 @@ pub fn initial_state(query_length: usize, max_distance: usize, algorithm: Algori
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transducer::Unrestricted;
 
     #[test]
     fn test_characteristic_vector() {
         let query = b"test";
         let mut buffer = [false; 8];
+        let policy = Unrestricted;
 
-        let cv = characteristic_vector(b't', query, 3, 0, &mut buffer);
+        let cv = characteristic_vector(policy, b't', query, 3, 0, &mut buffer);
         assert_eq!(cv, &[true, false, false]);
 
-        let cv = characteristic_vector(b'e', query, 3, 0, &mut buffer);
+        let cv = characteristic_vector(policy, b'e', query, 3, 0, &mut buffer);
         assert_eq!(cv, &[false, true, false]);
 
-        let cv = characteristic_vector(b's', query, 3, 1, &mut buffer);
+        let cv = characteristic_vector(policy, b's', query, 3, 1, &mut buffer);
         assert_eq!(cv, &[false, true, false]);
     }
 
@@ -732,9 +794,11 @@ mod tests {
         let max_distance = 2;
         let mut state = State::new();
         state.insert(Position::new(0, 0), Algorithm::Standard, max_distance);
+        let policy = Unrestricted;
 
         let next = transition_state(
             &state,
+            policy,
             b't',
             query,
             max_distance,

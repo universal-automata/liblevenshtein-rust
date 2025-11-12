@@ -1,5 +1,5 @@
 use liblevenshtein::transducer::transition::{initial_state, transition_state};
-use liblevenshtein::transducer::Algorithm;
+use liblevenshtein::transducer::{Algorithm, Unrestricted};
 
 #[test]
 fn test_transition_debug() {
@@ -13,6 +13,7 @@ fn test_transition_debug() {
     // Try transitioning with 't'
     let next = transition_state(
         &state,
+        Unrestricted,
         b't',
         query,
         max_distance,
@@ -28,6 +29,7 @@ fn test_transition_debug() {
         // Try transitioning with 'e'
         let next2 = transition_state(
             &next_state,
+            Unrestricted,
             b'e',
             query,
             max_distance,
@@ -43,6 +45,7 @@ fn test_transition_debug() {
             // Try transitioning with 's'
             let next3 = transition_state(
                 &next_state2,
+                Unrestricted,
                 b's',
                 query,
                 max_distance,
@@ -58,6 +61,7 @@ fn test_transition_debug() {
                 // Try transitioning with final 't'
                 let next4 = transition_state(
                     &next_state3,
+                    Unrestricted,
                     b't',
                     query,
                     max_distance,

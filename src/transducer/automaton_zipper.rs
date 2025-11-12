@@ -6,7 +6,7 @@
 //! as it processes input characters.
 
 use crate::transducer::transition::transition_state_pooled;
-use crate::transducer::{Algorithm, Position, State, StatePool};
+use crate::transducer::{Algorithm, Position, State, StatePool, Unrestricted};
 use std::sync::Arc;
 
 /// Zipper for tracking Levenshtein automaton state during traversal.
@@ -182,6 +182,7 @@ impl AutomatonZipper {
         transition_state_pooled(
             &self.state,
             pool,
+            Unrestricted, // Default policy: allow all substitutions
             dict_char,
             &self.query,
             self.max_distance,

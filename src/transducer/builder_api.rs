@@ -3,7 +3,7 @@
 //! This module provides a more ergonomic, self-documenting API for querying
 //! dictionaries with various options.
 
-use super::{Algorithm, OrderedQueryIterator, QueryIterator};
+use super::{Algorithm, OrderedQueryIterator, QueryIterator, SubstitutionPolicyFor, Unrestricted};
 use crate::dictionary::Dictionary;
 
 /// Fluent builder for constructing Levenshtein queries
@@ -125,7 +125,10 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
     /// # Note
     ///
     /// For prefix matching, use `.ordered().prefix()` instead of `.prefix_mode()`.
-    pub fn execute(self) -> QueryIterator<D::Node> {
+    pub fn execute(self) -> QueryIterator<D::Node>
+    where
+        Unrestricted: SubstitutionPolicyFor<<D::Node as crate::dictionary::DictionaryNode>::Unit>,
+    {
         QueryIterator::new(
             self.dictionary.root(),
             self.term,
@@ -162,7 +165,10 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
     ///     .prefix()  // Match terms starting with query
     ///     .collect();
     /// ```
-    pub fn ordered(self) -> OrderedQueryIterator<D::Node> {
+    pub fn ordered(self) -> OrderedQueryIterator<D::Node>
+    where
+        Unrestricted: SubstitutionPolicyFor<<D::Node as crate::dictionary::DictionaryNode>::Unit>,
+    {
         OrderedQueryIterator::new(
             self.dictionary.root(),
             self.term,
@@ -183,7 +189,10 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
     ///     .max_distance(1)
     ///     .collect_vec();
     /// ```
-    pub fn collect_vec(self) -> Vec<String> {
+    pub fn collect_vec(self) -> Vec<String>
+    where
+        Unrestricted: SubstitutionPolicyFor<<D::Node as crate::dictionary::DictionaryNode>::Unit>,
+    {
         self.execute().collect()
     }
 
@@ -197,7 +206,10 @@ impl<'a, D: Dictionary> QueryBuilder<'a, D> {
     ///     .max_distance(2)
     ///     .limit(10);
     /// ```
-    pub fn limit(self, n: usize) -> impl Iterator<Item = String> {
+    pub fn limit(self, n: usize) -> impl Iterator<Item = String>
+    where
+        Unrestricted: SubstitutionPolicyFor<<D::Node as crate::dictionary::DictionaryNode>::Unit>,
+    {
         self.execute().take(n)
     }
 }

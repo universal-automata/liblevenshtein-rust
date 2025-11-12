@@ -7,7 +7,7 @@
 //! This ordering enables efficient "top-k" queries and take-while patterns.
 
 use super::transition::{initial_state, transition_state_pooled};
-use super::{Algorithm, Intersection, PathNode, StatePool};
+use super::{Algorithm, Intersection, PathNode, StatePool, SubstitutionPolicy, SubstitutionPolicyFor, Unrestricted};
 use crate::dictionary::{CharUnit, DictionaryNode};
 use std::collections::VecDeque;
 
@@ -61,7 +61,7 @@ pub struct OrderedCandidate {
 ///     println!("{}", candidate.term);
 /// }
 /// ```
-pub struct OrderedQueryIterator<N: DictionaryNode> {
+pub struct OrderedQueryIterator<N: DictionaryNode, P: SubstitutionPolicy = Unrestricted> {
     /// Pending intersections grouped by minimum distance
     pending_by_distance: Vec<VecDeque<Box<Intersection<N>>>>,
     /// Current distance level being explored
@@ -72,6 +72,8 @@ pub struct OrderedQueryIterator<N: DictionaryNode> {
     query: Vec<N::Unit>,
     /// Levenshtein algorithm
     algorithm: Algorithm,
+    /// Substitution policy
+    policy: P,
     /// State pool for allocation reuse
     state_pool: StatePool,
     /// Substring matching mode (for suffix automata)
@@ -82,18 +84,43 @@ pub struct OrderedQueryIterator<N: DictionaryNode> {
     buffer_index: usize,
 }
 
-impl<N: DictionaryNode> OrderedQueryIterator<N> {
-    /// Create a new ordered query iterator
+impl<N: DictionaryNode> OrderedQueryIterator<N, Unrestricted> {
+    /// Create a new ordered query iterator with unrestricted policy
     pub fn new(root: N, query: String, max_distance: usize, algorithm: Algorithm) -> Self {
         Self::with_substring_mode(root, query, max_distance, algorithm, false)
     }
 
-    /// Create a new ordered query iterator with substring matching mode
+    /// Create a new ordered query iterator with substring matching mode and unrestricted policy
     pub fn with_substring_mode(
         root: N,
         query: String,
         max_distance: usize,
         algorithm: Algorithm,
+        substring_mode: bool,
+    ) -> Self {
+        Self::with_policy_and_substring(root, query, max_distance, algorithm, Unrestricted, substring_mode)
+    }
+}
+
+impl<N: DictionaryNode, P: SubstitutionPolicy + SubstitutionPolicyFor<N::Unit>> OrderedQueryIterator<N, P> {
+    /// Create a new ordered query iterator with custom substitution policy
+    pub fn with_policy(
+        root: N,
+        query: String,
+        max_distance: usize,
+        algorithm: Algorithm,
+        policy: P,
+    ) -> Self {
+        Self::with_policy_and_substring(root, query, max_distance, algorithm, policy, false)
+    }
+
+    /// Create a new ordered query iterator with custom policy and substring matching mode
+    pub fn with_policy_and_substring(
+        root: N,
+        query: String,
+        max_distance: usize,
+        algorithm: Algorithm,
+        policy: P,
         substring_mode: bool,
     ) -> Self {
         let query_units = N::Unit::from_str(&query);
@@ -114,6 +141,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             max_distance,
             query: query_units,
             algorithm,
+            policy,
             state_pool: StatePool::new(),
             substring_mode,
             sorted_buffer: Vec::with_capacity(64), // Heuristic: typical max results per distance
@@ -219,6 +247,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             if let Some(next_state) = transition_state_pooled(
                 &intersection.state,
                 &mut self.state_pool,
+                self.policy, // Use the iterator's policy parameter
                 label,
                 &self.query,
                 self.max_distance,
@@ -247,9 +276,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
             }
         }
     }
-}
 
-impl<N: DictionaryNode> OrderedQueryIterator<N> {
     /// Add a filter predicate to this iterator.
     ///
     /// Returns a new iterator that only yields candidates matching the predicate.
@@ -265,7 +292,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     ///         .unwrap_or(false)
     /// })
     /// ```
-    pub fn filter<F>(self, predicate: F) -> FilteredOrderedQueryIterator<N, F>
+    pub fn filter<F>(self, predicate: F) -> FilteredOrderedQueryIterator<N, P, F>
     where
         F: Fn(&OrderedCandidate) -> bool,
     {
@@ -290,7 +317,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     /// // Matches: "test" (d=0), "testing" (d=0), "tester" (d=0), "best" (d=1)
     /// query.prefix()
     /// ```
-    pub fn prefix(mut self) -> PrefixOrderedQueryIterator<N> {
+    pub fn prefix(mut self) -> PrefixOrderedQueryIterator<N, P> {
         // Enable substring mode for prefix matching
         // This allows matching terms that start with the query without penalizing the unmatched suffix
         self.substring_mode = true;
@@ -298,7 +325,7 @@ impl<N: DictionaryNode> OrderedQueryIterator<N> {
     }
 }
 
-impl<N: DictionaryNode> Iterator for OrderedQueryIterator<N> {
+impl<N: DictionaryNode, P: SubstitutionPolicy + SubstitutionPolicyFor<N::Unit>> Iterator for OrderedQueryIterator<N, P> {
     type Item = OrderedCandidate;
 
     #[inline]
@@ -311,15 +338,15 @@ impl<N: DictionaryNode> Iterator for OrderedQueryIterator<N> {
 ///
 /// Wraps an OrderedQueryIterator and applies a filter predicate to results.
 /// Only candidates matching the predicate are yielded.
-pub struct FilteredOrderedQueryIterator<N: DictionaryNode, F>
+pub struct FilteredOrderedQueryIterator<N: DictionaryNode, P: SubstitutionPolicy, F>
 where
     F: Fn(&OrderedCandidate) -> bool,
 {
-    inner: OrderedQueryIterator<N>,
+    inner: OrderedQueryIterator<N, P>,
     predicate: F,
 }
 
-impl<N: DictionaryNode, F> Iterator for FilteredOrderedQueryIterator<N, F>
+impl<N: DictionaryNode, P: SubstitutionPolicy + SubstitutionPolicyFor<N::Unit>, F> Iterator for FilteredOrderedQueryIterator<N, P, F>
 where
     F: Fn(&OrderedCandidate) -> bool,
 {
@@ -344,11 +371,11 @@ where
 /// than the query.
 ///
 /// Essential for autocomplete and code completion.
-pub struct PrefixOrderedQueryIterator<N: DictionaryNode> {
-    inner: OrderedQueryIterator<N>,
+pub struct PrefixOrderedQueryIterator<N: DictionaryNode, P: SubstitutionPolicy = Unrestricted> {
+    inner: OrderedQueryIterator<N, P>,
 }
 
-impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
+impl<N: DictionaryNode, P: SubstitutionPolicy + SubstitutionPolicyFor<N::Unit>> PrefixOrderedQueryIterator<N, P> {
     /// Advance to the next prefix match in order
     #[inline]
     fn advance_prefix(&mut self) -> Option<OrderedCandidate> {
@@ -392,7 +419,7 @@ impl<N: DictionaryNode> PrefixOrderedQueryIterator<N> {
     }
 }
 
-impl<N: DictionaryNode> Iterator for PrefixOrderedQueryIterator<N> {
+impl<N: DictionaryNode, P: SubstitutionPolicy + SubstitutionPolicyFor<N::Unit>> Iterator for PrefixOrderedQueryIterator<N, P> {
     type Item = OrderedCandidate;
 
     #[inline]

@@ -9,7 +9,7 @@ use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{CharUnit, MappedDictionaryNode};
 use crate::transducer::intersection::PathNode;
 use crate::transducer::transition::{initial_state, transition_state_pooled};
-use crate::transducer::{Algorithm, Candidate, Intersection, StatePool};
+use crate::transducer::{Algorithm, Candidate, Intersection, StatePool, SubstitutionPolicyFor, Unrestricted};
 use std::collections::{HashSet, VecDeque};
 
 /// Iterator that yields candidates filtered by their associated values.
@@ -198,6 +198,7 @@ where
     N: MappedDictionaryNode,
     N::Value: DictionaryValue,
     F: Fn(&N::Value) -> bool,
+    Unrestricted: SubstitutionPolicyFor<N::Unit>,
 {
     /// Queue child intersections for exploration
     #[inline]
@@ -206,6 +207,7 @@ where
             if let Some(next_state) = transition_state_pooled(
                 &intersection.state,
                 &mut self.state_pool,
+                Unrestricted, // Default policy: allow all substitutions
                 label,
                 &self.query,
                 self.max_distance,
@@ -378,6 +380,7 @@ impl<N, V> ValueSetFilteredQueryIterator<N, V>
 where
     N: MappedDictionaryNode<Value = V>,
     V: DictionaryValue + Eq + std::hash::Hash,
+    Unrestricted: SubstitutionPolicyFor<N::Unit>,
 {
     /// Queue child intersections for exploration
     #[inline]
@@ -386,6 +389,7 @@ where
             if let Some(next_state) = transition_state_pooled(
                 &intersection.state,
                 &mut self.state_pool,
+                Unrestricted, // Default policy: allow all substitutions
                 label,
                 &self.query,
                 self.max_distance,

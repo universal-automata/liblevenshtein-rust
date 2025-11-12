@@ -2,6 +2,7 @@
 
 use liblevenshtein::prelude::*;
 use liblevenshtein::transducer::transition::{initial_state, transition_state};
+use liblevenshtein::transducer::Unrestricted;
 
 #[test]
 fn trace_aple_to_apple() {
@@ -28,6 +29,7 @@ fn trace_aple_to_apple() {
     let a_node = root.transition(b'a').expect("Should have 'a'");
     state = transition_state(
         &state,
+        Unrestricted,
         b'a',
         query,
         max_distance,
@@ -42,6 +44,7 @@ fn trace_aple_to_apple() {
     let p1_node = a_node.transition(b'p').expect("Should have first 'p'");
     state = transition_state(
         &state,
+        Unrestricted,
         b'p',
         query,
         max_distance,
@@ -57,6 +60,7 @@ fn trace_aple_to_apple() {
         println!("\nFound second 'p' in dictionary");
         if let Some(new_state) = transition_state(
             &state,
+            Unrestricted,
             b'p',
             query,
             max_distance,
@@ -72,6 +76,7 @@ fn trace_aple_to_apple() {
                 println!("\nFound 'l' in dictionary");
                 if let Some(new_state) = transition_state(
                     &state,
+                    Unrestricted,
                     b'l',
                     query,
                     max_distance,
@@ -87,6 +92,7 @@ fn trace_aple_to_apple() {
                         println!("\nFound 'e' in dictionary");
                         if let Some(new_state) = transition_state(
                             &state,
+                            Unrestricted,
                             b'e',
                             query,
                             max_distance,

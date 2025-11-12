@@ -34,6 +34,7 @@
 use crate::transducer::universal::{
     CharacteristicVector, PositionVariant, UniversalPosition, UniversalState,
 };
+use crate::transducer::{SubstitutionPolicy, Unrestricted};
 
 /// Universal Levenshtein Automaton A^∀,χ_n
 ///
@@ -43,6 +44,10 @@ use crate::transducer::universal::{
 /// # Type Parameters
 ///
 /// - `V`: Position variant (Standard, Transposition, or MergeAndSplit)
+/// - `P`: Substitution policy (defaults to [`Unrestricted`])
+///
+/// The default [`Unrestricted`] policy is a zero-sized type, so there is
+/// zero memory or performance overhead for the default case.
 ///
 /// # Examples
 ///
@@ -59,14 +64,17 @@ use crate::transducer::universal::{
 /// assert!(!automaton.accepts("test", "hello"));
 /// ```
 #[derive(Debug, Clone)]
-pub struct UniversalAutomaton<V: PositionVariant> {
+pub struct UniversalAutomaton<V: PositionVariant, P: SubstitutionPolicy = Unrestricted> {
     /// Maximum edit distance n
     max_distance: u8,
-    /// Current state (mutable during processing)
+    /// Substitution policy
+    policy: P,
+    /// Phantom data for position variant
     _phantom: std::marker::PhantomData<V>,
 }
 
-impl<V: PositionVariant> UniversalAutomaton<V> {
+// Backward-compatible constructors for Unrestricted policy
+impl<V: PositionVariant> UniversalAutomaton<V, Unrestricted> {
     /// Create a new Universal Levenshtein Automaton for maximum distance n
     ///
     /// # Arguments
@@ -75,7 +83,7 @@ impl<V: PositionVariant> UniversalAutomaton<V> {
     ///
     /// # Returns
     ///
-    /// A new `UniversalAutomaton` instance
+    /// A new `UniversalAutomaton` instance with unrestricted substitutions
     ///
     /// # Examples
     ///
@@ -86,6 +94,37 @@ impl<V: PositionVariant> UniversalAutomaton<V> {
     pub fn new(max_distance: u8) -> Self {
         Self {
             max_distance,
+            policy: Unrestricted,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+// Generic methods (work with any policy)
+impl<V: PositionVariant, P: SubstitutionPolicy> UniversalAutomaton<V, P> {
+    /// Create a new Universal Levenshtein Automaton with custom substitution policy
+    ///
+    /// # Arguments
+    ///
+    /// - `max_distance`: Maximum edit distance n (typically 1, 2, or 3)
+    /// - `policy`: Substitution policy to use
+    ///
+    /// # Returns
+    ///
+    /// A new `UniversalAutomaton` instance
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let policy_set = SubstitutionSet::phonetic_basic();
+    /// let policy = Restricted::new(&policy_set);
+    /// let automaton = UniversalAutomaton::<Standard>::with_policy(2, policy);
+    /// ```
+    #[must_use]
+    pub fn with_policy(max_distance: u8, policy: P) -> Self {
+        Self {
+            max_distance,
+            policy,
             _phantom: std::marker::PhantomData,
         }
     }

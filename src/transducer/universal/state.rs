@@ -280,7 +280,7 @@ impl<V: PositionVariant> UniversalState<V> {
     pub fn transition(
         &self,
         bit_vector: &crate::transducer::universal::CharacteristicVector,
-        input_length: usize,
+        _input_length: usize,
     ) -> Option<Self> {
         // Special case: empty state has no successors
         if self.is_empty() {
