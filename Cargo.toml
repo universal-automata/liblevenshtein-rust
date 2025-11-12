@@ -211,6 +211,10 @@ harness = false
 name = "automaton_vs_linear_scan"
 harness = false
 
+[[bench]]
+name = "universal_state_comparison"
+harness = false
+
 [[bin]]
 name = "liblevenshtein"
 path = "src/bin/liblevenshtein.rs"
