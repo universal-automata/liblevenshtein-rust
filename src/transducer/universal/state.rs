@@ -157,7 +157,14 @@ impl<V: PositionVariant> UniversalState<V> {
     /// ```
     pub fn add_position(&mut self, pos: UniversalPosition<V>) {
         // Check if this position is subsumed by an existing one
+        // Early exit optimization: positions are sorted by (errors, offset) ascending
+        // For existing to subsume pos, we need pos.errors > existing.errors
+        // Once existing.errors >= pos.errors, no further positions can subsume pos
         for existing in &self.positions {
+            // Early exit: if existing has same or more errors, it cannot subsume pos
+            if existing.errors() >= pos.errors() {
+                break;
+            }
             if subsumes(existing, &pos, self.max_distance) {
                 return; // Already covered by existing position
             }
