@@ -337,3 +337,8 @@ required-features = ["rand"]
 [[bench]]
 name = "substitution_integration_bench"
 harness = false
+
+[[bench]]
+name = "small_set_analysis"
+harness = false
+required-features = ["rand"]

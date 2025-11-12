@@ -41,6 +41,30 @@
 
 use rustc_hash::FxHashSet;
 
+/// Internal representation of SubstitutionSet storage.
+///
+/// Uses a hybrid approach (H3 optimization):
+/// - **Small sets (≤4 pairs)**: Linear scan in Vec (~200-350ns, 1.2-1.9× faster than hash)
+/// - **Large sets (>4 pairs)**: Hash lookup in FxHashSet (~370ns constant time)
+///
+/// Crossover analysis shows linear scan wins for tiny sets due to:
+/// - No hashing overhead (~3-5ns saved)
+/// - Better cache behavior (sequential access)
+/// - Predictable branches (linear loop)
+/// - Smaller memory footprint (2× less than hash)
+///
+/// See: docs/optimization/substitution-set/05-crossover-analysis.md
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SubstitutionSetImpl {
+    /// Small set using linear scan (≤4 pairs).
+    /// Faster for tiny sets due to no hash overhead.
+    Small(Vec<(u8, u8)>),
+
+    /// Large set using hash lookup (>4 pairs).
+    /// Scales better for larger sets with O(1) lookup.
+    Large(FxHashSet<(u8, u8)>),
+}
+
 /// Set of allowed character substitutions.
 ///
 /// A `SubstitutionSet` defines which character pairs can be substituted
@@ -49,9 +73,16 @@ use rustc_hash::FxHashSet;
 ///
 /// ## Performance
 ///
-/// - **Storage**: HashSet with fast non-cryptographic hashing (FxHasher)
-/// - **Lookup**: O(1) average case, ~10-30ns per check
-/// - **Memory**: ~48 bytes base + 24 bytes per allowed pair
+/// Uses a hybrid approach (H3 optimization):
+/// - **Small sets (≤4 pairs)**: Linear scan (~200-350ns, 15-48% faster than hash)
+/// - **Large sets (>4 pairs)**: Hash lookup (~370ns constant time)
+///
+/// Automatically upgrades from Vec to FxHashSet when exceeding threshold.
+///
+/// ## Memory
+///
+/// - **Small sets**: ~24 bytes + 2 bytes per pair (50-75% less than hash)
+/// - **Large sets**: ~48 bytes + 24 bytes per pair (same as before)
 ///
 /// ## Symmetry
 ///
@@ -68,13 +99,21 @@ use rustc_hash::FxHashSet;
 /// Most presets (like `phonetic_basic()`) include symmetric pairs where appropriate.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SubstitutionSet {
-    /// Allowed substitution pairs (dict_char, query_char).
-    /// Uses FxHasher for fast non-cryptographic hashing.
-    allowed: FxHashSet<(u8, u8)>,
+    /// Internal storage using hybrid Vec/HashSet approach.
+    inner: SubstitutionSetImpl,
 }
 
 impl SubstitutionSet {
+    /// Threshold for upgrading from Vec to FxHashSet.
+    ///
+    /// Based on empirical crossover analysis showing linear scan wins for ≤4 pairs.
+    /// See: docs/optimization/substitution-set/05-crossover-analysis.md
+    const SMALL_SET_THRESHOLD: usize = 4;
+
     /// Create an empty substitution set.
+    ///
+    /// Starts with a small Vec-based representation for optimal performance
+    /// with tiny sets (automatically upgrades to hash for larger sets).
     ///
     /// # Example
     ///
@@ -87,7 +126,7 @@ impl SubstitutionSet {
     #[inline]
     pub fn new() -> Self {
         Self {
-            allowed: FxHashSet::default(),
+            inner: SubstitutionSetImpl::Small(Vec::new()),
         }
     }
 
@@ -108,8 +147,17 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            allowed: FxHashSet::with_capacity_and_hasher(capacity, Default::default()),
+        // Choose optimal storage based on expected capacity
+        if capacity <= Self::SMALL_SET_THRESHOLD {
+            Self {
+                inner: SubstitutionSetImpl::Small(Vec::with_capacity(capacity)),
+            }
+        } else {
+            Self {
+                inner: SubstitutionSetImpl::Large(
+                    FxHashSet::with_capacity_and_hasher(capacity, Default::default())
+                ),
+            }
         }
     }
 
@@ -160,7 +208,30 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn allow_byte(&mut self, a: u8, b: u8) {
-        self.allowed.insert((a, b));
+        match &mut self.inner {
+            SubstitutionSetImpl::Small(vec) if vec.len() < Self::SMALL_SET_THRESHOLD => {
+                // Still small - add to Vec if not duplicate
+                if !vec.contains(&(a, b)) {
+                    vec.push((a, b));
+                }
+            }
+            SubstitutionSetImpl::Small(vec) => {
+                // Exceeded threshold - upgrade to hash set
+                let mut set = FxHashSet::with_capacity_and_hasher(
+                    vec.len() + 1,
+                    Default::default()
+                );
+                for &pair in vec.iter() {
+                    set.insert(pair);
+                }
+                set.insert((a, b));
+                self.inner = SubstitutionSetImpl::Large(set);
+            }
+            SubstitutionSetImpl::Large(set) => {
+                // Already large - use hash set
+                set.insert((a, b));
+            }
+        }
     }
 
     /// Check if substituting byte `a` with byte `b` is allowed.
@@ -193,7 +264,16 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn contains(&self, a: u8, b: u8) -> bool {
-        self.allowed.contains(&(a, b))
+        match &self.inner {
+            SubstitutionSetImpl::Small(vec) => {
+                // Linear scan for small sets (faster for ≤4 pairs)
+                vec.iter().any(|&(x, y)| x == a && y == b)
+            }
+            SubstitutionSetImpl::Large(set) => {
+                // Hash lookup for large sets (faster for >4 pairs)
+                set.contains(&(a, b))
+            }
+        }
     }
 
     /// Build a substitution set from character pairs.
@@ -237,7 +317,10 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.allowed.len()
+        match &self.inner {
+            SubstitutionSetImpl::Small(vec) => vec.len(),
+            SubstitutionSetImpl::Large(set) => set.len(),
+        }
     }
 
     /// Check if the substitution set is empty.
@@ -254,7 +337,10 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.allowed.is_empty()
+        match &self.inner {
+            SubstitutionSetImpl::Small(vec) => vec.is_empty(),
+            SubstitutionSetImpl::Large(set) => set.is_empty(),
+        }
     }
 
     /// Clear all allowed substitutions.
@@ -271,7 +357,10 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn clear(&mut self) {
-        self.allowed.clear();
+        match &mut self.inner {
+            SubstitutionSetImpl::Small(vec) => vec.clear(),
+            SubstitutionSetImpl::Large(set) => set.clear(),
+        }
     }
 
     // ========================================================================

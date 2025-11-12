@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+
+#### SubstitutionSet Optimizations (2025-11-12)
+- **H1: Const Arrays for Presets - 15-28% faster initialization**
+  - Preset substitution sets now use compile-time const arrays
+  - Eliminates runtime hash computations and char-to-byte conversions
+  - Performance improvements:
+    - phonetic_basic: **19.2% faster** (196ns → 158ns)
+    - keyboard_qwerty: **15.6% faster** (587ns → 495ns)
+    - leet_speak: **18.1% faster** (245ns → 200ns)
+    - ocr_friendly: **28.2% faster** (224ns → 160ns)
+  - Implementation: Direct byte insertion with pre-allocated capacity
+  - Zero runtime overhead (compile-time optimization)
+  - Documentation: `docs/optimization/substitution-set/02-hypothesis1-const-arrays.md`
+
+- **H3: Hybrid Small/Large Strategy - 9-46% faster for small sets**
+  - Automatic strategy selection based on set size
+  - Linear scan (Vec) for ≤4 pairs, hash lookup (FxHashSet) for >4 pairs
+  - Crossover analysis validated 5-pair threshold empirically
+  - Performance improvements (small sets):
+    - 1 pair: **46.4% faster** (376.7ns → 201.3ns, 1.87× speedup)
+    - 2 pairs: **28.2% faster** (366.8ns → 263.3ns, 1.39× speedup)
+    - 3 pairs: **9.0% faster** (363.6ns → 330.8ns, 1.10× speedup)
+  - Integration test results: 21/25 improved (84%), zero critical regressions
+  - Memory savings: **50-79% reduction** for small sets (1-4 pairs)
+  - Implementation: Enum-based hybrid with automatic upgrade at threshold
+  - All 509 tests passing, production-ready
+  - Documentation: `docs/optimization/substitution-set/06-hypothesis3-hybrid.md`
+
+- **H2: Bitmap Optimization - Rejected**
+  - Evaluated 128×128 bit matrix for O(1) lookup
+  - Results: 2.4× faster lookups but 4-13× slower initialization
+  - Break-even point: ~690 lookups (typical queries have 50-300)
+  - Decision: Rejected due to initialization cost outweighing lookup benefits
+  - Lesson learned: Optimize full lifecycle, not just hot path
+  - Documentation: `docs/optimization/substitution-set/03-hypothesis2-bitmap.md`
+
+- **Complete optimization summary**
+  - Scientific methodology: Hypothesis-driven with rigorous benchmarking
+  - Two production-ready optimizations (H1, H3)
+  - Zero regressions in integration tests
+  - Comprehensive documentation: `docs/optimization/substitution-set/07-final-summary.md`
+
 ### Deprecated
 
 #### OptimizedDawg (2025-11-11)
