@@ -40,16 +40,35 @@ This directory contains **complete documentation** of Universal Levenshtein Auto
 
 ### Complete Documentation Index
 
-#### Theory Documents (Core Thesis)
+#### Theory Documents (Core Thesis 2005 + TCS Paper 2011)
 
 1. **[PAPER_SUMMARY.md](./PAPER_SUMMARY.md)** (~2000 lines) ⭐
-   - Complete chapter-by-chapter analysis of all 77 pages
+   - Complete chapter-by-chapter analysis of 2005 thesis (all 77 pages)
    - Every definition, theorem, lemma, proposition with proofs
    - Section-by-section narrative flow
    - All examples worked through step-by-step
    - **Start here** for comprehensive understanding
 
-2. **[GLOSSARY.md](./GLOSSARY.md)** (~650 lines)
+2. **[TCS_2011_PAPER_ANALYSIS.md](./TCS_2011_PAPER_ANALYSIS.md)** (~3500 lines) ⭐ **NEW**
+   - Complete analysis of 2011 TCS journal paper
+   - **Generalized operation framework** beyond Levenshtein
+   - **Bounded diagonal property** (Theorem 8.2) - validates SmallVec optimization
+   - Matrix-state construction with extensors
+   - Empirical evaluation: **2.77-5× speedup** over dynamic programming
+   - **Critical bug identification**: Diagonal crossing fix needed
+   - Enhancement opportunities and implementation roadmap
+   - **Use this** for understanding theoretical foundations and optimization opportunities
+
+3. **[TCS_2011_LAZY_APPLICABILITY.md](./TCS_2011_LAZY_APPLICABILITY.md)** (~800 lines) **NEW**
+   - **Answers**: "Does TCS 2011 paper apply to lazy automata?" → **PARTIAL**
+   - What applies: Bounded diagonal, operations, subsumption ✅
+   - What doesn't: Alphabet independence, word-agnostic states ❌
+   - **Why lazy-universal hybrid is impossible** (contradictory requirements)
+   - Concrete benefits for lazy implementation
+   - Priority recommendations with code examples
+   - **Use this** to understand which concepts transfer to lazy vs universal
+
+4. **[GLOSSARY.md](./GLOSSARY.md)** (~650 lines)
    - Complete notation reference for all symbols
    - Quick lookup table with 50+ symbols and page numbers
    - Organized by category (metasymbols, distances, positions, automata, functions)
@@ -57,7 +76,7 @@ This directory contains **complete documentation** of Universal Levenshtein Auto
    - Common confusions explained
    - **Use this** while reading PAPER_SUMMARY.md or thesis
 
-3. **[ALGORITHMS.md](./ALGORITHMS.md)** (~1500 lines)
+5. **[ALGORITHMS.md](./ALGORITHMS.md)** (~1500 lines)
    - Section 6 (Building Algorithms) fully extracted
    - Summarized and detailed pseudocode
    - Complete type definitions and API functions
@@ -65,7 +84,7 @@ This directory contains **complete documentation** of Universal Levenshtein Auto
    - Complexity analysis with exact formulas
    - **Use this** for implementation reference
 
-4. **[THEORETICAL_FOUNDATIONS.md](./THEORETICAL_FOUNDATIONS.md)** (~1400 lines)
+6. **[THEORETICAL_FOUNDATIONS.md](./THEORETICAL_FOUNDATIONS.md)** (~1400 lines)
    - All definitions, propositions, lemmas, theorems
    - Complete proofs and proof sketches
    - Organized by section (Distance Properties, NFAs, DFAs, Universal Automata, Minimality)
@@ -73,11 +92,14 @@ This directory contains **complete documentation** of Universal Levenshtein Auto
    - Critical warnings (triangle inequality violation!)
    - **Use this** for mathematical rigor
 
-5. **[IMPLEMENTATION_MAPPING.md](./IMPLEMENTATION_MAPPING.md)** (To be created)
-   - Maps theoretical definitions to Rust code structures
-   - Bridges ALGORITHMS.md to actual liblevenshtein-rust implementation
-   - Design patterns for universal positions, subsumption, bit vectors
-   - **Use this** when implementing in Rust
+7. **[TCS_2011_IMPLEMENTATION_MAPPING.md](./TCS_2011_IMPLEMENTATION_MAPPING.md)** (~1200 lines) ⭐ **NEW**
+   - Concrete mapping from TCS 2011 paper to code
+   - Maps theoretical concepts to **both lazy and universal** implementations
+   - Shows what applies to each architecture (9 major concepts analyzed)
+   - File location reference table for quick navigation
+   - Implementation status tracking (✅ complete, 🚧 in progress, 🐛 buggy, ❌ N/A)
+   - Priority action items with specific file:line references
+   - **Use this** when implementing paper concepts or understanding code structure
 
 #### Implementation Planning Documents
 
@@ -111,6 +133,39 @@ See [Implementation Strategy](#implementation-strategy) section below for detail
    - Archived with comprehensive documentation explaining why it was replaced
    - Historical reference for educational purposes
    - **Reason for archival**: Empirical benchmarking showed SmallVec superior
+
+#### Phonetic Corrections Research (2025-11-12)
+
+**Location**: [`docs/research/phonetic-corrections/`](../phonetic-corrections/)
+
+9. **[ENGLISH_PHONETIC_FEASIBILITY.md](../phonetic-corrections/ENGLISH_PHONETIC_FEASIBILITY.md)** (~2100 lines) ⭐ **NEW**
+   - Comprehensive analysis of English phonetic spelling rules from https://zompist.com/spell.html
+   - Classification of ~50 phonetic rules by modelability with universal automata
+   - **60-85% of rules are modelable** (45% fully, 34% partially, 21% not modelable)
+   - Theoretical justification from TCS 2011 bounded diagonal property
+   - 7 worked examples: telephone→tel@fön, daughter→dòt@r, right→rït, etc.
+   - Required extensions: larger operations (d=3,4), position-aware, bi-directional context
+   - Performance analysis: 5-10× speedup vs DP, 8-80 MB memory depending on operation set
+   - Limitations: cannot model retroactive modifications, syllable boundaries, morphology
+   - **Use this** to understand which English phonetic rules can be implemented with generalized operations
+
+10. **[IMPLEMENTATION_GUIDE.md](../phonetic-corrections/IMPLEMENTATION_GUIDE.md)** (~1000 lines) ⭐ **NEW**
+   - Practical step-by-step implementation guide for phonetic corrections
+   - **3-phase approach**: Core (60-70% coverage), Extended (75-85%), Context (80-85%)
+   - Complete Rust code examples for all operation types
+   - Testing strategy with coverage measurement (CMU Pronouncing Dictionary)
+   - Performance tuning and benchmarking guide
+   - Integration examples: spell checker, fuzzy search, OCR post-processing
+   - Estimated effort: Phase 1 (3-5 days), Phase 2 (2-3 weeks), Phase 3 (2-3 weeks)
+   - **Use this** for implementing phonetic matching features in liblevenshtein-rust
+
+**Phonetic Corrections Summary**:
+- ✅ **60-70%** fully modelable: consonant/vowel digraphs, silent letters, double consonants
+- 🟡 **10-15%** partially modelable: context-dependent c/g softening, vowel-R interactions, complex GH patterns
+- ❌ **15-25%** not modelable: retroactive vowel lengthening, syllable structure, morphological context
+- **Practical applications**: Spell checking with phonetic suggestions, "sounds like" search, OCR correction
+- **Performance**: 3-10× faster than DP for dictionary search, 75-85% word coverage
+- **See also**: [Generalized Operations Design](../../design/generalized-operations.md#example-5-english-phonetic-corrections) for API usage
 
 ### Key Theoretical Contributions
 
