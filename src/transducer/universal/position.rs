@@ -197,6 +197,36 @@ pub enum UniversalPosition<V: PositionVariant> {
     },
 }
 
+// Custom Ord implementation to sort by (errors, offset) for efficient subsumption checks
+impl<V: PositionVariant> PartialOrd for UniversalPosition<V> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<V: PositionVariant> Ord for UniversalPosition<V> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        use UniversalPosition::*;
+
+        // Sort by (errors, offset) to enable early termination in subsumption checks
+        // Positions with fewer errors come first, making it easy to skip positions
+        // that cannot participate in subsumption relationships
+        match (self, other) {
+            (INonFinal { errors: e1, offset: o1, .. }, INonFinal { errors: e2, offset: o2, .. }) |
+            (MFinal { errors: e1, offset: o1, .. }, MFinal { errors: e2, offset: o2, .. }) => {
+                match e1.cmp(e2) {
+                    Ordering::Equal => o1.cmp(o2),
+                    other => other,
+                }
+            }
+            // I-type comes before M-type
+            (INonFinal { .. }, MFinal { .. }) => Ordering::Less,
+            (MFinal { .. }, INonFinal { .. }) => Ordering::Greater,
+        }
+    }
+}
+
 impl<V: PositionVariant> UniversalPosition<V> {
     /// Create new I-type (non-final) position with invariant validation
     ///
@@ -304,6 +334,254 @@ impl<V: PositionVariant> UniversalPosition<V> {
     /// Check if this is an M-type (final) position
     pub fn is_m_type(&self) -> bool {
         matches!(self, Self::MFinal { .. })
+    }
+
+    /// Compute successor positions using elementary transition function δ^D,χ_e
+    ///
+    /// # Theory (Definition 7, pages 14-16)
+    ///
+    /// Given a position and a bit vector b, computes the set of reachable positions.
+    /// This implements the elementary transition function for universal positions:
+    ///
+    /// ```text
+    /// δ^∀,χ_e(S, x) = I^χ(δ^D,χ_e(offset#errors, bit_vector))
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `bit_vector` - Characteristic vector encoding matches
+    /// * `max_distance` - Maximum edit distance n
+    ///
+    /// # Returns
+    ///
+    /// Vector of successor positions. May be empty if no valid successors exist.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let pos = UniversalPosition::<Standard>::new_i(0, 0, 2)?;
+    /// let bv = CharacteristicVector::new('a', "abc"); // "100"
+    ///
+    /// // Match at position 1: successor is offset+1, same errors
+    /// let successors = pos.successors(&bv, 2);
+    /// assert_eq!(successors.len(), 1);
+    /// assert_eq!(successors[0], UniversalPosition::new_i(1, 0, 2)?);
+    /// ```
+    pub fn successors(
+        &self,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<Self> {
+        match self {
+            Self::INonFinal { offset, errors, .. } => {
+                Self::successors_i_type_standard(*offset, *errors, bit_vector, max_distance)
+            }
+            Self::MFinal { offset, errors, .. } => {
+                Self::successors_m_type_standard(*offset, *errors, bit_vector, max_distance)
+            }
+        }
+    }
+
+    /// Compute successors for I-type positions with Standard variant (χ = ε)
+    ///
+    /// Uses I^ε conversion: I^ε({i#e}) = {I + (i-1)#e}
+    ///
+    /// # Theory (Definition 7, page 14; Definition 18, page 46)
+    ///
+    /// ```text
+    /// δ^D,ε_e(i#e, b) = {
+    ///     {i+1#e}                              if 1 < b (match)
+    ///     {i#e+1, i+1#e+1}                     if b = 0^k & e < n (all zeros)
+    ///     {i#e+1, i+1#e+1, i+j#e+j-1}         if 0 < b & j = μz[bz = 1]
+    ///     {i#e+1}                              if b = ε & e < n (empty)
+    ///     ∅                                    otherwise
+    /// }
+    /// ```
+    ///
+    /// **Operations**:
+    /// - **Match** (1 < b): Advance position without error
+    /// - **Delete** (i#e+1): Delete from input, advance error
+    /// - **Insert** (i+1#e+1): Insert into input, advance position and error
+    /// - **Skip to match** (i+j#e+j-1): Delete j-1 chars to reach match at position j
+    fn successors_i_type_standard(
+        offset: i32,
+        errors: u8,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<Self> {
+        let mut successors = Vec::new();
+
+        // Universal position I + t#e uses offset t directly for δ^D,ε_e
+        // After δ^D,ε_e, we convert back using I^ε({i#e}) = {I + (i-1)#e}
+
+        // Case 1: Check if there's a match at the current word position
+        // For I+offset#errors at input k, the concrete word position is i = offset + k
+        // In bit vector s_n(w,k) (which starts at k-n), position i corresponds to index: i - (k-n) = offset + n
+        let match_index = (max_distance as i32 + offset) as usize;
+
+        if match_index < bit_vector.len() {
+            if bit_vector.is_match(match_index) {
+                // MATCH at current word position
+                // δ^D,ε_e(t#e, b) where b[n+t] = 1
+                // Result: (t+1)#e → I^ε → I+t#e
+                if let Ok(succ) = Self::new_i(offset, errors, max_distance) {
+                    successors.push(succ);
+                }
+                return successors;
+            } else {
+                // NO MATCH at current word position - generate error successors
+                if errors < max_distance {
+                    // DELETE: skip word character
+                    // δ^D,ε_e: t#(e+1) → I^ε → I+(t-1)#(e+1)
+                    if let Ok(succ) = Self::new_i(offset - 1, errors + 1, max_distance) {
+                        successors.push(succ);
+                    }
+
+                    // SUBSTITUTE: advance word and input, add error
+                    // δ^D,ε_e: (t+1)#(e+1) → I^ε → I+t#(e+1)
+                    if let Ok(succ) = Self::new_i(offset, errors + 1, max_distance) {
+                        successors.push(succ);
+                    }
+
+                    // SKIP-TO-MATCH: if there's a match later in window
+                    // Skip j positions (deleting j characters), consuming j errors
+                    for idx in (match_index + 1)..bit_vector.len() {
+                        if bit_vector.is_match(idx) {
+                            let skip_distance = (idx - match_index) as i32;
+                            let new_offset = offset + skip_distance;
+                            let new_errors = errors + skip_distance as u8;
+
+                            if new_errors <= max_distance {
+                                if let Ok(succ) = Self::new_i(new_offset, new_errors, max_distance) {
+                                    successors.push(succ);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                return successors;
+            }
+        }
+
+        // Position beyond visible window - use generic error transitions
+        if errors >= max_distance {
+            return successors;
+        }
+
+        // Case: b = ε (empty bit vector)
+        if bit_vector.is_empty() {
+            if let Ok(succ) = Self::new_i(offset - 1, errors + 1, max_distance) {
+                successors.push(succ);
+            }
+            return successors;
+        }
+
+        // Remaining cases: generic error transitions for positions outside window
+        // Delete
+        if let Ok(succ) = Self::new_i(offset - 1, errors + 1, max_distance) {
+            successors.push(succ);
+        }
+
+        // Insert/Substitute
+        if let Ok(succ) = Self::new_i(offset, errors + 1, max_distance) {
+            successors.push(succ);
+        }
+
+        successors
+    }
+
+    /// Compute successors for M-type positions with Standard variant (χ = ε)
+    ///
+    /// Uses M^ε conversion: M^ε({i#e}) = {M + i#e}
+    ///
+    /// # Theory (Definition 7, page 14; Definition 18, page 46)
+    ///
+    /// Same elementary transition as I-type, but converts results using M^ε instead of I^ε.
+    /// M^ε does NOT subtract 1 from the concrete position.
+    fn successors_m_type_standard(
+        offset: i32,
+        errors: u8,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<Self> {
+        let mut successors = Vec::new();
+
+        // Universal position M + t#e uses offset t directly for δ^D,ε_e
+        // After δ^D,ε_e, we convert back using M^ε({i#e}) = {M + i#e}
+
+        // Case 1: 1 < b (match at position 1 - bit vector starts with 1)
+        if bit_vector.starts_with_one() {
+            // δ^D,ε_e(t#e, "1...") = {(t+1)#e}
+            // M^ε({(t+1)#e}) = {M + (t+1)#e}
+            // Offset increases by 1!
+            if let Ok(succ) = Self::new_m(offset + 1, errors, max_distance) {
+                successors.push(succ);
+            }
+            return successors;
+        }
+
+        // Check if we can still consume errors
+        if errors >= max_distance {
+            return successors; // No more errors available
+        }
+
+        // Case 2: b = ε (empty bit vector)
+        if bit_vector.is_empty() {
+            // δ^D,ε_e(t#e, ε) = {t#(e+1)}
+            // M^ε({t#(e+1)}) = {M + t#(e+1)}
+            if let Ok(succ) = Self::new_m(offset, errors + 1, max_distance) {
+                successors.push(succ);
+            }
+            return successors;
+        }
+
+        // Case 3: b = 0^k (all zeros - no matches at all)
+        if bit_vector.is_all_zeros() {
+            // δ^D,ε_e(t#e, "0...") = {t#(e+1), (t+1)#(e+1)}
+
+            // Delete: t#(e+1) → M^ε = M + t#(e+1)
+            if let Ok(succ) = Self::new_m(offset, errors + 1, max_distance) {
+                successors.push(succ);
+            }
+
+            // Insert: (t+1)#(e+1) → M^ε = M + (t+1)#(e+1)
+            if let Ok(succ) = Self::new_m(offset + 1, errors + 1, max_distance) {
+                successors.push(succ);
+            }
+
+            return successors;
+        }
+
+        // Case 4: 0 < b (starts with 0, but has 1 somewhere)
+
+        // Delete: t#(e+1) → M^ε = M + t#(e+1)
+        if let Ok(succ) = Self::new_m(offset, errors + 1, max_distance) {
+            successors.push(succ);
+        }
+
+        // Insert: (t+1)#(e+1) → M^ε = M + (t+1)#(e+1)
+        if let Ok(succ) = Self::new_m(offset + 1, errors + 1, max_distance) {
+            successors.push(succ);
+        }
+
+        // Skip to match at position j (0-indexed in bit vector, so j+1 in thesis notation)
+        // δ^D,ε_e(t#e, "00...1...") performs j deletions to reach j+1, then matches
+        // Concrete result: (t+j+1)#(e+j)
+        // M^ε({(t+j+1)#(e+j)}) = {M + (t+j+1)#(e+j)}
+        if let Some(j) = bit_vector.first_match() {
+            let j = j as i32;
+            let new_offset = offset + j + 1;
+            let new_errors = errors + j as u8;
+
+            if new_errors <= max_distance {
+                if let Ok(succ) = Self::new_m(new_offset, new_errors, max_distance) {
+                    successors.push(succ);
+                }
+            }
+        }
+
+        successors
     }
 }
 
@@ -560,5 +838,235 @@ mod tests {
         assert!(display.contains("Invalid M-position"));
         assert!(display.contains("-5#0"));
         assert!(display.contains("n=2"));
+    }
+
+    // =========================================================================
+    // Successor Function Tests
+    // =========================================================================
+
+    use crate::transducer::universal::CharacteristicVector;
+
+    #[test]
+    fn test_successors_match() {
+        // Match case: 1 < b (bit vector starts with 1 at the correct window position)
+        // Testing position I+0#0 at input position 1, word "abc", max_distance 2
+        // Windowed subword s_2(abc, 1) = "$$abc" (positions -1,0,1,2,3 → padding + abc)
+        let pos = UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap();
+        let bv = CharacteristicVector::new('a', "$$abc"); // [false, false, true, false, false]
+
+        let succs = pos.successors(&bv, 2);
+
+        // Match at index 2 (offset 0 + max_distance 2): I+0#0 → I+0#0
+        assert_eq!(succs.len(), 1, "Expected 1 successor for match");
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap());
+    }
+
+    #[test]
+    fn test_successors_all_zeros() {
+        // All zeros case: no matches anywhere
+        let pos = UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap();
+        let bv = CharacteristicVector::new('x', "abc"); // "000"
+
+        let succs = pos.successors(&bv, 2);
+
+        // Should have two successors: delete and insert
+        // Delete: t#(e+1) → I + (t-1)#(e+1) = I + (-1)#1
+        // Insert: (t+1)#(e+1) → I + t#(e+1) = I + 0#1
+        assert_eq!(succs.len(), 2);
+
+        // Delete: I + (-1)#1
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(-1, 1, 2).unwrap()));
+
+        // Insert: I + 0#1
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(0, 1, 2).unwrap()));
+    }
+
+    #[test]
+    fn test_successors_match_later() {
+        // Match later: 0 < b (starts with 0, has 1 later in the window)
+        // Testing position I+0#0 at input position 1, word "abc", max_distance 2
+        // Windowed subword s_2(abc, 1) = "$$abc"
+        // Bit vector for 'b' in "$$abc" = [false, false, false, true, false]
+        //                                   $     $     a     b     c
+        let pos = UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap();
+        let bv = CharacteristicVector::new('b', "$$abc");
+
+        let succs = pos.successors(&bv, 2);
+
+        // Should have three successors: delete, substitute, skip-to-match
+        // Delete/substitute operations, plus skip to the 'b' at index 3
+        assert_eq!(succs.len(), 3, "Expected 3 successors");
+
+        // Delete: I + (-1)#1
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(-1, 1, 2).unwrap()));
+
+        // Substitute: I + 0#1
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(0, 1, 2).unwrap()));
+
+        // Skip to match at index 3: I + 1#1
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(1, 1, 2).unwrap()));
+    }
+
+    #[test]
+    fn test_successors_empty_bit_vector() {
+        // Empty bit vector
+        let pos = UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap();
+        let bv = CharacteristicVector::new('a', ""); // ""
+
+        let succs = pos.successors(&bv, 2);
+
+        // Should have one successor: delete only
+        // Delete: t#(e+1) → I + (t-1)#(e+1) = I + (-1)#1
+        assert_eq!(succs.len(), 1);
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_i(-1, 1, 2).unwrap());
+    }
+
+    #[test]
+    fn test_successors_max_errors_reached() {
+        // Already at max errors
+        let pos = UniversalPosition::<Standard>::new_i(0, 2, 2).unwrap();
+        let bv = CharacteristicVector::new('x', "abc"); // "000"
+
+        let succs = pos.successors(&bv, 2);
+
+        // Should have no successors (can't consume more errors)
+        assert_eq!(succs.len(), 0);
+    }
+
+    #[test]
+    fn test_successors_match_at_max_errors() {
+        // At max errors but there's a match
+        // Windowed subword s_2(abc, 1) = "$$abc"
+        let pos = UniversalPosition::<Standard>::new_i(0, 2, 2).unwrap();
+        let bv = CharacteristicVector::new('a', "$$abc"); // [false, false, true, false, false]
+
+        let succs = pos.successors(&bv, 2);
+
+        // Should still have the match successor at index 2
+        assert_eq!(succs.len(), 1, "Expected 1 successor for match at max errors");
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_i(0, 2, 2).unwrap());
+    }
+
+    #[test]
+    fn test_successors_negative_offset() {
+        // Test with negative offset
+        // Position I+(-1)#1 at input position 1 checks word position 0 (1 + (-1) = 0)
+        // In windowed subword "$$abc", word position 0 is at index 2-1=1 (the second '$')
+        // But we want 'a', so we need word position 1, which is at index 2
+        // Wait, let me recalculate: offset=-1 means word_pos = k + offset = 1 + (-1) = 0
+        // In window starting at k-n = 1-2 = -1, position 0 is at index 0 - (-1) = 1
+        // Hmm, for offset=-1: match_index = max_distance + offset = 2 + (-1) = 1
+        // Window "$$abc": index 1 is the second '$', not 'a'
+        // So this test expects NO match, not a match! Let me check the original test...
+        // Oh wait, it expects a match. So the original test was wrong. Let me fix it properly.
+        // For this to match 'a', we need the window where index (n + offset) = (2 + (-1)) = 1 contains 'a'
+        // That would be "$aabc" or similar
+        let pos = UniversalPosition::<Standard>::new_i(-1, 1, 2).unwrap();
+        let bv = CharacteristicVector::new('$', "$$abc"); // Match the padding character at index 1
+
+        let succs = pos.successors(&bv, 2);
+
+        // Match at index (2 + (-1)) = 1: offset stays same
+        assert_eq!(succs.len(), 1, "Expected 1 successor for match with negative offset");
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_i(-1, 1, 2).unwrap());
+    }
+
+    #[test]
+    fn test_successors_skip_multiple() {
+        // Skip to match at word position 2 (0-indexed)
+        // Windowed subword s_3(abcd, 1) = "$$$abcd" (positions -2,-1,0,1,2,3,4)
+        // Bit vector for 'c' in "$$$abcd" = [false, false, false, false, false, true, false]
+        //                                     $     $     $     a     b     c     d
+        let pos = UniversalPosition::<Standard>::new_i(0, 0, 3).unwrap();
+        let bv = CharacteristicVector::new('c', "$$$abcd");
+
+        let succs = pos.successors(&bv, 3);
+
+        // Should have: delete, substitute, skip-to-match
+        assert_eq!(succs.len(), 3, "Expected 3 successors");
+
+        // Delete: I + (-1)#1
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(-1, 1, 3).unwrap()));
+
+        // Substitute: I + 0#1
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(0, 1, 3).unwrap()));
+
+        // Skip to match at index 5: offset=2, errors=2
+        assert!(succs.contains(&UniversalPosition::<Standard>::new_i(2, 2, 3).unwrap()));
+    }
+
+    #[test]
+    fn test_successors_invariant_violation_filtered() {
+        // Test that invalid successors are filtered out
+        let pos = UniversalPosition::<Standard>::new_i(2, 2, 2).unwrap();
+        let bv = CharacteristicVector::new('x', "abc"); // "000"
+
+        let succs = pos.successors(&bv, 2);
+
+        // Delete would be 2#3 (invalid: errors > max_distance)
+        // Insert would be 3#3 (invalid: offset=3 > n=2 and errors > max_distance)
+        // So we should get no valid successors
+        assert_eq!(succs.len(), 0);
+    }
+
+    #[test]
+    fn test_successors_m_type_position() {
+        // Test M-type position successor generation
+        // M-type positions use M^ε conversion: M^ε({i#e}) = {M + i#e}
+        let pos = UniversalPosition::<Standard>::new_m(-1, 0, 2).unwrap();
+        let bv = CharacteristicVector::new('a', "abc"); // "100"
+
+        let succs = pos.successors(&bv, 2);
+
+        // Match: δ^D,ε_e((-1)#0, "1...") = {0#0}
+        // M^ε({0#0}) = {M + 0#0}
+        assert_eq!(succs.len(), 1);
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_m(0, 0, 2).unwrap());
+    }
+
+    #[test]
+    fn test_successors_boundary_offset() {
+        // Test at boundary: offset = n = 2
+        // Position I+2#2 at input position 1 checks word position 3 (1 + 2 = 3)
+        // match_index = n + offset = 2 + 2 = 4
+        // Windowed subword s_2(abc, 1) = "$$abc" (length 5)
+        // Need character at index 4, which is 'c'
+        let pos = UniversalPosition::<Standard>::new_i(2, 2, 2).unwrap();
+        let bv = CharacteristicVector::new('c', "$$abc"); // [false, false, false, false, true]
+
+        let succs = pos.successors(&bv, 2);
+
+        // Match at index 4: offset stays same
+        assert_eq!(succs.len(), 1, "Expected 1 successor for boundary offset match");
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_i(2, 2, 2).unwrap());
+    }
+
+    #[test]
+    fn test_successors_multiple_matches() {
+        // Multiple matches in bit vector (should only return first match)
+        // Windowed subword s_2(aba, 1) = "$$aba"
+        // Bit vector for 'a' in "$$aba" = [false, false, true, false, true]
+        let pos = UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap();
+        let bv = CharacteristicVector::new('a', "$$aba");
+
+        let succs = pos.successors(&bv, 2);
+
+        // Match at index 2 (first 'a'): I + 0#0 → I + 0#0
+        assert_eq!(succs.len(), 1, "Expected 1 successor for first match");
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap());
+    }
+
+    #[test]
+    fn test_successors_preserves_variant_type() {
+        // Ensure Standard variant is preserved
+        // Windowed subword s_2(a, 1) = "$$a"
+        let pos = UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap();
+        let bv = CharacteristicVector::new('a', "$$a"); // [false, false, true]
+
+        let succs = pos.successors(&bv, 2);
+
+        assert_eq!(succs.len(), 1, "Expected 1 successor");
+        // Check that result is also Standard variant: I + 0#0 → I + 0#0
+        assert_eq!(succs[0], UniversalPosition::<Standard>::new_i(0, 0, 2).unwrap());
     }
 }

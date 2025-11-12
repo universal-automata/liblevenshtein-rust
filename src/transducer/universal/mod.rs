@@ -47,13 +47,19 @@
 //! assert!(!automaton.accepts("test", "hello")); // distance > 2
 //! ```
 
+pub mod automaton;
 pub mod bit_vector;
+pub mod diagonal;
 pub mod position;
 pub mod state;
 pub mod subsumption;
 
 // Re-exports
+pub use automaton::UniversalAutomaton;
+
 pub use bit_vector::{CharacteristicVector, characteristic_vector, encode_word_pair};
+
+pub use diagonal::{right_most, diagonal_crossed, convert_position};
 
 pub use position::{
     UniversalPosition,
