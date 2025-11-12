@@ -218,33 +218,152 @@ integration test regressions. Real-world usage shows universal improvement.
 
 ---
 
-### Hypothesis 4: SIMD Lookup for Small Sets (LOW PRIORITY)
+### Hypothesis 4: SIMD Lookup for Small Sets ❌ **REJECTED**
 
-**Hypothesis**: For very small sets (≤8 pairs), SIMD parallel comparison could
-outperform both linear scan and hashing.
+**Hypothesis**: For very small sets (≤8 pairs), SIMD parallel comparison using AVX2
+instructions could outperform linear scan by checking multiple pairs simultaneously.
 
 **Expected Impact**: 1-3% improvement for tiny sets
 
-**Status**: DEFERRED (low priority)
+**Actual Impact**: <1% realistic (SIMD setup overhead negates benefits)
+
+**Evaluation Results** (2025-11-12):
+
+**Break-Even Analysis**:
+- Linear scan: N × 1.0ns per pair
+- SIMD setup: ~5-10ns (load, shuffle, mask)
+- SIMD compare: ~1-2ns
+- **Conclusion**: Linear wins for sizes 1-4, SIMD only competitive at size 8
+
+**Cost/Benefit Score**: **1.1/5** (threshold: 3.0/5)
+
+**Decision**: ❌ **REJECT** - Setup overhead exceeds parallel benefit, adds platform-specific
+complexity (+150-200 LOC) for <1% gain
+
+**Documentation**: See `08-h4-h6-evaluation.md` for full analysis
+
+**Status**: ❌ EVALUATED AND REJECTED - Deferred indefinitely
 
 ---
 
-### Hypothesis 5: Custom Hasher Optimization (LOW PRIORITY)
+### Hypothesis 5: Perfect Hashing for Presets ❌ **REJECTED**
 
-**Hypothesis**: FxHasher is general-purpose. A specialized hasher for (u8, u8) pairs
-could reduce collisions and improve performance.
+**Hypothesis**: Compile-time perfect hash function for fixed presets eliminates runtime
+hash computation entirely, potentially faster than const array initialization.
 
-**Expected Impact**: 1-2% improvement
+**Expected Impact**: 1-2% improvement for preset initialization
 
-**Status**: DEFERRED (diminishing returns)
+**Actual Impact**: <0.5% realistic (doesn't address initialization bottleneck)
+
+**Evaluation Results** (2025-11-12):
+
+**Critical Issue**: Perfect hashing optimizes **lookup**, not **initialization**.
+Memory allocation dominates initialization cost, not hash computation.
+
+**Cost/Benefit Score**: **1.6/5** (threshold: 3.0/5)
+
+**Decision**: ❌ **REJECT** - Doesn't address the right bottleneck (memory allocation),
+adds build-time complexity (+100-150 LOC) for <0.5% gain
+
+**Documentation**: See `08-h4-h6-evaluation.md` for full analysis
+
+**Status**: ❌ EVALUATED AND REJECTED - Deferred indefinitely
+
+---
+
+### Hypothesis 6: Custom Hasher Optimization ❌ **REJECTED**
+
+**Hypothesis**: Specialized hasher for (u8, u8) pairs could reduce collisions and
+improve performance over general-purpose FxHasher.
+
+**Expected Impact**: 1-2% improvement for hash-based lookups
+
+**Actual Impact**: <0.5% end-to-end (hash time is tiny fraction of total query time)
+
+**Evaluation Results** (2025-11-12):
+
+**Best-Case Analysis**:
+- Hash savings: ~2-3ns per lookup
+- End-to-end impact: 0.2-2% of total query time
+- FxHasher already excellent for small keys
+
+**Cost/Benefit Score**: **1.8/5** (threshold: 3.0/5)
+
+**Decision**: ❌ **REJECT** - Hard to beat production-proven FxHasher, risk of worse
+collisions, <0.5% end-to-end gain not justified
+
+**Documentation**: See `08-h4-h6-evaluation.md` for full analysis
+
+**Status**: ❌ EVALUATED AND REJECTED - Deferred indefinitely
 
 ## Phase 4: Integration and Final Benchmarks
 
-_(To be filled after experiments complete)_
+**Completed**: 2025-11-12
+
+### H1 + H3 Combined Integration Testing
+
+**Test Suite**: All 509 tests passing ✅
+
+**Integration Benchmarks** (H3 results):
+- Unrestricted (0 pairs): 10/10 improved (5-26% faster)
+- Phonetic (14 pairs): 6/6 improved (3-12% faster)
+- Keyboard (68 pairs): 2/5 improved (7-9%), 3/5 no change
+- Custom Small (3 pairs): 3/4 improved (1-4%), 1/4 noise
+- **Total**: 21/25 improved (84%), zero critical regressions
+
+### H4-H6 Evaluation
+
+**Comprehensive Cost/Benefit Analysis**: 2025-11-12
+- H4 (SIMD): 1.1/5 → REJECT
+- H5 (Perfect Hash): 1.6/5 → REJECT
+- H6 (Custom Hasher): 1.8/5 → REJECT
+- All below 3.0/5 acceptance threshold
+
+**Decision**: Defer indefinitely due to insufficient ROI (<3% combined gains for high complexity)
 
 ## Phase 5: Results Summary
 
-_(To be filled after all experiments complete)_
+**Project Status**: ✅ **SUCCESSFULLY COMPLETED** (2025-11-12)
+
+### Accepted Optimizations
+
+1. **H1 (Const Arrays for Presets)**: 15-28% faster initialization
+2. **H3 (Hybrid Small/Large Strategy)**: 9-46% faster for small sets, 50-79% memory reduction
+
+### Rejected Optimizations
+
+1. **H2 (Bitmap)**: 2.4× faster lookups but 4-13× slower initialization → NET NEGATIVE
+2. **H4 (SIMD)**: <1% expected gain, high complexity (1.1/5 score)
+3. **H5 (Perfect Hash)**: <0.5% expected gain, wrong bottleneck (1.6/5 score)
+4. **H6 (Custom Hasher)**: <0.5% expected gain, hard to beat FxHasher (1.8/5 score)
+
+### Production Readiness
+
+- ✅ All 509 tests passing
+- ✅ Zero critical regressions in integration tests
+- ✅ 84% of integration tests improved (21/25)
+- ✅ Comprehensive documentation complete
+- ✅ CHANGELOG.md updated
+- ✅ Git commit created (6a96515)
+
+### Final Metrics
+
+**Performance Improvements**:
+- Small sets (1-4 pairs): **9-46% faster** (H3)
+- Preset initialization: **15-28% faster** (H1)
+- Memory usage: **50-79% reduction** for small sets (H3)
+
+**Code Additions**:
+- H1: +50 LOC (const arrays)
+- H3: +70 LOC (hybrid strategy)
+- Total: +120 LOC for major performance wins
+
+### Recommendations
+
+1. ✅ **Deploy H1 + H3 to production** - Both optimizations ready
+2. ✅ **Monitor real-world metrics** - Validate improvements in production
+3. ✅ **Archive project documentation** - Complete for future reference
+4. ✅ **Close optimization project** - Mission accomplished
 
 ## Reproducibility
 
