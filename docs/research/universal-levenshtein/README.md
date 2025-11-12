@@ -1,7 +1,8 @@
 # Universal Levenshtein Automata - Complete Documentation
 
 **Last Updated**: 2025-11-11
-**Status**: Comprehensive Theory Documentation + Implementation Planning
+**Status**: ✅ **Implemented** - SmallVec-based Universal transducers (Standard + Transposition)
+**Implementation**: src/transducer/universal/ (commit ce7ccca, 2025-11-11)
 
 ---
 
@@ -86,6 +87,30 @@ See [Implementation Strategy](#implementation-strategy) section below for detail
 - **implementation-plan.md** - Phase-by-phase roadmap
 - **decision-matrix.md** - Approach comparison
 - **architectural-sketches.md** - Code designs
+
+#### Optimization Research Documents
+
+**State Container Optimization** (2025-11-11):
+
+6. **[UNIVERSAL_BTREESET_VS_SMALLVEC_RESULTS.md](./UNIVERSAL_BTREESET_VS_SMALLVEC_RESULTS.md)** (~1400 lines) ⭐
+   - Comprehensive benchmark analysis comparing BTreeSet vs SmallVec
+   - 24 benchmark scenarios across Standard and Transposition algorithms
+   - Performance results: SmallVec wins 75% with 1.08-2.06× speedup
+   - Memory analysis: SmallVec uses 4.8× less memory for typical states
+   - **Current implementation**: SmallVec (canonical approach as of commit ce7ccca)
+   - **Use this** to understand state container design decisions
+
+7. **[BTREESET_VS_SMALLVEC_COMPARISON.md](./BTREESET_VS_SMALLVEC_COMPARISON.md)** (~350 lines)
+   - Initial comparison guide (pre-benchmarking)
+   - Theoretical analysis of both approaches
+   - Benchmarking methodology
+   - **Historical**: See UNIVERSAL_BTREESET_VS_SMALLVEC_RESULTS.md for actual results
+
+8. **[Archived: BTreeSet Implementation](../../archive/universal-levenshtein/btreeset-implementation/)**
+   - Original BTreeSet implementation with error-based early termination
+   - Archived with comprehensive documentation explaining why it was replaced
+   - Historical reference for educational purposes
+   - **Reason for archival**: Empirical benchmarking showed SmallVec superior
 
 ### Key Theoretical Contributions
 
