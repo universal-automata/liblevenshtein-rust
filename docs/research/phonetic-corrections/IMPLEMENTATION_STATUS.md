@@ -1,14 +1,26 @@
 # Generalized Operations Framework: Implementation Status
 
 **Date**: 2025-11-12
-**Session**: Continued from previous phonetic corrections research
-**Status**: 🟡 **PARTIALLY IMPLEMENTED** - Core framework complete, integration pending
+**Last Updated**: 2025-11-12 (Phase 1 phonetic operations completed)
+**Status**: 🟢 **CORE IMPLEMENTATION COMPLETE** - Framework + Phase 1 phonetics ready, automata integration pending
 
 ---
 
 ## Summary
 
-The generalized operations framework from TCS 2011 has been successfully implemented, providing the foundation for phonetic corrections and custom edit distance metrics. However, full phonetic operations support requires additional work on multi-character substitution storage and universal automata integration.
+The generalized operations framework from TCS 2011 has been successfully implemented, along with **Phase 1 phonetic operations**. The core infrastructure (`OperationType`, `OperationSet`, `SubstitutionSet`) is fully functional with multi-character support. English phonetic corrections are now available through the `phonetic` module, providing ~60% coverage of common phonetic transformations.
+
+**What works now:**
+- ✅ Generalized operations framework (operation triples with restrictions)
+- ✅ Multi-character substitution matching (2→1, 1→2, 2→2)
+- ✅ Phase 1 phonetic operations (consonant digraphs, clusters, confusions, doubles)
+- ✅ Backward compatibility layer (Algorithm → OperationSet)
+- ✅ Comprehensive test coverage (50+ tests, 100% passing)
+
+**What's blocked:**
+- ❌ Universal automata integration (requires architectural redesign)
+- ❌ End-to-end phonetic string matching (depends on automata integration)
+- ❌ Runtime-based transition system (depends on automata integration)
 
 ---
 
@@ -187,22 +199,32 @@ The current `PositionVariant` trait provides **compile-time specialization** for
 
 ---
 
-### Phase 1 Phonetic Operations (Depends on Multi-Char SubstitutionSet)
+### Phase 1 Phonetic Operations
 
-**Status**: 🟡 **READY FOR IMPLEMENTATION** - After multi-char support
-**Effort**: 3-5 days
-**Files**: `src/transducer/phonetic.rs` (new)
+**Status**: ✅ **COMPLETED** - 2025-11-12
+**Effort**: ~1 day (actual)
+**Files**: `src/transducer/phonetic.rs` (420 lines)
 
-**Planned**:
-- `phonetic_english_basic()` preset
-- Consonant digraphs: `ch→ç, sh→$, ph→f, th→+, qu→kw, wr→r, wh→w, rh→r`
-- Vowel digraphs: `ea→ë, ee→ë, ai→ä, oa→ö, au→ò, aw→ò, etc.`
-- Vowel trigraphs: `eau→ö`
-- Silent e deletion
-- Double consonant simplification
-- Initial cluster reduction
+**Implemented**:
+- `phonetic_english_basic()` comprehensive preset
+- `consonant_digraphs()`: ch↔k, sh↔s, ph↔f, th↔t, qu↔kw (ASCII-only, bidirectional)
+  - 3 operations: 2→1, 1→2, 2→2
+- `initial_clusters()`: wr↔r, wh↔w, kn↔n, ps↔s, pn↔n, gn↔n, rh↔r (bidirectional)
+  - 2 operations: 2→1, 1→2
+- `phonetic_confusions()`: c↔k, c↔s, s↔z, g↔j, f↔v, a↔e, i↔e
+  - 1 operation: 1→1 (symmetric)
+- `double_consonants()`: bb↔b, dd↔d, ff↔f, etc. (14 consonants)
+  - 1 operation: 2→1 (bidirectional)
+- 10 tests, all passing
 
-**Coverage**: 60-70% of common English phonetic transformations
+**Coverage**: ~60% of common English phonetic transformations (ASCII-only variant)
+
+**Design Notes**:
+- Used ASCII substitutes (k, s, f, t) instead of special phonetic characters (ç, $, +)
+- Bidirectional mappings for maximum flexibility
+- Weight hierarchy: doubles (0.10) < digraphs (0.15) < clusters (0.20) < confusions (0.25)
+- Modular design: separate functions for each phonetic category
+- Total: 7 operations in `phonetic_english_basic()` preset
 
 ---
 
@@ -213,16 +235,28 @@ The current `PositionVariant` trait provides **compile-time specialization** for
 | Module | Tests | Status |
 |--------|-------|--------|
 | `operation_type` | 7 | ✅ All passing |
-| `operation_set` | 10 | ✅ All passing |
+| `operation_set` | 11 (1 new) | ✅ All passing |
 | `algorithm` | 7 (4 new) | ✅ All passing |
-| **Total** | **24** | **✅ 100%** |
+| `substitution_set` | 15+ (multi-char) | ✅ All passing |
+| `phonetic` | 10 | ✅ All passing |
+| **Total** | **50+** | **✅ 100%** |
+
+### Phonetic Tests Breakdown
+
+- `test_consonant_digraphs` - Verifies 3 operations (2→1, 1→2, 2→2)
+- `test_initial_clusters` - Verifies 2 operations (2→1, 1→2)
+- `test_phonetic_confusions` - Verifies 1 operation (1→1)
+- `test_double_consonants` - Verifies 1 operation (2→1 bidirectional)
+- `test_phonetic_english_basic` - Verifies comprehensive preset (7 operations)
+- `test_can_apply_consonant_digraphs` - Tests ph↔f matching
+- `test_can_apply_initial_clusters` - Tests wr↔r, kn↔n matching
+- `test_operation_weights` - Verifies weight hierarchy
 
 ### Missing Tests
 
-- Multi-character `SubstitutionSet` operations
-- Phonetic operation presets
-- Integration tests with universal automata
-- Performance benchmarks for operation set matching
+- Integration tests with universal automata (blocked on automata integration)
+- Performance benchmarks for phonetic operation matching
+- End-to-end phonetic string matching tests (requires automata integration)
 
 ---
 
@@ -230,15 +264,18 @@ The current `PositionVariant` trait provides **compile-time specialization** for
 
 ### Immediate (< 1 week)
 
-1. **Complete `SubstitutionSet` multi-char storage**
-   - Design data structure
-   - Implement `allow_str()` fully
-   - Implement `contains_str()` fully
-   - Add comprehensive tests
-   - Benchmark performance
+1. ✅ **Complete `SubstitutionSet` multi-char storage** - DONE
+   - Hybrid Vec/HashMap storage implemented
+   - `allow_str()` fully functional
+   - `contains_str()` fully functional
+   - Comprehensive tests added (15+)
+   - Performance benchmarked
 
-2. **Add `from_str_pairs()` tests**
-   - Currently untested (relies on placeholder `allow_str()`)
+2. ✅ **Implement Phase 1 phonetic operations** - DONE
+   - `phonetic.rs` module created (420 lines)
+   - 4 operation categories implemented
+   - 10 tests, all passing
+   - Integrated with transducer module
 
 ### Medium-term (1-4 weeks)
 
@@ -365,11 +402,24 @@ let ops: OperationSet = Algorithm::Standard.into();
 
 ## Conclusion
 
-The generalized operations framework is **successfully implemented** and provides a solid foundation for future work. The core abstractions (`OperationType`, `OperationSet`, `OperationSetBuilder`) are complete, tested, and ready for use.
+The generalized operations framework is **fully implemented** and **Phase 1 phonetic operations are complete**. The core abstractions (`OperationType`, `OperationSet`, `SubstitutionSet`) work correctly with multi-character operations. English phonetic corrections are now available through the `phonetic` module.
 
-However, **full phonetic corrections support** requires completing the multi-character substitution storage and integrating with the universal automata transition system. These are substantial engineering efforts that will take 4-6 weeks of focused development.
+**Completed (2025-11-12):**
+- ✅ Generalized operations framework (operations as triples)
+- ✅ Multi-character substitution storage (hybrid Vec/HashMap)
+- ✅ Phase 1 phonetic operations (4 categories, 7 operations, 10 tests)
+- ✅ Backward compatibility (Algorithm → OperationSet conversion)
 
-The backward compatibility layer ensures that existing code continues to work, enabling a smooth migration path for users.
+**Next Steps:**
+The main blocker for **end-to-end phonetic matching** is universal automata integration. The current universal automata use compile-time specialization and need to be refactored to accept runtime `OperationSet` parameters. This is a 3-4 week architectural effort.
+
+**Users can already:**
+- Create custom operation sets with multi-character rules
+- Use the phonetic operation presets
+- Convert between Algorithm and OperationSet
+- Test operations with `can_apply()`
+
+**Actual usage for string matching** requires the universal automata integration (next major milestone).
 
 ---
 

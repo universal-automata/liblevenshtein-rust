@@ -23,6 +23,7 @@ pub mod intersection_zipper;
 pub mod operation_set;
 pub mod operation_type;
 mod ordered_query;
+pub mod phonetic;
 mod pool;
 mod position;
 mod query;
