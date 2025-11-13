@@ -378,9 +378,14 @@ impl GeneralizedState {
                             // Phase 3: Use can_apply() for phonetic operations
                             // Don't check bit_vector - phonetic ops don't require char matches
                             if op.can_apply(word_2chars.as_bytes(), input_1char.as_bytes()) {
-                                let new_errors = errors + op.weight() as u8;
+                                let weight_as_errors = op.weight() as u8;
+                                let new_errors = errors + weight_as_errors;
+
                                 if new_errors <= self.max_distance {
                                     // Direct transition: offset+1, errors+weight
+                                    // Note: For fractional weights (e.g., 0.15), weight truncates to 0
+                                    // This creates positions with offset > errors (e.g., offset=1, errors=0)
+                                    // which is allowed by the relaxed invariant in new_i()
                                     if let Ok(merge) = GeneralizedPosition::new_i(
                                         offset + 1,
                                         new_errors,

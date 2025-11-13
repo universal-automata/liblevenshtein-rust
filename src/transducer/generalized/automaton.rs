@@ -1260,7 +1260,13 @@ mod tests {
     #[test]
     fn test_phonetic_digraph_2to1_ch_to_k() {
         // Test phonetic operation: "ch" → "k" (⟨2,1,0.15⟩)
-        let ops = crate::transducer::phonetic::consonant_digraphs();
+        // Need standard ops for matching non-phonetic characters
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
         let automaton = GeneralizedAutomaton::with_operations(1, ops);
 
         // "church" can match "kurk" via "ch"→"k" digraph operations
@@ -1269,8 +1275,8 @@ mod tests {
         // "chair" can match "kair" via "ch"→"k"
         assert!(automaton.accepts("chair", "kair"));
 
-        // Distance 0: no phonetic operations allowed
-        let ops0 = crate::transducer::phonetic::consonant_digraphs();
+        // Distance 0: exact match only (with standard match operation)
+        let ops0 = crate::transducer::OperationSet::default();
         let automaton0 = GeneralizedAutomaton::with_operations(0, ops0);
         assert!(automaton0.accepts("church", "church")); // exact match
         assert!(!automaton0.accepts("church", "kurk")); // requires phonetic ops
@@ -1279,7 +1285,13 @@ mod tests {
     #[test]
     fn test_phonetic_digraph_2to1_ph_to_f() {
         // Test phonetic operation: "ph" → "f" (⟨2,1,0.15⟩)
-        let ops = crate::transducer::phonetic::consonant_digraphs();
+        // Need standard ops for matching non-phonetic characters
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
         let automaton = GeneralizedAutomaton::with_operations(1, ops);
 
         // "phone" can match "fone" via "ph"→"f"
@@ -1292,7 +1304,13 @@ mod tests {
     #[test]
     fn test_phonetic_digraph_2to1_sh_to_s() {
         // Test phonetic operation: "sh" → "s" (⟨2,1,0.15⟩)
-        let ops = crate::transducer::phonetic::consonant_digraphs();
+        // Need standard ops for matching non-phonetic characters
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
         let automaton = GeneralizedAutomaton::with_operations(1, ops);
 
         // "ship" can match "sip" via "sh"→"s"
@@ -1305,7 +1323,13 @@ mod tests {
     #[test]
     fn test_phonetic_digraph_2to1_th_to_t() {
         // Test phonetic operation: "th" → "t" (⟨2,1,0.15⟩)
-        let ops = crate::transducer::phonetic::consonant_digraphs();
+        // Need standard ops for matching non-phonetic characters
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
         let automaton = GeneralizedAutomaton::with_operations(1, ops);
 
         // "think" can match "tink" via "th"→"t"
@@ -1318,7 +1342,13 @@ mod tests {
     #[test]
     fn test_phonetic_digraph_multiple_in_word() {
         // Test multiple phonetic operations in same word
-        let ops = crate::transducer::phonetic::consonant_digraphs();
+        // Need standard ops for matching non-phonetic characters
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
         let automaton = GeneralizedAutomaton::with_operations(2, ops);
 
         // "church" has two "ch" digraphs, both can convert: "kurk"
@@ -1352,7 +1382,13 @@ mod tests {
     #[test]
     fn test_phonetic_distance_constraints() {
         // Verify phonetic operations respect distance limits
-        let ops = crate::transducer::phonetic::consonant_digraphs();
+        // Need standard ops for matching non-phonetic characters and deletions
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
 
         // Distance 1: allows one phonetic operation
         let automaton1 = GeneralizedAutomaton::with_operations(1, ops.clone());

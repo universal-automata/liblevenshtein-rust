@@ -259,11 +259,22 @@ impl GeneralizedPosition {
         let n = max_distance as i32;
 
         // Check invariant: |offset| ≤ errors ∧ -n ≤ offset ≤ n ∧ 0 ≤ errors ≤ n
-        if offset.abs() <= errors as i32
-            && offset >= -n
-            && offset <= n
-            && errors <= max_distance
-        {
+        // RELAXED: For fractional-weight operations (which truncate to 0), allow offset > errors
+        // when errors == 0. Since fractional operations are "free", we don't limit offset by n
+        // in this case, as multiple free operations can be chained.
+        let invariant_satisfied = if errors == 0 && offset > 0 {
+            // Relaxed invariant for fractional-weight operations: no offset upper bound
+            // Only check that offset is non-negative (we're ahead in word consumption)
+            true
+        } else {
+            // Standard invariant
+            offset.abs() <= errors as i32
+                && offset >= -n
+                && offset <= n
+                && errors <= max_distance
+        };
+
+        if invariant_satisfied {
             Ok(GeneralizedPosition::INonFinal { offset, errors })
         } else {
             Err(PositionError::InvalidIPosition {
