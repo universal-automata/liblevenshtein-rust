@@ -402,7 +402,9 @@ impl GeneralizedState {
             }
 
             // Phase 2d: Multi-character operations - SPLIT ⟨1,2,1⟩
-            // Split: consume 1 input char, match 2 word chars (two-step operation)
+            // Split: consume 1 word char, match 2 input chars (two-step operation)
+            // Note: Phase 3 phonetic ⟨1,2⟩ operations (e.g., "k"→"ch") require
+            // architectural changes to pass operations/characters to completion functions
             let has_split_op = operations.operations().iter()
                 .any(|op| op.consume_x() == 1 && op.consume_y() == 2);
 
@@ -579,23 +581,43 @@ impl GeneralizedState {
             }
         }
 
-        // Phase 2d: Multi-character operations - MERGE ⟨2,1,1⟩
-        // Merge: consume 2 input chars, match 1 word char (direct operation)
-        let has_merge_op = operations.operations().iter()
-            .any(|op| op.consume_x() == 2 && op.consume_y() == 1);
+        // Phase 2d/3: Multi-character operations - MERGE ⟨2,1⟩
+        // Merge: consume 2 word chars, match 1 input char (direct operation)
+        // Phase 3: Supports phonetic operations like "ch"→"k", "ph"→"f"
+        if errors < self.max_distance {
+            let word_chars: Vec<char> = word_slice.chars().collect();
+            let next_match_index = (offset + bit_vector.len() as i32 + 1) as usize;
 
-        if has_merge_op && errors < self.max_distance {
-            let next_bit_index = offset + bit_vector.len() as i32 + 1;
-            // Check next position in bit vector
-            if next_bit_index >= 0 && (next_bit_index as usize) < bit_vector.len()
-                && bit_vector.is_match(next_bit_index as usize) {
-                // Direct transition: offset+1, errors+1
-                if let Ok(merge) = GeneralizedPosition::new_m(
-                    offset + 1,
-                    errors + 1,
-                    self.max_distance
-                ) {
-                    successors.push(merge);
+            // Check if we have enough word characters (need 2 consecutive chars)
+            // Skip padding chars '$'
+            if next_match_index + 1 < word_chars.len()
+                && word_chars[next_match_index] != '$'
+                && word_chars[next_match_index + 1] != '$' {
+                // Extract 2 word characters
+                let word_2chars: String = word_chars[next_match_index..next_match_index+2].iter().collect();
+                let input_1char = input_char.to_string();
+
+                // Check all ⟨2,1⟩ operations
+                for op in operations.operations() {
+                    if op.consume_x() == 2 && op.consume_y() == 1 {
+                        // Phase 3: Use can_apply() for phonetic operations
+                        if op.can_apply(word_2chars.as_bytes(), input_1char.as_bytes()) {
+                            let weight_as_errors = op.weight() as u8;
+                            let new_errors = errors + weight_as_errors;
+
+                            if new_errors <= self.max_distance {
+                                // Direct transition: offset+1, errors+weight
+                                if let Ok(merge) = GeneralizedPosition::new_m(
+                                    offset + 1,
+                                    new_errors,
+                                    self.max_distance
+                                ) {
+                                    successors.push(merge);
+                                    break; // Only add one merge successor per position
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

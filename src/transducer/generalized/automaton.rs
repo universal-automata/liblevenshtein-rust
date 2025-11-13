@@ -1399,4 +1399,113 @@ mod tests {
         let automaton2 = GeneralizedAutomaton::with_operations(2, ops);
         assert!(automaton2.accepts("phone", "fo")); // ph→f + delete 'ne'
     }
+
+    // ==================== Cross-Validation Tests ====================
+    // Compare Generalized Automaton with Universal Automaton
+    // to ensure correctness of phonetic operations
+
+    #[test]
+    fn test_cross_validate_standard_operations() {
+        // Test that generalized automaton matches universal automaton
+        // for standard Levenshtein operations
+        use crate::transducer::universal::UniversalAutomaton;
+        use crate::transducer::universal::Standard;
+
+        let test_cases = vec![
+            ("kitten", "sitting", 3, true),
+            ("kitten", "sitting", 2, false),
+            ("saturday", "sunday", 3, true),
+            ("saturday", "sunday", 2, false),
+            ("test", "test", 0, true),
+            ("test", "tast", 1, true),
+            ("", "", 0, true),
+            ("a", "b", 1, true),
+            ("abc", "def", 3, true),
+        ];
+
+        for (word, input, distance, expected) in test_cases {
+            let gen_auto = GeneralizedAutomaton::new(distance);
+            let univ_auto = UniversalAutomaton::<Standard>::new(distance);
+
+            let gen_result = gen_auto.accepts(word, input);
+            let univ_result = univ_auto.accepts(word, input);
+
+            assert_eq!(gen_result, univ_result,
+                      "Mismatch for ('{}', '{}', {}): gen={}, univ={}",
+                      word, input, distance, gen_result, univ_result);
+            assert_eq!(gen_result, expected,
+                      "Expected {} for ('{}', '{}', {}), got {}",
+                      expected, word, input, distance, gen_result);
+        }
+    }
+
+    #[test]
+    fn test_cross_validate_phonetic_merge_simple() {
+        // Cross-validate phonetic merge operations
+        // Generalized automaton should accept same strings as manual validation
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // These should all be accepted
+        let accept_cases = vec![
+            ("phone", "fone"),   // ph→f
+            ("graph", "graf"),   // ph→f
+            ("ship", "sip"),     // sh→s
+            ("think", "tink"),   // th→t
+            ("church", "kurc"),  // first ch→k
+            ("chair", "kair"),   // ch→k
+        ];
+
+        for (word, input) in accept_cases {
+            assert!(automaton.accepts(word, input),
+                   "Should accept ('{}', '{}')", word, input);
+        }
+
+        // These should all be rejected (require > distance 1)
+        let reject_cases = vec![
+            ("phone", "fo"),     // ph→f + delete (needs distance 2)
+            ("church", "urk"),   // ch→k + delete (needs distance 2)
+        ];
+
+        for (word, input) in reject_cases {
+            assert!(!automaton.accepts(word, input),
+                   "Should reject ('{}', '{}') at distance 1", word, input);
+        }
+    }
+
+    #[test]
+    fn test_cross_validate_fractional_weights() {
+        // Verify fractional weights (0.15) are treated as "free" operations
+        // Multiple phonetic operations should be possible at distance 1
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+
+        // With distance 1, multiple fractional-weight operations should work
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // "church" → "kurk" requires 2× ch→k operations
+        // Each operation has weight 0.15, truncates to 0
+        // Both should succeed at distance 1
+        assert!(automaton.accepts("church", "kurk"),
+               "Two phonetic operations (2×0.15=0 errors) should work at distance 1");
+
+        // "church" → "kurks" requires 2× ch→k + 1 insert = 1 standard error
+        // Should still work at distance 1
+        assert!(automaton.accepts("church", "kurks"),
+               "Two phonetic + one standard operation (total 1 error) should work at distance 1");
+
+        // But two standard operations should fail
+        assert!(!automaton.accepts("church", "korks"),
+               "Two phonetic + two standard operations should fail at distance 1");
+    }
 }
+
