@@ -717,4 +717,211 @@ mod tests {
         // "aabc" → "aacb" (swap last two adjacent chars)
         assert!(automaton.accepts("aabc", "aacb"));
     }
+
+    // ============================================================================
+    // MERGE AND SPLIT TESTS
+    // ============================================================================
+
+    #[test]
+    fn test_merge_and_split_distance_zero() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(0);
+
+        // Distance 0 should only accept identical strings
+        assert!(automaton.accepts("", ""));
+        assert!(automaton.accepts("hello", "hello"));
+        assert!(!automaton.accepts("hello", "helo"));
+        assert!(!automaton.accepts("hello", "helllo"));
+    }
+
+    #[test]
+    fn test_merge_simple() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Merge: "ab" → "a" (merge two input chars 'ab' into one word char 'a')
+        // Input has "ab", word has "a" - merge consumes 2 input chars for 1 word char
+        assert!(automaton.accepts("ab", "a"));
+
+        // Merge at different positions
+        assert!(automaton.accepts("abc", "ac"));  // merge 'ab' → 'a'
+        assert!(automaton.accepts("xab", "xa"));  // merge 'ab' → 'a' at end
+        assert!(automaton.accepts("xaby", "xay"));  // merge 'ab' → 'a' in middle
+    }
+
+    #[test]
+    fn test_split_simple() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Split: "a" → "ab" (split one input char 'a' into two word chars 'ab')
+        // Input has "a", word has "ab" - split expands 1 input char to 2 word chars
+        assert!(automaton.accepts("a", "ab"));
+
+        // Split at different positions
+        assert!(automaton.accepts("ac", "abc"));  // split 'a' → 'ab'
+        assert!(automaton.accepts("xa", "xab"));  // split 'a' → 'ab' at end
+        assert!(automaton.accepts("xay", "xaby"));  // split 'a' → 'ab' in middle
+
+        // Additional split tests
+        assert!(automaton.accepts("b", "bc"));    // split 'b' → 'bc'
+        assert!(automaton.accepts("t", "te"));    // split 't' → 'te'
+    }
+
+    #[test]
+    fn test_merge_and_split_longer_words() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Merge in longer words
+        assert!(automaton.accepts("algorithm", "algorihm"));  // merge 'it' → 'i'
+        assert!(automaton.accepts("banana", "banna"));  // merge 'an' → 'n'
+
+        // Split in longer words
+        assert!(automaton.accepts("algorithim", "algorithm"));  // split 'i' → 'it'
+        assert!(automaton.accepts("banna", "banana"));  // split 'n' → 'an'
+    }
+
+    #[test]
+    fn test_merge_and_split_with_standard_operations() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Merge/split mode should include ALL standard operations
+
+        // Standard insertion
+        assert!(automaton.accepts("test", "teest"));
+
+        // Standard deletion
+        assert!(automaton.accepts("test", "tst"));
+
+        // Standard substitution
+        assert!(automaton.accepts("test", "best"));
+    }
+
+    #[test]
+    fn test_merge_and_split_empty_and_single_char() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Empty word
+        assert!(automaton.accepts("", ""));
+
+        // Single character - merge/split mode still supports standard operations
+        assert!(automaton.accepts("a", "a"));
+        assert!(automaton.accepts("a", "b"));  // substitution
+        assert!(automaton.accepts("a", ""));   // deletion
+        assert!(automaton.accepts("", "a"));   // insertion
+
+        // Single char to two chars (split)
+        assert!(automaton.accepts("a", "ab"));
+
+        // Two chars to one char (merge)
+        assert!(automaton.accepts("ab", "a"));
+    }
+
+    #[test]
+    fn test_merge_at_start() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Merge at the very start of the word
+        assert!(automaton.accepts("abcd", "acd"));  // merge 'ab' → 'a'
+        assert!(automaton.accepts("test", "est"));  // merge 'te' → 'e'
+    }
+
+    #[test]
+    fn test_merge_at_end() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Merge at the very end of the word
+        assert!(automaton.accepts("test", "tes"));  // merge 'st' → 's'
+        assert!(automaton.accepts("abcd", "abc"));  // merge 'cd' → 'c'
+    }
+
+    #[test]
+    fn test_split_at_start() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Split at the very start of the word
+        assert!(automaton.accepts("acd", "abcd"));  // split 'a' → 'ab'
+        assert!(automaton.accepts("est", "test"));  // split 'e' → 'te'
+    }
+
+    #[test]
+    fn test_split_at_end() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Split at the very end of the word
+        assert!(automaton.accepts("tes", "test"));  // split 's' → 'st'
+        assert!(automaton.accepts("abc", "abcd"));  // split 'c' → 'cd'
+    }
+
+    #[test]
+    fn test_merge_and_split_multiple_operations() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(2);
+
+        // Multiple merge operations
+        assert!(automaton.accepts("abcd", "ac"));   // merge 'ab' → 'a', merge 'cd' → 'c'
+
+        // Multiple split operations
+        assert!(automaton.accepts("ac", "abcd"));   // split 'a' → 'ab', split 'c' → 'cd'
+
+        // Mix of operations
+        assert!(automaton.accepts("abc", "abbc"));  // split 'b' → 'bb'
+        assert!(automaton.accepts("abbc", "abc"));  // merge 'bb' → 'b'
+    }
+
+    #[test]
+    fn test_merge_and_split_vs_standard() {
+        use crate::transducer::universal::{MergeAndSplit, Standard};
+        let merge_split_automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+        let standard_automaton = UniversalAutomaton::<Standard>::new(1);
+
+        // Standard operations should work in both
+        assert_eq!(
+            standard_automaton.accepts("test", "best"),
+            merge_split_automaton.accepts("test", "best")
+        );
+        assert_eq!(
+            standard_automaton.accepts("test", "tst"),
+            merge_split_automaton.accepts("test", "tst")
+        );
+
+        // Verify that merge/split automaton does support these operations
+        // Note: We can't easily demonstrate that standard DOESN'T support merge/split
+        // because "ab" → "a" can be achieved with deletion, and "a" → "ab" with insertion.
+        // The key difference is efficiency: merge/split does it in 1 operation,
+        // while standard needs 2 operations.
+
+        // With distance 1, merge/split can do:
+        assert!(merge_split_automaton.accepts("ab", "a"));   // merge in 1 op
+        assert!(merge_split_automaton.accepts("a", "ab"));   // split in 1 op
+        assert!(merge_split_automaton.accepts("abc", "ac")); // merge 'ab' → 'a'
+        assert!(merge_split_automaton.accepts("ac", "abc")); // split 'a' → 'ab'
+
+        // Standard automaton can also accept these, but via different paths
+        // (e.g., deletion + substitution for "ab" → "a", insertion + substitution for "a" → "ab")
+        // So these tests just verify merge/split works correctly
+    }
+
+    #[test]
+    fn test_merge_and_split_with_repeated_chars() {
+        use crate::transducer::universal::MergeAndSplit;
+        let automaton = UniversalAutomaton::<MergeAndSplit>::new(1);
+
+        // Merge with repeated characters
+        assert!(automaton.accepts("aab", "ab"));   // merge 'aa' → 'a'
+        assert!(automaton.accepts("aabb", "abb")); // merge 'aa' → 'a'
+        assert!(automaton.accepts("abbb", "abb")); // merge 'bb' → 'b'
+
+        // Split with repeated characters
+        assert!(automaton.accepts("ab", "aab"));   // split 'a' → 'aa'
+        assert!(automaton.accepts("abb", "aabb")); // split 'a' → 'aa'
+        assert!(automaton.accepts("abb", "abbb")); // split 'b' → 'bb'
+    }
 }

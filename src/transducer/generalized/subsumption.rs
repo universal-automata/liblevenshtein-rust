@@ -71,6 +71,16 @@ pub fn subsumes(
 ///
 /// From Definition 11 (page 18): i#e ≤^ε_s j#f ⇔ f > e ∧ |j - i| ≤ f - e
 ///
+/// # Phase 2d Extension
+///
+/// With multi-character operations, positions can be in intermediate states (transposing, splitting).
+/// **Key Rule**: Only positions of the same variant can subsume each other.
+///
+/// Rationale:
+/// - Transposing/splitting positions represent intermediate states with different constraints
+/// - They have different futures in the automaton
+/// - Cross-variant subsumption would be incorrect
+///
 /// # Arguments
 ///
 /// - `pos1`: Position i#e (potential subsumer)
@@ -83,7 +93,7 @@ pub fn subsumes(
 ///
 /// # Conditions
 ///
-/// 1. Both must be same type (I or M)
+/// 1. Both must be same variant (INonFinal, MFinal, ITransposing, etc.)
 /// 2. pos2 has more errors: f > e
 /// 3. Positions close enough: |j - i| ≤ f - e
 fn subsumes_standard(
@@ -93,53 +103,52 @@ fn subsumes_standard(
 ) -> bool {
     use GeneralizedPosition::*;
 
+    // Helper function for the actual subsumption check (same for all variants)
+    fn check_subsumption(i: i32, e: u8, j: i32, f: u8) -> bool {
+        // f > e (pos2 has more errors available)
+        if f <= e {
+            return false;
+        }
+
+        let error_diff = (f - e) as i32;
+        let offset_diff = (j - i).abs();
+
+        // |j - i| ≤ f - e
+        offset_diff <= error_diff
+    }
+
     match (pos1, pos2) {
-        // I-type subsumes I-type
-        (
-            INonFinal {
-                offset: i,
-                errors: e,
-            },
-            INonFinal {
-                offset: j,
-                errors: f,
-            },
-        ) => {
-            // f > e (pos2 has more errors available)
-            if *f <= *e {
-                return false;
-            }
-
-            let error_diff = (*f - *e) as i32;
-            let offset_diff = (*j - *i).abs();
-
-            // |j - i| ≤ f - e
-            offset_diff <= error_diff
+        // I-type subsumes I-type (usual state)
+        (INonFinal { offset: i, errors: e }, INonFinal { offset: j, errors: f }) => {
+            check_subsumption(*i, *e, *j, *f)
         }
 
-        // M-type subsumes M-type
-        (
-            MFinal {
-                offset: i,
-                errors: e,
-            },
-            MFinal {
-                offset: j,
-                errors: f,
-            },
-        ) => {
-            // Same logic as I-type
-            if *f <= *e {
-                return false;
-            }
-
-            let error_diff = (*f - *e) as i32;
-            let offset_diff = (*j - *i).abs();
-
-            offset_diff <= error_diff
+        // M-type subsumes M-type (usual state)
+        (MFinal { offset: i, errors: e }, MFinal { offset: j, errors: f }) => {
+            check_subsumption(*i, *e, *j, *f)
         }
 
-        // Different types cannot subsume each other
+        // I-type transposing subsumes I-type transposing
+        (ITransposing { offset: i, errors: e }, ITransposing { offset: j, errors: f }) => {
+            check_subsumption(*i, *e, *j, *f)
+        }
+
+        // M-type transposing subsumes M-type transposing
+        (MTransposing { offset: i, errors: e }, MTransposing { offset: j, errors: f }) => {
+            check_subsumption(*i, *e, *j, *f)
+        }
+
+        // I-type splitting subsumes I-type splitting
+        (ISplitting { offset: i, errors: e }, ISplitting { offset: j, errors: f }) => {
+            check_subsumption(*i, *e, *j, *f)
+        }
+
+        // M-type splitting subsumes M-type splitting
+        (MSplitting { offset: i, errors: e }, MSplitting { offset: j, errors: f }) => {
+            check_subsumption(*i, *e, *j, *f)
+        }
+
+        // Different variants never subsume each other
         _ => false,
     }
 }
@@ -220,5 +229,105 @@ mod tests {
         // f > e: 3 > 2 ✓
         // |j - i| ≤ f - e: |0 - (-1)| = 1 ≤ 3 - 2 = 1 ✓
         assert!(subsumes(&pos1, &pos2, 3));
+    }
+
+    // Tests for Phase 2d.2: Variant subsumption
+
+    #[test]
+    fn test_same_variant_subsumption_transposing() {
+        // I+(-1)#1_t subsumes I+0#2_t (same variant)
+        let pos1 = GeneralizedPosition::new_i_transposing(-1, 1, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_i_transposing(0, 2, 2).unwrap();
+        // f > e: 2 > 1 ✓
+        // |j - i| ≤ f - e: |0 - (-1)| = 1 ≤ 2 - 1 = 1 ✓
+        assert!(subsumes(&pos1, &pos2, 2));
+    }
+
+    #[test]
+    fn test_same_variant_subsumption_splitting() {
+        // I+(-1)#1_s subsumes I+0#2_s (same variant)
+        let pos1 = GeneralizedPosition::new_i_splitting(-1, 1, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2).unwrap();
+        assert!(subsumes(&pos1, &pos2, 2));
+    }
+
+    #[test]
+    fn test_same_variant_subsumption_m_transposing() {
+        // M+(-1)#1_t subsumes M+(-2)#2_t (same variant)
+        let pos1 = GeneralizedPosition::new_m_transposing(-1, 1, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_m_transposing(-2, 2, 2).unwrap();
+        assert!(subsumes(&pos1, &pos2, 2));
+    }
+
+    #[test]
+    fn test_same_variant_subsumption_m_splitting() {
+        // M+(-1)#1_s subsumes M+(-2)#2_s (same variant)
+        let pos1 = GeneralizedPosition::new_m_splitting(-1, 1, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_m_splitting(-2, 2, 2).unwrap();
+        assert!(subsumes(&pos1, &pos2, 2));
+    }
+
+    #[test]
+    fn test_different_variant_no_subsumption_usual_vs_transposing() {
+        // I+0#1 (usual) does NOT subsume I+0#2_t (transposing)
+        let pos1 = GeneralizedPosition::new_i(0, 1, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_i_transposing(0, 2, 2).unwrap();
+        assert!(!subsumes(&pos1, &pos2, 2));
+
+        // And vice versa
+        assert!(!subsumes(&pos2, &pos1, 2));
+    }
+
+    #[test]
+    fn test_different_variant_no_subsumption_transposing_vs_splitting() {
+        // I+0#1_t (transposing) does NOT subsume I+0#2_s (splitting)
+        let pos1 = GeneralizedPosition::new_i_transposing(0, 1, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2).unwrap();
+        assert!(!subsumes(&pos1, &pos2, 2));
+
+        // And vice versa
+        assert!(!subsumes(&pos2, &pos1, 2));
+    }
+
+    #[test]
+    fn test_different_variant_no_subsumption_usual_vs_splitting() {
+        // I+0#1 (usual) does NOT subsume I+0#2_s (splitting)
+        let pos1 = GeneralizedPosition::new_i(0, 1, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2).unwrap();
+        assert!(!subsumes(&pos1, &pos2, 2));
+
+        // And vice versa
+        assert!(!subsumes(&pos2, &pos1, 2));
+    }
+
+    #[test]
+    fn test_different_variant_same_offset_errors() {
+        // Even with same offset and errors, different variants don't subsume
+        let i_usual = GeneralizedPosition::new_i(0, 1, 2).unwrap();
+        let i_trans = GeneralizedPosition::new_i_transposing(0, 1, 2).unwrap();
+        let i_split = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+
+        // No cross-variant subsumption
+        assert!(!subsumes(&i_usual, &i_trans, 2));
+        assert!(!subsumes(&i_usual, &i_split, 2));
+        assert!(!subsumes(&i_trans, &i_usual, 2));
+        assert!(!subsumes(&i_trans, &i_split, 2));
+        assert!(!subsumes(&i_split, &i_usual, 2));
+        assert!(!subsumes(&i_split, &i_trans, 2));
+    }
+
+    #[test]
+    fn test_m_type_variants_no_cross_subsumption() {
+        // M-type variants also don't subsume across types
+        let m_usual = GeneralizedPosition::new_m(0, 1, 2).unwrap();
+        let m_trans = GeneralizedPosition::new_m_transposing(0, 1, 2).unwrap();
+        let m_split = GeneralizedPosition::new_m_splitting(0, 1, 2).unwrap();
+
+        assert!(!subsumes(&m_usual, &m_trans, 2));
+        assert!(!subsumes(&m_usual, &m_split, 2));
+        assert!(!subsumes(&m_trans, &m_usual, 2));
+        assert!(!subsumes(&m_trans, &m_split, 2));
+        assert!(!subsumes(&m_split, &m_usual, 2));
+        assert!(!subsumes(&m_split, &m_trans, 2));
     }
 }

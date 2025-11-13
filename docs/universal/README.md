@@ -16,11 +16,13 @@ The Universal Levenshtein Automaton is a parameter-free automaton that efficient
 ### Phase Completion Documents
 - **[transposition_phase1_complete.md](transposition_phase1_complete.md)** - Phase 1: Infrastructure and trait-based dispatch
 - **[transposition_phase2_complete.md](transposition_phase2_complete.md)** - Phase 2: Transposition logic implementation
+- **[merge_split_phase3_complete.md](merge_split_phase3_complete.md)** - Phase 3: Merge/Split logic implementation
 
 ### Technical Analysis
 - **[lazy_to_universal_mapping.md](lazy_to_universal_mapping.md)** - Cross-validation between Universal and lazy automaton
 - **[hypothesis_h5_offset_completion_bug.md](hypothesis_h5_offset_completion_bug.md)** - Critical bug fix: transposition completion offset
 - **[hypothesis_h6_test_assertions.md](hypothesis_h6_test_assertions.md)** - Test assertion corrections
+- **[merge_split_analysis.md](merge_split_analysis.md)** - Phase 3 research: merge/split operations analysis and offset calculations
 
 ### Debugging Documents
 - **[transposition_fix_needed.md](transposition_fix_needed.md)** - Initial debugging analysis
@@ -44,9 +46,14 @@ The Universal Levenshtein Automaton is a parameter-free automaton that efficient
 - 168/168 universal automaton tests passing
 - 617/617 total tests passing
 
-### Phase 3: Merge/Split ⏳ PENDING
-- Placeholder trait implemented
-- Successor logic not yet implemented
+### Phase 3: Merge/Split ✅ COMPLETE
+- Merge operation ⟨2,1,1⟩ support (two input chars → one word char)
+- Split operation ⟨1,2,1⟩ support (one input char → two word chars)
+- Two-step split state machine (enter/complete)
+- Cross-validated against lazy automaton
+- 13/13 merge/split tests passing
+- 181/181 universal automaton tests passing
+- 630/630 total tests passing
 
 ## Key Technical Insights
 

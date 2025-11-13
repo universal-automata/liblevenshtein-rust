@@ -366,35 +366,158 @@ impl PositionVariant for MergeAndSplit {
     fn compute_i_successors(
         offset: i32,
         errors: u8,
-        _variant_state: &Self::State,
+        variant_state: &Self::State,
         bit_vector: &crate::transducer::universal::CharacteristicVector,
         max_distance: u8,
     ) -> Vec<UniversalPosition<Self>> {
-        // TODO: Implement merge/split logic in Phase 3
-        // For now, just delegate to standard successors
-        UniversalPosition::<Self>::successors_i_type_standard(
+        let is_splitting = matches!(variant_state, MergeSplitState::Splitting);
+
+        // Start with standard operations (always included - merge/split is ADDITIVE)
+        let mut successors = UniversalPosition::<Self>::successors_i_type_standard(
             offset,
             errors,
             bit_vector,
             max_distance,
-        )
+        );
+
+        // Bit vector indices
+        let match_index = (max_distance as i32 + offset) as usize;
+        let next_match_index = (max_distance as i32 + offset + 1) as usize;
+
+        if is_splitting {
+            // Split Completion: i#(e+1)_s → (i+1)#e
+            // At input k: current word position i = offset + k
+            // Lazy creates: (i+1)#e (absolute position i+1)
+            // At next input k+1: need offset' such that offset' + (k+1) = i+1 = (offset+k)+1
+            // Therefore: offset' = (offset+k+1) - (k+1) = offset + 0
+            if match_index < bit_vector.len() && bit_vector.is_match(match_index) {
+                if let Ok(succ) = UniversalPosition::new_i_with_state(
+                    offset,  // offset + 0
+                    errors - 1,  // Complete split: decrement error back
+                    max_distance,
+                    MergeSplitState::Usual,
+                ) {
+                    successors.push(succ);
+                }
+            }
+        } else {
+            // Not splitting - can enter merge or split
+
+            // Merge Operation: i#e → (i+2)#(e+1)
+            // Merge: consume 2 input chars, 1 word char
+            // At input k: current word position i = offset + k
+            // Lazy creates: (i+2)#(e+1) (absolute position i+2)
+            // At next input k+1: need offset' such that offset' + (k+1) = i+2 = (offset+k)+2
+            // Therefore: offset' = (offset+k+2) - (k+1) = offset + 1
+            if next_match_index < bit_vector.len()
+                && bit_vector.is_match(next_match_index)
+                && errors < max_distance
+            {
+                if let Ok(merge) = UniversalPosition::new_i_with_state(
+                    offset + 1,
+                    errors + 1,
+                    max_distance,
+                    MergeSplitState::Usual,
+                ) {
+                    successors.push(merge);
+                }
+            }
+
+            // Split Entry: i#e → i#(e+1)_s
+            // Split: one input char becomes two word chars
+            // At input k: current word position i = offset + k
+            // Lazy creates: i#(e+1)_s (same absolute position i, entering split state)
+            // At next input k+1: need offset' such that offset' + (k+1) = i = offset+k
+            // Therefore: offset' = (offset+k) - (k+1) = offset - 1
+            if match_index < bit_vector.len()
+                && bit_vector.is_match(match_index)
+                && errors < max_distance
+            {
+                if let Ok(split) = UniversalPosition::new_i_with_state(
+                    offset - 1,
+                    errors + 1,
+                    max_distance,
+                    MergeSplitState::Splitting,
+                ) {
+                    successors.push(split);
+                }
+            }
+        }
+
+        successors
     }
 
     fn compute_m_successors(
         offset: i32,
         errors: u8,
-        _variant_state: &Self::State,
+        variant_state: &Self::State,
         bit_vector: &crate::transducer::universal::CharacteristicVector,
         max_distance: u8,
     ) -> Vec<UniversalPosition<Self>> {
-        // TODO: Implement merge/split logic in Phase 3
-        // For now, just delegate to standard successors
-        UniversalPosition::<Self>::successors_m_type_standard(
+        let is_splitting = matches!(variant_state, MergeSplitState::Splitting);
+
+        // Start with standard operations (always included - merge/split is ADDITIVE)
+        let mut successors = UniversalPosition::<Self>::successors_m_type_standard(
             offset,
             errors,
             bit_vector,
             max_distance,
-        )
+        );
+
+        // Bit vector indices
+        let match_index = (max_distance as i32 + offset) as usize;
+        let next_match_index = (max_distance as i32 + offset + 1) as usize;
+
+        if is_splitting {
+            // Split Completion: i#(e+1)_s → (i+1)#e
+            // Same offset calculation as I-type
+            if match_index < bit_vector.len() && bit_vector.is_match(match_index) {
+                if let Ok(succ) = UniversalPosition::new_m_with_state(
+                    offset,  // offset + 0
+                    errors - 1,  // Complete split: decrement error back
+                    max_distance,
+                    MergeSplitState::Usual,
+                ) {
+                    successors.push(succ);
+                }
+            }
+        } else {
+            // Not splitting - can enter merge or split
+
+            // Merge Operation: i#e → (i+2)#(e+1)
+            // Same offset calculation as I-type
+            if next_match_index < bit_vector.len()
+                && bit_vector.is_match(next_match_index)
+                && errors < max_distance
+            {
+                if let Ok(merge) = UniversalPosition::new_m_with_state(
+                    offset + 1,
+                    errors + 1,
+                    max_distance,
+                    MergeSplitState::Usual,
+                ) {
+                    successors.push(merge);
+                }
+            }
+
+            // Split Entry: i#e → i#(e+1)_s
+            // Same offset calculation as I-type
+            if match_index < bit_vector.len()
+                && bit_vector.is_match(match_index)
+                && errors < max_distance
+            {
+                if let Ok(split) = UniversalPosition::new_m_with_state(
+                    offset - 1,
+                    errors + 1,
+                    max_distance,
+                    MergeSplitState::Splitting,
+                ) {
+                    successors.push(split);
+                }
+            }
+        }
+
+        successors
     }
 }
 

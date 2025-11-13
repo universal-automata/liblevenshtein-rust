@@ -150,6 +150,8 @@ impl GeneralizedState {
         &self,
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
+        word_slice: &str,
+        input_char: char,
         _input_length: usize,
     ) -> Option<Self> {
         // Special case: empty state has no successors
@@ -163,7 +165,8 @@ impl GeneralizedState {
         // For each position in current state
         for pos in &self.positions {
             // Compute successors using runtime-configurable operations
-            let successors = self.successors(pos, operations, bit_vector);
+            // Phase 3: Pass word_slice and input_char for phonetic operations
+            let successors = self.successors(pos, operations, bit_vector, word_slice, input_char);
 
             // Add all successors to next state
             for succ in successors {
@@ -182,18 +185,39 @@ impl GeneralizedState {
     /// Compute successors for a position using runtime-configurable operations
     ///
     /// Phase 2: Uses OperationSet to support custom edit distance metrics.
+    /// Phase 3: Accepts word_slice and input_char for phonetic operations.
     fn successors(
         &self,
         pos: &GeneralizedPosition,
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
+        word_slice: &str,
+        input_char: char,
     ) -> Vec<GeneralizedPosition> {
         match pos {
             GeneralizedPosition::INonFinal { offset, errors } => {
-                self.successors_i_type(*offset, *errors, operations, bit_vector)
+                self.successors_i_type(*offset, *errors, operations, bit_vector, word_slice, input_char)
             }
             GeneralizedPosition::MFinal { offset, errors } => {
-                self.successors_m_type(*offset, *errors, operations, bit_vector)
+                self.successors_m_type(*offset, *errors, operations, bit_vector, word_slice, input_char)
+            }
+            // Phase 2d: Multi-character operation intermediate states
+            GeneralizedPosition::ITransposing { offset, errors } => {
+                // Complete transposition for I-type positions
+                self.successors_i_transposing(*offset, *errors, bit_vector)
+            }
+            GeneralizedPosition::MTransposing { offset, errors } => {
+                // Complete transposition for M-type positions
+                self.successors_m_transposing(*offset, *errors, bit_vector)
+            }
+            // Phase 2d.5: Splitting positions
+            GeneralizedPosition::ISplitting { offset, errors } => {
+                // Complete split for I-type positions
+                self.successors_i_splitting(*offset, *errors, bit_vector)
+            }
+            GeneralizedPosition::MSplitting { offset, errors } => {
+                // Complete split for M-type positions
+                self.successors_m_splitting(*offset, *errors, bit_vector)
             }
         }
     }
@@ -218,6 +242,8 @@ impl GeneralizedState {
         errors: u8,
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
+        word_slice: &str,
+        input_char: char,
     ) -> Vec<GeneralizedPosition> {
         let mut successors = Vec::new();
         let n = self.max_distance as i32;
@@ -229,9 +255,9 @@ impl GeneralizedState {
         if match_index < bit_vector.len() {
             let has_match = bit_vector.is_match(match_index);
 
-            // Iterate over all operations
+            // Iterate over all operations (handle standard single-character operations)
             for op in operations.operations() {
-                // Only handle single-char operations for now (Phase 2c will add multi-char)
+                // Skip multi-char operations in this loop (handled separately below)
                 if op.consume_x() > 1 || op.consume_y() > 1 {
                     continue;
                 }
@@ -240,34 +266,152 @@ impl GeneralizedState {
                 if op.is_match() {
                     // Match operation: ⟨1, 1, 0.0⟩
                     if has_match {
-                        // δ^D,ε_e: (t+1)#e → I^ε → I+t#e
-                        if let Ok(succ) = GeneralizedPosition::new_i(offset, errors, self.max_distance) {
-                            successors.push(succ);
-                            // Match takes precedence - early return
-                            return successors;
+                        // Phase 3: For match, check can_apply() with actual characters
+                        let word_chars: Vec<char> = word_slice.chars().collect();
+                        if match_index < word_chars.len() {
+                            let word_char_str = word_chars[match_index].to_string();
+                            let input_char_str = input_char.to_string();
+                            if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                                // δ^D,ε_e: (t+1)#e → I^ε → I+t#e
+                                if let Ok(succ) = GeneralizedPosition::new_i(offset, errors, self.max_distance) {
+                                    successors.push(succ);
+                                    // Match takes precedence - early return
+                                    return successors;
+                                }
+                            }
                         }
                     }
                 } else if op.is_deletion() {
                     // Delete operation: ⟨1, 0, w⟩
+                    // Phase 3: For deletion, check can_apply() with word character and empty input
                     if errors < self.max_distance {
                         let new_errors = errors + op.weight() as u8;
                         if new_errors <= self.max_distance {
-                            // δ^D,ε_e: t#(e+w) → I^ε → I+(t-1)#(e+w)
-                            if let Ok(succ) = GeneralizedPosition::new_i(offset - 1, new_errors, self.max_distance) {
-                                successors.push(succ);
+                            let word_chars: Vec<char> = word_slice.chars().collect();
+                            if match_index < word_chars.len() {
+                                let word_char_str = word_chars[match_index].to_string();
+                                if op.can_apply(word_char_str.as_bytes(), &[]) {
+                                    // δ^D,ε_e: t#(e+w) → I^ε → I+(t-1)#(e+w)
+                                    if let Ok(succ) = GeneralizedPosition::new_i(offset - 1, new_errors, self.max_distance) {
+                                        successors.push(succ);
+                                    }
+                                }
                             }
                         }
                     }
-                } else if op.is_insertion() || op.is_substitution() {
-                    // Insert ⟨0, 1, w⟩ or Substitute ⟨1, 1, w⟩
+                } else if op.is_insertion() {
+                    // Insert ⟨0, 1, w⟩
+                    // Phase 3: For insertion, check can_apply() with empty word and input character
                     if errors < self.max_distance {
                         let new_errors = errors + op.weight() as u8;
                         if new_errors <= self.max_distance {
-                            // δ^D,ε_e: (t+1)#(e+w) → I^ε → I+t#(e+w)
-                            if let Ok(succ) = GeneralizedPosition::new_i(offset, new_errors, self.max_distance) {
-                                successors.push(succ);
+                            let input_char_str = input_char.to_string();
+                            if op.can_apply(&[], input_char_str.as_bytes()) {
+                                // δ^D,ε_e: (t+1)#(e+w) → I^ε → I+t#(e+w)
+                                if let Ok(succ) = GeneralizedPosition::new_i(offset, new_errors, self.max_distance) {
+                                    successors.push(succ);
+                                }
                             }
                         }
+                    }
+                } else if op.is_substitution() {
+                    // Substitute ⟨1, 1, w⟩
+                    // Phase 3: For substitution, check can_apply() with word and input characters
+                    if errors < self.max_distance {
+                        let new_errors = errors + op.weight() as u8;
+                        if new_errors <= self.max_distance {
+                            let word_chars: Vec<char> = word_slice.chars().collect();
+                            if match_index < word_chars.len() {
+                                let word_char_str = word_chars[match_index].to_string();
+                                let input_char_str = input_char.to_string();
+                                if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                                    // δ^D,ε_e: (t+1)#(e+w) → I^ε → I+t#(e+w)
+                                    if let Ok(succ) = GeneralizedPosition::new_i(offset, new_errors, self.max_distance) {
+                                        successors.push(succ);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Phase 2d: Multi-character operations - TRANSPOSITION ⟨2,2,1⟩
+            // Check if we have transposition operations in the operation set
+            let has_transpose_op = operations.operations().iter()
+                .any(|op| op.consume_x() == 2 && op.consume_y() == 2);
+
+            if has_transpose_op && errors < self.max_distance {
+                // Transposition enter: check next position in bit vector
+                let next_match_index = (offset + n + 1) as usize;
+                if next_match_index < bit_vector.len() && bit_vector.is_match(next_match_index) {
+                    // Enter transposing state: offset-1, errors+1
+                    // Offset adjustment: stay at same word position at next input
+                    if let Ok(trans) = GeneralizedPosition::new_i_transposing(
+                        offset - 1,
+                        errors + 1,
+                        self.max_distance
+                    ) {
+                        successors.push(trans);
+                    }
+                }
+            }
+
+            // Phase 2d/3: Multi-character operations - MERGE ⟨2,1⟩
+            // Merge: consume 2 word chars, match 1 input char (direct operation)
+            // Phase 3: Supports phonetic operations like "ch"→"k", "ph"→"f"
+            if errors < self.max_distance {
+                let word_chars: Vec<char> = word_slice.chars().collect();
+
+                // Check if we have enough word characters (need 2 consecutive chars)
+                // Skip padding chars '$'
+                if match_index + 1 < word_chars.len()
+                    && word_chars[match_index] != '$'
+                    && word_chars[match_index + 1] != '$' {
+                    // Extract 2 word characters
+                    let word_2chars: String = word_chars[match_index..match_index+2].iter().collect();
+                    let input_1char = input_char.to_string();
+
+                    // Check all ⟨2,1⟩ operations
+                    for op in operations.operations() {
+                        if op.consume_x() == 2 && op.consume_y() == 1 {
+                            // Phase 3: Use can_apply() for phonetic operations
+                            // Don't check bit_vector - phonetic ops don't require char matches
+                            if op.can_apply(word_2chars.as_bytes(), input_1char.as_bytes()) {
+                                let new_errors = errors + op.weight() as u8;
+                                if new_errors <= self.max_distance {
+                                    // Direct transition: offset+1, errors+weight
+                                    if let Ok(merge) = GeneralizedPosition::new_i(
+                                        offset + 1,
+                                        new_errors,
+                                        self.max_distance
+                                    ) {
+                                        successors.push(merge);
+                                        break; // Only add one merge successor per position
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Phase 2d: Multi-character operations - SPLIT ⟨1,2,1⟩
+            // Split: consume 1 input char, match 2 word chars (two-step operation)
+            let has_split_op = operations.operations().iter()
+                .any(|op| op.consume_x() == 1 && op.consume_y() == 2);
+
+            if has_split_op && errors < self.max_distance {
+                // Enter split: check current position for first word char
+                if match_index < bit_vector.len() && bit_vector.is_match(match_index) {
+                    // Enter splitting state: offset-1, errors+1
+                    // Offset adjustment: stay at same word position at next input
+                    if let Ok(split) = GeneralizedPosition::new_i_splitting(
+                        offset - 1,
+                        errors + 1,
+                        self.max_distance
+                    ) {
+                        successors.push(split);
                     }
                 }
             }
@@ -329,6 +473,8 @@ impl GeneralizedState {
         errors: u8,
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
+        word_slice: &str,
+        input_char: char,
     ) -> Vec<GeneralizedPosition> {
         let mut successors = Vec::new();
 
@@ -350,25 +496,264 @@ impl GeneralizedState {
             // Classify operation type and generate successors
             if op.is_match() && has_match {
                 // Match operation: ⟨1, 1, 0.0⟩
-                if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, errors, self.max_distance) {
-                    successors.push(succ);
+                // Phase 3: Check can_apply() with actual characters
+                let word_chars: Vec<char> = word_slice.chars().collect();
+                if bit_index >= 0 && (bit_index as usize) < word_chars.len() {
+                    let word_char_str = word_chars[bit_index as usize].to_string();
+                    let input_char_str = input_char.to_string();
+                    if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                        if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, errors, self.max_distance) {
+                            successors.push(succ);
+                        }
+                    }
                 }
             } else if op.is_deletion() && errors < self.max_distance {
                 // Delete operation: ⟨1, 0, w⟩
+                // Phase 3: Check can_apply() with word character and empty input
                 let new_errors = errors + op.weight() as u8;
                 if new_errors <= self.max_distance {
-                    if let Ok(succ) = GeneralizedPosition::new_m(offset, new_errors, self.max_distance) {
-                        successors.push(succ);
+                    let word_chars: Vec<char> = word_slice.chars().collect();
+                    if bit_index >= 0 && (bit_index as usize) < word_chars.len() {
+                        let word_char_str = word_chars[bit_index as usize].to_string();
+                        if op.can_apply(word_char_str.as_bytes(), &[]) {
+                            if let Ok(succ) = GeneralizedPosition::new_m(offset, new_errors, self.max_distance) {
+                                successors.push(succ);
+                            }
+                        }
                     }
                 }
-            } else if (op.is_insertion() || op.is_substitution()) && errors < self.max_distance {
-                // Insert ⟨0, 1, w⟩ or Substitute ⟨1, 1, w⟩
+            } else if op.is_insertion() && errors < self.max_distance {
+                // Insert ⟨0, 1, w⟩
+                // Phase 3: Check can_apply() with empty word and input character
                 let new_errors = errors + op.weight() as u8;
                 if new_errors <= self.max_distance {
-                    if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, new_errors, self.max_distance) {
-                        successors.push(succ);
+                    let input_char_str = input_char.to_string();
+                    if op.can_apply(&[], input_char_str.as_bytes()) {
+                        if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, new_errors, self.max_distance) {
+                            successors.push(succ);
+                        }
                     }
                 }
+            } else if op.is_substitution() && errors < self.max_distance {
+                // Substitute ⟨1, 1, w⟩
+                // Phase 3: Check can_apply() with word and input characters
+                let new_errors = errors + op.weight() as u8;
+                if new_errors <= self.max_distance {
+                    let word_chars: Vec<char> = word_slice.chars().collect();
+                    if bit_index >= 0 && (bit_index as usize) < word_chars.len() {
+                        let word_char_str = word_chars[bit_index as usize].to_string();
+                        let input_char_str = input_char.to_string();
+                        if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                            if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, new_errors, self.max_distance) {
+                                successors.push(succ);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Phase 2d: Multi-character operations - TRANSPOSITION ⟨2,2,1⟩
+        // Check if we have transposition operations in the operation set
+        let has_transpose_op = operations.operations().iter()
+            .any(|op| op.consume_x() == 2 && op.consume_y() == 2);
+
+        if has_transpose_op && errors < self.max_distance {
+            // Transposition enter: check next position in bit vector
+            let next_bit_index = offset + bit_vector.len() as i32 + 1;
+            if next_bit_index >= 0 && (next_bit_index as usize) < bit_vector.len()
+                && bit_vector.is_match(next_bit_index as usize) {
+                // Enter transposing state: offset-1, errors+1
+                if let Ok(trans) = GeneralizedPosition::new_m_transposing(
+                    offset - 1,
+                    errors + 1,
+                    self.max_distance
+                ) {
+                    successors.push(trans);
+                }
+            }
+        }
+
+        // Phase 2d: Multi-character operations - MERGE ⟨2,1,1⟩
+        // Merge: consume 2 input chars, match 1 word char (direct operation)
+        let has_merge_op = operations.operations().iter()
+            .any(|op| op.consume_x() == 2 && op.consume_y() == 1);
+
+        if has_merge_op && errors < self.max_distance {
+            let next_bit_index = offset + bit_vector.len() as i32 + 1;
+            // Check next position in bit vector
+            if next_bit_index >= 0 && (next_bit_index as usize) < bit_vector.len()
+                && bit_vector.is_match(next_bit_index as usize) {
+                // Direct transition: offset+1, errors+1
+                if let Ok(merge) = GeneralizedPosition::new_m(
+                    offset + 1,
+                    errors + 1,
+                    self.max_distance
+                ) {
+                    successors.push(merge);
+                }
+            }
+        }
+
+        // Phase 2d: Multi-character operations - SPLIT ⟨1,2,1⟩
+        // Split: consume 1 input char, match 2 word chars (two-step operation)
+        let has_split_op = operations.operations().iter()
+            .any(|op| op.consume_x() == 1 && op.consume_y() == 2);
+
+        if has_split_op && errors < self.max_distance {
+            // Enter split: check current position for first word char
+            if bit_index >= 0 && (bit_index as usize) < bit_vector.len()
+                && bit_vector.is_match(bit_index as usize) {
+                // Enter splitting state: offset-1, errors+1
+                if let Ok(split) = GeneralizedPosition::new_m_splitting(
+                    offset - 1,
+                    errors + 1,
+                    self.max_distance
+                ) {
+                    successors.push(split);
+                }
+            }
+        }
+
+        successors
+    }
+
+    /// Compute successors for I-type transposing positions
+    ///
+    /// Complete the transposition operation: consume the second input character,
+    /// match against current word position, and return to usual state.
+    ///
+    /// # Transposition Complete Logic
+    ///
+    /// From transposing state I+(offset)#(errors)_t:
+    /// - Check bit_vector[offset + n] (current position)
+    /// - If match, create I+(offset+1)#(errors-1) (jump 2 word positions, decrement error)
+    fn successors_i_transposing(
+        &self,
+        offset: i32,
+        errors: u8,
+        bit_vector: &CharacteristicVector,
+    ) -> Vec<GeneralizedPosition> {
+        let mut successors = Vec::new();
+        let n = self.max_distance as i32;
+        let match_index = (offset + n) as usize;
+
+        // Complete transposition: check current position for match
+        if match_index < bit_vector.len() && bit_vector.is_match(match_index) {
+            // Complete transposition: offset+1 (jump 2 word positions), errors-1
+            if let Ok(succ) = GeneralizedPosition::new_i(
+                offset + 1,
+                errors - 1,  // Decrement error (was incremented on enter)
+                self.max_distance
+            ) {
+                successors.push(succ);
+            }
+        }
+
+        successors
+    }
+
+    /// Compute successors for M-type transposing positions
+    ///
+    /// Complete the transposition operation for M-type (final) positions.
+    ///
+    /// # Transposition Complete Logic
+    ///
+    /// From transposing state M+(offset)#(errors)_t:
+    /// - Check bit_vector at appropriate index
+    /// - If match, create M+(offset+1)#(errors-1)
+    fn successors_m_transposing(
+        &self,
+        offset: i32,
+        errors: u8,
+        bit_vector: &CharacteristicVector,
+    ) -> Vec<GeneralizedPosition> {
+        let mut successors = Vec::new();
+        let bit_index = offset + bit_vector.len() as i32;
+
+        // Complete transposition: check current position for match
+        if bit_index >= 0
+            && (bit_index as usize) < bit_vector.len()
+            && bit_vector.is_match(bit_index as usize)
+        {
+            // Complete transposition: offset+1, errors-1
+            if let Ok(succ) = GeneralizedPosition::new_m(
+                offset + 1,
+                errors - 1,  // Decrement error
+                self.max_distance
+            ) {
+                successors.push(succ);
+            }
+        }
+
+        successors
+    }
+
+    /// Compute successors for I-type splitting positions
+    ///
+    /// Complete the split operation: consume the second input character,
+    /// match against current word position, and return to usual state.
+    ///
+    /// # Split Complete Logic
+    ///
+    /// From splitting state I+(offset)#(errors)_s:
+    /// - Check bit_vector[offset + n] (current position for second word char)
+    /// - If match, create I+(offset+0)#(errors-1) (advance 1 word position, decrement error)
+    fn successors_i_splitting(
+        &self,
+        offset: i32,
+        errors: u8,
+        bit_vector: &CharacteristicVector,
+    ) -> Vec<GeneralizedPosition> {
+        let mut successors = Vec::new();
+        let n = self.max_distance as i32;
+        let match_index = (offset + n) as usize;
+
+        // Complete split: check current position for second word char
+        if match_index < bit_vector.len() && bit_vector.is_match(match_index) {
+            // Complete split: offset+0 (advance 1 word position), errors-1
+            if let Ok(succ) = GeneralizedPosition::new_i(
+                offset,      // +0 (stays same!)
+                errors - 1,  // Decrement error (was incremented on enter)
+                self.max_distance
+            ) {
+                successors.push(succ);
+            }
+        }
+
+        successors
+    }
+
+    /// Compute successors for M-type splitting positions
+    ///
+    /// Complete the split operation for M-type (final) positions.
+    ///
+    /// # Split Complete Logic
+    ///
+    /// From splitting state M+(offset)#(errors)_s:
+    /// - Check bit_vector at appropriate index
+    /// - If match, create M+(offset+0)#(errors-1)
+    fn successors_m_splitting(
+        &self,
+        offset: i32,
+        errors: u8,
+        bit_vector: &CharacteristicVector,
+    ) -> Vec<GeneralizedPosition> {
+        let mut successors = Vec::new();
+        let bit_index = offset + bit_vector.len() as i32;
+
+        // Complete split: check current position for second word char
+        if bit_index >= 0
+            && (bit_index as usize) < bit_vector.len()
+            && bit_vector.is_match(bit_index as usize)
+        {
+            // Complete split: offset+0, errors-1
+            if let Ok(succ) = GeneralizedPosition::new_m(
+                offset,      // +0 (stays same!)
+                errors - 1,  // Decrement error
+                self.max_distance
+            ) {
+                successors.push(succ);
             }
         }
 

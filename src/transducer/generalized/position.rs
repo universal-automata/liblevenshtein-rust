@@ -101,6 +101,10 @@ impl std::error::Error for PositionError {}
 /// Theory → Rust:
 /// - `I + t#k` → `INonFinal { offset: t, errors: k }`
 /// - `M + t#k` → `MFinal { offset: t, errors: k }`
+/// - `I + t#k_t` → `ITransposing { offset: t, errors: k }` (transposing state)
+/// - `M + t#k_t` → `MTransposing { offset: t, errors: k }` (transposing state)
+/// - `I + t#k_s` → `ISplitting { offset: t, errors: k }` (splitting state)
+/// - `M + t#k_s` → `MSplitting { offset: t, errors: k }` (splitting state)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GeneralizedPosition {
     /// I-type (non-final): I + offset#errors
@@ -128,6 +132,60 @@ pub enum GeneralizedPosition {
         /// Number of errors consumed (range: 0 to n)
         errors: u8,
     },
+
+    /// I-type transposing state: I + offset#errors_t
+    ///
+    /// Intermediate state during transposition operation ⟨2,2,1⟩.
+    /// Represents a position in the middle of a two-step adjacent character swap.
+    ///
+    /// Same invariants as INonFinal: |offset| ≤ errors ∧ -n ≤ offset ≤ n ∧ 0 ≤ errors ≤ n
+    ITransposing {
+        /// Offset from parameter I (range: -n to n)
+        offset: i32,
+
+        /// Number of errors consumed (range: 0 to n)
+        errors: u8,
+    },
+
+    /// M-type transposing state: M + offset#errors_t
+    ///
+    /// Intermediate state during transposition operation ⟨2,2,1⟩ at final positions.
+    ///
+    /// Same invariants as MFinal: errors ≥ -offset - n ∧ -2n ≤ offset ≤ 0 ∧ 0 ≤ errors ≤ n
+    MTransposing {
+        /// Offset from parameter M (range: -2n to 0)
+        offset: i32,
+
+        /// Number of errors consumed (range: 0 to n)
+        errors: u8,
+    },
+
+    /// I-type splitting state: I + offset#errors_s
+    ///
+    /// Intermediate state during split operation ⟨1,2,1⟩.
+    /// Represents a position after matching the first word character of a split.
+    ///
+    /// Same invariants as INonFinal: |offset| ≤ errors ∧ -n ≤ offset ≤ n ∧ 0 ≤ errors ≤ n
+    ISplitting {
+        /// Offset from parameter I (range: -n to n)
+        offset: i32,
+
+        /// Number of errors consumed (range: 0 to n)
+        errors: u8,
+    },
+
+    /// M-type splitting state: M + offset#errors_s
+    ///
+    /// Intermediate state during split operation ⟨1,2,1⟩ at final positions.
+    ///
+    /// Same invariants as MFinal: errors ≥ -offset - n ∧ -2n ≤ offset ≤ 0 ∧ 0 ≤ errors ≤ n
+    MSplitting {
+        /// Offset from parameter M (range: -2n to 0)
+        offset: i32,
+
+        /// Number of errors consumed (range: 0 to n)
+        errors: u8,
+    },
 }
 
 // Custom Ord implementation to sort by (errors, offset) for efficient subsumption checks
@@ -142,20 +200,37 @@ impl Ord for GeneralizedPosition {
         use std::cmp::Ordering;
         use GeneralizedPosition::*;
 
-        // Sort by (errors, offset) to enable early termination in subsumption checks
+        // Sort by (variant_priority, errors, offset) to enable early termination in subsumption checks
         // Positions with fewer errors come first, making it easy to skip positions
         // that cannot participate in subsumption relationships
-        match (self, other) {
-            (INonFinal { errors: e1, offset: o1 }, INonFinal { errors: e2, offset: o2 }) |
-            (MFinal { errors: e1, offset: o1 }, MFinal { errors: e2, offset: o2 }) => {
-                match e1.cmp(e2) {
-                    Ordering::Equal => o1.cmp(o2),
+        //
+        // Variant priority order (lower comes first):
+        // I-types (0-2): INonFinal < ITransposing < ISplitting
+        // M-types (3-5): MFinal < MTransposing < MSplitting
+
+        let variant_priority = |pos: &GeneralizedPosition| match pos {
+            INonFinal { .. } => 0,
+            ITransposing { .. } => 1,
+            ISplitting { .. } => 2,
+            MFinal { .. } => 3,
+            MTransposing { .. } => 4,
+            MSplitting { .. } => 5,
+        };
+
+        let p1 = variant_priority(self);
+        let p2 = variant_priority(other);
+
+        match p1.cmp(&p2) {
+            Ordering::Equal => {
+                // Same variant type, sort by (errors, offset)
+                let e1 = self.errors();
+                let e2 = other.errors();
+                match e1.cmp(&e2) {
+                    Ordering::Equal => self.offset().cmp(&other.offset()),
                     other => other,
                 }
             }
-            // I-type comes before M-type
-            (INonFinal { .. }, MFinal { .. }) => Ordering::Less,
-            (MFinal { .. }, INonFinal { .. }) => Ordering::Greater,
+            other => other,
         }
     }
 }
@@ -237,11 +312,147 @@ impl GeneralizedPosition {
         }
     }
 
+    /// Create new I-type transposing position with invariant validation
+    ///
+    /// Transposing positions are intermediate states during transposition ⟨2,2,1⟩.
+    /// They use the same invariants as INonFinal positions.
+    ///
+    /// # Arguments
+    ///
+    /// - `offset`: Offset t from parameter I (must satisfy |t| ≤ k and -n ≤ t ≤ n)
+    /// - `errors`: Number of errors k consumed (must satisfy 0 ≤ k ≤ n)
+    /// - `max_distance`: Maximum edit distance n
+    ///
+    /// # Invariant
+    ///
+    /// `|offset| ≤ errors ∧ -n ≤ offset ≤ n ∧ 0 ≤ errors ≤ n` (same as INonFinal)
+    pub fn new_i_transposing(offset: i32, errors: u8, max_distance: u8) -> Result<Self, PositionError> {
+        let n = max_distance as i32;
+
+        // Same invariant as INonFinal
+        if offset.abs() <= errors as i32
+            && offset >= -n
+            && offset <= n
+            && errors <= max_distance
+        {
+            Ok(GeneralizedPosition::ITransposing { offset, errors })
+        } else {
+            Err(PositionError::InvalidIPosition {
+                offset,
+                errors,
+                max_distance,
+            })
+        }
+    }
+
+    /// Create new M-type transposing position with invariant validation
+    ///
+    /// Transposing positions are intermediate states during transposition ⟨2,2,1⟩.
+    /// They use the same invariants as MFinal positions.
+    ///
+    /// # Arguments
+    ///
+    /// - `offset`: Offset t from parameter M (must satisfy -2n ≤ t ≤ 0 and k ≥ -t - n)
+    /// - `errors`: Number of errors k consumed (must satisfy 0 ≤ k ≤ n)
+    /// - `max_distance`: Maximum edit distance n
+    ///
+    /// # Invariant
+    ///
+    /// `errors ≥ -offset - n ∧ -2n ≤ offset ≤ 0 ∧ 0 ≤ errors ≤ n` (same as MFinal)
+    pub fn new_m_transposing(offset: i32, errors: u8, max_distance: u8) -> Result<Self, PositionError> {
+        let n = max_distance as i32;
+
+        // Same invariant as MFinal
+        if errors as i32 >= -offset - n
+            && offset >= -2 * n
+            && offset <= 0
+            && errors <= max_distance
+        {
+            Ok(GeneralizedPosition::MTransposing { offset, errors })
+        } else {
+            Err(PositionError::InvalidMPosition {
+                offset,
+                errors,
+                max_distance,
+            })
+        }
+    }
+
+    /// Create new I-type splitting position with invariant validation
+    ///
+    /// Splitting positions are intermediate states during split ⟨1,2,1⟩.
+    /// They use the same invariants as INonFinal positions.
+    ///
+    /// # Arguments
+    ///
+    /// - `offset`: Offset t from parameter I (must satisfy |t| ≤ k and -n ≤ t ≤ n)
+    /// - `errors`: Number of errors k consumed (must satisfy 0 ≤ k ≤ n)
+    /// - `max_distance`: Maximum edit distance n
+    ///
+    /// # Invariant
+    ///
+    /// `|offset| ≤ errors ∧ -n ≤ offset ≤ n ∧ 0 ≤ errors ≤ n` (same as INonFinal)
+    pub fn new_i_splitting(offset: i32, errors: u8, max_distance: u8) -> Result<Self, PositionError> {
+        let n = max_distance as i32;
+
+        // Same invariant as INonFinal
+        if offset.abs() <= errors as i32
+            && offset >= -n
+            && offset <= n
+            && errors <= max_distance
+        {
+            Ok(GeneralizedPosition::ISplitting { offset, errors })
+        } else {
+            Err(PositionError::InvalidIPosition {
+                offset,
+                errors,
+                max_distance,
+            })
+        }
+    }
+
+    /// Create new M-type splitting position with invariant validation
+    ///
+    /// Splitting positions are intermediate states during split ⟨1,2,1⟩.
+    /// They use the same invariants as MFinal positions.
+    ///
+    /// # Arguments
+    ///
+    /// - `offset`: Offset t from parameter M (must satisfy -2n ≤ t ≤ 0 and k ≥ -t - n)
+    /// - `errors`: Number of errors k consumed (must satisfy 0 ≤ k ≤ n)
+    /// - `max_distance`: Maximum edit distance n
+    ///
+    /// # Invariant
+    ///
+    /// `errors ≥ -offset - n ∧ -2n ≤ offset ≤ 0 ∧ 0 ≤ errors ≤ n` (same as MFinal)
+    pub fn new_m_splitting(offset: i32, errors: u8, max_distance: u8) -> Result<Self, PositionError> {
+        let n = max_distance as i32;
+
+        // Same invariant as MFinal
+        if errors as i32 >= -offset - n
+            && offset >= -2 * n
+            && offset <= 0
+            && errors <= max_distance
+        {
+            Ok(GeneralizedPosition::MSplitting { offset, errors })
+        } else {
+            Err(PositionError::InvalidMPosition {
+                offset,
+                errors,
+                max_distance,
+            })
+        }
+    }
+
     /// Get the offset value
     pub fn offset(&self) -> i32 {
         match self {
             GeneralizedPosition::INonFinal { offset, .. } |
-            GeneralizedPosition::MFinal { offset, .. } => *offset,
+            GeneralizedPosition::MFinal { offset, .. } |
+            GeneralizedPosition::ITransposing { offset, .. } |
+            GeneralizedPosition::MTransposing { offset, .. } |
+            GeneralizedPosition::ISplitting { offset, .. } |
+            GeneralizedPosition::MSplitting { offset, .. } => *offset,
         }
     }
 
@@ -249,18 +460,36 @@ impl GeneralizedPosition {
     pub fn errors(&self) -> u8 {
         match self {
             GeneralizedPosition::INonFinal { errors, .. } |
-            GeneralizedPosition::MFinal { errors, .. } => *errors,
+            GeneralizedPosition::MFinal { errors, .. } |
+            GeneralizedPosition::ITransposing { errors, .. } |
+            GeneralizedPosition::MTransposing { errors, .. } |
+            GeneralizedPosition::ISplitting { errors, .. } |
+            GeneralizedPosition::MSplitting { errors, .. } => *errors,
         }
     }
 
     /// Check if this is an I-type (non-final) position
+    ///
+    /// Returns true for INonFinal, ITransposing, and ISplitting variants.
     pub fn is_non_final(&self) -> bool {
-        matches!(self, GeneralizedPosition::INonFinal { .. })
+        matches!(
+            self,
+            GeneralizedPosition::INonFinal { .. } |
+            GeneralizedPosition::ITransposing { .. } |
+            GeneralizedPosition::ISplitting { .. }
+        )
     }
 
     /// Check if this is an M-type (final) position
+    ///
+    /// Returns true for MFinal, MTransposing, and MSplitting variants.
     pub fn is_final(&self) -> bool {
-        matches!(self, GeneralizedPosition::MFinal { .. })
+        matches!(
+            self,
+            GeneralizedPosition::MFinal { .. } |
+            GeneralizedPosition::MTransposing { .. } |
+            GeneralizedPosition::MSplitting { .. }
+        )
     }
 }
 
@@ -272,6 +501,18 @@ impl fmt::Display for GeneralizedPosition {
             }
             GeneralizedPosition::MFinal { offset, errors } => {
                 write!(f, "M + {}#{}", offset, errors)
+            }
+            GeneralizedPosition::ITransposing { offset, errors } => {
+                write!(f, "I + {}#{}_t", offset, errors)
+            }
+            GeneralizedPosition::MTransposing { offset, errors } => {
+                write!(f, "M + {}#{}_t", offset, errors)
+            }
+            GeneralizedPosition::ISplitting { offset, errors } => {
+                write!(f, "I + {}#{}_s", offset, errors)
+            }
+            GeneralizedPosition::MSplitting { offset, errors } => {
+                write!(f, "M + {}#{}_s", offset, errors)
             }
         }
     }
@@ -375,5 +616,129 @@ mod tests {
 
         let pos2 = GeneralizedPosition::new_m(-1, 1, 2).unwrap();
         assert_eq!(format!("{}", pos2), "M + -1#1");
+    }
+
+    // Tests for new position variants (Phase 2d.1)
+
+    #[test]
+    fn test_new_i_transposing_valid() {
+        let pos = GeneralizedPosition::new_i_transposing(0, 1, 2).unwrap();
+        assert_eq!(pos.offset(), 0);
+        assert_eq!(pos.errors(), 1);
+        assert!(pos.is_non_final());
+        assert!(!pos.is_final());
+
+        // Test with negative offset
+        let pos = GeneralizedPosition::new_i_transposing(-1, 1, 2).unwrap();
+        assert_eq!(pos.offset(), -1);
+        assert_eq!(pos.errors(), 1);
+    }
+
+    #[test]
+    fn test_new_i_transposing_invalid() {
+        // Same invariants as INonFinal
+        assert!(GeneralizedPosition::new_i_transposing(3, 1, 2).is_err()); // offset > n
+        assert!(GeneralizedPosition::new_i_transposing(2, 1, 2).is_err()); // |offset| > errors
+    }
+
+    #[test]
+    fn test_new_m_transposing_valid() {
+        let pos = GeneralizedPosition::new_m_transposing(0, 0, 2).unwrap();
+        assert_eq!(pos.offset(), 0);
+        assert_eq!(pos.errors(), 0);
+        assert!(!pos.is_non_final());
+        assert!(pos.is_final());
+
+        let pos = GeneralizedPosition::new_m_transposing(-1, 1, 2).unwrap();
+        assert_eq!(pos.offset(), -1);
+        assert_eq!(pos.errors(), 1);
+    }
+
+    #[test]
+    fn test_new_m_transposing_invalid() {
+        // Same invariants as MFinal
+        assert!(GeneralizedPosition::new_m_transposing(-4, 1, 2).is_err()); // errors < -offset - n
+        assert!(GeneralizedPosition::new_m_transposing(1, 1, 2).is_err());  // offset > 0
+    }
+
+    #[test]
+    fn test_new_i_splitting_valid() {
+        let pos = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+        assert_eq!(pos.offset(), 0);
+        assert_eq!(pos.errors(), 1);
+        assert!(pos.is_non_final());
+        assert!(!pos.is_final());
+
+        let pos = GeneralizedPosition::new_i_splitting(-2, 2, 2).unwrap();
+        assert_eq!(pos.offset(), -2);
+        assert_eq!(pos.errors(), 2);
+    }
+
+    #[test]
+    fn test_new_i_splitting_invalid() {
+        // Same invariants as INonFinal
+        assert!(GeneralizedPosition::new_i_splitting(3, 1, 2).is_err()); // offset > n
+        assert!(GeneralizedPosition::new_i_splitting(-3, 2, 2).is_err()); // offset < -n
+    }
+
+    #[test]
+    fn test_new_m_splitting_valid() {
+        let pos = GeneralizedPosition::new_m_splitting(0, 0, 2).unwrap();
+        assert_eq!(pos.offset(), 0);
+        assert_eq!(pos.errors(), 0);
+        assert!(!pos.is_non_final());
+        assert!(pos.is_final());
+
+        let pos = GeneralizedPosition::new_m_splitting(-2, 2, 2).unwrap();
+        assert_eq!(pos.offset(), -2);
+        assert_eq!(pos.errors(), 2);
+    }
+
+    #[test]
+    fn test_new_m_splitting_invalid() {
+        // Same invariants as MFinal
+        assert!(GeneralizedPosition::new_m_splitting(-5, 2, 2).is_err()); // offset < -2n
+        assert!(GeneralizedPosition::new_m_splitting(1, 1, 2).is_err());  // offset > 0
+    }
+
+    #[test]
+    fn test_display_transposing() {
+        let pos = GeneralizedPosition::new_i_transposing(1, 2, 3).unwrap();
+        assert_eq!(format!("{}", pos), "I + 1#2_t");
+
+        let pos = GeneralizedPosition::new_m_transposing(-1, 1, 2).unwrap();
+        assert_eq!(format!("{}", pos), "M + -1#1_t");
+    }
+
+    #[test]
+    fn test_display_splitting() {
+        let pos = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+        assert_eq!(format!("{}", pos), "I + 0#1_s");
+
+        let pos = GeneralizedPosition::new_m_splitting(-2, 2, 2).unwrap();
+        assert_eq!(format!("{}", pos), "M + -2#2_s");
+    }
+
+    #[test]
+    fn test_ordering_with_new_variants() {
+        let i_normal = GeneralizedPosition::new_i(0, 1, 2).unwrap();
+        let i_transposing = GeneralizedPosition::new_i_transposing(0, 1, 2).unwrap();
+        let i_splitting = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+        let m_normal = GeneralizedPosition::new_m(0, 1, 2).unwrap();
+        let m_transposing = GeneralizedPosition::new_m_transposing(0, 1, 2).unwrap();
+        let m_splitting = GeneralizedPosition::new_m_splitting(0, 1, 2).unwrap();
+
+        // I-types come before M-types
+        assert!(i_normal < m_normal);
+        assert!(i_transposing < m_transposing);
+        assert!(i_splitting < m_splitting);
+
+        // Within I-types: INonFinal < ITransposing < ISplitting
+        assert!(i_normal < i_transposing);
+        assert!(i_transposing < i_splitting);
+
+        // Within M-types: MFinal < MTransposing < MSplitting
+        assert!(m_normal < m_transposing);
+        assert!(m_transposing < m_splitting);
     }
 }
