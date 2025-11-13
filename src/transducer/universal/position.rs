@@ -33,7 +33,6 @@
 //! ```
 
 use std::fmt;
-use std::marker::PhantomData;
 
 /// Error type for invalid position creation
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,8 +90,37 @@ impl std::error::Error for PositionError {}
 /// - χ = t (with Transposition)
 /// - χ = ms (with Merge/Split)
 pub trait PositionVariant: Clone + fmt::Debug + PartialEq + Eq + std::hash::Hash {
+    /// State type for this variant
+    ///
+    /// - Standard: `()` (zero-sized, no state needed)
+    /// - Transposition: `TranspositionState` (Usual or Transposing)
+    /// - MergeAndSplit: `MergeSplitState` (Usual or Splitting)
+    type State: Clone + fmt::Debug + PartialEq + Eq + std::hash::Hash + Default;
+
     /// Human-readable variant name
     fn variant_name() -> &'static str;
+
+    /// Compute successors for I-type positions with this variant
+    ///
+    /// Each variant implements variant-specific successor generation logic.
+    fn compute_i_successors(
+        offset: i32,
+        errors: u8,
+        variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>>;
+
+    /// Compute successors for M-type positions with this variant
+    ///
+    /// Each variant implements variant-specific successor generation logic.
+    fn compute_m_successors(
+        offset: i32,
+        errors: u8,
+        variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>>;
 }
 
 /// Standard Levenshtein distance variant (χ = ε)
@@ -102,9 +130,57 @@ pub trait PositionVariant: Clone + fmt::Debug + PartialEq + Eq + std::hash::Hash
 pub struct Standard;
 
 impl PositionVariant for Standard {
+    type State = ();
+
     fn variant_name() -> &'static str {
         "Standard"
     }
+
+    fn compute_i_successors(
+        offset: i32,
+        errors: u8,
+        _variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>> {
+        UniversalPosition::<Self>::successors_i_type_standard(
+            offset,
+            errors,
+            bit_vector,
+            max_distance,
+        )
+    }
+
+    fn compute_m_successors(
+        offset: i32,
+        errors: u8,
+        _variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>> {
+        UniversalPosition::<Self>::successors_m_type_standard(
+            offset,
+            errors,
+            bit_vector,
+            max_distance,
+        )
+    }
+}
+
+/// Transposition state for tracking transposition operations
+///
+/// From Mitankin's thesis (Definition 7, Page 16):
+/// - **Usual**: Regular position i#e
+/// - **Transposing**: Transposition state i#e_t (waiting to complete swap)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub enum TranspositionState {
+    /// Regular position (usual type)
+    #[default]
+    Usual,
+
+    /// Transposition state (waiting to complete swap)
+    /// Corresponds to i#e_t notation in thesis
+    Transposing,
 }
 
 /// Transposition variant (χ = t)
@@ -113,37 +189,212 @@ impl PositionVariant for Standard {
 ///
 /// Note: d^t_L does NOT satisfy triangle inequality (see thesis page 3)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Transposition {
-    /// Regular position (usual type)
-    Usual,
-
-    /// Transposition state (waiting to complete swap)
-    /// Corresponds to i#e_t notation in thesis
-    TranspositionState,
-}
+pub struct Transposition;
 
 impl PositionVariant for Transposition {
+    type State = TranspositionState;
+
     fn variant_name() -> &'static str {
         "Transposition"
     }
+
+    fn compute_i_successors(
+        offset: i32,
+        errors: u8,
+        variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>> {
+        match variant_state {
+            TranspositionState::Usual => {
+                // Get standard successors for usual state
+                let mut successors = UniversalPosition::<Self>::successors_i_type_standard(
+                    offset,
+                    errors,
+                    bit_vector,
+                    max_distance,
+                );
+
+                // Add transposition initiation: δ^D,t_e(i#e, b) includes {i#(e+1)_t} if b[1] = 1 ∧ e < n
+                // b[1] refers to position n+offset+1 in the bit vector (next position after current)
+                // Cross-validated with lazy automaton: creates i#(e+1)_t (same i, +1 error)
+                let next_match_index = (max_distance as i32 + offset + 1) as usize;
+                if next_match_index < bit_vector.len()
+                    && bit_vector.is_match(next_match_index)
+                    && errors < max_distance
+                {
+                    // Enter transposition state: i#(e+1)_t (same word position i, one more error)
+                    // Universal offset for i#(e+1): offset = i - (e+1) = (i-e) - 1 = offset - 1
+                    if let Ok(trans) = UniversalPosition::new_i_with_state(
+                        offset - 1,
+                        errors + 1,
+                        max_distance,
+                        TranspositionState::Transposing,
+                    ) {
+                        successors.push(trans);
+                    }
+                }
+
+                successors
+            }
+            TranspositionState::Transposing => {
+                // In transposition state: δ^D,t_e(i#e_t, b) = {(i+2)#(e-1)} if b[0] = 1, else ∅
+                // Cross-validated with lazy automaton: checks cv[0] and creates (i+2)#e
+                let match_index = (max_distance as i32 + offset) as usize;
+
+                if match_index < bit_vector.len() && bit_vector.is_match(match_index) {
+                    // Complete transposition: i#(e+1)_t → (i+2)#e
+                    // At input k: current word position i = offset + k
+                    // Lazy creates: (i+2)#(e-1) (absolute position i+2)
+                    // At next input k+1: need offset' such that offset' + (k+1) = i+2 = (offset+k)+2
+                    // Therefore: offset' = (offset+k+2) - (k+1) = offset + 1
+                    if let Ok(succ) = UniversalPosition::new_i_with_state(
+                        offset + 1,
+                        errors - 1,
+                        max_distance,
+                        TranspositionState::Usual,
+                    ) {
+                        vec![succ]
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    // Transposition failed
+                    vec![]
+                }
+            }
+        }
+    }
+
+    fn compute_m_successors(
+        offset: i32,
+        errors: u8,
+        variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>> {
+        match variant_state {
+            TranspositionState::Usual => {
+                // Get standard successors for usual state
+                let mut successors = UniversalPosition::<Self>::successors_m_type_standard(
+                    offset,
+                    errors,
+                    bit_vector,
+                    max_distance,
+                );
+
+                // Add transposition initiation: δ^D,t_e(i#e, b) includes {i#(e+1)_t} if b[1] = 1 ∧ e < n
+                // Cross-validated with lazy automaton: creates i#(e+1)_t (same i, +1 error)
+                let next_match_index = (max_distance as i32 + offset + 1) as usize;
+                if next_match_index < bit_vector.len()
+                    && bit_vector.is_match(next_match_index)
+                    && errors < max_distance
+                {
+                    // Enter transposition state: i#(e+1)_t (same word position i, one more error)
+                    // Universal offset for i#(e+1): offset = i - (e+1) = (i-e) - 1 = offset - 1
+                    if let Ok(trans) = UniversalPosition::new_m_with_state(
+                        offset - 1,
+                        errors + 1,
+                        max_distance,
+                        TranspositionState::Transposing,
+                    ) {
+                        successors.push(trans);
+                    }
+                }
+
+                successors
+            }
+            TranspositionState::Transposing => {
+                // In transposition state: δ^D,t_e(i#e_t, b) = {(i+2)#(e-1)} if b[0] = 1, else ∅
+                // Cross-validated with lazy automaton: checks cv[0] and creates (i+2)#e
+                let match_index = (max_distance as i32 + offset) as usize;
+
+                if match_index < bit_vector.len() && bit_vector.is_match(match_index) {
+                    // Complete transposition: i#(e+1)_t → (i+2)#e
+                    // At input k: current word position i = offset + k
+                    // Lazy creates: (i+2)#(e-1) (absolute position i+2)
+                    // At next input k+1: need offset' such that offset' + (k+1) = i+2 = (offset+k)+2
+                    // Therefore: offset' = (offset+k+2) - (k+1) = offset + 1
+                    if let Ok(succ) = UniversalPosition::new_m_with_state(
+                        offset + 1,
+                        errors - 1,
+                        max_distance,
+                        TranspositionState::Usual,
+                    ) {
+                        vec![succ]
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    // Transposition failed
+                    vec![]
+                }
+            }
+        }
+    }
+}
+
+/// Merge/Split state for tracking merge and split operations
+///
+/// From Mitankin's thesis (Definition 7, Page 16):
+/// - **Usual**: Regular position i#e
+/// - **Splitting**: Split state i#e_s (waiting to emit second character)
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub enum MergeSplitState {
+    /// Regular position (usual type)
+    #[default]
+    Usual,
+
+    /// Split state (waiting to emit second character)
+    /// Corresponds to i#e_s notation in thesis
+    Splitting,
 }
 
 /// Merge/Split variant (χ = ms)
 ///
 /// Operations: insertion, deletion, substitution, **merge** (2→1), **split** (1→2)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum MergeAndSplit {
-    /// Regular position (usual type)
-    Usual,
-
-    /// Split state (waiting to emit second character)
-    /// Corresponds to i#e_s notation in thesis
-    SplitState,
-}
+pub struct MergeAndSplit;
 
 impl PositionVariant for MergeAndSplit {
+    type State = MergeSplitState;
+
     fn variant_name() -> &'static str {
         "MergeAndSplit"
+    }
+
+    fn compute_i_successors(
+        offset: i32,
+        errors: u8,
+        _variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>> {
+        // TODO: Implement merge/split logic in Phase 3
+        // For now, just delegate to standard successors
+        UniversalPosition::<Self>::successors_i_type_standard(
+            offset,
+            errors,
+            bit_vector,
+            max_distance,
+        )
+    }
+
+    fn compute_m_successors(
+        offset: i32,
+        errors: u8,
+        _variant_state: &Self::State,
+        bit_vector: &crate::transducer::universal::CharacteristicVector,
+        max_distance: u8,
+    ) -> Vec<UniversalPosition<Self>> {
+        // TODO: Implement merge/split logic in Phase 3
+        // For now, just delegate to standard successors
+        UniversalPosition::<Self>::successors_m_type_standard(
+            offset,
+            errors,
+            bit_vector,
+            max_distance,
+        )
     }
 }
 
@@ -158,10 +409,10 @@ impl PositionVariant for MergeAndSplit {
 /// # Notation Mapping
 ///
 /// Theory → Rust:
-/// - `I + t#k` → `INonFinal { offset: t, errors: k, .. }`
-/// - `M + t#k` → `MFinal { offset: t, errors: k, .. }`
-/// - `It + t#k` → `INonFinal { .., variant: Transposition::TranspositionState }`
-/// - `Is + t#k` → `INonFinal { .., variant: MergeAndSplit::SplitState }`
+/// - `I + t#k` → `INonFinal { offset: t, errors: k, variant_state: V::State::default() }`
+/// - `M + t#k` → `MFinal { offset: t, errors: k, variant_state: V::State::default() }`
+/// - `I + t#k_t` → `INonFinal { .., variant_state: TranspositionState::Transposing }`
+/// - `I + t#k_s` → `INonFinal { .., variant_state: MergeSplitState::Splitting }`
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum UniversalPosition<V: PositionVariant> {
     /// I-type (non-final): I + offset#errors
@@ -176,8 +427,12 @@ pub enum UniversalPosition<V: PositionVariant> {
         /// Number of errors consumed (range: 0 to n)
         errors: u8,
 
-        /// Position variant (Standard/Transposition/MergeAndSplit)
-        variant: PhantomData<V>,
+        /// Variant-specific state (e.g., transposition or split state)
+        ///
+        /// - Standard: `()` (zero-sized)
+        /// - Transposition: `TranspositionState` (Usual or Transposing)
+        /// - MergeAndSplit: `MergeSplitState` (Usual or Splitting)
+        variant_state: V::State,
     },
 
     /// M-type (final): M + offset#errors
@@ -192,8 +447,8 @@ pub enum UniversalPosition<V: PositionVariant> {
         /// Number of errors consumed (range: 0 to n)
         errors: u8,
 
-        /// Position variant (Standard/Transposition/MergeAndSplit)
-        variant: PhantomData<V>,
+        /// Variant-specific state (e.g., transposition or split state)
+        variant_state: V::State,
     },
 }
 
@@ -266,7 +521,7 @@ impl<V: PositionVariant> UniversalPosition<V> {
         Ok(Self::INonFinal {
             offset,
             errors,
-            variant: PhantomData,
+            variant_state: V::State::default(),
         })
     }
 
@@ -308,7 +563,90 @@ impl<V: PositionVariant> UniversalPosition<V> {
         Ok(Self::MFinal {
             offset,
             errors,
-            variant: PhantomData,
+            variant_state: V::State::default(),
+        })
+    }
+
+    /// Create new I-type position with custom variant state
+    ///
+    /// This allows creating positions in specific variant states (e.g., transposition state).
+    ///
+    /// # Arguments
+    ///
+    /// - `offset`: Offset t from parameter I
+    /// - `errors`: Number of errors k consumed
+    /// - `max_distance`: Maximum edit distance n
+    /// - `variant_state`: Variant-specific state (e.g., TranspositionState::Transposing)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Create transposition state position
+    /// let pos = UniversalPosition::<Transposition>::new_i_with_state(
+    ///     1, 1, 2, TranspositionState::Transposing
+    /// )?;
+    /// ```
+    pub fn new_i_with_state(
+        offset: i32,
+        errors: u8,
+        max_distance: u8,
+        variant_state: V::State,
+    ) -> Result<Self, PositionError> {
+        let n = max_distance as i32;
+
+        // Check invariant: |offset| ≤ errors ∧ -n ≤ offset ≤ n ∧ 0 ≤ errors ≤ max_distance
+        if offset.abs() as u8 > errors
+            || offset < -n
+            || offset > n
+            || errors > max_distance
+        {
+            return Err(PositionError::InvalidIPosition {
+                offset,
+                errors,
+                max_distance,
+            });
+        }
+
+        Ok(Self::INonFinal {
+            offset,
+            errors,
+            variant_state,
+        })
+    }
+
+    /// Create new M-type position with custom variant state
+    ///
+    /// # Arguments
+    ///
+    /// - `offset`: Offset t from parameter M
+    /// - `errors`: Number of errors k consumed
+    /// - `max_distance`: Maximum edit distance n
+    /// - `variant_state`: Variant-specific state
+    pub fn new_m_with_state(
+        offset: i32,
+        errors: u8,
+        max_distance: u8,
+        variant_state: V::State,
+    ) -> Result<Self, PositionError> {
+        let n = max_distance as i32;
+
+        // Check invariant: errors ≥ -offset - n ∧ -2n ≤ offset ≤ 0 ∧ 0 ≤ errors ≤ max_distance
+        if (errors as i32) < -offset - n
+            || offset < -2 * n
+            || offset > 0
+            || errors > max_distance
+        {
+            return Err(PositionError::InvalidMPosition {
+                offset,
+                errors,
+                max_distance,
+            });
+        }
+
+        Ok(Self::MFinal {
+            offset,
+            errors,
+            variant_state,
         })
     }
 
@@ -316,6 +654,13 @@ impl<V: PositionVariant> UniversalPosition<V> {
     pub fn offset(&self) -> i32 {
         match self {
             Self::INonFinal { offset, .. } | Self::MFinal { offset, .. } => *offset,
+        }
+    }
+
+    /// Get the variant state
+    pub fn variant_state(&self) -> &V::State {
+        match self {
+            Self::INonFinal { variant_state, .. } | Self::MFinal { variant_state, .. } => variant_state,
         }
     }
 
@@ -336,48 +681,30 @@ impl<V: PositionVariant> UniversalPosition<V> {
         matches!(self, Self::MFinal { .. })
     }
 
-    /// Compute successor positions using elementary transition function δ^D,χ_e
+    /// Compute successor positions (generic dispatcher)
     ///
-    /// # Theory (Definition 7, pages 14-16)
+    /// This method provides a generic interface for successor computation that works
+    /// with any variant type. For concrete types (Standard, Transposition, MergeAndSplit),
+    /// specialized implementations with variant-specific logic will be used when the
+    /// type is known at compile time.
     ///
-    /// Given a position and a bit vector b, computes the set of reachable positions.
-    /// This implements the elementary transition function for universal positions:
+    /// # Note
     ///
-    /// ```text
-    /// δ^∀,χ_e(S, x) = I^χ(δ^D,χ_e(offset#errors, bit_vector))
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `bit_vector` - Characteristic vector encoding matches
-    /// * `max_distance` - Maximum edit distance n
-    ///
-    /// # Returns
-    ///
-    /// Vector of successor positions. May be empty if no valid successors exist.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let pos = UniversalPosition::<Standard>::new_i(0, 0, 2)?;
-    /// let bv = CharacteristicVector::new('a', "abc"); // "100"
-    ///
-    /// // Match at position 1: successor is offset+1, same errors
-    /// let successors = pos.successors(&bv, 2);
-    /// assert_eq!(successors.len(), 1);
-    /// assert_eq!(successors[0], UniversalPosition::new_i(1, 0, 2)?);
-    /// ```
+    /// This generic version delegates to the standard successor methods. Specialized
+    /// implementations (see `impl UniversalPosition<Standard>`, etc.) provide
+    /// variant-specific behavior when the concrete type is known.
     pub fn successors(
         &self,
         bit_vector: &crate::transducer::universal::CharacteristicVector,
         max_distance: u8,
     ) -> Vec<Self> {
+        // Use trait-based dispatch for variant-specific successor logic
         match self {
-            Self::INonFinal { offset, errors, .. } => {
-                Self::successors_i_type_standard(*offset, *errors, bit_vector, max_distance)
+            Self::INonFinal { offset, errors, variant_state } => {
+                V::compute_i_successors(*offset, *errors, variant_state, bit_vector, max_distance)
             }
-            Self::MFinal { offset, errors, .. } => {
-                Self::successors_m_type_standard(*offset, *errors, bit_vector, max_distance)
+            Self::MFinal { offset, errors, variant_state } => {
+                V::compute_m_successors(*offset, *errors, variant_state, bit_vector, max_distance)
             }
         }
     }

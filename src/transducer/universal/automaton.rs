@@ -580,4 +580,141 @@ mod tests {
         // Distance 2
         assert!(automaton.accepts("algorithm", "algarithm"));
     }
+
+    // =========================================================================
+    // Transposition Variant Tests
+    // =========================================================================
+
+    #[test]
+    fn test_transposition_adjacent_swap_start() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // Swap first two characters: "test" → "etst"
+        assert!(automaton.accepts("test", "etst"));
+    }
+
+    #[test]
+    fn test_transposition_adjacent_swap_middle() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // Swap middle characters: "test" → "tset"
+        assert!(automaton.accepts("test", "tset"));
+    }
+
+    #[test]
+    fn test_transposition_adjacent_swap_end() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // Swap last two characters: "test" → "tets"
+        assert!(automaton.accepts("test", "tets"));
+    }
+
+    #[test]
+    fn test_transposition_with_standard_operations() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(2);
+
+        // Transposition + deletion: "test" → "tset" → "set" (distance 2)
+        assert!(automaton.accepts("test", "set"));
+
+        // Transposition + insertion: "test" → "tset" → "taset" (distance 2)
+        assert!(automaton.accepts("test", "taset"));
+    }
+
+    #[test]
+    fn test_transposition_longer_words() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // "algorithm" → "lagorithm" (swap 'a' and 'l')
+        assert!(automaton.accepts("algorithm", "lagorithm"));
+
+        // "algorithm" → "aglorithm" (swap 'l' and 'g')
+        assert!(automaton.accepts("algorithm", "aglorithm"));
+    }
+
+    #[test]
+    fn test_transposition_rejects_non_adjacent() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // Cannot swap non-adjacent chars with distance 1
+        // "test" → "stet" requires swapping 't' and 's' (positions 0 and 2)
+        // This needs 2 operations, so should reject
+        assert!(!automaton.accepts("test", "stet"));
+    }
+
+    #[test]
+    fn test_transposition_empty_and_single_char() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // Empty word
+        assert!(automaton.accepts("", ""));
+
+        // Single character - transposition mode still supports standard operations
+        assert!(automaton.accepts("a", "a"));
+        assert!(automaton.accepts("a", "b")); // Accepts via substitution (transposition includes standard ops)
+    }
+
+    #[test]
+    fn test_transposition_two_chars() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // Two characters - single transposition
+        assert!(automaton.accepts("ab", "ba"));
+        assert!(automaton.accepts("xy", "yx"));
+    }
+
+    #[test]
+    fn test_transposition_distance_zero() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(0);
+
+        // Distance 0 - only exact matches
+        assert!(automaton.accepts("test", "test"));
+        assert!(!automaton.accepts("test", "etst")); // Would need transposition
+    }
+
+    #[test]
+    fn test_transposition_vs_standard() {
+        use crate::transducer::universal::Transposition;
+
+        // With transposition: "test" → "etst" = distance 1
+        let trans_automaton = UniversalAutomaton::<Transposition>::new(1);
+        assert!(trans_automaton.accepts("test", "etst"));
+
+        // With standard: "test" → "etst" requires 2 operations
+        // (delete 't', insert 'e' OR substitute twice)
+        let std_automaton = UniversalAutomaton::<Standard>::new(1);
+        assert!(!std_automaton.accepts("test", "etst"));
+    }
+
+    #[test]
+    fn test_transposition_multiple_swaps() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(2);
+
+        // Two transpositions: "abcd" → "bacd" → "badc"
+        assert!(automaton.accepts("abcd", "badc"));
+    }
+
+    #[test]
+    fn test_transposition_with_repeated_chars() {
+        use crate::transducer::universal::Transposition;
+        let automaton = UniversalAutomaton::<Transposition>::new(1);
+
+        // "abcd" → "bacd" (swap first two adjacent chars)
+        assert!(automaton.accepts("abcd", "bacd"));
+
+        // "aabb" → "abab" (swap middle two adjacent chars)
+        assert!(automaton.accepts("aabb", "abab"));
+
+        // "aabc" → "aacb" (swap last two adjacent chars)
+        assert!(automaton.accepts("aabc", "aacb"));
+    }
 }

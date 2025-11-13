@@ -34,6 +34,7 @@ pub mod substitution_set;
 pub mod substitution_set_char;
 pub mod transition;
 pub mod universal;
+pub mod generalized;
 mod value_filtered_query;
 mod zipper_query_iterator;
 
