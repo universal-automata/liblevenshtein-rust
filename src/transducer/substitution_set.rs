@@ -39,7 +39,7 @@
 //! let results: Vec<_> = transducer.query("fone", 1).collect();
 //! ```
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Internal representation of SubstitutionSet storage.
 ///
@@ -63,6 +63,31 @@ enum SubstitutionSetImpl {
     /// Large set using hash lookup (>4 pairs).
     /// Scales better for larger sets with O(1) lookup.
     Large(FxHashSet<(u8, u8)>),
+}
+
+/// Internal storage for multi-character substitution pairs.
+///
+/// Uses the same hybrid approach as single-character storage for consistency
+/// and performance:
+/// - **Small sets (≤4 pairs)**: Linear scan in Vec
+/// - **Large sets (>4 pairs)**: Hash map for O(1) lookup
+///
+/// Strings are stored as `Box<str>` for memory efficiency:
+/// - Immutable (no excess capacity like String)
+/// - Minimal overhead (size of pointer + inline length)
+/// - Cache-friendly for small strings
+///
+/// The large variant uses `FxHashMap<Box<str>, FxHashSet<Box<str>>>` to
+/// efficiently handle one-to-many mappings (one source can map to multiple targets).
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum MultiCharSubstitutionImpl {
+    /// Small set using linear scan (≤4 pairs).
+    /// Box<str> is used instead of String for lower memory overhead.
+    Small(Vec<(Box<str>, Box<str>)>),
+
+    /// Large set using hash lookup (>4 pairs).
+    /// Maps source string to set of valid target strings for efficient one-to-many lookups.
+    Large(FxHashMap<Box<str>, FxHashSet<Box<str>>>),
 }
 
 /// Set of allowed character substitutions.
@@ -99,8 +124,12 @@ enum SubstitutionSetImpl {
 /// Most presets (like `phonetic_basic()`) include symmetric pairs where appropriate.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SubstitutionSet {
-    /// Internal storage using hybrid Vec/HashSet approach.
+    /// Internal storage for single-character pairs using hybrid Vec/HashSet approach.
     inner: SubstitutionSetImpl,
+
+    /// Internal storage for multi-character pairs using hybrid Vec/HashMap approach.
+    /// This is separate from single-char storage to maintain performance for the common case.
+    multi_char: MultiCharSubstitutionImpl,
 }
 
 impl SubstitutionSet {
@@ -127,6 +156,7 @@ impl SubstitutionSet {
     pub fn new() -> Self {
         Self {
             inner: SubstitutionSetImpl::Small(Vec::new()),
+            multi_char: MultiCharSubstitutionImpl::Small(Vec::new()),
         }
     }
 
@@ -147,16 +177,19 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        // Choose optimal storage based on expected capacity
+        // Choose optimal storage based on expected capacity for single-char pairs
+        // Multi-char storage starts empty and grows as needed
         if capacity <= Self::SMALL_SET_THRESHOLD {
             Self {
                 inner: SubstitutionSetImpl::Small(Vec::with_capacity(capacity)),
+                multi_char: MultiCharSubstitutionImpl::Small(Vec::new()),
             }
         } else {
             Self {
                 inner: SubstitutionSetImpl::Large(
                     FxHashSet::with_capacity_and_hasher(capacity, Default::default())
                 ),
+                multi_char: MultiCharSubstitutionImpl::Small(Vec::new()),
             }
         }
     }
@@ -357,9 +390,16 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn clear(&mut self) {
+        // Clear single-char storage
         match &mut self.inner {
             SubstitutionSetImpl::Small(vec) => vec.clear(),
             SubstitutionSetImpl::Large(set) => set.clear(),
+        }
+
+        // Clear multi-char storage
+        match &mut self.multi_char {
+            MultiCharSubstitutionImpl::Small(vec) => vec.clear(),
+            MultiCharSubstitutionImpl::Large(map) => map.clear(),
         }
     }
 
@@ -609,26 +649,61 @@ impl SubstitutionSet {
     /// as a hash of the byte sequences. Single-character strings use the
     /// optimized single-byte storage.
     pub fn allow_str(&mut self, a: &str, b: &str) {
-        // For single-char pairs, use optimized single-byte storage
+        // Reject empty strings - they're not valid substitution pairs
+        if a.is_empty() || b.is_empty() {
+            return;
+        }
+
+        // Fast path: Single-char pairs use optimized single-byte storage
         if a.len() == 1 && b.len() == 1 {
             if let (Some(a_char), Some(b_char)) = (a.chars().next(), b.chars().next()) {
                 if a_char.is_ascii() && b_char.is_ascii() {
                     self.allow_byte(a_char as u8, b_char as u8);
+                    return;
                 }
             }
         }
-        // For multi-char pairs, we need a different storage strategy
-        // For now, we'll use the hash of the concatenated bytes
-        // This is a temporary approach - ideally we'd use a separate storage
-        else {
-            // TODO: Implement multi-character substitution storage
-            // For now, just validate they're ASCII
-            if a.is_ascii() && b.is_ascii() {
-                // Store as hash key (u8, u8) using first bytes as placeholder
-                // This is a limitation - proper implementation needs separate storage
-                let a_key = a.bytes().next().unwrap_or(0);
-                let b_key = b.bytes().next().unwrap_or(0);
-                self.allow_byte(a_key, b_key);
+
+        // Slow path: Multi-char pairs use separate storage
+        // Only ASCII strings are supported for now
+        if !a.is_ascii() || !b.is_ascii() {
+            return;
+        }
+
+        // Convert to Box<str> for memory efficiency
+        let a_boxed: Box<str> = a.into();
+        let b_boxed: Box<str> = b.into();
+
+        match &mut self.multi_char {
+            MultiCharSubstitutionImpl::Small(vec) if vec.len() < Self::SMALL_SET_THRESHOLD => {
+                // Still small - add to Vec if not duplicate
+                if !vec.iter().any(|(x, y)| x.as_ref() == a && y.as_ref() == b) {
+                    vec.push((a_boxed, b_boxed));
+                }
+            }
+            MultiCharSubstitutionImpl::Small(vec) => {
+                // Exceeded threshold - upgrade to hash map
+                let mut map: FxHashMap<Box<str>, FxHashSet<Box<str>>> =
+                    FxHashMap::with_capacity_and_hasher(vec.len() + 1, Default::default());
+
+                for (src, tgt) in vec.drain(..) {
+                    map.entry(src)
+                        .or_insert_with(|| FxHashSet::with_capacity_and_hasher(1, Default::default()))
+                        .insert(tgt);
+                }
+
+                // Insert new pair
+                map.entry(a_boxed)
+                    .or_insert_with(|| FxHashSet::with_capacity_and_hasher(1, Default::default()))
+                    .insert(b_boxed);
+
+                self.multi_char = MultiCharSubstitutionImpl::Large(map);
+            }
+            MultiCharSubstitutionImpl::Large(map) => {
+                // Already large - use hash map
+                map.entry(a_boxed)
+                    .or_insert_with(|| FxHashSet::with_capacity_and_hasher(1, Default::default()))
+                    .insert(b_boxed);
             }
         }
     }
@@ -658,18 +733,32 @@ impl SubstitutionSet {
     /// ```
     #[inline]
     pub fn contains_str(&self, a: &[u8], b: &[u8]) -> bool {
-        // For single-byte pairs, use optimized lookup
+        // Fast path: Single-byte pairs use optimized lookup
         if a.len() == 1 && b.len() == 1 {
-            self.contains(a[0], b[0])
+            return self.contains(a[0], b[0]);
         }
-        // For multi-char pairs, use temporary implementation
-        else {
-            // TODO: Implement proper multi-character substitution lookup
-            // For now, check first bytes as placeholder
-            if !a.is_empty() && !b.is_empty() {
-                self.contains(a[0], b[0])
-            } else {
-                false
+
+        // Slow path: Multi-char pairs query separate storage
+        // Convert to str for lookup (only valid UTF-8 ASCII strings are stored)
+        let a_str = match std::str::from_utf8(a) {
+            Ok(s) if s.is_ascii() => s,
+            _ => return false,
+        };
+        let b_str = match std::str::from_utf8(b) {
+            Ok(s) if s.is_ascii() => s,
+            _ => return false,
+        };
+
+        match &self.multi_char {
+            MultiCharSubstitutionImpl::Small(vec) => {
+                // Linear scan for small sets
+                vec.iter().any(|(x, y)| x.as_ref() == a_str && y.as_ref() == b_str)
+            }
+            MultiCharSubstitutionImpl::Large(map) => {
+                // Hash lookup for large sets
+                map.get(a_str)
+                    .map(|targets| targets.contains(b_str))
+                    .unwrap_or(false)
             }
         }
     }
@@ -888,5 +977,172 @@ mod tests {
         let set = SubstitutionSet::from_pairs(&[('a', 'b')]);
         let debug_str = format!("{:?}", set);
         assert!(debug_str.contains("SubstitutionSet"));
+    }
+
+    // ========================================================================
+    // Multi-Character Tests
+    // ========================================================================
+
+    #[test]
+    fn test_multi_char_basic() {
+        let mut set = SubstitutionSet::new();
+
+        // Add multi-character substitutions
+        set.allow_str("ph", "f");
+        set.allow_str("ch", "k");
+
+        // Test contains_str
+        assert!(set.contains_str(b"ph", b"f"));
+        assert!(set.contains_str(b"ch", b"k"));
+
+        // Not symmetric
+        assert!(!set.contains_str(b"f", b"ph"));
+        assert!(!set.contains_str(b"k", b"ch"));
+
+        // Test from_str_pairs
+        let set2 = SubstitutionSet::from_str_pairs(&[
+            ("ph", "f"),
+            ("ch", "k"),
+        ]);
+
+        assert!(set2.contains_str(b"ph", b"f"));
+        assert!(set2.contains_str(b"ch", b"k"));
+    }
+
+    #[test]
+    fn test_multi_char_digraphs() {
+        let mut set = SubstitutionSet::new();
+
+        // English phonetic digraphs (ASCII only)
+        set.allow_str("ph", "f");
+        set.allow_str("ch", "k");  // Use ASCII instead of ç
+        set.allow_str("sh", "$");
+        set.allow_str("th", "+");
+
+        assert!(set.contains_str(b"ph", b"f"));
+        assert!(set.contains_str(b"ch", b"k"));
+        assert!(set.contains_str(b"sh", b"$"));
+        assert!(set.contains_str(b"th", b"+"));
+
+        // Test non-matches
+        assert!(!set.contains_str(b"ph", b"g"));
+        assert!(!set.contains_str(b"xy", b"z"));
+    }
+
+    #[test]
+    fn test_multi_char_trigraphs() {
+        let mut set = SubstitutionSet::new();
+
+        // Trigraphs (ASCII only)
+        set.allow_str("eau", "o");  // Use ASCII instead of ö
+        set.allow_str("ght", "t");
+
+        assert!(set.contains_str(b"eau", b"o"));
+        assert!(set.contains_str(b"ght", b"t"));
+    }
+
+    #[test]
+    fn test_multi_char_one_to_many() {
+        let mut set = SubstitutionSet::new();
+
+        // One source can map to multiple targets
+        set.allow_str("c", "k");
+        set.allow_str("c", "s");
+
+        assert!(set.contains_str(b"c", b"k"));
+        assert!(set.contains_str(b"c", b"s"));
+    }
+
+    #[test]
+    fn test_multi_char_mixed_with_single() {
+        let mut set = SubstitutionSet::new();
+
+        // Mix single and multi-character substitutions
+        set.allow('f', 'p');  // Single-char
+        set.allow_str("ph", "f");  // Multi-char
+
+        // Both should work
+        assert!(set.contains(b'f', b'p'));
+        assert!(set.contains_str(b"ph", b"f"));
+
+        // Single-char should use fast path
+        assert!(set.contains_str(b"f", b"p"));
+    }
+
+    #[test]
+    fn test_multi_char_upgrade_to_hashmap() {
+        let mut set = SubstitutionSet::new();
+
+        // Add more than SMALL_SET_THRESHOLD (4) multi-char pairs
+        set.allow_str("ph", "f");
+        set.allow_str("ch", "k");
+        set.allow_str("sh", "$");
+        set.allow_str("th", "+");
+        set.allow_str("wh", "w");  // 5th pair - should trigger upgrade
+
+        // All should still be accessible
+        assert!(set.contains_str(b"ph", b"f"));
+        assert!(set.contains_str(b"ch", b"k"));
+        assert!(set.contains_str(b"sh", b"$"));
+        assert!(set.contains_str(b"th", b"+"));
+        assert!(set.contains_str(b"wh", b"w"));
+    }
+
+    #[test]
+    fn test_multi_char_duplicates() {
+        let mut set = SubstitutionSet::new();
+
+        set.allow_str("ph", "f");
+        set.allow_str("ph", "f");  // Duplicate
+
+        // Should be deduplicated (implementation uses FxHashSet for targets)
+        assert!(set.contains_str(b"ph", b"f"));
+    }
+
+    #[test]
+    fn test_multi_char_clear() {
+        let mut set = SubstitutionSet::new();
+
+        set.allow_str("ph", "f");
+        set.allow_str("ch", "k");
+        assert!(set.contains_str(b"ph", b"f"));
+
+        set.clear();
+
+        // Multi-char should be cleared
+        assert!(!set.contains_str(b"ph", b"f"));
+        assert!(!set.contains_str(b"ch", b"k"));
+    }
+
+    #[test]
+    fn test_multi_char_non_ascii_ignored() {
+        let mut set = SubstitutionSet::new();
+
+        // Non-ASCII should be ignored
+        set.allow_str("α", "β");  // Greek
+        set.allow_str("你", "好");  // Chinese
+
+        // Nothing should be added
+        assert!(!set.contains_str("α".as_bytes(), "β".as_bytes()));
+        assert!(!set.contains_str("你".as_bytes(), "好".as_bytes()));
+    }
+
+    #[test]
+    fn test_multi_char_empty_strings() {
+        let mut set = SubstitutionSet::new();
+
+        // Empty strings should not cause panics and are handled gracefully
+        set.allow_str("", "");  // Neither stored in single-char nor multi-char
+        set.allow_str("a", ""); // Only 'a' is single-char, empty target is not stored
+        set.allow_str("", "b"); // Empty source means nothing to match
+
+        // All lookups should return false for empty strings
+        // (they're not valid substitution targets)
+        assert!(!set.contains_str(b"", b""));
+        assert!(!set.contains_str(b"a", b""));
+        assert!(!set.contains_str(b"", b"b"));
+
+        // Verify the set is still empty (no valid pairs stored)
+        assert!(set.is_empty());
     }
 }
