@@ -763,6 +763,159 @@ impl SubstitutionSet {
         }
     }
 
+    /// Check if a source exists in any substitution pair, regardless of target.
+    ///
+    /// This method is useful for checking if an operation COULD apply to a source
+    /// character before knowing the target character (e.g., when entering a split state).
+    ///
+    /// # Parameters
+    ///
+    /// - `source`: Source bytes to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if `source` appears as a source in ANY substitution pair, `false` otherwise.
+    ///
+    /// # Performance
+    ///
+    /// - Single-byte: O(|set|) linear scan for both Small and Large variants
+    /// - Multi-byte: O(1) for Large variant (HashMap key lookup), O(|set|) for Small
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use liblevenshtein::transducer::SubstitutionSet;
+    /// let mut set = SubstitutionSet::new();
+    /// set.allow_str("k", "ch");
+    /// set.allow_str("t", "th");
+    ///
+    /// assert!(set.has_source(b"k"));   // k→ch exists
+    /// assert!(set.has_source(b"t"));   // t→th exists
+    /// assert!(!set.has_source(b"a"));  // a→?? doesn't exist
+    /// ```
+    #[inline]
+    pub fn has_source(&self, source: &[u8]) -> bool {
+        // Convert source to string for multi-char storage check
+        let src_str = match std::str::from_utf8(source) {
+            Ok(s) if s.is_ascii() => s,
+            _ => return false,
+        };
+
+        // Check single-byte storage if source is single character
+        if source.len() == 1 {
+            let src_byte = source[0];
+            let found_in_single = match &self.inner {
+                SubstitutionSetImpl::Small(vec) => {
+                    vec.iter().any(|(s, _)| *s == src_byte)
+                }
+                SubstitutionSetImpl::Large(set) => {
+                    // FxHashSet doesn't support partial key lookup, so iterate
+                    set.iter().any(|(s, _)| *s == src_byte)
+                }
+            };
+
+            // If found in single-byte storage, return true immediately
+            if found_in_single {
+                return true;
+            }
+
+            // IMPORTANT: Also check multi-char storage!
+            // Pairs like ("k", "ch") are stored in multi-char (not single-byte)
+            // because target "ch" has length > 1
+        }
+
+        // Check multi-char storage (for all sources, regardless of length)
+        match &self.multi_char {
+            MultiCharSubstitutionImpl::Small(vec) => {
+                vec.iter().any(|(s, _)| s.as_ref() == src_str)
+            }
+            MultiCharSubstitutionImpl::Large(map) => {
+                // HashMap has sources as keys - O(1) lookup!
+                map.contains_key(src_str)
+            }
+        }
+    }
+
+    /// Check if there exists a target for the given source that starts with the specified character.
+    ///
+    /// This is used for phonetic split operations to validate that the current input character
+    /// matches the first character of a potential split target.
+    ///
+    /// # Parameters
+    ///
+    /// - `source`: The source bytes to look up
+    /// - `first_char`: The character to check against the first character of targets
+    ///
+    /// # Returns
+    ///
+    /// `true` if at least one target for this source starts with `first_char`, `false` otherwise.
+    #[inline]
+    pub fn has_target_starting_with(&self, source: &[u8], first_char: char) -> bool {
+        // Convert source to string for multi-char storage check
+        let src_str = match std::str::from_utf8(source) {
+            Ok(s) if s.is_ascii() => s,
+            _ => return false,
+        };
+
+        // Check single-byte storage if source is single character
+        if source.len() == 1 {
+            let src_byte = source[0];
+
+            // Check single-byte storage
+            // Note: Each entry is (source_byte, target_byte) - single byte pairs
+            let found_in_single = match &self.inner {
+                SubstitutionSetImpl::Small(vec) => {
+                    vec.iter()
+                        .filter(|(s, _)| *s == src_byte)
+                        .any(|(_, target)| {
+                            // Single-byte target - convert to char and check
+                            let target_char = *target as char;
+                            target_char == first_char
+                        })
+                }
+                SubstitutionSetImpl::Large(set) => {
+                    set.iter()
+                        .filter(|(s, _)| *s == src_byte)
+                        .any(|(_, target)| {
+                            let target_char = *target as char;
+                            target_char == first_char
+                        })
+                }
+            };
+
+            if found_in_single {
+                return true;
+            }
+
+            // IMPORTANT: Also check multi-char storage!
+            // Pairs like ("k", "ch") are stored in multi-char storage
+        }
+
+        // Check multi-char storage
+        match &self.multi_char {
+            MultiCharSubstitutionImpl::Small(vec) => {
+                // Small variant stores individual (source, target) pairs
+                vec.iter()
+                    .filter(|(s, _)| s.as_ref() == src_str)
+                    .any(|(_, target)| {
+                        // target is a Box<str>, check its first char
+                        target.chars().next() == Some(first_char)
+                    })
+            }
+            MultiCharSubstitutionImpl::Large(map) => {
+                // Large variant stores source → Set<target> mappings
+                map.get(src_str)
+                    .map(|target_set| {
+                        // target_set is FxHashSet<Box<str>>
+                        target_set.iter().any(|target| {
+                            target.chars().next() == Some(first_char)
+                        })
+                    })
+                    .unwrap_or(false)
+            }
+        }
+    }
+
     /// Build a substitution set from string pairs.
     ///
     /// This supports multi-character substitution pairs.
@@ -1145,4 +1298,206 @@ mod tests {
         // Verify the set is still empty (no valid pairs stored)
         assert!(set.is_empty());
     }
+
+    #[test]
+    fn test_has_source_single_char() {
+        let mut set = SubstitutionSet::new();
+
+        // Add single-character substitutions
+        set.allow('f', 'p');
+        set.allow('k', 'c');
+
+        // Test has_source for single chars
+        assert!(set.has_source(b"f"));
+        assert!(set.has_source(b"k"));
+        assert!(!set.has_source(b"a"));
+        assert!(!set.has_source(b"p"));  // 'p' is a target, not a source
+    }
+
+    #[test]
+    fn test_has_source_multi_char() {
+        let mut set = SubstitutionSet::new();
+
+        // Add multi-character substitutions
+        set.allow_str("ph", "f");
+        set.allow_str("ch", "k");
+        set.allow_str("k", "ch");
+
+        // Test has_source for multi-char
+        assert!(set.has_source(b"ph"));
+        assert!(set.has_source(b"ch"));
+        assert!(set.has_source(b"k"));
+        assert!(!set.has_source(b"f"));   // 'f' is a target, not a source
+        assert!(!set.has_source(b"th"));  // 'th' doesn't exist as source
+    }
+
+    #[test]
+    fn test_has_source_mixed() {
+        let mut set = SubstitutionSet::new();
+
+        // Mix single and multi-character substitutions
+        set.allow('f', 'p');
+        set.allow_str("ph", "f");
+        set.allow_str("k", "ch");
+
+        // Test both single and multi-char sources
+        assert!(set.has_source(b"f"));   // Single-char source
+        assert!(set.has_source(b"ph"));  // Multi-char source
+        assert!(set.has_source(b"k"));   // Single-char source
+        assert!(!set.has_source(b"p"));  // Target, not source
+        assert!(!set.has_source(b"ch")); // Target, not source
+    }
+
+    #[test]
+    fn test_has_source_upgrade_to_large() {
+        let mut set = SubstitutionSet::new();
+
+        // Add enough pairs to trigger upgrade to Large variant (> 4 pairs)
+        set.allow_str("a", "b");
+        set.allow_str("c", "d");
+        set.allow_str("e", "f");
+        set.allow_str("g", "h");
+        set.allow_str("i", "j");  // 5th pair - triggers upgrade
+
+        // All sources should still be found after upgrade
+        assert!(set.has_source(b"a"));
+        assert!(set.has_source(b"c"));
+        assert!(set.has_source(b"e"));
+        assert!(set.has_source(b"g"));
+        assert!(set.has_source(b"i"));
+        assert!(!set.has_source(b"b"));  // Target, not source
+    }
+
+    #[test]
+    fn test_has_source_empty() {
+        let set = SubstitutionSet::new();
+
+        // Empty set should return false for any source
+        assert!(!set.has_source(b"a"));
+        assert!(!set.has_source(b"ph"));
+    }
+
+    #[test]
+    fn test_has_source_phonetic_example() {
+        let mut set = SubstitutionSet::new();
+
+        // Realistic phonetic split operations (⟨1,2⟩)
+        set.allow_str("k", "ch");
+        set.allow_str("s", "sh");
+        set.allow_str("f", "ph");
+        set.allow_str("t", "th");
+
+        // Test which single characters can be split
+        assert!(set.has_source(b"k"));  // k→ch
+        assert!(set.has_source(b"s"));  // s→sh
+        assert!(set.has_source(b"f"));  // f→ph
+        assert!(set.has_source(b"t"));  // t→th
+        assert!(!set.has_source(b"a")); // a cannot be split
+        assert!(!set.has_source(b"e")); // e cannot be split
+    }
+
+    #[test]
+    fn test_has_target_starting_with_single_char_to_multi_char() {
+        let mut set = SubstitutionSet::new();
+
+        // Phonetic split operations: single char → multi char
+        set.allow_str("k", "ch");
+        set.allow_str("s", "sh");
+        set.allow_str("t", "th");
+
+        // Test k→ch (should start with 'c')
+        assert!(set.has_target_starting_with(b"k", 'c'));
+        assert!(!set.has_target_starting_with(b"k", 's'));
+        assert!(!set.has_target_starting_with(b"k", 't'));
+
+        // Test s→sh (should start with 's')
+        assert!(set.has_target_starting_with(b"s", 's'));
+        assert!(!set.has_target_starting_with(b"s", 'c'));
+
+        // Test t→th (should start with 't')
+        assert!(set.has_target_starting_with(b"t", 't'));
+        assert!(!set.has_target_starting_with(b"t", 'c'));
+    }
+
+    #[test]
+    fn test_has_target_starting_with_reverse_operations() {
+        let mut set = SubstitutionSet::new();
+
+        // Reverse phonetic operations: multi char → single char
+        set.allow_str("ch", "k");
+        set.allow_str("sh", "s");
+        set.allow_str("th", "t");
+
+        // Test ch→k (should start with 'k')
+        assert!(set.has_target_starting_with(b"ch", 'k'));
+        assert!(!set.has_target_starting_with(b"ch", 's'));
+
+        // Test sh→s (should start with 's')
+        assert!(set.has_target_starting_with(b"sh", 's'));
+        assert!(!set.has_target_starting_with(b"sh", 'k'));
+    }
+
+    #[test]
+    fn test_has_target_starting_with_multiple_targets() {
+        let mut set = SubstitutionSet::new();
+
+        // One source with multiple targets
+        set.allow_str("a", "b");
+        set.allow_str("a", "c");
+        set.allow_str("a", "d");
+
+        // Should match any of the first characters
+        assert!(set.has_target_starting_with(b"a", 'b'));
+        assert!(set.has_target_starting_with(b"a", 'c'));
+        assert!(set.has_target_starting_with(b"a", 'd'));
+        assert!(!set.has_target_starting_with(b"a", 'e'));
+    }
+
+    #[test]
+    fn test_has_target_starting_with_nonexistent_source() {
+        let mut set = SubstitutionSet::new();
+        set.allow_str("k", "ch");
+
+        // Source doesn't exist
+        assert!(!set.has_target_starting_with(b"x", 'c'));
+        assert!(!set.has_target_starting_with(b"y", 'y'));
+    }
+
+    #[test]
+    fn test_has_target_starting_with_empty_set() {
+        let set = SubstitutionSet::new();
+
+        // Empty set
+        assert!(!set.has_target_starting_with(b"k", 'c'));
+        assert!(!set.has_target_starting_with(b"a", 'b'));
+    }
+
+    #[test]
+    fn test_has_target_starting_with_realistic_phonetic() {
+        let mut set = SubstitutionSet::new();
+
+        // Realistic bidirectional phonetic operations
+        // Splits: k→ch, s→sh, f→ph, t→th
+        set.allow_str("k", "ch");
+        set.allow_str("s", "sh");
+        set.allow_str("f", "ph");
+        set.allow_str("t", "th");
+
+        // Merges: ch→k, sh→s, ph→f, th→t
+        set.allow_str("ch", "k");
+        set.allow_str("sh", "s");
+        set.allow_str("ph", "f");
+        set.allow_str("th", "t");
+
+        // Test split targets (input char should match first char of target)
+        assert!(set.has_target_starting_with(b"k", 'c'));  // k→ch, need 'c' then 'h'
+        assert!(set.has_target_starting_with(b"t", 't'));  // t→th, need 't' then 'h'
+        assert!(!set.has_target_starting_with(b"t", 'a')); // t→th, 'a' not valid first char
+        assert!(!set.has_target_starting_with(b"k", 'a')); // k→ch, 'a' not valid first char
+
+        // Test merge targets
+        assert!(set.has_target_starting_with(b"ch", 'k')); // ch→k
+        assert!(set.has_target_starting_with(b"th", 't')); // th→t
+    }
 }
+

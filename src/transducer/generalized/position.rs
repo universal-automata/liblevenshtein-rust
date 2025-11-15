@@ -172,6 +172,11 @@ pub enum GeneralizedPosition {
 
         /// Number of errors consumed (range: 0 to n)
         errors: u8,
+
+        /// Phase 3b: Character read when entering the split state (first of 2-char input sequence)
+        /// This is needed because when completing the split, we need to pair this with the
+        /// current input character to form the 2-character sequence for phonetic validation.
+        entry_char: char,
     },
 
     /// M-type splitting state: M + offset#errors_s
@@ -185,6 +190,9 @@ pub enum GeneralizedPosition {
 
         /// Number of errors consumed (range: 0 to n)
         errors: u8,
+
+        /// Phase 3b: Character read when entering the split state (first of 2-char input sequence)
+        entry_char: char,
     },
 }
 
@@ -340,12 +348,20 @@ impl GeneralizedPosition {
     pub fn new_i_transposing(offset: i32, errors: u8, max_distance: u8) -> Result<Self, PositionError> {
         let n = max_distance as i32;
 
-        // Same invariant as INonFinal
-        if offset.abs() <= errors as i32
-            && offset >= -n
-            && offset <= n
-            && errors <= max_distance
-        {
+        // Phase 3b: Relaxed invariant for fractional-weight operations
+        // Similar to new_i(), allow negative offsets when errors==0 for phonetic operations
+        let invariant_satisfied = if errors == 0 && offset < 0 {
+            // Relaxed invariant: allow negative offset for transpose entry with fractional weights
+            offset >= -n && errors <= max_distance
+        } else {
+            // Standard invariant
+            offset.abs() <= errors as i32
+                && offset >= -n
+                && offset <= n
+                && errors <= max_distance
+        };
+
+        if invariant_satisfied {
             Ok(GeneralizedPosition::ITransposing { offset, errors })
         } else {
             Err(PositionError::InvalidIPosition {
@@ -399,20 +415,32 @@ impl GeneralizedPosition {
     /// - `offset`: Offset t from parameter I (must satisfy |t| ≤ k and -n ≤ t ≤ n)
     /// - `errors`: Number of errors k consumed (must satisfy 0 ≤ k ≤ n)
     /// - `max_distance`: Maximum edit distance n
+    /// - `entry_char`: Character read when entering the split state (first of 2-char sequence)
     ///
     /// # Invariant
     ///
     /// `|offset| ≤ errors ∧ -n ≤ offset ≤ n ∧ 0 ≤ errors ≤ n` (same as INonFinal)
-    pub fn new_i_splitting(offset: i32, errors: u8, max_distance: u8) -> Result<Self, PositionError> {
+    pub fn new_i_splitting(offset: i32, errors: u8, max_distance: u8, entry_char: char) -> Result<Self, PositionError> {
         let n = max_distance as i32;
 
-        // Same invariant as INonFinal
-        if offset.abs() <= errors as i32
-            && offset >= -n
-            && offset <= n
-            && errors <= max_distance
-        {
-            Ok(GeneralizedPosition::ISplitting { offset, errors })
+        // Phase 3b: Relaxed invariant for phonetic split operations
+        // When errors==0: entering fresh phonetic split with fractional weight
+        // When errors>0: entering phonetic split from position with accumulated errors from other operations
+        let invariant_satisfied = if errors == 0 {
+            // Fresh phonetic entry with zero errors: allow negative offset for split state
+            offset >= -n && offset <= n && errors <= max_distance
+        } else {
+            // Entry with accumulated errors: use subsumption-based constraints (same as M-type)
+            // This allows phonetic splits even when previous operations added errors
+            // Example: k→ch (errors=0) then insert 'a' (errors=1) then t→th (needs offset=-2, errors=1)
+            errors as i32 >= -offset - n    // Subsumption bound
+                && offset >= -2 * n           // Allow further negative offset
+                && offset <= 0                 // Splitting always decrements offset
+                && errors <= max_distance
+        };
+
+        if invariant_satisfied {
+            Ok(GeneralizedPosition::ISplitting { offset, errors, entry_char })
         } else {
             Err(PositionError::InvalidIPosition {
                 offset,
@@ -432,11 +460,12 @@ impl GeneralizedPosition {
     /// - `offset`: Offset t from parameter M (must satisfy -2n ≤ t ≤ 0 and k ≥ -t - n)
     /// - `errors`: Number of errors k consumed (must satisfy 0 ≤ k ≤ n)
     /// - `max_distance`: Maximum edit distance n
+    /// - `entry_char`: Character read when entering the split state (first of 2-char sequence)
     ///
     /// # Invariant
     ///
     /// `errors ≥ -offset - n ∧ -2n ≤ offset ≤ 0 ∧ 0 ≤ errors ≤ n` (same as MFinal)
-    pub fn new_m_splitting(offset: i32, errors: u8, max_distance: u8) -> Result<Self, PositionError> {
+    pub fn new_m_splitting(offset: i32, errors: u8, max_distance: u8, entry_char: char) -> Result<Self, PositionError> {
         let n = max_distance as i32;
 
         // Same invariant as MFinal
@@ -445,7 +474,7 @@ impl GeneralizedPosition {
             && offset <= 0
             && errors <= max_distance
         {
-            Ok(GeneralizedPosition::MSplitting { offset, errors })
+            Ok(GeneralizedPosition::MSplitting { offset, errors, entry_char })
         } else {
             Err(PositionError::InvalidMPosition {
                 offset,
@@ -519,10 +548,10 @@ impl fmt::Display for GeneralizedPosition {
             GeneralizedPosition::MTransposing { offset, errors } => {
                 write!(f, "M + {}#{}_t", offset, errors)
             }
-            GeneralizedPosition::ISplitting { offset, errors } => {
+            GeneralizedPosition::ISplitting { offset, errors, .. } => {
                 write!(f, "I + {}#{}_s", offset, errors)
             }
-            GeneralizedPosition::MSplitting { offset, errors } => {
+            GeneralizedPosition::MSplitting { offset, errors, .. } => {
                 write!(f, "M + {}#{}_s", offset, errors)
             }
         }
@@ -674,13 +703,13 @@ mod tests {
 
     #[test]
     fn test_new_i_splitting_valid() {
-        let pos = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+        let pos = GeneralizedPosition::new_i_splitting(0, 1, 2, 'a').unwrap();
         assert_eq!(pos.offset(), 0);
         assert_eq!(pos.errors(), 1);
         assert!(pos.is_non_final());
         assert!(!pos.is_final());
 
-        let pos = GeneralizedPosition::new_i_splitting(-2, 2, 2).unwrap();
+        let pos = GeneralizedPosition::new_i_splitting(-2, 2, 2, 'b').unwrap();
         assert_eq!(pos.offset(), -2);
         assert_eq!(pos.errors(), 2);
     }
@@ -688,19 +717,19 @@ mod tests {
     #[test]
     fn test_new_i_splitting_invalid() {
         // Same invariants as INonFinal
-        assert!(GeneralizedPosition::new_i_splitting(3, 1, 2).is_err()); // offset > n
-        assert!(GeneralizedPosition::new_i_splitting(-3, 2, 2).is_err()); // offset < -n
+        assert!(GeneralizedPosition::new_i_splitting(3, 1, 2, 'a').is_err()); // offset > n
+        assert!(GeneralizedPosition::new_i_splitting(-3, 2, 2, 'a').is_err()); // offset < -n
     }
 
     #[test]
     fn test_new_m_splitting_valid() {
-        let pos = GeneralizedPosition::new_m_splitting(0, 0, 2).unwrap();
+        let pos = GeneralizedPosition::new_m_splitting(0, 0, 2, 'a').unwrap();
         assert_eq!(pos.offset(), 0);
         assert_eq!(pos.errors(), 0);
         assert!(!pos.is_non_final());
         assert!(pos.is_final());
 
-        let pos = GeneralizedPosition::new_m_splitting(-2, 2, 2).unwrap();
+        let pos = GeneralizedPosition::new_m_splitting(-2, 2, 2, 'b').unwrap();
         assert_eq!(pos.offset(), -2);
         assert_eq!(pos.errors(), 2);
     }
@@ -708,8 +737,8 @@ mod tests {
     #[test]
     fn test_new_m_splitting_invalid() {
         // Same invariants as MFinal
-        assert!(GeneralizedPosition::new_m_splitting(-5, 2, 2).is_err()); // offset < -2n
-        assert!(GeneralizedPosition::new_m_splitting(1, 1, 2).is_err());  // offset > 0
+        assert!(GeneralizedPosition::new_m_splitting(-5, 2, 2, 'a').is_err()); // offset < -2n
+        assert!(GeneralizedPosition::new_m_splitting(1, 1, 2, 'a').is_err());  // offset > 0
     }
 
     #[test]
@@ -723,10 +752,10 @@ mod tests {
 
     #[test]
     fn test_display_splitting() {
-        let pos = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+        let pos = GeneralizedPosition::new_i_splitting(0, 1, 2, 'a').unwrap();
         assert_eq!(format!("{}", pos), "I + 0#1_s");
 
-        let pos = GeneralizedPosition::new_m_splitting(-2, 2, 2).unwrap();
+        let pos = GeneralizedPosition::new_m_splitting(-2, 2, 2, 'a').unwrap();
         assert_eq!(format!("{}", pos), "M + -2#2_s");
     }
 
@@ -734,10 +763,10 @@ mod tests {
     fn test_ordering_with_new_variants() {
         let i_normal = GeneralizedPosition::new_i(0, 1, 2).unwrap();
         let i_transposing = GeneralizedPosition::new_i_transposing(0, 1, 2).unwrap();
-        let i_splitting = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+        let i_splitting = GeneralizedPosition::new_i_splitting(0, 1, 2, 'a').unwrap();
         let m_normal = GeneralizedPosition::new_m(0, 1, 2).unwrap();
         let m_transposing = GeneralizedPosition::new_m_transposing(0, 1, 2).unwrap();
-        let m_splitting = GeneralizedPosition::new_m_splitting(0, 1, 2).unwrap();
+        let m_splitting = GeneralizedPosition::new_m_splitting(0, 1, 2, 'a').unwrap();
 
         // I-types come before M-types
         assert!(i_normal < m_normal);

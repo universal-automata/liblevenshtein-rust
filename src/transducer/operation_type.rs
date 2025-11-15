@@ -351,6 +351,135 @@ impl OperationType {
             Some(set) => set.contains_str(dict_chars, query_chars),
         }
     }
+
+    /// Check if this operation could potentially apply to the given source characters.
+    ///
+    /// Unlike [`can_apply()`](Self::can_apply), this only checks the source (dictionary)
+    /// characters and ignores the target (query) characters. This is useful for speculative
+    /// state entry when we don't yet know the target characters (e.g., entering a split state).
+    ///
+    /// # Theoretical Justification
+    ///
+    /// This method satisfies the **locality property** from weighted-levenshtein-automata
+    /// research: the decision uses only O(n) lookahead in the word. Checking if a source
+    /// exists in a bounded restriction set is O(|restriction|) which is bounded by O(n).
+    ///
+    /// # Parameters
+    ///
+    /// - `dict_chars`: Characters from dictionary word
+    ///
+    /// # Returns
+    ///
+    /// `true` if the operation COULD apply to these source characters (given the right target),
+    /// `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use liblevenshtein::transducer::{OperationType, SubstitutionSet};
+    /// // Phonetic split operation: k→ch
+    /// let mut phonetic = SubstitutionSet::new();
+    /// phonetic.allow_str("k", "ch");
+    /// phonetic.allow_str("t", "th");
+    /// let split_op = OperationType::with_restriction(1, 2, 0.15, phonetic, "split");
+    ///
+    /// assert!(split_op.can_apply_to_source(b"k"));  // k can be split (→ch)
+    /// assert!(split_op.can_apply_to_source(b"t"));  // t can be split (→th)
+    /// assert!(!split_op.can_apply_to_source(b"a")); // a cannot be split
+    /// ```
+    ///
+    /// # Use Case: Split State Entry
+    ///
+    /// When deciding whether to enter a split state for phonetic operations:
+    ///
+    /// ```rust,ignore
+    /// // Check if THIS word character can be split (without knowing target yet)
+    /// let can_enter_split = split_ops.iter().any(|op| {
+    ///     op.can_apply_to_source(word_char.as_bytes())
+    /// });
+    /// ```
+    #[inline]
+    pub fn can_apply_to_source(&self, dict_chars: &[u8]) -> bool {
+        // Length check - must match expected consumption
+        if dict_chars.len() != self.consume_x {
+            return false;
+        }
+
+        // Check restriction set if present
+        match &self.restriction {
+            None => true,  // Unrestricted operation can apply to any source
+            Some(set) => set.has_source(dict_chars),
+        }
+    }
+
+    /// Check if this operation could apply to the given source AND the target starts with the given character.
+    ///
+    /// This is used for phonetic split operations to validate that when entering a split state,
+    /// the current input character matches the first character of the operation's target sequence.
+    ///
+    /// # Theoretical Justification
+    ///
+    /// This maintains the **locality property** - the decision uses only:
+    /// 1. O(1) current input character
+    /// 2. O(n) word position check (via restriction set)
+    /// Both are within the allowed O(n) lookahead constraint.
+    ///
+    /// # Parameters
+    ///
+    /// - `dict_chars`: Characters from dictionary word (source)
+    /// - `first_target_char`: The expected first character of the target sequence
+    ///
+    /// # Returns
+    ///
+    /// `true` if this operation could apply to the source AND has a target starting with `first_target_char`,
+    /// `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use liblevenshtein::transducer::{OperationType, SubstitutionSet};
+    /// // Phonetic split operation: k→ch, t→th
+    /// let mut phonetic = SubstitutionSet::new();
+    /// phonetic.allow_str("k", "ch");
+    /// phonetic.allow_str("t", "th");
+    /// let split_op = OperationType::with_restriction(1, 2, 0.15, phonetic, "split");
+    ///
+    /// // k→ch: first target char is 'c'
+    /// assert!(split_op.matches_first_target_char(b"k", 'c'));
+    /// assert!(!split_op.matches_first_target_char(b"k", 't'));
+    /// assert!(!split_op.matches_first_target_char(b"k", 'a'));
+    ///
+    /// // t→th: first target char is 't'
+    /// assert!(split_op.matches_first_target_char(b"t", 't'));
+    /// assert!(!split_op.matches_first_target_char(b"t", 'c'));
+    /// ```
+    ///
+    /// # Use Case: Split State Entry Validation
+    ///
+    /// When deciding whether to enter a split state, verify both:
+    /// 1. The word character can be split (via `can_apply_to_source`)
+    /// 2. The current input character matches the first target character
+    ///
+    /// ```rust,ignore
+    /// // Only enter split state if input char matches first char of split target
+    /// let can_enter_split = split_ops.iter().any(|op| {
+    ///     op.can_apply_to_source(word_char.as_bytes())
+    ///         && op.matches_first_target_char(word_char.as_bytes(), input_char)
+    /// });
+    /// ```
+    #[inline]
+    pub fn matches_first_target_char(&self, dict_chars: &[u8], first_target_char: char) -> bool {
+        // Length check - must match expected consumption
+        if dict_chars.len() != self.consume_x {
+            return false;
+        }
+
+        // Check restriction set if present
+        match &self.restriction {
+            None => false,  // Unrestricted operations don't have specific targets to check
+            Some(set) => set.has_target_starting_with(dict_chars, first_target_char),
+        }
+    }
 }
 
 impl fmt::Display for OperationType {
@@ -454,5 +583,82 @@ mod tests {
         assert!(display.contains("2"));
         assert!(display.contains("1"));
         assert!(display.contains("0.15"));
+    }
+
+    #[test]
+    fn test_can_apply_to_source_unrestricted() {
+        let subst = OperationType::new(1, 1, 1.0, "substitution");
+
+        // Unrestricted operation can apply to any source of correct length
+        assert!(subst.can_apply_to_source(b"a"));
+        assert!(subst.can_apply_to_source(b"x"));
+        assert!(subst.can_apply_to_source(b"z"));
+
+        // Wrong length should fail
+        assert!(!subst.can_apply_to_source(b"ab"));
+        assert!(!subst.can_apply_to_source(b""));
+    }
+
+    #[test]
+    fn test_can_apply_to_source_restricted() {
+        // Phonetic split operation: k→ch, t→th
+        let mut phonetic = SubstitutionSet::new();
+        phonetic.allow_str("k", "ch");
+        phonetic.allow_str("t", "th");
+
+        let split_op = OperationType::with_restriction(1, 2, 0.15, phonetic, "split");
+
+        // Sources that exist in restriction set
+        assert!(split_op.can_apply_to_source(b"k"));  // k→ch
+        assert!(split_op.can_apply_to_source(b"t"));  // t→th
+
+        // Sources that don't exist in restriction set
+        assert!(!split_op.can_apply_to_source(b"a"));
+        assert!(!split_op.can_apply_to_source(b"e"));
+        assert!(!split_op.can_apply_to_source(b"s"));
+
+        // Wrong length
+        assert!(!split_op.can_apply_to_source(b"ch"));  // Target, not source, and wrong length
+    }
+
+    #[test]
+    fn test_can_apply_to_source_multi_char() {
+        // Merge operation: ch→k, sh→s
+        let mut phonetic = SubstitutionSet::new();
+        phonetic.allow_str("ch", "k");
+        phonetic.allow_str("sh", "s");
+
+        let merge_op = OperationType::with_restriction(2, 1, 0.15, phonetic, "merge");
+
+        // Multi-char sources that exist
+        assert!(merge_op.can_apply_to_source(b"ch"));  // ch→k
+        assert!(merge_op.can_apply_to_source(b"sh"));  // sh→s
+
+        // Sources that don't exist
+        assert!(!merge_op.can_apply_to_source(b"ph"));
+        assert!(!merge_op.can_apply_to_source(b"th"));
+
+        // Wrong length
+        assert!(!merge_op.can_apply_to_source(b"c"));
+        assert!(!merge_op.can_apply_to_source(b"s"));
+    }
+
+    #[test]
+    fn test_can_apply_to_source_vs_can_apply() {
+        let mut phonetic = SubstitutionSet::new();
+        phonetic.allow_str("k", "ch");
+
+        let split_op = OperationType::with_restriction(1, 2, 0.15, phonetic, "split");
+
+        // can_apply_to_source only checks source
+        assert!(split_op.can_apply_to_source(b"k"));
+
+        // can_apply checks both source AND target
+        assert!(split_op.can_apply(b"k", b"ch"));
+        assert!(!split_op.can_apply(b"k", b"sh"));  // Wrong target
+
+        // Source doesn't exist
+        assert!(!split_op.can_apply_to_source(b"a"));
+        assert!(!split_op.can_apply(b"a", b"ch"));
     }
 }

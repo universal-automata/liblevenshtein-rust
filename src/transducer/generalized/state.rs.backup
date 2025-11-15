@@ -222,15 +222,15 @@ impl GeneralizedState {
                 self.successors_m_transposing(*offset, *errors, operations, bit_vector, full_word, word_slice, input_char)
             }
             // Phase 2d.5: Splitting positions
-            GeneralizedPosition::ISplitting { offset, errors, entry_char } => {
+            GeneralizedPosition::ISplitting { offset, errors } => {
                 // Complete split for I-type positions
                 // Phase 3b: Pass full_word, word_slice, input_char for phonetic validation
-                self.successors_i_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char)
+                self.successors_i_splitting(*offset, *errors, operations, bit_vector, full_word, word_slice, input_char)
             }
-            GeneralizedPosition::MSplitting { offset, errors, entry_char } => {
+            GeneralizedPosition::MSplitting { offset, errors } => {
                 // Complete split for M-type positions
                 // Phase 3b: Pass full_word, word_slice, input_char for phonetic validation
-                self.successors_m_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char)
+                self.successors_m_splitting(*offset, *errors, operations, bit_vector, full_word, word_slice, input_char)
             }
         }
     }
@@ -456,44 +456,29 @@ impl GeneralizedState {
                     // Check standard operations (bit_vector match)
                     let standard_match = match_index < bit_vector.len() && bit_vector.is_match(match_index);
 
-                    // For phonetic operations, check if THIS word character can be split
-                    // We need at least one split operation that can apply to this word char
-                    // AND the current input char must match the first char of the split target
-                    let word_1char = word_chars[match_index].to_string();
-                    let can_phonetic_split = split_ops.iter().any(|op| {
-                        if op.weight() < 1.0 && op.consume_x() == 1 {
-                            // Check TWO conditions:
-                            // 1. This word character can be split (source check)
-                            // 2. Current input character matches first char of target (prevents wrong split entry)
-                            // This fixes the double-split bug where t→th was entered when reading 'a' instead of 't'
-                            op.can_apply_to_source(word_1char.as_bytes())
-                                && op.matches_first_target_char(word_1char.as_bytes(), input_char)
-                        } else {
-                            false
-                        }
-                    });
+                    // For phonetic operations, we speculatively enter split state
+                    // Validation happens at completion time when we have both input chars
 
-                    // Enter split state - prioritize phonetic over standard
-                    // When both conditions are true, phonetic split takes precedence (errors+0 vs errors+1)
-                    if can_phonetic_split {
+                    // Enter split state for standard operations
+                    if standard_match && errors < self.max_distance {
+                        // Standard split: enter with errors+1 (will decrement at completion)
+                        if let Ok(split) = GeneralizedPosition::new_i_splitting(
+                            offset - 1,
+                            errors + 1,
+                            self.max_distance
+                        ) {
+                            successors.push(split);
+                        }
+                    }
+
+                    // ALSO enter split state for phonetic operations (if different from standard)
+                    if has_phonetic_split {
                         // Phonetic split: enter with errors+0 (fractional weight truncates to 0)
                         // Allowed even at max_distance since cost=0
                         if let Ok(split) = GeneralizedPosition::new_i_splitting(
                             offset - 1,
                             errors,
-                            self.max_distance,
-                            input_char  // Store the character read when entering this split state
-                        ) {
-                            successors.push(split);
-                        }
-                    } else if standard_match && errors < self.max_distance {
-                        // Standard split: enter with errors+1 (will decrement at completion)
-                        // Only used when phonetic split doesn't apply
-                        if let Ok(split) = GeneralizedPosition::new_i_splitting(
-                            offset - 1,
-                            errors + 1,
-                            self.max_distance,
-                            input_char  // Store the character read when entering this split state
+                            self.max_distance
                         ) {
                             successors.push(split);
                         }
@@ -748,42 +733,26 @@ impl GeneralizedState {
                 let standard_match = bit_index >= 0 && (bit_index as usize) < bit_vector.len()
                     && bit_vector.is_match(bit_index as usize);
 
-                // For phonetic operations, check if THIS word character can be split
-                // AND the current input char must match the first char of the split target
-                let word_1char = word_chars[next_match_index].to_string();
-                let can_phonetic_split = split_ops.iter().any(|op| {
-                    if op.weight() < 1.0 && op.consume_x() == 1 {
-                        // Check TWO conditions:
-                        // 1. This word character can be split (source check)
-                        // 2. Current input character matches first char of target (prevents wrong split entry)
-                        op.can_apply_to_source(word_1char.as_bytes())
-                            && op.matches_first_target_char(word_1char.as_bytes(), input_char)
-                    } else {
-                        false
+                // Enter split state for standard operations
+                if standard_match && errors < self.max_distance {
+                    // Standard split: enter with errors+1 (will decrement at completion)
+                    if let Ok(split) = GeneralizedPosition::new_m_splitting(
+                        offset - 1,
+                        errors + 1,
+                        self.max_distance
+                    ) {
+                        successors.push(split);
                     }
-                });
+                }
 
-                // Enter split state - prioritize phonetic over standard
-                // When both conditions are true, phonetic split takes precedence (errors+0 vs errors+1)
-                if can_phonetic_split {
+                // ALSO enter split state for phonetic operations
+                if has_phonetic_split {
                     // Phonetic split: enter with errors+0 (fractional weight truncates to 0)
                     // Allowed even at max_distance since cost=0
                     if let Ok(split) = GeneralizedPosition::new_m_splitting(
                         offset - 1,
                         errors,
-                        self.max_distance,
-                        input_char  // Store the character read when entering this split state
-                    ) {
-                        successors.push(split);
-                    }
-                } else if standard_match && errors < self.max_distance {
-                    // Standard split: enter with errors+1 (will decrement at completion)
-                    // Only used when phonetic split doesn't apply
-                    if let Ok(split) = GeneralizedPosition::new_m_splitting(
-                        offset - 1,
-                        errors + 1,
-                        self.max_distance,
-                        input_char  // Store the character read when entering this split state
+                        self.max_distance
                     ) {
                         successors.push(split);
                     }
@@ -959,7 +928,6 @@ impl GeneralizedState {
         &self,
         offset: i32,
         errors: u8,
-        entry_char: char,
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
@@ -997,9 +965,8 @@ impl GeneralizedState {
             word_chars[match_index].to_string()
         };
 
-        // Get both input characters (entry_char + current)
-        // Use entry_char (the char read when entering this split state) instead of state-level previous_input_char
-        let prev_char = entry_char;
+        // Get both input characters (previous + current)
+        let prev_char = self.previous_input_char.unwrap_or('\0');
         let curr_char = input_char;
         let input_2chars = format!("{}{}", prev_char, curr_char);
 
@@ -1064,7 +1031,6 @@ impl GeneralizedState {
         &self,
         offset: i32,
         errors: u8,
-        entry_char: char,
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
@@ -1103,9 +1069,8 @@ impl GeneralizedState {
             word_chars[next_match_index].to_string()
         };
 
-        // Get both input characters (entry_char + current)
-        // Use entry_char (the char read when entering this split state) instead of state-level previous_input_char
-        let prev_char = entry_char;
+        // Get both input characters (previous + current)
+        let prev_char = self.previous_input_char.unwrap_or('\0');
         let curr_char = input_char;
         let input_2chars = format!("{}{}", prev_char, curr_char);
 

@@ -297,8 +297,28 @@ impl GeneralizedAutomaton {
 
         // Special case 2: Input too long (encoding h_n undefined)
         // From thesis page 51: h_n(w, x) defined only if |x| ≤ |w| + n
-        if input.len() > word.len() + self.max_distance as usize {
-            return false;
+        // However, expansion operations (e.g., split ⟨1,2⟩) can increase effective word length
+        // Phase 3b: Calculate maximum expansion from operations
+        let max_expansion = self.operations.operations()
+            .iter()
+            .map(|op| op.consume_y().saturating_sub(op.consume_x()))
+            .max()
+            .unwrap_or(0);
+
+        if max_expansion > 0 {
+            // With expansion operations (e.g., k→ch split):
+            // Upper bound: each word char could expand by max_expansion, plus insertions
+            // Example: "kat" with 2 splits ⟨1,2⟩ → 3 + 2*1 = 5 effective chars
+            // Conservative bound: |x| ≤ |w| * (1 + max_expansion) + n
+            let max_len = word.len() * (1 + max_expansion as usize) + self.max_distance as usize;
+            if input.len() > max_len {
+                return false;
+            }
+        } else {
+            // Standard Levenshtein bound: |x| ≤ |w| + n
+            if input.len() > word.len() + self.max_distance as usize {
+                return false;
+            }
         }
 
         // Start with initial state {I#0}
@@ -315,8 +335,8 @@ impl GeneralizedAutomaton {
             let bit_vector = CharacteristicVector::new(input_char, &subword);
 
             // Apply transition: state := δ^∀,χ_n(state, β)
-            // Phase 3: Pass word slice and input character for phonetic operations
-            if let Some(next_state) = state.transition(&self.operations, &bit_vector, &subword, input_char, i + 1) {
+            // Phase 3b: Pass full word, word slice, and input character for phonetic operations
+            if let Some(next_state) = state.transition(&self.operations, &bit_vector, word, &subword, input_char, i + 1) {
                 state = next_state;
             } else {
                 // Transition failed, reject
@@ -408,7 +428,7 @@ mod tests {
             let bit_vector = CharacteristicVector::new(ch, &subword);
             eprintln!("DEBUG: Bit vector length = {}", bit_vector.len());
 
-            match state.transition(&automaton.operations, &bit_vector, &subword, ch, i + 1) {
+            match state.transition(&automaton.operations, &bit_vector, word, &subword, ch, i + 1) {
                 Some(next) => {
                     eprintln!("DEBUG: Next state = {}", next);
                     state = next;
@@ -476,7 +496,7 @@ mod tests {
             let bit_vector = CharacteristicVector::new(ch, &subword);
             eprintln!("Bit vector length: {}", bit_vector.len());
 
-            match state.transition(&automaton.operations, &bit_vector, &subword, ch, i + 1) {
+            match state.transition(&automaton.operations, &bit_vector, word, &subword, ch, i + 1) {
                 Some(next) => {
                     eprintln!("Next state: {}", next);
                     state = next;
@@ -580,7 +600,7 @@ mod tests {
             let bit_vector = CharacteristicVector::new(ch, &subword);
             eprintln!("Bit vector length: {}", bit_vector.len());
 
-            match state.transition(&automaton.operations, &bit_vector, &subword, ch, i + 1) {
+            match state.transition(&automaton.operations, &bit_vector, word, &subword, ch, i + 1) {
                 Some(next) => {
                     eprintln!("Next state: {}", next);
                     state = next;
@@ -629,10 +649,10 @@ mod tests {
                 GeneralizedPosition::MTransposing { offset, errors } => {
                     eprintln!("\nM-type transposing: offset={}, errors={} (not accepting - intermediate state)", offset, errors);
                 }
-                GeneralizedPosition::ISplitting { offset, errors } => {
+                GeneralizedPosition::ISplitting { offset, errors, .. } => {
                     eprintln!("\nI-type splitting: offset={}, errors={} (not accepting - intermediate state)", offset, errors);
                 }
-                GeneralizedPosition::MSplitting { offset, errors } => {
+                GeneralizedPosition::MSplitting { offset, errors, .. } => {
                     eprintln!("\nM-type splitting: offset={}, errors={} (not accepting - intermediate state)", offset, errors);
                 }
             }
@@ -1506,6 +1526,280 @@ mod tests {
         // But two standard operations should fail
         assert!(!automaton.accepts("church", "korks"),
                "Two phonetic + two standard operations should fail at distance 1");
+    }
+
+    // Phase 3b: Phonetic split ⟨1,2⟩ tests
+    #[test]
+    fn test_phonetic_split_k_to_ch() {
+        // Test "k"→"ch" split operation
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // "ark" → "arch" via k→ch split
+        assert!(automaton.accepts("ark", "arch"),
+               "Split k→ch should work at distance 1");
+
+        // "back" → "bach" via k→ch split
+        assert!(automaton.accepts("back", "bach"),
+               "Split k→ch at word end should work");
+
+        // "kan" → "chan" via k→ch split at start
+        assert!(automaton.accepts("kan", "chan"),
+               "Split k→ch at word start should work");
+    }
+
+    #[test]
+    fn test_phonetic_split_f_to_ph() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // "graf" → "graph" via f→ph split
+        assert!(automaton.accepts("graf", "graph"),
+               "Split f→ph should work at distance 1");
+
+        // "foto" → "photo" via f→ph split at start
+        assert!(automaton.accepts("foto", "photo"),
+               "Split f→ph at word start should work");
+    }
+
+    #[test]
+    fn test_phonetic_split_s_to_sh() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // "sip" → "ship" via s→sh split
+        assert!(automaton.accepts("sip", "ship"),
+               "Split s→sh should work at distance 1");
+
+        // "sell" → "shell" via s→sh split at start
+        assert!(automaton.accepts("sell", "shell"),
+               "Split s→sh at word start should work");
+    }
+
+    #[test]
+    fn test_phonetic_split_t_to_th() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // "bat" → "bath" via t→th split
+        assert!(automaton.accepts("bat", "bath"),
+               "Split t→th should work at distance 1");
+
+        // "tin" → "thin" via t→th split at start
+        assert!(automaton.accepts("tin", "thin"),
+               "Split t→th at word start should work");
+    }
+
+    #[test]
+    fn test_phonetic_split_multiple() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+
+        // Multiple splits require higher distance
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // Single split at distance 1 (fractional weight = 0)
+                assert!(automaton.accepts("kair", "chair"),
+                       "Single k→ch split should work at distance 1");
+
+        // But two splits need to check if fractional weights allow it
+        // Each split has weight 0.15, both truncate to 0
+        // So two splits should work at distance 1
+        assert!(automaton.accepts("kat", "chath"),
+               "Two splits (k→ch, t→th) with fractional weights should work at distance 1");
+    }
+
+    #[test]
+    fn test_phonetic_split_with_standard_ops() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(2, ops);
+
+        // Split + standard operations
+        // "graf" → "grape" via f→ph split (0 errors) + e→a substitute (1 error) = 1 total
+        assert!(automaton.accepts("graf", "graphe"),
+               "Split f→ph + insert 'e' should work at distance 1");
+
+        // Multiple standard operations
+        // "bak" → "batch" via k→ch split (0) + insert 't' (1) = 1 total
+        assert!(automaton.accepts("bak", "batch"),
+               "Split k→ch + insert should work at distance 1");
+    }
+
+    #[test]
+    fn test_phonetic_split_distance_constraints() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(0, ops.clone());
+
+        // At distance 0, no operations should work
+        assert!(!automaton.accepts("ark", "arch"),
+               "Split should not work at distance 0");
+
+        // At distance 1, fractional-weight split should work
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+        assert!(automaton.accepts("ark", "arch"),
+               "Split should work at distance 1");
+    }
+
+    // Phase 3b: Phonetic transpose ⟨2,2⟩ tests
+    #[test]
+    fn test_phonetic_transpose_qu_to_kw() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // "queen" → "kween" via qu→kw transpose
+        assert!(automaton.accepts("queen", "kween"),
+               "Transpose qu→kw should work at distance 1");
+
+        // "quick" → "kwick" via qu→kw transpose
+        assert!(automaton.accepts("quick", "kwick"),
+               "Transpose qu→kw at word start should work");
+
+        // "quit" → "kwit" via qu→kw transpose
+        assert!(automaton.accepts("quit", "kwit"),
+               "Transpose qu→kw should work");
+    }
+
+    #[test]
+    fn test_phonetic_transpose_kw_to_qu() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // "kween" → "queen" via kw→qu transpose (reverse)
+        assert!(automaton.accepts("kween", "queen"),
+               "Transpose kw→qu should work at distance 1");
+
+        // "kwik" → "quik" via kw→qu transpose
+        assert!(automaton.accepts("kwik", "quik"),
+               "Transpose kw→qu should work");
+    }
+
+    #[test]
+    fn test_phonetic_transpose_multiple() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+
+        // Multiple transposes with fractional weights
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // Single transpose at distance 1
+        assert!(automaton.accepts("queen", "kween"),
+               "Single transpose should work at distance 1");
+
+        // Two transposes would need multiple qu/kw in the word
+        // "ququ" → "kwkw" (two transposes, both fractional = 0)
+        assert!(automaton.accepts("ququ", "kwkw"),
+               "Two transposes with fractional weights should work at distance 1");
+    }
+
+    #[test]
+    fn test_phonetic_transpose_with_standard_ops() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // Transpose + standard operations
+        // "queen" → "kweens" via qu→kw (0) + insert 's' (1) = 1 total
+        assert!(automaton.accepts("queen", "kweens"),
+               "Transpose + insert should work at distance 1");
+    }
+
+    #[test]
+    fn test_phonetic_transpose_distance_constraints() {
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(0, ops.clone());
+
+        // At distance 0, no operations should work
+        assert!(!automaton.accepts("queen", "kween"),
+               "Transpose should not work at distance 0");
+
+        // At distance 1, fractional-weight transpose should work
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+        assert!(automaton.accepts("queen", "kween"),
+               "Transpose should work at distance 1");
+    }
+
+    #[test]
+    fn test_phonetic_mixed_merge_split_transpose() {
+        // Test combining all phonetic operation types
+        let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
+        let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
+        for op in phonetic_ops.operations() {
+            builder = builder.with_operation(op.clone());
+        }
+        let ops = builder.build();
+        let automaton = GeneralizedAutomaton::with_operations(1, ops);
+
+        // Merge: "phone" → "fone" (ph→f)
+        assert!(automaton.accepts("phone", "fone"),
+               "Merge operation should work");
+
+        // Split: "graf" → "graph" (f→ph)
+        assert!(automaton.accepts("graf", "graph"),
+               "Split operation should work");
+
+        // Transpose: "queen" → "kween" (qu→kw)
+        assert!(automaton.accepts("queen", "kween"),
+               "Transpose operation should work");
+
+        // All three have fractional weights, all work at distance 1
+        // Each operation independently truncates to 0 errors
     }
 }
 

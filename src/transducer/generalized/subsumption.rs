@@ -139,12 +139,12 @@ fn subsumes_standard(
         }
 
         // I-type splitting subsumes I-type splitting
-        (ISplitting { offset: i, errors: e }, ISplitting { offset: j, errors: f }) => {
+        (ISplitting { offset: i, errors: e, .. }, ISplitting { offset: j, errors: f, .. }) => {
             check_subsumption(*i, *e, *j, *f)
         }
 
         // M-type splitting subsumes M-type splitting
-        (MSplitting { offset: i, errors: e }, MSplitting { offset: j, errors: f }) => {
+        (MSplitting { offset: i, errors: e, .. }, MSplitting { offset: j, errors: f, .. }) => {
             check_subsumption(*i, *e, *j, *f)
         }
 
@@ -246,8 +246,8 @@ mod tests {
     #[test]
     fn test_same_variant_subsumption_splitting() {
         // I+(-1)#1_s subsumes I+0#2_s (same variant)
-        let pos1 = GeneralizedPosition::new_i_splitting(-1, 1, 2).unwrap();
-        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2).unwrap();
+        let pos1 = GeneralizedPosition::new_i_splitting(-1, 1, 2, 'a').unwrap();
+        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2, 'a').unwrap();
         assert!(subsumes(&pos1, &pos2, 2));
     }
 
@@ -262,8 +262,8 @@ mod tests {
     #[test]
     fn test_same_variant_subsumption_m_splitting() {
         // M+(-1)#1_s subsumes M+(-2)#2_s (same variant)
-        let pos1 = GeneralizedPosition::new_m_splitting(-1, 1, 2).unwrap();
-        let pos2 = GeneralizedPosition::new_m_splitting(-2, 2, 2).unwrap();
+        let pos1 = GeneralizedPosition::new_m_splitting(-1, 1, 2, 'a').unwrap();
+        let pos2 = GeneralizedPosition::new_m_splitting(-2, 2, 2, 'a').unwrap();
         assert!(subsumes(&pos1, &pos2, 2));
     }
 
@@ -282,7 +282,7 @@ mod tests {
     fn test_different_variant_no_subsumption_transposing_vs_splitting() {
         // I+0#1_t (transposing) does NOT subsume I+0#2_s (splitting)
         let pos1 = GeneralizedPosition::new_i_transposing(0, 1, 2).unwrap();
-        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2, 'a').unwrap();
         assert!(!subsumes(&pos1, &pos2, 2));
 
         // And vice versa
@@ -293,7 +293,7 @@ mod tests {
     fn test_different_variant_no_subsumption_usual_vs_splitting() {
         // I+0#1 (usual) does NOT subsume I+0#2_s (splitting)
         let pos1 = GeneralizedPosition::new_i(0, 1, 2).unwrap();
-        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2).unwrap();
+        let pos2 = GeneralizedPosition::new_i_splitting(0, 2, 2, 'a').unwrap();
         assert!(!subsumes(&pos1, &pos2, 2));
 
         // And vice versa
@@ -305,7 +305,7 @@ mod tests {
         // Even with same offset and errors, different variants don't subsume
         let i_usual = GeneralizedPosition::new_i(0, 1, 2).unwrap();
         let i_trans = GeneralizedPosition::new_i_transposing(0, 1, 2).unwrap();
-        let i_split = GeneralizedPosition::new_i_splitting(0, 1, 2).unwrap();
+        let i_split = GeneralizedPosition::new_i_splitting(0, 1, 2, 'a').unwrap();
 
         // No cross-variant subsumption
         assert!(!subsumes(&i_usual, &i_trans, 2));
@@ -321,7 +321,7 @@ mod tests {
         // M-type variants also don't subsume across types
         let m_usual = GeneralizedPosition::new_m(0, 1, 2).unwrap();
         let m_trans = GeneralizedPosition::new_m_transposing(0, 1, 2).unwrap();
-        let m_split = GeneralizedPosition::new_m_splitting(0, 1, 2).unwrap();
+        let m_split = GeneralizedPosition::new_m_splitting(0, 1, 2, 'a').unwrap();
 
         assert!(!subsumes(&m_usual, &m_trans, 2));
         assert!(!subsumes(&m_usual, &m_split, 2));
