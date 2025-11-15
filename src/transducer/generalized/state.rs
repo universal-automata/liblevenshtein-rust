@@ -968,19 +968,18 @@ impl GeneralizedState {
     ) -> Vec<GeneralizedPosition> {
         let mut successors = Vec::new();
         let n = self.max_distance as i32;
-        let match_index = (offset + n) as usize;
+        let match_index_i32 = offset + n;
 
         // Phase 3b: Complete split with phonetic validation
         // Extract word character that was split
         let word_chars: Vec<char> = word_slice.chars().collect();
 
-        // Phase 3b fix: If word_slice is empty, extract from full_word using absolute position
-        let word_1char = if word_chars.is_empty() {
-            // Subword is empty - we need to use full_word
-            // Calculate absolute word position from offset
+        // Phase 3b fix: Handle negative match_index or empty word_slice by using full_word
+        let word_1char = if match_index_i32 < 0 || word_chars.is_empty() {
+            // Need to use full_word instead of word_slice
             let full_word_chars: Vec<char> = full_word.chars().collect();
-            // The splitting state was entered at offset-1, so the word char is at position corresponding to offset
-            // With the corrected offset calculation (using offset not offset+1), we need to find the right position
+            // Calculate absolute position in full word
+            // When entering split, we did offset-1, so the word char being split is at offset+n+1
             let word_pos = (offset + n + 1) as usize;
 
             if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
@@ -991,6 +990,7 @@ impl GeneralizedState {
             }
         } else {
             // Normal case: extract from subword
+            let match_index = match_index_i32 as usize;
             if match_index >= word_chars.len() || word_chars[match_index] == '$' {
                 return successors;
             }
@@ -1037,14 +1037,17 @@ impl GeneralizedState {
 
         // FALLBACK: Check standard operations (bit_vector match)
         // Only reached if no phonetic operation applied
-        if errors > 0 && match_index < bit_vector.len() && bit_vector.is_match(match_index) {
-            // Complete split: offset+0 (advance 1 word position), errors-1
-            if let Ok(succ) = GeneralizedPosition::new_i(
-                offset,      // +0 (stays same!)
-                errors - 1,  // Decrement error (was incremented on enter)
-                self.max_distance
-            ) {
-                successors.push(succ);
+        if errors > 0 && match_index_i32 >= 0 {
+            let match_idx = match_index_i32 as usize;
+            if match_idx < bit_vector.len() && bit_vector.is_match(match_idx) {
+                // Complete split: offset+0 (advance 1 word position), errors-1
+                if let Ok(succ) = GeneralizedPosition::new_i(
+                    offset,      // +0 (stays same!)
+                    errors - 1,  // Decrement error (was incremented on enter)
+                    self.max_distance
+                ) {
+                    successors.push(succ);
+                }
             }
         }
 
@@ -1076,18 +1079,18 @@ impl GeneralizedState {
 
         // Phase 3b: Complete split with phonetic validation
         // Extract word character that was split
-        let next_match_index = (offset + bit_vector.len() as i32) as usize;
+        let next_match_index_i32 = offset + bit_vector.len() as i32;
         let word_chars: Vec<char> = word_slice.chars().collect();
 
-        // Phase 3b fix: If word_slice is empty, extract from full_word
-        let word_1char = if word_chars.is_empty() {
-            // Subword is empty - use full_word to extract character
+        // Phase 3b fix: Handle negative or out-of-bounds index by using full_word
+        let word_1char = if next_match_index_i32 < 0 || word_chars.is_empty() {
+            // Need to use full_word instead of word_slice
             let full_word_chars: Vec<char> = full_word.chars().collect();
 
             // For M-type, calculate absolute position
-            // M-type offset is relative to word end, so word_pos = word_len + offset
+            // When entering split, we did offset-1, so add +1 to get the word char being split
             let word_len = full_word_chars.len();
-            let word_pos = (word_len as i32 + offset) as usize;
+            let word_pos = (word_len as i32 + offset + 1) as usize;
 
             if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
                 full_word_chars[word_pos].to_string()
@@ -1097,7 +1100,8 @@ impl GeneralizedState {
             }
         } else {
             // Normal case: extract from subword
-            if next_match_index >= word_chars.len() || (next_match_index < word_chars.len() && word_chars[next_match_index] == '$') {
+            let next_match_index = next_match_index_i32 as usize;
+            if next_match_index >= word_chars.len() || word_chars[next_match_index] == '$' {
                 return successors;
             }
             word_chars[next_match_index].to_string()

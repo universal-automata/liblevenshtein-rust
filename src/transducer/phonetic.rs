@@ -20,10 +20,11 @@
 //! use liblevenshtein::transducer::OperationSetBuilder;
 //!
 //! // Build operation set with standard ops + phonetic corrections
-//! let ops = OperationSetBuilder::new()
-//!     .with_standard_ops()
-//!     .with_operation_set(&phonetic_english_basic())
-//!     .build();
+//! let mut builder = OperationSetBuilder::new().with_standard_ops();
+//! for op in phonetic_english_basic().operations() {
+//!     builder = builder.with_operation(op.clone());
+//! }
+//! let ops = builder.build();
 //! ```
 //!
 //! # Future Phases

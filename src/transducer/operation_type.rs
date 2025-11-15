@@ -18,7 +18,7 @@
 //!
 //! ## Standard Levenshtein Operations
 //!
-//! ```
+//! ```text
 //! Match:         ⟨1, 1, 0.0⟩  // Consume 1 from each, no cost
 //! Substitution:  ⟨1, 1, 1.0⟩  // Consume 1 from each, cost 1
 //! Insertion:     ⟨0, 1, 1.0⟩  // Consume only from query, cost 1
@@ -29,13 +29,13 @@
 //! ## Extended Operations
 //!
 //! ### Phonetic Corrections
-//! ```
+//! ```text
 //! ph→f digraph:  ⟨2, 1, 0.15⟩  // "ph" in dict matches "f" in query
 //! Silent e:      ⟨1, 0, 0.1⟩   // Final "e" deletion, low cost
 //! ```
 //!
 //! ### Weighted OCR Corrections
-//! ```
+//! ```text
 //! O↔0 confusion: ⟨1, 1, 0.2⟩  // Common OCR error, low cost
 //! l↔I confusion: ⟨1, 1, 0.3⟩  // Less common, higher cost
 //! ```
