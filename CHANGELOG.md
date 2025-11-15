@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-11-14
+
+### Added
+
+#### Phase 3b: Phonetic Operations - Partial Implementation (2025-11-14)
+- **Phonetic Split Operations ⟨1,2⟩ (92% complete - 22/24 tests passing)**
+  - Implemented split operations for single-to-multi-character phonetic transformations (k→ch, t→th, s→sh, f→ph)
+  - Added `entry_char` field to ISplitting/MSplitting positions to track character at split entry
+  - Prevents spurious split entry by validating input character matches target's first character
+  - Prioritizes phonetic splits (errors+0, fractional weight) over standard splits (errors+1)
+  - Handles negative match_index in split completion when offset becomes very negative
+
+- **New SubstitutionSet APIs**
+  - `has_source(&self, source: &[u8]) -> bool`: Check if source exists in restriction set
+  - `has_target_starting_with(&self, source: &[u8], first_char: char) -> bool`: Validate target starts with given character
+  - Comprehensive test coverage with 7 new unit tests
+  - Supports both single-byte and multi-char storage architectures
+
+- **New OperationType APIs**
+  - `can_apply_to_source(&self, dict_chars: &[u8]) -> bool`: Validate source without target for speculative split entry
+  - `matches_first_target_char(&self, dict_chars: &[u8], first_target_char: char) -> bool`: Validate first character of split target
+  - Full documentation with examples and theoretical justification for locality property
+  - Enables generic phonetic split detection without hard-coding operation targets
+
+### Fixed
+
+#### Phase 3b Bug Fixes (2025-11-14)
+- **Entry Character Architecture Issue**
+  - Fixed: `previous_input_char` was shared at state level, causing incorrect character for parallel exploration paths
+  - Solution: Store `entry_char` in each splitting position to track character read when entering that specific split
+  - Impact: Enables correct double-split operations like "kat"→"chath" (k→ch, t→th)
+
+- **Split Entry Priority Issue**
+  - Fixed: Both phonetic and standard splits were being entered simultaneously, exhausting error budget
+  - Solution: Use if-else chain to prioritize phonetic splits (errors+0) over standard splits (errors+1)
+  - Impact: Phonetic operations take precedence when both conditions are met
+
+- **Split Entry Validation Issue**
+  - Fixed: Splits were entered speculatively without checking if input character matches target's first character
+  - Solution: Validate with `matches_first_target_char()` before entering split state
+  - Impact: Prevents entering t→th split when reading 'a' instead of 't'
+
+- **I-Splitting Invariant Issue**
+  - Fixed: Standard invariant `|offset| <= errors` too restrictive for accumulated errors from other operations
+  - Solution: Relaxed invariant for errors > 0 using subsumption-based constraints (errors >= -offset - n, offset >= -2*n)
+  - Impact: Allows phonetic splits from positions with accumulated errors (e.g., after k→ch + insert 'a' + t→th)
+
+- **Negative Match Index Handling**
+  - Fixed: When offset becomes very negative (< -n), match_index calculation wraps on usize cast
+  - Solution: Check if match_index_i32 < 0 before casting, use full_word fallback for extraction
+  - Impact: Prevents undefined behavior in word character extraction during split completion
+
+### Changed
+
+#### Generalized Position Updates (2025-11-14)
+- Updated ISplitting and MSplitting position variants to include `entry_char: char` field
+- Modified subsumption logic to handle new entry_char field with pattern matching wildcards
+- Updated all position creation call sites in state transition functions
+- Enhanced position constructors (`new_i_splitting`, `new_m_splitting`) with entry_char parameter
+- All 4 new tests for splitting position constructors passing
+
+### Technical Details
+
+#### Architecture Changes (2025-11-14)
+- **Files Modified**: 6 core files (substitution_set.rs, operation_type.rs, position.rs, state.rs, subsumption.rs, automaton.rs)
+- **Test Coverage**: 22/24 phonetic tests passing (91.7% success rate, up from 90.5%)
+- **API Additions**: 4 new public methods with full documentation
+- **Test Additions**: 11 new unit tests (7 for SubstitutionSet, 4 for positions)
+
+#### Remaining Work (2025-11-14)
+- 2 failing tests: `test_phonetic_split_multiple`, `test_phonetic_split_with_standard_ops`
+- Issue: Word character extraction in edge cases when offset < -n
+- Root cause: Complex interaction between word_slice vs full_word extraction logic
+- Impact: Affects consecutive phonetic splits with accumulated errors
+
 ### Performance
 
 #### SubstitutionSet Optimizations (2025-11-12)
