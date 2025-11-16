@@ -474,21 +474,6 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Remove PathMap git dependency for crates.io
-        run: |
-          # Temporarily comment out PathMap git dependency for crates.io publishing
-          sed -i 's/^pathmap = { git/# pathmap = { git/' Cargo.toml
-          # Also remove pathmap-backend from CLI feature since PathMap won't be available
-          sed -i 's/"pathmap-backend", //' Cargo.toml
-          # Convert pathmap-backend to an empty marker feature since the dependency is disabled
-          sed -i 's/^pathmap-backend = \["pathmap"\]/pathmap-backend = []/' Cargo.toml
-
-      - name: Verify package builds without PathMap
-        run: cargo build --lib --verbose
-
-      - name: Run tests without PathMap
-        run: cargo test --lib --verbose
-
       - name: Publish to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

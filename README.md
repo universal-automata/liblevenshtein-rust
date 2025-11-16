@@ -10,8 +10,6 @@ A Rust implementation of [liblevenshtein](https://github.com/universal-automata/
 
 Based on "Fast String Correction with Levenshtein-Automata" (Schulz & Mihov, 2002).
 
-> **Note:** Ready for crates.io publication (PathMap dependency is now optional).
-
 ## What's New
 
 ### v0.5.0 (2025-11-04)
@@ -177,24 +175,6 @@ Or install the CLI tool:
 
 ```bash
 cargo install liblevenshtein --features cli,compression,protobuf
-```
-
-**Note:** The PathMap backend is not available from crates.io (git dependency). All other backends (DoubleArrayTrie, DAWG, etc.) are fully supported.
-
-### From GitHub (For PathMap Backend)
-
-To use the PathMap backend, install from source:
-
-```toml
-[dependencies]
-liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", tag = "v0.5.0", features = ["pathmap-backend"] }
-```
-
-Or install the CLI with PathMap:
-
-```bash
-cargo install --git https://github.com/universal-automata/liblevenshtein-rust --tag v0.5.0 \
-  --features cli,pathmap-backend,compression,protobuf liblevenshtein
 ```
 
 ### Pre-built Packages
