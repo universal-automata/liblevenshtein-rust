@@ -61,4 +61,5 @@ mod subsumption;
 pub use automaton::GeneralizedAutomaton;
 pub use position::{GeneralizedPosition, PositionError};
 pub use state::GeneralizedState;
-pub(crate) use bit_vector::CharacteristicVector;
+pub use bit_vector::CharacteristicVector;
+pub use subsumption::subsumes;

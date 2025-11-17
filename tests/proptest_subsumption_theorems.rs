@@ -6,7 +6,7 @@
 // These tests validate foundational properties critical for anti-chain
 // state minimization in Levenshtein automata.
 
-use liblevenshtein::transducer::generalized::GeneralizedPosition;
+use liblevenshtein::transducer::generalized::{GeneralizedPosition, subsumes};
 use proptest::prelude::*;
 
 // ============================================================================
@@ -15,11 +15,11 @@ use proptest::prelude::*;
 
 /// Generate positions that might subsume each other
 fn subsumable_positions() -> impl Strategy<Value = (GeneralizedPosition, GeneralizedPosition, u8)> {
-    (1u8..10).prop_flat_map(|max_distance| {
+    (2u8..10).prop_flat_map(|max_distance| {  // Start at 2 to allow errors1 < max_distance
         // Generate two I-type positions with same variant
         let max_d = max_distance as i32;
 
-        (0u8..=max_distance).prop_flat_map(move |errors1| {
+        (0u8..max_distance).prop_flat_map(move |errors1| {  // errors1 < max_distance
             let e1 = errors1 as i32;
             let min_offset1 = (-max_d).max(-e1);
             let max_offset1 = max_d.min(e1);
@@ -65,14 +65,14 @@ mod subsumption_transitivity {
         fn subsumes_is_transitive(
             ((p1, p2, max_dist), (_, p3, _)) in (subsumable_positions(), subsumable_positions())
         ) {
-            // Ensure all three have same variant
-            prop_assume!(p1.variant() == p2.variant());
-            prop_assume!(p2.variant() == p3.variant());
+            // Ensure all three have same variant (I-type or M-type)
+            prop_assume!(p1.is_non_final() == p2.is_non_final());
+            prop_assume!(p2.is_non_final() == p3.is_non_final());
 
             // Check if p1 ⊑ p2 and p2 ⊑ p3
-            if p1.subsumes(&p2, max_dist) && p2.subsumes(&p3, max_dist) {
+            if subsumes(&p1, &p2, max_dist) && subsumes(&p2, &p3, max_dist) {
                 // Then p1 ⊑ p3 MUST hold (transitivity)
-                prop_assert!(p1.subsumes(&p3, max_dist),
+                prop_assert!(subsumes(&p1, &p3, max_dist),
                     "Subsumption transitivity violated:\n\
                      p1 = {:?} subsumes p2 = {:?}\n\
                      p2 = {:?} subsumes p3 = {:?}\n\
@@ -91,10 +91,9 @@ mod subsumption_transitivity {
                     .prop_filter("valid position", |p| p.is_some())
                     .prop_map(|p| p.unwrap())
             }),
-            chain_length in 2usize..=5
+            chain_length in 2usize..=5,
+            max_distance in 1u8..10
         ) {
-            let max_distance = seed_position.max_distance();
-
             // Build a chain: p1 ⊑ p2 ⊑ p3 ⊑ ... ⊑ pN
             let mut chain = vec![seed_position];
 
@@ -117,7 +116,7 @@ mod subsumption_transitivity {
             // Verify transitivity: any p[i] should subsume all p[j] where j > i
             for i in 0..chain.len() {
                 for j in (i + 1)..chain.len() {
-                    if chain[i].subsumes(&chain[j], max_distance) {
+                    if subsumes(&chain[i], &chain[j], max_distance) {
                         // OK - maintains subsumption
                     } else {
                         // Might not subsume due to offset difference growing too large
@@ -151,10 +150,10 @@ mod subsumption_antisymmetry {
             (p1, p2, max_dist) in subsumable_positions()
         ) {
             // Same variant required for subsumption
-            prop_assume!(p1.variant() == p2.variant());
+            prop_assume!(p1.is_non_final() == p2.is_non_final());
 
-            let p1_subsumes_p2 = p1.subsumes(&p2, max_dist);
-            let p2_subsumes_p1 = p2.subsumes(&p1, max_dist);
+            let p1_subsumes_p2 = subsumes(&p1, &p2, max_dist);
+            let p2_subsumes_p1 = subsumes(&p2, &p1, max_dist);
 
             // It's impossible for both to be true
             prop_assert!(!(p1_subsumes_p2 && p2_subsumes_p1),
@@ -171,7 +170,7 @@ mod subsumption_antisymmetry {
             // but this violates irreflexivity.
             if p1_subsumes_p2 && p2_subsumes_p1 {
                 // By transitivity, p1 should subsume itself
-                let p1_subsumes_p1 = p1.subsumes(&p1, max_dist);
+                let p1_subsumes_p1 = subsumes(&p1, &p1, max_dist);
                 prop_assert!(!p1_subsumes_p1,
                     "Transitivity implies p1 subsumes itself, violating irreflexivity");
             }
@@ -200,7 +199,7 @@ mod subsumption_irreflexivity {
             prop_assume!(offset >= -(max_distance as i32) && offset <= max_distance as i32);
 
             if let Ok(p) = GeneralizedPosition::new_i(offset, errors, max_distance) {
-                prop_assert!(!p.subsumes(&p, max_distance),
+                prop_assert!(!subsumes(&p, &p, max_distance),
                     "Position {:?} should not subsume itself (irreflexivity)", p);
             }
         }
@@ -232,9 +231,9 @@ mod subsumption_variant_restriction {
                 GeneralizedPosition::new_m(offset2, errors2, max_distance)
             ) {
                 // Different variants cannot subsume each other
-                prop_assert!(!p_i.subsumes(&p_m, max_distance),
+                prop_assert!(!subsumes(&p_i, &p_m, max_distance),
                     "I-type {:?} should not subsume M-type {:?}", p_i, p_m);
-                prop_assert!(!p_m.subsumes(&p_i, max_distance),
+                prop_assert!(!subsumes(&p_m, &p_i, max_distance),
                     "M-type {:?} should not subsume I-type {:?}", p_m, p_i);
             }
         }
@@ -259,15 +258,15 @@ mod partial_order_properties {
         fn subsumption_is_strict_partial_order(
             (p1, p2, max_dist) in subsumable_positions()
         ) {
-            prop_assume!(p1.variant() == p2.variant());
+            prop_assume!(p1.is_non_final() == p2.is_non_final());
 
             // Irreflexivity
-            prop_assert!(!p1.subsumes(&p1, max_dist));
-            prop_assert!(!p2.subsumes(&p2, max_dist));
+            prop_assert!(!subsumes(&p1, &p1, max_dist));
+            prop_assert!(!subsumes(&p2, &p2, max_dist));
 
             // Asymmetry (derived from irreflexivity + transitivity)
-            if p1.subsumes(&p2, max_dist) {
-                prop_assert!(!p2.subsumes(&p1, max_dist),
+            if subsumes(&p1, &p2, max_dist) {
+                prop_assert!(!subsumes(&p2, &p1, max_dist),
                     "If p1 ⊑ p2, then ¬(p2 ⊑ p1) (asymmetry)");
             }
         }

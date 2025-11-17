@@ -689,13 +689,18 @@ impl GeneralizedState {
         // Phase 3: Supports phonetic operations like "ch"→"k", "ph"→"f"
         if errors < self.max_distance {
             let word_chars: Vec<char> = word_slice.chars().collect();
-            let next_match_index = (offset + bit_vector.len() as i32 + 1) as usize;
+            let next_match_index_i32 = offset + bit_vector.len() as i32 + 1;
 
-            // Check if we have enough word characters (need 2 consecutive chars)
-            // Skip padding chars '$'
-            if next_match_index + 1 < word_chars.len()
-                && word_chars[next_match_index] != '$'
-                && word_chars[next_match_index + 1] != '$' {
+            // Check if index is valid (non-negative) before converting to usize
+            // M-type positions can have negative offsets, so this prevents overflow
+            if next_match_index_i32 >= 0 {
+                let next_match_index = next_match_index_i32 as usize;
+
+                // Check if we have enough word characters (need 2 consecutive chars)
+                // Skip padding chars '$'
+                if next_match_index + 1 < word_chars.len()
+                    && word_chars[next_match_index] != '$'
+                    && word_chars[next_match_index + 1] != '$' {
                 // Extract 2 word characters
                 let word_2chars: String = word_chars[next_match_index..next_match_index+2].iter().collect();
                 let input_1char = input_char.to_string();
@@ -721,6 +726,7 @@ impl GeneralizedState {
                             }
                         }
                     }
+                }
                 }
             }
         }
