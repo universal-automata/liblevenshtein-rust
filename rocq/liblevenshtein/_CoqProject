@@ -1,0 +1,17 @@
+-R . LevensteinAutomata
+
+# Coq standard library dependencies
+-arg -w -arg -notation-overridden
+-arg -w -arg -redundant-canonical-projection
+-arg -w -arg -deprecated-hint-without-locality
+
+# Source files
+Core.v
+Subsumption.v
+Invariants.v
+Operations.v
+Transitions.v
+State.v
+
+# Use standard library
+-Q /usr/lib/coq/user-contrib/Coq Coq

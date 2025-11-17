@@ -715,7 +715,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_new_i_splitting_invalid() {
         // Same invariants as INonFinal
         assert!(GeneralizedPosition::new_i_splitting(3, 1, 2, 'a').is_err()); // offset > n

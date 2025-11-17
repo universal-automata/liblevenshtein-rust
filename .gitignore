@@ -72,3 +72,9 @@ data/corpora/*.dat
 data/corpora/*.zip
 data/corpora/birkbeck/
 data/generated/
+
+rocq/**/.lia.cache
+rocq/**/*.vo
+rocq/**/*.vok
+rocq/**/*.vos
+rocq/**/*.glob

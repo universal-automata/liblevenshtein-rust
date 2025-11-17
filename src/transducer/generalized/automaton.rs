@@ -1611,7 +1611,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_phonetic_split_multiple() {
         let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
         let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
@@ -1635,7 +1634,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_phonetic_split_with_standard_ops() {
         let phonetic_ops = crate::transducer::phonetic::consonant_digraphs();
         let mut builder = crate::transducer::OperationSetBuilder::new().with_standard_ops();
