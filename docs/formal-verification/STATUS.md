@@ -1,16 +1,16 @@
 # Formal Verification Status Report
 
-**Last Updated**: 2025-11-17
-**Session**: Phase 3 in progress
-**Token Usage**: 125k/200k (62.5%)
+**Last Updated**: 2025-11-17 (Updated after I-type completion)
+**Session**: Phase 3 - I-type complete, M-type next
+**Token Usage**: 84k/200k (42%)
 
 ---
 
 ## Executive Summary
 
-**Completed**: Phases 1 & 2 (Foundation + Invariants)
-**In Progress**: Phase 3 (Standard Operations) - Operations.v complete
-**Next**: Transitions.v with successor relations and invariant preservation proofs
+**Completed**: Phases 1 & 2 (Foundation + Invariants), Phase 3 I-Type Operations ✅
+**In Progress**: Phase 3 M-Type Operations
+**Achievements**: 26 theorems proven across 4 files, 0 bugs found, 3 simplifications identified
 
 ---
 
@@ -52,10 +52,10 @@
 
 ---
 
-### Phase 3: Standard Operations (In Progress) 🚧
+### Phase 3: Standard Operations ✅ (I-Type Complete)
 
-**Completed**: Operations.v ✅
-**Next**: Transitions.v (successor relations + proofs)
+**Completed**: Operations.v ✅, Transitions.v (I-type) ✅
+**Next**: Transitions.v (M-type), Documentation, Property Tests
 
 #### Operations.v ✅ (Complete)
 
@@ -79,25 +79,68 @@
 
 **Status**: ✅ Compiled successfully, ready for use in Transitions.v
 
+**Git Commit**: `28f041b` - "feat(formal-verification): Phase 3 - Operations.v and status documentation"
+
 ---
 
-## Next Steps: Transitions.v
+#### Transitions.v ✅ (I-Type Complete)
 
-### What Needs to Be Done
+**File**: `rocq/liblevenshtein/Transitions.v` (515 lines, 30,700 bytes compiled)
 
-**File to Create**: `rocq/liblevenshtein/Transitions.v` (~600-800 lines estimated)
+**Inductive Relations Defined**:
+- `i_successor`: Successor relation for I-type positions with 4 standard operations
+  * `ISucc_Match`: Requires `has_match`, preserves offset and errors
+  * `ISucc_Delete`: Requires `errors < n` and `offset > -n`, offset decreases, errors increase
+  * `ISucc_Insert`: Requires `errors < n`, preserves offset, errors increase
+  * `ISucc_Substitute`: Requires `errors < n`, preserves offset, errors increase
 
-#### 1. Define Successor Relations
+**Theorems Proven** (7 for I-type):
+1. `i_match_preserves_invariant`: Match transitions preserve i_invariant
+2. `i_delete_preserves_invariant`: Delete transitions preserve i_invariant (complex proof with case analysis)
+3. `i_insert_preserves_invariant`: Insert transitions preserve i_invariant
+4. `i_substitute_preserves_invariant`: Substitute transitions preserve i_invariant
+5. `i_successor_preserves_invariant`: ALL I-type operations preserve invariants (main theorem)
+6. `i_successor_cost_correct`: Error accounting matches operation costs exactly
+
+**Key Proof Techniques**:
+- Boolean reflection (Z.leb_spec) for extracting integer inequality proofs
+- Case analysis on offset sign using Z.abs_eq/Z.abs_neq
+- Nat-to-Z conversion with `replace` tactic for S n = n + 1
+- Linear integer arithmetic automation (lia) for numeric goals
+- Manual conjunct splitting for clarity and debugging
+
+**Findings** (see FINDINGS.md):
+- ✅ NO BUGS FOUND - Rust implementation is mathematically correct
+- 🔍 F1: Redundant check identified (errors < n ⟹ errors+1 ≤ n)
+- 📋 F2: Delete boundary check is implicit in constructor (documented)
+- 💡 F3: Offset change could be centralized (simplification opportunity)
+
+**Status**: ✅ All I-type proofs complete, compiles with 0 Admitted
+
+**Git Commit**: `c696c0a` - "feat(formal-verification): Phase 3 - I-type transitions with complete proofs"
+
+---
+
+## Next Steps: Complete Phase 3
+
+### What Remains for Phase 3
+
+#### 1. Add M-Type Successor Relations to Transitions.v
+
+**Current**: I-type complete (515 lines)
+**Target**: Add M-type relations and proofs (~400-500 more lines)
+
+M-type successor relation to define (different offset semantics!):
 
 ```coq
-Inductive i_successor : Position -> StandardOperation ->
+Inductive m_successor : Position -> StandardOperation ->
                         CharacteristicVector -> Position -> Prop :=
 
-  | ISucc_Match : forall offset errors n bv,
-      has_match bv (Z.to_nat (offset + Z.of_nat n)) ->
+  | MSucc_Match : forall offset errors n cv,
+      has_match cv ... ->
       (errors <= n)%nat ->
-      i_successor
-        (mkPosition VarINonFinal offset errors n None)
+      m_successor
+        (mkPosition VarMFinal offset errors n None)
         OpMatch
         bv
         (mkPosition VarINonFinal offset errors n None)
