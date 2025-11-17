@@ -78,3 +78,6 @@ rocq/**/*.vo
 rocq/**/*.vok
 rocq/**/*.vos
 rocq/**/*.glob
+rocq/**/Makefile
+rocq/**/Makefile.conf
+rocq/**/.Makefile.d

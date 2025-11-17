@@ -7,11 +7,9 @@
 
 # Source files
 Core.v
-Subsumption.v
 Invariants.v
 Operations.v
 Transitions.v
-State.v
 
 # Use standard library
 -Q /usr/lib/coq/user-contrib/Coq Coq

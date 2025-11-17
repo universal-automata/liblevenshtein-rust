@@ -502,6 +502,9 @@ impl GeneralizedState {
             }
 
             // SKIP-TO-MATCH optimization (Phase 2c: generalize for multi-char)
+            // Scans FORWARD through word to find next match position
+            // NOT equivalent to N DELETEs (DELETE moves backward, skip moves forward)
+            // Cost: number of word characters skipped over
             if !has_match && errors < self.max_distance {
                 for idx in (match_index + 1)..bit_vector.len() {
                     if bit_vector.is_match(idx) {

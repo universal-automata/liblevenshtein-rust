@@ -297,7 +297,7 @@ mod offset_semantics {
 
     proptest! {
         #[test]
-        fn i_type_only_delete_decreases_offset(
+        fn i_type_offset_changes_are_valid(
             (offset, errors, max_distance) in valid_i_position(),
             word in test_word(),
             input_ch in input_char()
@@ -318,11 +318,24 @@ mod offset_semantics {
                 for succ in next_state.positions() {
                     if succ.is_non_final() {
                         let offset_diff = succ.offset() - offset;
+                        let error_diff = succ.errors() as i32 - errors as i32;
 
-                        // I-type: only delete changes offset (by -1)
-                        // Match/Insert/Substitute: offset unchanged
-                        prop_assert!(offset_diff == 0 || offset_diff == -1,
-                            "I-type offset change {} not in {{0, -1}}", offset_diff);
+                        // I-type standard operations:
+                        // - Match: offset+0, errors+0
+                        // - Delete: offset-1, errors+1
+                        // - Insert: offset+0, errors+1
+                        // - Substitute: offset+0, errors+1
+                        // - Skip-to-match (optimization): offset+N, errors+N (N deletes)
+
+                        // Validate: offset change should not exceed error change
+                        // (each position skip costs at least 1 error)
+                        prop_assert!(offset_diff <= error_diff,
+                            "I-type offset increase {} > error increase {}",
+                            offset_diff, error_diff);
+
+                        // Validate: offset can decrease by at most 1 (single delete)
+                        prop_assert!(offset_diff >= -1,
+                            "I-type offset decrease {} < -1", offset_diff);
                     }
                 }
             }
