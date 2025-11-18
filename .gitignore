@@ -82,6 +82,16 @@ rocq/**/Makefile
 rocq/**/Makefile.conf
 rocq/**/.Makefile.d
 
+# Rocq/Coq verification artifacts
+docs/verification/**/.lia.cache
+docs/verification/**/*.vo
+docs/verification/**/*.vok
+docs/verification/**/*.vos
+docs/verification/**/*.glob
+docs/verification/**/.*.aux
+docs/verification/**/html/
+docs/verification/**/extracted/
+
 # Profiling artifacts
 *.perf.data
 *.perf.data.old
