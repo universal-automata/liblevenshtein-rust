@@ -1,0 +1,541 @@
+   Compiling liblevenshtein v0.7.0 (/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust)
+warning: unused import: `SubstitutionSet`
+  --> src/transducer/operation_set.rs:59:40
+   |
+59 | use crate::transducer::{OperationType, SubstitutionSet};
+   |                                        ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated struct `dictionary::dawg_optimized::OptimizedDawg`: Use DynamicDawg instead - 11× faster construction with full feature support
+  --> src/dictionary/factory.rs:25:28
+   |
+25 | use super::dawg_optimized::OptimizedDawg;
+   |                            ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `dictionary::dawg_optimized::OptimizedDawg`: Use DynamicDawg instead - 11× faster construction with full feature support
+  --> src/dictionary/factory.rs:74:19
+   |
+74 |     OptimizedDawg(OptimizedDawg),
+   |                   ^^^^^^^^^^^^^
+
+warning: use of deprecated struct `dictionary::dawg_optimized::OptimizedDawg`: Use DynamicDawg instead - 11× faster construction with full feature support
+  --> src/lib.rs:73:48
+   |
+73 |     pub use crate::dictionary::dawg_optimized::OptimizedDawg;
+   |                                                ^^^^^^^^^^^^^
+
+warning: unused variable: `full_word`
+   --> src/transducer/generalized/state.rs:266:9
+    |
+266 |         full_word: &str,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_full_word`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `word_chars`
+   --> src/transducer/generalized/state.rs:267:9
+    |
+267 |         word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_word_chars`
+
+warning: unused variable: `full_word`
+   --> src/transducer/generalized/state.rs:580:9
+    |
+580 |         full_word: &str,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_full_word`
+
+warning: unused variable: `word_chars`
+   --> src/transducer/generalized/state.rs:581:9
+    |
+581 |         word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_word_chars`
+
+warning: unused variable: `full_word`
+   --> src/transducer/generalized/state.rs:874:9
+    |
+874 |         full_word: &str,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_full_word`
+
+warning: unused variable: `word_chars`
+   --> src/transducer/generalized/state.rs:875:9
+    |
+875 |         word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_word_chars`
+
+warning: unused variable: `full_word`
+   --> src/transducer/generalized/state.rs:950:9
+    |
+950 |         full_word: &str,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_full_word`
+
+warning: unused variable: `word_chars`
+   --> src/transducer/generalized/state.rs:951:9
+    |
+951 |         word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_word_chars`
+
+warning: field `policy` is never read
+  --> src/transducer/universal/automaton.rs:71:5
+   |
+67 | pub struct UniversalAutomaton<V: PositionVariant, P: SubstitutionPolicy = Unrestricted> {
+   |            ------------------ field in this struct
+...
+71 |     policy: P,
+   |     ^^^^^^
+   |
+   = note: `UniversalAutomaton` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `characteristic_vector` is never used
+   --> src/transducer/generalized/bit_vector.rs:286:8
+    |
+286 | pub fn characteristic_vector(character: char, word: &str) -> CharacteristicVector {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `PADDING_CHAR` is never used
+   --> src/transducer/generalized/bit_vector.rs:293:7
+    |
+293 | const PADDING_CHAR: char = '$';
+    |       ^^^^^^^^^^^^
+
+warning: function `relevant_subword` is never used
+   --> src/transducer/generalized/bit_vector.rs:328:4
+    |
+328 | fn relevant_subword(word: &str, position: usize, max_distance: u8) -> String {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `encode_word_pair` is never used
+   --> src/transducer/generalized/bit_vector.rs:404:8
+    |
+404 | pub fn encode_word_pair(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: `liblevenshtein` (lib) generated 17 warnings (run `cargo fix --lib -p liblevenshtein` to apply 1 suggestion)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 50.43s
+     Running benches/generalized_automaton_benchmarks.rs (target/release/deps/generalized_automaton_benchmarks-dca0ec5bac20c675)
+Benchmarking state_transition/by_input_length/3
+Benchmarking state_transition/by_input_length/3: Warming up for 3.0000 s
+Benchmarking state_transition/by_input_length/3: Collecting 100 samples in estimated 5.0039 s (5.3M iterations)
+Benchmarking state_transition/by_input_length/3: Analyzing
+state_transition/by_input_length/3
+                        time:   [940.51 ns 945.57 ns 951.13 ns]
+                        thrpt:  [3.1541 Melem/s 3.1727 Melem/s 3.1898 Melem/s]
+                 change:
+                        time:   [-3.0130% -2.1551% -1.3086%] (p = 0.00 < 0.05)
+                        thrpt:  [+1.3260% +2.2026% +3.1066%]
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking state_transition/by_input_length/5
+Benchmarking state_transition/by_input_length/5: Warming up for 3.0000 s
+Benchmarking state_transition/by_input_length/5: Collecting 100 samples in estimated 5.0006 s (2.7M iterations)
+Benchmarking state_transition/by_input_length/5: Analyzing
+state_transition/by_input_length/5
+                        time:   [1.8516 µs 1.8594 µs 1.8688 µs]
+                        thrpt:  [2.6755 Melem/s 2.6890 Melem/s 2.7003 Melem/s]
+                 change:
+                        time:   [-10.379% -9.6647% -8.8816%] (p = 0.00 < 0.05)
+                        thrpt:  [+9.7473% +10.699% +11.581%]
+                        Performance has improved.
+Found 13 outliers among 100 measurements (13.00%)
+  1 (1.00%) low mild
+  8 (8.00%) high mild
+  4 (4.00%) high severe
+Benchmarking state_transition/by_input_length/8
+Benchmarking state_transition/by_input_length/8: Warming up for 3.0000 s
+Benchmarking state_transition/by_input_length/8: Collecting 100 samples in estimated 5.0036 s (1.1M iterations)
+Benchmarking state_transition/by_input_length/8: Analyzing
+state_transition/by_input_length/8
+                        time:   [4.5062 µs 4.5251 µs 4.5458 µs]
+                        thrpt:  [1.7599 Melem/s 1.7679 Melem/s 1.7753 Melem/s]
+                 change:
+                        time:   [-12.204% -11.449% -10.734%] (p = 0.00 < 0.05)
+                        thrpt:  [+12.024% +12.930% +13.901%]
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking state_transition/by_input_length/12
+Benchmarking state_transition/by_input_length/12: Warming up for 3.0000 s
+Benchmarking state_transition/by_input_length/12: Collecting 100 samples in estimated 5.0204 s (944k iterations)
+Benchmarking state_transition/by_input_length/12: Analyzing
+state_transition/by_input_length/12
+                        time:   [5.2550 µs 5.2793 µs 5.3073 µs]
+                        thrpt:  [2.2610 Melem/s 2.2730 Melem/s 2.2836 Melem/s]
+                 change:
+                        time:   [-4.9391% -4.2127% -3.4945%] (p = 0.00 < 0.05)
+                        thrpt:  [+3.6210% +4.3980% +5.1957%]
+                        Performance has improved.
+Found 10 outliers among 100 measurements (10.00%)
+  7 (7.00%) high mild
+  3 (3.00%) high severe
+Benchmarking state_transition/by_input_length/15
+Benchmarking state_transition/by_input_length/15: Warming up for 3.0000 s
+Benchmarking state_transition/by_input_length/15: Collecting 100 samples in estimated 5.0106 s (929k iterations)
+Benchmarking state_transition/by_input_length/15: Analyzing
+state_transition/by_input_length/15
+                        time:   [5.3187 µs 5.3358 µs 5.3550 µs]
+                        thrpt:  [2.8011 Melem/s 2.8112 Melem/s 2.8202 Melem/s]
+                 change:
+                        time:   [-11.806% -11.145% -10.483%] (p = 0.00 < 0.05)
+                        thrpt:  [+11.710% +12.543% +13.386%]
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking state_transition/by_distance/0
+Benchmarking state_transition/by_distance/0: Warming up for 3.0000 s
+Benchmarking state_transition/by_distance/0: Collecting 100 samples in estimated 5.0028 s (6.5M iterations)
+Benchmarking state_transition/by_distance/0: Analyzing
+state_transition/by_distance/0
+                        time:   [767.50 ns 770.74 ns 774.39 ns]
+                        thrpt:  [11.622 Melem/s 11.677 Melem/s 11.726 Melem/s]
+                 change:
+                        time:   [-24.410% -23.378% -22.379%] (p = 0.00 < 0.05)
+                        thrpt:  [+28.832% +30.511% +32.293%]
+                        Performance has improved.
+Found 11 outliers among 100 measurements (11.00%)
+  8 (8.00%) high mild
+  3 (3.00%) high severe
+Benchmarking state_transition/by_distance/1
+Benchmarking state_transition/by_distance/1: Warming up for 3.0000 s
+Benchmarking state_transition/by_distance/1: Collecting 100 samples in estimated 5.0047 s (2.2M iterations)
+Benchmarking state_transition/by_distance/1: Analyzing
+state_transition/by_distance/1
+                        time:   [2.3540 µs 2.3848 µs 2.4203 µs]
+                        thrpt:  [3.7185 Melem/s 3.7740 Melem/s 3.8233 Melem/s]
+                 change:
+                        time:   [-4.7704% -3.6628% -2.5097%] (p = 0.00 < 0.05)
+                        thrpt:  [+2.5743% +3.8020% +5.0094%]
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  6 (6.00%) high mild
+Benchmarking state_transition/by_distance/2
+Benchmarking state_transition/by_distance/2: Warming up for 3.0000 s
+Benchmarking state_transition/by_distance/2: Collecting 100 samples in estimated 5.0257 s (934k iterations)
+Benchmarking state_transition/by_distance/2: Analyzing
+state_transition/by_distance/2
+                        time:   [5.3369 µs 5.3567 µs 5.3782 µs]
+                        thrpt:  [1.6734 Melem/s 1.6801 Melem/s 1.6864 Melem/s]
+                 change:
+                        time:   [-2.2206% -1.4131% -0.6515%] (p = 0.00 < 0.05)
+                        thrpt:  [+0.6557% +1.4333% +2.2710%]
+                        Change within noise threshold.
+Found 10 outliers among 100 measurements (10.00%)
+  1 (1.00%) low mild
+  8 (8.00%) high mild
+  1 (1.00%) high severe
+Benchmarking state_transition/by_distance/3
+Benchmarking state_transition/by_distance/3: Warming up for 3.0000 s
+Benchmarking state_transition/by_distance/3: Collecting 100 samples in estimated 5.0239 s (677k iterations)
+Benchmarking state_transition/by_distance/3: Analyzing
+state_transition/by_distance/3
+                        time:   [7.3726 µs 7.4018 µs 7.4365 µs]
+                        thrpt:  [1.2102 Melem/s 1.2159 Melem/s 1.2207 Melem/s]
+                 change:
+                        time:   [-2.3507% -1.3761% -0.4423%] (p = 0.00 < 0.05)
+                        thrpt:  [+0.4442% +1.3953% +2.4073%]
+                        Change within noise threshold.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking state_transition/scenarios/exact_match
+Benchmarking state_transition/scenarios/exact_match: Warming up for 3.0000 s
+Benchmarking state_transition/scenarios/exact_match: Collecting 100 samples in estimated 5.0066 s (1.4M iterations)
+Benchmarking state_transition/scenarios/exact_match: Analyzing
+state_transition/scenarios/exact_match
+                        time:   [3.5393 µs 3.5531 µs 3.5683 µs]
+                        change: [-9.7003% -8.8000% -7.9737%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 11 outliers among 100 measurements (11.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  4 (4.00%) high severe
+Benchmarking state_transition/scenarios/one_error
+Benchmarking state_transition/scenarios/one_error: Warming up for 3.0000 s
+Benchmarking state_transition/scenarios/one_error: Collecting 100 samples in estimated 5.0270 s (934k iterations)
+Benchmarking state_transition/scenarios/one_error: Analyzing
+state_transition/scenarios/one_error
+                        time:   [5.3284 µs 5.3506 µs 5.3767 µs]
+                        change: [-10.441% -9.4725% -8.4935%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 10 outliers among 100 measurements (10.00%)
+  8 (8.00%) high mild
+  2 (2.00%) high severe
+Benchmarking state_transition/scenarios/two_errors
+Benchmarking state_transition/scenarios/two_errors: Warming up for 3.0000 s
+Benchmarking state_transition/scenarios/two_errors: Collecting 100 samples in estimated 5.0062 s (864k iterations)
+Benchmarking state_transition/scenarios/two_errors: Analyzing
+state_transition/scenarios/two_errors
+                        time:   [5.7616 µs 5.7832 µs 5.8084 µs]
+                        change: [-7.0481% -5.9827% -4.8861%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 11 outliers among 100 measurements (11.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  8 (8.00%) high severe
+Benchmarking state_transition/scenarios/reject_distance_3
+Benchmarking state_transition/scenarios/reject_distance_3: Warming up for 3.0000 s
+Benchmarking state_transition/scenarios/reject_distance_3: Collecting 100 samples in estimated 5.0106 s (1.1M iterations)
+Benchmarking state_transition/scenarios/reject_distance_3: Analyzing
+state_transition/scenarios/reject_distance_3
+                        time:   [4.4661 µs 4.5095 µs 4.5617 µs]
+                        change: [-6.8514% -5.9915% -5.1290%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking state_transition/word_length_scaling/5
+Benchmarking state_transition/word_length_scaling/5: Warming up for 3.0000 s
+Benchmarking state_transition/word_length_scaling/5: Collecting 100 samples in estimated 5.0014 s (3.2M iterations)
+Benchmarking state_transition/word_length_scaling/5: Analyzing
+state_transition/word_length_scaling/5
+                        time:   [1.5547 µs 1.5619 µs 1.5706 µs]
+                        thrpt:  [3.1835 Melem/s 3.2012 Melem/s 3.2160 Melem/s]
+                 change:
+                        time:   [-2.5086% -1.6654% -0.7866%] (p = 0.00 < 0.05)
+                        thrpt:  [+0.7928% +1.6936% +2.5731%]
+                        Change within noise threshold.
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+Benchmarking state_transition/word_length_scaling/10
+Benchmarking state_transition/word_length_scaling/10: Warming up for 3.0000 s
+Benchmarking state_transition/word_length_scaling/10: Collecting 100 samples in estimated 5.0129 s (1.3M iterations)
+Benchmarking state_transition/word_length_scaling/10: Analyzing
+state_transition/word_length_scaling/10
+                        time:   [3.7930 µs 3.8171 µs 3.8462 µs]
+                        thrpt:  [2.6000 Melem/s 2.6198 Melem/s 2.6364 Melem/s]
+                 change:
+                        time:   [-11.382% -10.546% -9.7510%] (p = 0.00 < 0.05)
+                        thrpt:  [+10.805% +11.789% +12.843%]
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) high mild
+  5 (5.00%) high severe
+Benchmarking state_transition/word_length_scaling/15
+Benchmarking state_transition/word_length_scaling/15: Warming up for 3.0000 s
+Benchmarking state_transition/word_length_scaling/15: Collecting 100 samples in estimated 5.0190 s (803k iterations)
+Benchmarking state_transition/word_length_scaling/15: Analyzing
+state_transition/word_length_scaling/15
+                        time:   [6.2760 µs 6.3037 µs 6.3340 µs]
+                        thrpt:  [2.3682 Melem/s 2.3795 Melem/s 2.3901 Melem/s]
+                 change:
+                        time:   [-11.237% -10.543% -9.8284%] (p = 0.00 < 0.05)
+                        thrpt:  [+10.900% +11.786% +12.660%]
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking state_transition/word_length_scaling/20
+Benchmarking state_transition/word_length_scaling/20: Warming up for 3.0000 s
+Benchmarking state_transition/word_length_scaling/20: Collecting 100 samples in estimated 5.0409 s (550k iterations)
+Benchmarking state_transition/word_length_scaling/20: Analyzing
+state_transition/word_length_scaling/20
+                        time:   [9.0147 µs 9.0489 µs 9.0852 µs]
+                        thrpt:  [2.2014 Melem/s 2.2102 Melem/s 2.2186 Melem/s]
+                 change:
+                        time:   [-13.403% -12.720% -12.051%] (p = 0.00 < 0.05)
+                        thrpt:  [+13.703% +14.574% +15.477%]
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+
+Benchmarking operations/types/match
+Benchmarking operations/types/match: Warming up for 3.0000 s
+Benchmarking operations/types/match: Collecting 100 samples in estimated 5.0048 s (4.6M iterations)
+Benchmarking operations/types/match: Analyzing
+operations/types/match  time:   [1.1078 µs 1.1149 µs 1.1224 µs]
+                        change: [+0.2245% +1.1142% +1.9611%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 7 outliers among 100 measurements (7.00%)
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+Benchmarking operations/types/delete
+Benchmarking operations/types/delete: Warming up for 3.0000 s
+Benchmarking operations/types/delete: Collecting 100 samples in estimated 5.0013 s (5.5M iterations)
+Benchmarking operations/types/delete: Analyzing
+operations/types/delete time:   [897.09 ns 901.38 ns 906.09 ns]
+                        change: [+1.0816% +2.0190% +2.9153%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking operations/types/insert
+Benchmarking operations/types/insert: Warming up for 3.0000 s
+Benchmarking operations/types/insert: Collecting 100 samples in estimated 5.0030 s (3.6M iterations)
+Benchmarking operations/types/insert: Analyzing
+operations/types/insert time:   [1.3763 µs 1.3827 µs 1.3899 µs]
+                        change: [+2.9243% +4.0675% +5.1312%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking operations/types/substitute
+Benchmarking operations/types/substitute: Warming up for 3.0000 s
+Benchmarking operations/types/substitute: Collecting 100 samples in estimated 5.0004 s (3.8M iterations)
+Benchmarking operations/types/substitute: Analyzing
+operations/types/substitute
+                        time:   [1.2816 µs 1.2903 µs 1.3002 µs]
+                        change: [-0.8477% +0.0640% +0.9685%] (p = 0.89 > 0.05)
+                        No change in performance detected.
+Found 6 outliers among 100 measurements (6.00%)
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking subsumption/state_size/exact_match/1
+Benchmarking subsumption/state_size/exact_match/1: Warming up for 3.0000 s
+Benchmarking subsumption/state_size/exact_match/1: Collecting 100 samples in estimated 5.0139 s (1.7M iterations)
+Benchmarking subsumption/state_size/exact_match/1: Analyzing
+subsumption/state_size/exact_match/1
+                        time:   [2.9829 µs 2.9939 µs 3.0071 µs]
+                        thrpt:  [3.3254 Melem/s 3.3401 Melem/s 3.3525 Melem/s]
+                 change:
+                        time:   [-10.552% -9.7869% -9.0082%] (p = 0.00 < 0.05)
+                        thrpt:  [+9.9000% +10.849% +11.797%]
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+Benchmarking subsumption/state_size/exact_match/2
+Benchmarking subsumption/state_size/exact_match/2: Warming up for 3.0000 s
+Benchmarking subsumption/state_size/exact_match/2: Collecting 100 samples in estimated 5.0041 s (1.1M iterations)
+Benchmarking subsumption/state_size/exact_match/2: Analyzing
+subsumption/state_size/exact_match/2
+                        time:   [4.5897 µs 4.6080 µs 4.6270 µs]
+                        thrpt:  [2.1612 Melem/s 2.1701 Melem/s 2.1788 Melem/s]
+                 change:
+                        time:   [+1.0370% +2.0453% +3.0239%] (p = 0.00 < 0.05)
+                        thrpt:  [-2.9352% -2.0043% -1.0264%]
+                        Performance has regressed.
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking subsumption/state_size/exact_match/3
+Benchmarking subsumption/state_size/exact_match/3: Warming up for 3.0000 s
+Benchmarking subsumption/state_size/exact_match/3: Collecting 100 samples in estimated 5.0137 s (1.0M iterations)
+Benchmarking subsumption/state_size/exact_match/3: Analyzing
+subsumption/state_size/exact_match/3
+                        time:   [4.9874 µs 5.0068 µs 5.0260 µs]
+                        thrpt:  [1.9897 Melem/s 1.9973 Melem/s 2.0051 Melem/s]
+                 change:
+                        time:   [+13.263% +14.248% +15.230%] (p = 0.00 < 0.05)
+                        thrpt:  [-13.217% -12.471% -11.710%]
+                        Performance has regressed.
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking subsumption/state_size/max_state/1
+Benchmarking subsumption/state_size/max_state/1: Warming up for 3.0000 s
+Benchmarking subsumption/state_size/max_state/1: Collecting 100 samples in estimated 5.0014 s (8.8M iterations)
+Benchmarking subsumption/state_size/max_state/1: Analyzing
+subsumption/state_size/max_state/1
+                        time:   [564.81 ns 567.00 ns 569.40 ns]
+                        thrpt:  [17.562 Melem/s 17.637 Melem/s 17.705 Melem/s]
+                 change:
+                        time:   [-20.186% -19.459% -18.774%] (p = 0.00 < 0.05)
+                        thrpt:  [+23.114% +24.160% +25.292%]
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking subsumption/state_size/max_state/2
+Benchmarking subsumption/state_size/max_state/2: Warming up for 3.0000 s
+Benchmarking subsumption/state_size/max_state/2: Collecting 100 samples in estimated 5.0001 s (1.7M iterations)
+Benchmarking subsumption/state_size/max_state/2: Analyzing
+subsumption/state_size/max_state/2
+                        time:   [2.9807 µs 3.0005 µs 3.0227 µs]
+                        thrpt:  [3.3084 Melem/s 3.3328 Melem/s 3.3549 Melem/s]
+                 change:
+                        time:   [-1.2300% -0.0882% +1.0420%] (p = 0.88 > 0.05)
+                        thrpt:  [-1.0313% +0.0883% +1.2453%]
+                        No change in performance detected.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking subsumption/state_size/max_state/3
+Benchmarking subsumption/state_size/max_state/3: Warming up for 3.0000 s
+Benchmarking subsumption/state_size/max_state/3: Collecting 100 samples in estimated 5.0346 s (475k iterations)
+Benchmarking subsumption/state_size/max_state/3: Analyzing
+subsumption/state_size/max_state/3
+                        time:   [10.607 µs 10.653 µs 10.701 µs]
+                        thrpt:  [934.48 Kelem/s 938.69 Kelem/s 942.77 Kelem/s]
+                 change:
+                        time:   [+0.3569% +1.4330% +2.5117%] (p = 0.01 < 0.05)
+                        thrpt:  [-2.4502% -1.4128% -0.3556%]
+                        Change within noise threshold.
+Found 6 outliers among 100 measurements (6.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking realistic/word_pairs/color_colour
+Benchmarking realistic/word_pairs/color_colour: Warming up for 3.0000 s
+Benchmarking realistic/word_pairs/color_colour: Collecting 100 samples in estimated 5.0005 s (2.1M iterations)
+Benchmarking realistic/word_pairs/color_colour: Analyzing
+realistic/word_pairs/color_colour
+                        time:   [2.2931 µs 2.3145 µs 2.3403 µs]
+                        change: [+5.6158% +6.7859% +7.9610%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking realistic/word_pairs/gray_grey
+Benchmarking realistic/word_pairs/gray_grey: Warming up for 3.0000 s
+Benchmarking realistic/word_pairs/gray_grey: Collecting 100 samples in estimated 5.0054 s (2.5M iterations)
+Benchmarking realistic/word_pairs/gray_grey: Analyzing
+realistic/word_pairs/gray_grey
+                        time:   [2.0903 µs 2.1013 µs 2.1130 µs]
+                        change: [+11.351% +12.181% +13.041%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 9 outliers among 100 measurements (9.00%)
+  2 (2.00%) low severe
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking realistic/word_pairs/theater_theatre
+Benchmarking realistic/word_pairs/theater_theatre: Warming up for 3.0000 s
+Benchmarking realistic/word_pairs/theater_theatre: Collecting 100 samples in estimated 5.0062 s (1.4M iterations)
+Benchmarking realistic/word_pairs/theater_theatre: Analyzing
+realistic/word_pairs/theater_theatre
+                        time:   [3.6003 µs 3.6164 µs 3.6337 µs]
+                        change: [+16.030% +16.828% +17.610%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking realistic/word_pairs/organize_organise
+Benchmarking realistic/word_pairs/organize_organise: Warming up for 3.0000 s
+Benchmarking realistic/word_pairs/organize_organise: Collecting 100 samples in estimated 5.0158 s (1.3M iterations)
+Benchmarking realistic/word_pairs/organize_organise: Analyzing
+realistic/word_pairs/organize_organise
+                        time:   [3.7638 µs 3.7845 µs 3.8073 µs]
+                        change: [-30.045% -29.489% -28.880%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+Benchmarking realistic/word_pairs/definitely_definately
+Benchmarking realistic/word_pairs/definitely_definately: Warming up for 3.0000 s
+Benchmarking realistic/word_pairs/definitely_definately: Collecting 100 samples in estimated 5.0047 s (853k iterations)
+Benchmarking realistic/word_pairs/definitely_definately: Analyzing
+realistic/word_pairs/definitely_definately
+                        time:   [5.8634 µs 5.8900 µs 5.9185 µs]
+                        change: [-31.927% -31.320% -30.682%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 10 outliers among 100 measurements (10.00%)
+  5 (5.00%) high mild
+  5 (5.00%) high severe
+

@@ -156,7 +156,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
         input_position: usize,  // Phase 4: Renamed from _input_length, now used for split word_pos calculation
@@ -206,7 +206,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
         input_position: usize,
@@ -264,7 +264,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
@@ -578,7 +578,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
@@ -872,7 +872,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
@@ -948,7 +948,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
@@ -1035,7 +1035,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
         input_position: usize,  // Phase 4: For correct word_pos calculation
@@ -1059,7 +1059,7 @@ impl GeneralizedState {
 
         // Phase 3b fix: Handle negative match_index or empty word_slice by using full_word
         let word_1char = if match_index_i32 < 0 || word_slice_chars.is_empty() {
-            // H2 Optimization: Use pre-computed word_slice_chars instead of collecting
+            // H2 Optimization: Use pre-computed word_chars if available, else collect on-demand
             // Phase 4 FIX: input_position is 1-indexed (thesis notation)
             // Split entered at (input_position-1), word_pos (1-indexed) = (input_position-1) + offset
             // Convert to 0-indexed: word_pos = ((input_position-1) + offset) - 1 = input_position + offset - 2
@@ -1069,14 +1069,20 @@ impl GeneralizedState {
             eprintln!("[DEBUG] Split completion fallback: input_pos={}, offset={}, word_pos={}",
                       input_position, offset, word_pos);
 
-            if word_pos < word_chars.len() && word_chars[word_pos] != '$' {
+            // Use pre-computed word_chars if available (distance > 1), else collect on-demand (distance <= 1)
+            let full_word_chars: Vec<char> = match word_chars {
+                Some(chars) => chars.to_vec(),
+                None => full_word.chars().collect(),
+            };
+
+            if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
                 #[cfg(debug_assertions)]
-                eprintln!("[DEBUG]   → Found char '{}' at word_pos={}", word_chars[word_pos], word_pos);
-                word_chars[word_pos].to_string()
+                eprintln!("[DEBUG]   → Found char '{}' at word_pos={}", full_word_chars[word_pos], word_pos);
+                full_word_chars[word_pos].to_string()
             } else {
                 #[cfg(debug_assertions)]
                 eprintln!("[DEBUG]   → word_pos={} out of bounds or padding (len={}), returning empty",
-                         word_pos, word_chars.len());
+                         word_pos, full_word_chars.len());
                 // Past word end - no character to validate
                 return successors;
             }
@@ -1226,7 +1232,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
-        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
+        word_chars: Option<&[char]>,  // H2 Optimization: Optional pre-computed character vector (None for distance <= 1)
         word_slice: &str,
         input_char: char,
         input_position: usize,  // Phase 4: For correct word_pos calculation
@@ -1248,8 +1254,14 @@ impl GeneralizedState {
             // Phase 4 FIX: input_position is 1-indexed, convert to 0-indexed word position
             let word_pos = (input_position as i32 + offset - 2) as usize;
 
-            if word_pos < word_chars.len() && word_chars[word_pos] != '$' {
-                word_chars[word_pos].to_string()
+            // Use pre-computed word_chars if available (distance > 1), else collect on-demand (distance <= 1)
+            let full_word_chars: Vec<char> = match word_chars {
+                Some(chars) => chars.to_vec(),
+                None => full_word.chars().collect(),
+            };
+
+            if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
+                full_word_chars[word_pos].to_string()
             } else {
                 // Past word end - no character to validate
                 return successors;

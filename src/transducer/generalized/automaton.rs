@@ -326,10 +326,15 @@ impl GeneralizedAutomaton {
         // Start with initial state {I#0}
         let mut state = self.initial_state();
 
-        // H2 Optimization: Pre-compute character vector once
-        // This eliminates 20+ repeated word.chars().collect() calls in successor generation
+        // H2 Optimization: Conditionally pre-compute character vector
+        // Only pre-compute for max_distance > 1 (eliminates overhead for trivial cases)
+        // For distance > 1: eliminates 20+ repeated word.chars().collect() calls
         // Target: 8.47% of cycles (Iterator::collect 4.08% + cfree 4.39%)
-        let word_chars: Vec<char> = word.chars().collect();
+        let word_chars: Option<Vec<char>> = if self.max_distance > 1 {
+            Some(word.chars().collect())
+        } else {
+            None
+        };
 
         // Process each character of input
         // This generates the bit vector sequence h_n(w, x) = β(x₁, s_n(w,1))...β(x_t, s_n(w,t))
@@ -350,8 +355,8 @@ impl GeneralizedAutomaton {
 
             // Apply transition: state := δ^∀,χ_n(state, β)
             // Phase 3b: Pass full word, word slice, and input character for phonetic operations
-            // H2 Optimization: Pass pre-computed character vector
-            if let Some(next_state) = state.transition(&self.operations, &bit_vector, word, &word_chars, &subword, input_char, i + 1) {
+            // H2 Optimization: Pass pre-computed character vector (conditional for distance > 1)
+            if let Some(next_state) = state.transition(&self.operations, &bit_vector, word, word_chars.as_deref(), &subword, input_char, i + 1) {
                 #[cfg(debug_assertions)]
                 eprintln!("  State after transition: {} positions", next_state.positions().count());
                 state = next_state;
@@ -460,7 +465,7 @@ mod tests {
             let bit_vector = CharacteristicVector::new(ch, &subword);
             eprintln!("DEBUG: Bit vector length = {}", bit_vector.len());
 
-            match state.transition(&automaton.operations, &bit_vector, word, &word_chars, &subword, ch, i + 1) {
+            match state.transition(&automaton.operations, &bit_vector, word, Some(&word_chars), &subword, ch, i + 1) {
                 Some(next) => {
                     eprintln!("DEBUG: Next state = {}", next);
                     state = next;
@@ -531,7 +536,7 @@ mod tests {
             let bit_vector = CharacteristicVector::new(ch, &subword);
             eprintln!("Bit vector length: {}", bit_vector.len());
 
-            match state.transition(&automaton.operations, &bit_vector, word, &word_chars, &subword, ch, i + 1) {
+            match state.transition(&automaton.operations, &bit_vector, word, Some(&word_chars), &subword, ch, i + 1) {
                 Some(next) => {
                     eprintln!("Next state: {}", next);
                     state = next;
@@ -638,7 +643,7 @@ mod tests {
             let bit_vector = CharacteristicVector::new(ch, &subword);
             eprintln!("Bit vector length: {}", bit_vector.len());
 
-            match state.transition(&automaton.operations, &bit_vector, word, &word_chars, &subword, ch, i + 1) {
+            match state.transition(&automaton.operations, &bit_vector, word, Some(&word_chars), &subword, ch, i + 1) {
                 Some(next) => {
                     eprintln!("Next state: {}", next);
                     state = next;
