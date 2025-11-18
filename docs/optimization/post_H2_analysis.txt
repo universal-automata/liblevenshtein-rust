@@ -1,0 +1,150 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 54K of event 'cycles:Pu'
+# Event count (approx.): 172757046175
+#
+# Overhead  Command          Shared Object                        Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  ...............  ...................................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+     3.19%  lto everything   [unknown]                            [k] 0xffffffffa1201968
+     1.25%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::LLVMContextImpl::~LLVMContextImpl()
+            |
+            ---llvm::LLVMContextImpl::~LLVMContextImpl()
+               LLVMContextDispose
+               rustc_codegen_llvm::back::write::codegen
+               std::sys::backtrace::__rust_begin_short_backtrace::<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>
+               <<std::thread::Builder>::spawn_unchecked_<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+               std::sys::thread::unix::Thread::new::thread_start
+               0x7f9777c969ca
+               0x7f9777d1aa0b
+
+     1.03%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::IDFCalculatorBase<llvm::MachineBasicBlock, false>::calculate(llvm::SmallVectorImpl<llvm::MachineBasicBlock*>&)
+            |
+            ---llvm::IDFCalculatorBase<llvm::MachineBasicBlock, false>::calculate(llvm::SmallVectorImpl<llvm::MachineBasicBlock*>&)
+               |          
+                --0.79%--LiveDebugValues::InstrRefBasedLDV::placeMLocPHIs(llvm::MachineFunction&, llvm::SmallPtrSetImpl<llvm::MachineBasicBlock*>&, LiveDebugValues::FuncValueTable&, llvm::SmallVectorImpl<llvm::SmallDenseMap<LiveDebugValues::LocIdx, LiveDebugValues::ValueIDNum, 4u, llvm::DenseMapInfo<LiveDebugValues::LocIdx, void>, llvm::detail::DenseMapPair<LiveDebugValues::LocIdx, LiveDebugValues::ValueIDNum> > >&)::$_0::operator()(LiveDebugValues::LocIdx) const
+                          LiveDebugValues::InstrRefBasedLDV::placeMLocPHIs(llvm::MachineFunction&, llvm::SmallPtrSetImpl<llvm::MachineBasicBlock*>&, LiveDebugValues::FuncValueTable&, llvm::SmallVectorImpl<llvm::SmallDenseMap<LiveDebugValues::LocIdx, LiveDebugValues::ValueIDNum, 4u, llvm::DenseMapInfo<LiveDebugValues::LocIdx, void>, llvm::detail::DenseMapPair<LiveDebugValues::LocIdx, LiveDebugValues::ValueIDNum> > >&)
+                          LiveDebugValues::InstrRefBasedLDV::buildMLocValueMap(llvm::MachineFunction&, LiveDebugValues::FuncValueTable&, LiveDebugValues::FuncValueTable&, llvm::SmallVectorImpl<llvm::SmallDenseMap<LiveDebugValues::LocIdx, LiveDebugValues::ValueIDNum, 4u, llvm::DenseMapInfo<LiveDebugValues::LocIdx, void>, llvm::detail::DenseMapPair<LiveDebugValues::LocIdx, LiveDebugValues::ValueIDNum> > >&)
+                          LiveDebugValues::InstrRefBasedLDV::ExtendRanges(llvm::MachineFunction&, llvm::MachineDominatorTree*, bool, unsigned int, unsigned int)
+                          (anonymous namespace)::LiveDebugValuesLegacy::runOnMachineFunction(llvm::MachineFunction&)
+                          llvm::FPPassManager::runOnFunction(llvm::Function&)
+                          llvm::FPPassManager::runOnModule(llvm::Module&)
+                          llvm::legacy::PassManagerImpl::run(llvm::Module&)
+                          LLVMRustWriteOutputFile
+                          rustc_codegen_llvm::back::write::write_output_file
+                          rustc_codegen_llvm::back::write::codegen
+                          std::sys::backtrace::__rust_begin_short_backtrace::<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>
+                          <<std::thread::Builder>::spawn_unchecked_<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+                          std::sys::thread::unix::Thread::new::thread_start
+                          0x7f9777c969ca
+                          0x7f9777d1aa0b
+
+     0.97%  lto everything   rustc                                [.] free
+            |
+            ---free
+
+     0.78%  opt cgu.0        [unknown]                            [k] 0xffffffffa1201968
+     0.78%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::removeUnreachableBlocks(llvm::Function&, llvm::DomTreeUpdater*, llvm::MemorySSAUpdater*)
+            |
+            ---llvm::removeUnreachableBlocks(llvm::Function&, llvm::DomTreeUpdater*, llvm::MemorySSAUpdater*)
+               |          
+                --0.68%--llvm::GlobalOptPass::run(llvm::Module&, llvm::AnalysisManager<llvm::Module>&)
+                          llvm::detail::PassModel<llvm::Module, llvm::GlobalOptPass, llvm::AnalysisManager<llvm::Module>>::run(llvm::Module&, llvm::AnalysisManager<llvm::Module>&)
+                          llvm::PassManager<llvm::Module, llvm::AnalysisManager<llvm::Module>>::run(llvm::Module&, llvm::AnalysisManager<llvm::Module>&)
+                          LLVMRustOptimize
+
+     0.60%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::BasicAAResult::alias(llvm::MemoryLocation const&, llvm::MemoryLocation const&, llvm::AAQueryInfo&, llvm::Instruction const*)
+            |
+            ---llvm::BasicAAResult::alias(llvm::MemoryLocation const&, llvm::MemoryLocation const&, llvm::AAQueryInfo&, llvm::Instruction const*)
+
+     0.59%  rustc            [unknown]                            [k] 0xffffffffa1201968
+     0.57%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::InstCombinerImpl::run()
+            |
+            ---llvm::InstCombinerImpl::run()
+               |          
+                --0.57%--llvm::InstCombinePass::run(llvm::Function&, llvm::AnalysisManager<llvm::Function>&)
+                          llvm::detail::PassModel<llvm::Function, llvm::InstCombinePass, llvm::AnalysisManager<llvm::Function>>::run(llvm::Function&, llvm::AnalysisManager<llvm::Function>&)
+                          llvm::PassManager<llvm::Function, llvm::AnalysisManager<llvm::Function>>::run(llvm::Function&, llvm::AnalysisManager<llvm::Function>&)
+                          llvm::ModuleToFunctionPassAdaptor::run(llvm::Module&, llvm::AnalysisManager<llvm::Module>&)
+                          llvm::detail::PassModel<llvm::Module, llvm::ModuleToFunctionPassAdaptor, llvm::AnalysisManager<llvm::Module>>::run(llvm::Module&, llvm::AnalysisManager<llvm::Module>&)
+                          llvm::PassManager<llvm::Module, llvm::AnalysisManager<llvm::Module>>::run(llvm::Module&, llvm::AnalysisManager<llvm::Module>&)
+                          LLVMRustOptimize
+
+     0.56%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::SelectionDAGISel::SelectCodeCommon(llvm::SDNode*, unsigned char const*, unsigned int)
+            |
+            ---llvm::SelectionDAGISel::SelectCodeCommon(llvm::SDNode*, unsigned char const*, unsigned int)
+               |          
+                --0.54%--(anonymous namespace)::X86DAGToDAGISel::Select(llvm::SDNode*) [clone .llvm.9384185007076117613]
+                          llvm::SelectionDAGISel::CodeGenAndEmitDAG()
+                          |          
+                           --0.54%--llvm::SelectionDAGISel::SelectAllBasicBlocks(llvm::Function const&)
+                                     llvm::SelectionDAGISel::runOnMachineFunction(llvm::MachineFunction&)
+                                     llvm::SelectionDAGISelLegacy::runOnMachineFunction(llvm::MachineFunction&)
+                                     llvm::FPPassManager::runOnFunction(llvm::Function&)
+                                     llvm::FPPassManager::runOnModule(llvm::Module&)
+                                     llvm::legacy::PassManagerImpl::run(llvm::Module&)
+                                     LLVMRustWriteOutputFile
+                                     rustc_codegen_llvm::back::write::write_output_file
+                                     rustc_codegen_llvm::back::write::codegen
+                                     std::sys::backtrace::__rust_begin_short_backtrace::<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>
+                                     <<std::thread::Builder>::spawn_unchecked_<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+                                     std::sys::thread::unix::Thread::new::thread_start
+                                     0x7f9777c969ca
+                                     0x7f9777d1aa0b
+
+     0.54%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::calculateDbgEntityHistory(llvm::MachineFunction const*, llvm::TargetRegisterInfo const*, llvm::DbgValueHistoryMap&, llvm::DbgLabelInstrMap&)
+            |
+            ---llvm::calculateDbgEntityHistory(llvm::MachineFunction const*, llvm::TargetRegisterInfo const*, llvm::DbgValueHistoryMap&, llvm::DbgLabelInstrMap&)
+               |          
+                --0.53%--llvm::DebugHandlerBase::beginFunction(llvm::MachineFunction const*)
+                          llvm::AsmPrinter::emitFunctionHeader()
+                          llvm::AsmPrinter::emitFunctionBody()
+                          llvm::X86AsmPrinter::runOnMachineFunction(llvm::MachineFunction&)
+                          llvm::FPPassManager::runOnFunction(llvm::Function&)
+                          llvm::FPPassManager::runOnModule(llvm::Module&)
+                          llvm::legacy::PassManagerImpl::run(llvm::Module&)
+                          LLVMRustWriteOutputFile
+                          rustc_codegen_llvm::back::write::write_output_file
+                          rustc_codegen_llvm::back::write::codegen
+                          std::sys::backtrace::__rust_begin_short_backtrace::<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>
+                          <<std::thread::Builder>::spawn_unchecked_<<rustc_codegen_llvm::LlvmCodegenBackend as rustc_codegen_ssa::traits::backend::ExtraBackendMethods>::spawn_named_thread<rustc_codegen_ssa::back::write::spawn_work<rustc_codegen_llvm::LlvmCodegenBackend>::{closure#0}, ()>::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+                          std::sys::thread::unix::Thread::new::thread_start
+                          0x7f9777c969ca
+                          0x7f9777d1aa0b
+
+     0.54%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::MetadataTracking::track(void*, llvm::Metadata&, llvm::PointerUnion<llvm::MetadataAsValue*, llvm::Metadata*, llvm::DebugValueUser*>)
+            |
+            ---llvm::MetadataTracking::track(void*, llvm::Metadata&, llvm::PointerUnion<llvm::MetadataAsValue*, llvm::Metadata*, llvm::DebugValueUser*>)
+
+     0.53%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::BitstreamCursor::readRecord(unsigned int, llvm::SmallVectorImpl<unsigned long>&, llvm::StringRef*)
+            |
+            ---llvm::BitstreamCursor::readRecord(unsigned int, llvm::SmallVectorImpl<unsigned long>&, llvm::StringRef*)
+
+     0.51%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] (anonymous namespace)::DAGCombiner::combine(llvm::SDNode*)
+            |
+            ---(anonymous namespace)::DAGCombiner::combine(llvm::SDNode*)
+
+     0.50%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::InstCombinerImpl::prepareWorklist(llvm::Function&)
+     0.50%  lto everything   rustc                                [.] malloc
+     0.48%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::MachineInstr::addOperand(llvm::MachineFunction&, llvm::MachineOperand const&)
+     0.48%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] (anonymous namespace)::MachineCopyPropagation::run(llvm::MachineFunction&)
+     0.46%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::DILocation::getImpl(llvm::LLVMContext&, unsigned int, unsigned int, llvm::Metadata*, llvm::Metadata*, bool, unsigned long, unsigned char, llvm::Metadata::StorageType, bool)
+     0.46%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::SelectionDAG::Combine(llvm::CombineLevel, llvm::BatchAAResults*, llvm::CodeGenOptLevel)
+     0.45%  lto everything   rustc                                [.] malloc_default
+     0.40%  lto everything   rustc                                [.] tcache_bin_flush_small
+     0.40%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::LazyCallGraph::Node::populateSlow()
+     0.39%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::InterferenceCache::Entry::update(unsigned int)
+     0.38%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] (anonymous namespace)::MDNodeMapper::mapTopLevelUniquedNode(llvm::MDNode const&)
+     0.37%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::RAGreedy::growRegion(llvm::RAGreedy::GlobalSplitCandidate&)
+     0.37%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::InstrEmitter::EmitMachineNode(llvm::SDNode*, bool, bool, llvm::SmallDenseMap<llvm::SDValue, llvm::Register, 16u, llvm::DenseMapInfo<llvm::SDValue, void>, llvm::detail::DenseMapPair<llvm::SDValue, llvm::Register> >&)
+     0.37%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::DomTreeBuilder::SemiNCAInfo<llvm::DominatorTreeBase<llvm::BasicBlock, false> >::CalculateFromScratch(llvm::DominatorTreeBase<llvm::BasicBlock, false>&, llvm::DomTreeBuilder::SemiNCAInfo<llvm::DominatorTreeBase<llvm::BasicBlock, false> >::BatchUpdateInfo*)
+     0.37%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::AsmPrinter::emitFunctionBody()
+     0.37%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::ScalarEvolution::getRangeRef(llvm::SCEV const*, llvm::ScalarEvolution::RangeSignHint, unsigned int)
+     0.35%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::DenseMapBase<llvm::DenseMap<llvm::DILocation*, llvm::detail::DenseSetEmpty, llvm::MDNodeInfo<llvm::DILocation>, llvm::detail::DenseSetPair<llvm::DILocation*> >, llvm::DILocation*, llvm::detail::DenseSetEmpty, llvm::MDNodeInfo<llvm::DILocation>, llvm::detail::DenseSetPair<llvm::DILocation*> >::moveFromOldBuckets(llvm::detail::DenseSetPair<llvm::DILocation*>*, llvm::detail::DenseSetPair<llvm::DILocation*>*)
+     0.35%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] (anonymous namespace)::DeadMachineInstructionElimImpl::eliminateDeadMI(llvm::MachineFunction&)
+     0.35%  lto everything   libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::SelectionDAGISel::CodeGenAndEmitDAG()
+     0.35%  opt cgu.0        rustc                                [.] free
+     0.34%  opt cgu.0        libLLVM.so.21.1-rust-1.91.0-stable   [.] llvm::InstCombinerImpl::run()
