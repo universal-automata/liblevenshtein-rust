@@ -423,21 +423,20 @@ impl GeneralizedPosition {
     pub fn new_i_splitting(offset: i32, errors: u8, max_distance: u8, entry_char: char) -> Result<Self, PositionError> {
         let n = max_distance as i32;
 
-        // Phase 3b: Relaxed invariant for phonetic split operations
-        // When errors==0: entering fresh phonetic split with fractional weight
-        // When errors>0: entering phonetic split from position with accumulated errors from other operations
-        let invariant_satisfied = if errors == 0 {
-            // Fresh phonetic entry with zero errors: allow negative offset for split state
-            offset >= -n && offset <= n && errors <= max_distance
-        } else {
-            // Entry with accumulated errors: use subsumption-based constraints (same as M-type)
-            // This allows phonetic splits even when previous operations added errors
-            // Example: k→ch (errors=0) then insert 'a' (errors=1) then t→th (needs offset=-2, errors=1)
-            errors as i32 >= -offset - n    // Subsumption bound
-                && offset >= -2 * n           // Allow further negative offset
-                && offset <= 0                 // Splitting always decrements offset
-                && errors <= max_distance
-        };
+        // Phase 4: Relaxed invariant for splitting states
+        // Splitting states are intermediate states during phonetic operations
+        // They need slightly relaxed reachability: |offset| ≤ errors + 1
+        // This allows phonetic splits from I+0#0 to create ISplitting+(-1)#0
+        // which satisfies |-1| ≤ 0 + 1 ✓
+        //
+        // Rationale: The split is a two-step operation (entry → completion)
+        // Entry: offset - 1 (may temporarily exceed reachability)
+        // Completion: offset + 1 (restores reachability)
+        // Net effect: offset unchanged, so final position satisfies standard invariant
+        let invariant_satisfied = offset.abs() <= (errors as i32 + 1)
+            && offset >= -n
+            && offset <= n
+            && errors <= max_distance;
 
         if invariant_satisfied {
             Ok(GeneralizedPosition::ISplitting { offset, errors, entry_char })
@@ -468,8 +467,10 @@ impl GeneralizedPosition {
     pub fn new_m_splitting(offset: i32, errors: u8, max_distance: u8, entry_char: char) -> Result<Self, PositionError> {
         let n = max_distance as i32;
 
-        // Same invariant as MFinal
-        if errors as i32 >= -offset - n
+        // Phase 4: Slightly relaxed invariant for M-type splitting states
+        // Allow errors + 1 >= -offset - n instead of errors >= -offset - n
+        // This gives splitting states one extra buffer for the offset decrement
+        if (errors as i32 + 1) >= -offset - n
             && offset >= -2 * n
             && offset <= 0
             && errors <= max_distance

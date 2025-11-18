@@ -158,7 +158,7 @@ impl GeneralizedState {
         full_word: &str,
         word_slice: &str,
         input_char: char,
-        _input_length: usize,
+        input_position: usize,  // Phase 4: Renamed from _input_length, now used for split word_pos calculation
     ) -> Option<Self> {
         // Special case: empty state has no successors
         if self.is_empty() {
@@ -170,9 +170,12 @@ impl GeneralizedState {
 
         // For each position in current state
         for pos in &self.positions {
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG] Processing position: {}", pos);
+
             // Compute successors using runtime-configurable operations
-            // Phase 3b: Pass full_word and word_slice for phonetic operations
-            let successors = self.successors(pos, operations, bit_vector, full_word, word_slice, input_char);
+            // Phase 3b/4: Pass full_word, word_slice, and input_position for phonetic operations
+            let successors = self.successors(pos, operations, bit_vector, full_word, word_slice, input_char, input_position);
 
             // Add all successors to next state
             for succ in successors {
@@ -194,6 +197,7 @@ impl GeneralizedState {
     ///
     /// Phase 2: Uses OperationSet to support custom edit distance metrics.
     /// Phase 3b: Accepts full_word, word_slice, and input_char for phonetic operations.
+    /// Phase 4: Accepts input_position for correct word_pos calculation in splits.
     fn successors(
         &self,
         pos: &GeneralizedPosition,
@@ -202,6 +206,7 @@ impl GeneralizedState {
         full_word: &str,
         word_slice: &str,
         input_char: char,
+        input_position: usize,
     ) -> Vec<GeneralizedPosition> {
         match pos {
             GeneralizedPosition::INonFinal { offset, errors } => {
@@ -224,13 +229,13 @@ impl GeneralizedState {
             // Phase 2d.5: Splitting positions
             GeneralizedPosition::ISplitting { offset, errors, entry_char } => {
                 // Complete split for I-type positions
-                // Phase 3b: Pass full_word, word_slice, input_char for phonetic validation
-                self.successors_i_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char)
+                // Phase 3b/4: Pass full_word, word_slice, input_char, input_position for phonetic validation and word_pos calc
+                self.successors_i_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char, input_position)
             }
             GeneralizedPosition::MSplitting { offset, errors, entry_char } => {
                 // Complete split for M-type positions
-                // Phase 3b: Pass full_word, word_slice, input_char for phonetic validation
-                self.successors_m_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char)
+                // Phase 3b/4: Pass full_word, word_slice, input_char, input_position for phonetic validation and word_pos calc
+                self.successors_m_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char, input_position)
             }
         }
     }
@@ -477,20 +482,25 @@ impl GeneralizedState {
                     // When both conditions are true, phonetic split takes precedence (errors+0 vs errors+1)
                     if can_phonetic_split {
                         // Phonetic split: enter with errors+0 (fractional weight truncates to 0)
-                        // Allowed even at max_distance since cost=0
-                        if let Ok(split) = GeneralizedPosition::new_i_splitting(
-                            offset - 1,
-                            errors,
-                            self.max_distance,
-                            input_char  // Store the character read when entering this split state
-                        ) {
-                            successors.push(split);
+                        // Phase 4: Requires max_distance > 0 (edit operations not allowed at distance 0)
+                        // AND errors <= max_distance (can be at max because doesn't consume errors)
+                        // Phase 4: offset UNCHANGED on entry (like MATCH, per PhoneticOperations.v)
+                        if self.max_distance > 0 && errors <= self.max_distance {
+                            if let Ok(split) = GeneralizedPosition::new_i_splitting(
+                                offset,  // Phase 4 FIX: unchanged (was offset-1)
+                                errors,
+                                self.max_distance,
+                                input_char  // Store the character read when entering this split state
+                            ) {
+                                successors.push(split);
+                            }
                         }
                     } else if standard_match && errors < self.max_distance {
                         // Standard split: enter with errors+1 (will decrement at completion)
                         // Only used when phonetic split doesn't apply
+                        // Phase 4: offset UNCHANGED on entry (like MATCH, per PhoneticOperations.v)
                         if let Ok(split) = GeneralizedPosition::new_i_splitting(
-                            offset - 1,
+                            offset,  // Phase 4 FIX: unchanged (was offset-1)
                             errors + 1,
                             self.max_distance,
                             input_char  // Store the character read when entering this split state
@@ -591,8 +601,17 @@ impl GeneralizedState {
                     let word_char_str = word_chars[bit_index as usize].to_string();
                     let input_char_str = input_char.to_string();
                     if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
-                        if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, errors, self.max_distance) {
-                            successors.push(succ);
+                        let new_offset = offset + 1;
+                        // Phase 4: M-type invariant is -2n ≤ offset ≤ 0
+                        // If new_offset > 0, create I-type instead (I-type allows -n ≤ offset ≤ n)
+                        if new_offset > 0 {
+                            if let Ok(succ) = GeneralizedPosition::new_i(new_offset, errors, self.max_distance) {
+                                successors.push(succ);
+                            }
+                        } else {
+                            if let Ok(succ) = GeneralizedPosition::new_m(new_offset, errors, self.max_distance) {
+                                successors.push(succ);
+                            }
                         }
                     }
                 }
@@ -618,8 +637,17 @@ impl GeneralizedState {
                 if new_errors <= self.max_distance {
                     let input_char_str = input_char.to_string();
                     if op.can_apply(&[], input_char_str.as_bytes()) {
-                        if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, new_errors, self.max_distance) {
-                            successors.push(succ);
+                        let new_offset = offset + 1;
+                        // Phase 4: M-type invariant is -2n ≤ offset ≤ 0
+                        // If new_offset > 0, create I-type instead (I-type allows -n ≤ offset ≤ n)
+                        if new_offset > 0 {
+                            if let Ok(succ) = GeneralizedPosition::new_i(new_offset, new_errors, self.max_distance) {
+                                successors.push(succ);
+                            }
+                        } else {
+                            if let Ok(succ) = GeneralizedPosition::new_m(new_offset, new_errors, self.max_distance) {
+                                successors.push(succ);
+                            }
                         }
                     }
                 }
@@ -633,8 +661,17 @@ impl GeneralizedState {
                         let word_char_str = word_chars[bit_index as usize].to_string();
                         let input_char_str = input_char.to_string();
                         if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
-                            if let Ok(succ) = GeneralizedPosition::new_m(offset + 1, new_errors, self.max_distance) {
-                                successors.push(succ);
+                            let new_offset = offset + 1;
+                            // Phase 4: M-type invariant is -2n ≤ offset ≤ 0
+                            // If new_offset > 0, create I-type instead (I-type allows -n ≤ offset ≤ n)
+                            if new_offset > 0 {
+                                if let Ok(succ) = GeneralizedPosition::new_i(new_offset, new_errors, self.max_distance) {
+                                    successors.push(succ);
+                                }
+                            } else {
+                                if let Ok(succ) = GeneralizedPosition::new_m(new_offset, new_errors, self.max_distance) {
+                                    successors.push(succ);
+                                }
                             }
                         }
                     }
@@ -742,10 +779,10 @@ impl GeneralizedState {
             .collect();
 
         // Phase 3b: Check if we should enter split state
-        // For standard splits: errors < max_distance required
-        // For phonetic splits with fractional weight: allowed even at max_distance (cost=0)
+        // Phase 4: Phonetic splits allowed when max_distance > 0 AND errors <= max_distance
+        // Standard splits allowed when errors < max_distance
         let has_phonetic_split = split_ops.iter().any(|op| op.weight() < 1.0);
-        let can_enter_split = errors < self.max_distance || has_phonetic_split;
+        let can_enter_split = errors < self.max_distance || (has_phonetic_split && self.max_distance > 0 && errors <= self.max_distance);
 
         if !split_ops.is_empty() && can_enter_split {
             let next_match_index = (offset + bit_vector.len() as i32) as usize;
@@ -776,20 +813,25 @@ impl GeneralizedState {
                 // When both conditions are true, phonetic split takes precedence (errors+0 vs errors+1)
                 if can_phonetic_split {
                     // Phonetic split: enter with errors+0 (fractional weight truncates to 0)
-                    // Allowed even at max_distance since cost=0
-                    if let Ok(split) = GeneralizedPosition::new_m_splitting(
-                        offset - 1,
-                        errors,
-                        self.max_distance,
-                        input_char  // Store the character read when entering this split state
-                    ) {
-                        successors.push(split);
+                    // Phase 4: Requires max_distance > 0 (edit operations not allowed at distance 0)
+                    // AND errors <= max_distance (can be at max because doesn't consume errors)
+                    // Phase 4: offset UNCHANGED on entry (like MATCH, per PhoneticOperations.v)
+                    if self.max_distance > 0 && errors <= self.max_distance {
+                        if let Ok(split) = GeneralizedPosition::new_m_splitting(
+                            offset,  // Phase 4 FIX: unchanged (was offset-1)
+                            errors,
+                            self.max_distance,
+                            input_char  // Store the character read when entering this split state
+                        ) {
+                            successors.push(split);
+                        }
                     }
                 } else if standard_match && errors < self.max_distance {
                     // Standard split: enter with errors+1 (will decrement at completion)
                     // Only used when phonetic split doesn't apply
+                    // Phase 4: offset UNCHANGED on entry (like MATCH, per PhoneticOperations.v)
                     if let Ok(split) = GeneralizedPosition::new_m_splitting(
-                        offset - 1,
+                        offset,  // Phase 4 FIX: unchanged (was offset-1)
                         errors + 1,
                         self.max_distance,
                         input_char  // Store the character read when entering this split state
@@ -964,6 +1006,11 @@ impl GeneralizedState {
     /// From splitting state I+(offset)#(errors)_s:
     /// - Check bit_vector[offset + n] (current position for second word char)
     /// - If match, create I+(offset+0)#(errors-1) (advance 1 word position, decrement error)
+    ///
+    /// # Phase 4: Formal Verification Fix
+    ///
+    /// When subword is empty, uses formally proven formula to calculate word position:
+    /// `word_pos = input_position + offset` (from SubwordOperations.v)
     fn successors_i_splitting(
         &self,
         offset: i32,
@@ -974,7 +1021,12 @@ impl GeneralizedState {
         full_word: &str,
         word_slice: &str,
         input_char: char,
+        input_position: usize,  // Phase 4: For correct word_pos calculation
     ) -> Vec<GeneralizedPosition> {
+        #[cfg(debug_assertions)]
+        eprintln!("[DEBUG] successors_i_splitting: offset={}, errors={}, entry_char='{}', input_char='{}', word_slice='{}'",
+                  offset, errors, entry_char, input_char, word_slice);
+
         let mut successors = Vec::new();
         let n = self.max_distance as i32;
         let match_index_i32 = offset + n;
@@ -983,27 +1035,50 @@ impl GeneralizedState {
         // Extract word character that was split
         let word_chars: Vec<char> = word_slice.chars().collect();
 
+        #[cfg(debug_assertions)]
+        eprintln!("[DEBUG]   match_index_i32={}, word_chars.len()={}", match_index_i32, word_chars.len());
+
         // Phase 3b fix: Handle negative match_index or empty word_slice by using full_word
         let word_1char = if match_index_i32 < 0 || word_chars.is_empty() {
             // Need to use full_word instead of word_slice
             let full_word_chars: Vec<char> = full_word.chars().collect();
-            // Calculate absolute position in full word
-            // When entering split, we did offset-1, so the word char being split is at offset+n+1
-            let word_pos = (offset + n + 1) as usize;
+            // Phase 4 FIX: input_position is 1-indexed (thesis notation)
+            // Split entered at (input_position-1), word_pos (1-indexed) = (input_position-1) + offset
+            // Convert to 0-indexed: word_pos = ((input_position-1) + offset) - 1 = input_position + offset - 2
+            let word_pos = (input_position as i32 + offset - 2) as usize;
+
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG] Split completion fallback: input_pos={}, offset={}, word_pos={}",
+                      input_position, offset, word_pos);
 
             if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
+                #[cfg(debug_assertions)]
+                eprintln!("[DEBUG]   → Found char '{}' at word_pos={}", full_word_chars[word_pos], word_pos);
                 full_word_chars[word_pos].to_string()
             } else {
+                #[cfg(debug_assertions)]
+                eprintln!("[DEBUG]   → word_pos={} out of bounds or padding (len={}), returning empty",
+                         word_pos, full_word_chars.len());
                 // Past word end - no character to validate
                 return successors;
             }
         } else {
             // Normal case: extract from subword
+            // Phase 4: With offset unchanged, subword has slid forward by 1
+            // The character we entered the split on is now at match_index-1
             let match_index = match_index_i32 as usize;
-            if match_index >= word_chars.len() || word_chars[match_index] == '$' {
+            let adjusted_index = if match_index > 0 { match_index - 1 } else { 0 };
+
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG]   Normal case: match_index={}, adjusted_index={}, word_chars[adjusted_index]='{}'",
+                     match_index, adjusted_index, if adjusted_index < word_chars.len() { word_chars[adjusted_index].to_string() } else { "OUT_OF_BOUNDS".to_string() });
+
+            if adjusted_index >= word_chars.len() || word_chars[adjusted_index] == '$' {
+                #[cfg(debug_assertions)]
+                eprintln!("[DEBUG]   → Returning early (out of bounds or padding)");
                 return successors;
             }
-            word_chars[match_index].to_string()
+            word_chars[adjusted_index].to_string()
         };
 
         // Get both input characters (entry_char + current)
@@ -1012,32 +1087,85 @@ impl GeneralizedState {
         let curr_char = input_char;
         let input_2chars = format!("{}{}", prev_char, curr_char);
 
+        #[cfg(debug_assertions)]
+        eprintln!("[DEBUG] word_1char='{}', input_2chars='{}'", word_1char, input_2chars);
+
         // Phase 3b: Check PHONETIC split operations FIRST ⟨1,2⟩ (more specific)
         for op in operations.operations() {
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG] Checking operation: {}", op);
+
             if op.consume_x() == 1 && op.consume_y() == 2 {
+                #[cfg(debug_assertions)]
+                eprintln!("[DEBUG] Operation is ⟨1,2⟩ type, checking if can_apply...");
+
                 if op.can_apply(word_1char.as_bytes(), input_2chars.as_bytes()) {
+                    #[cfg(debug_assertions)]
+                    eprintln!("[DEBUG] Phonetic split ⟨1,2⟩ match: '{}' can apply to word='{}', input='{}'",
+                              op, word_1char, input_2chars);
+
                     // Complete phonetic split (cost was already applied on enter)
-                    // Split consumes 1 word char, so advance offset by 1
-                    let new_offset = offset + 1;
+                    // Phase 4: offset UNCHANGED on completion (per PhoneticOperations.v)
+                    // Advancement happens via sliding subword window, not offset changes
+                    let new_offset = offset;  // Phase 4 FIX: unchanged (was offset+1)
 
                     // Check if we've reached or passed the end of the word
                     // If so, create M-type position; otherwise I-type
-                    let word_len = word_chars.len();
-                    let result_match_index = (new_offset + n) as usize;
+                    // Phase 4: input_position is 1-indexed, convert to 0-indexed word position
+                    let full_word_len = full_word.chars().count();
+                    let result_word_pos = (input_position as i32 + new_offset - 2) as usize;
+                    // After consuming the character in the split, we advance by 1
+                    let next_word_pos = result_word_pos + 1;
 
-                    if result_match_index >= word_len {
+                    #[cfg(debug_assertions)]
+                    eprintln!("[DEBUG] Split completion: new_offset={}, full_word_len={}, result_word_pos={}, next_word_pos={}",
+                              new_offset, full_word_len, result_word_pos, next_word_pos);
+
+                    if next_word_pos >= full_word_len {
                         // Past word end -> M-type position
-                        // M-type offset is relative to word end
-                        let m_offset = new_offset - (word_len as i32 - n);
+                        let m_offset = if next_word_pos == full_word_len {
+                            // Exactly at word end -> M+0
+                            0
+                        } else {
+                            // Strictly past word end -> calculate offset
+                            let result_offset = new_offset + 1;
+                            result_offset - (full_word_len as i32 - n)
+                        };
+                        #[cfg(debug_assertions)]
+                        eprintln!("[DEBUG] Creating M-type: next_word_pos={}, full_word_len={}, m_offset={}",
+                                 next_word_pos, full_word_len, m_offset);
+
                         if let Ok(succ) = GeneralizedPosition::new_m(m_offset, errors, self.max_distance) {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] M-type created successfully: {}", succ);
                             successors.push(succ);
                             return successors;  // Early return after phonetic split
+                        } else {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] Failed to create M-type position (invariant violation), trying I-type fallback");
+
+                            // Fallback: try creating I-type instead with unchanged offset
+                            // This handles the case where we're exactly at word end but M-type invariant can't be satisfied
+                            if let Ok(succ) = GeneralizedPosition::new_i(new_offset, errors, self.max_distance) {
+                                #[cfg(debug_assertions)]
+                                eprintln!("[DEBUG] I-type fallback created successfully: {}", succ);
+                                successors.push(succ);
+                                return successors;
+                            }
                         }
                     } else {
                         // Still within word -> I-type position
+                        #[cfg(debug_assertions)]
+                        eprintln!("[DEBUG] Creating I-type: new_offset={}", new_offset);
+
                         if let Ok(succ) = GeneralizedPosition::new_i(new_offset, errors, self.max_distance) {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] I-type created successfully: {}", succ);
                             successors.push(succ);
                             return successors;  // Early return after phonetic split
+                        } else {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] Failed to create I-type position (invariant violation)");
                         }
                     }
                 }
@@ -1082,6 +1210,7 @@ impl GeneralizedState {
         full_word: &str,
         word_slice: &str,
         input_char: char,
+        input_position: usize,  // Phase 4: For correct word_pos calculation
     ) -> Vec<GeneralizedPosition> {
         let mut successors = Vec::new();
         let bit_index = offset + bit_vector.len() as i32;
@@ -1096,10 +1225,8 @@ impl GeneralizedState {
             // Need to use full_word instead of word_slice
             let full_word_chars: Vec<char> = full_word.chars().collect();
 
-            // For M-type, calculate absolute position
-            // When entering split, we did offset-1, so add +1 to get the word char being split
-            let word_len = full_word_chars.len();
-            let word_pos = (word_len as i32 + offset + 1) as usize;
+            // Phase 4 FIX: input_position is 1-indexed, convert to 0-indexed word position
+            let word_pos = (input_position as i32 + offset - 2) as usize;
 
             if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
                 full_word_chars[word_pos].to_string()
@@ -1109,11 +1236,15 @@ impl GeneralizedState {
             }
         } else {
             // Normal case: extract from subword
+            // Phase 4: With offset unchanged, subword has slid forward by 1
+            // The character we entered the split on is now at next_match_index-1
             let next_match_index = next_match_index_i32 as usize;
-            if next_match_index >= word_chars.len() || word_chars[next_match_index] == '$' {
+            let adjusted_index = if next_match_index > 0 { next_match_index - 1 } else { 0 };
+
+            if adjusted_index >= word_chars.len() || word_chars[adjusted_index] == '$' {
                 return successors;
             }
-            word_chars[next_match_index].to_string()
+            word_chars[adjusted_index].to_string()
         };
 
         // Get both input characters (entry_char + current)
@@ -1127,10 +1258,10 @@ impl GeneralizedState {
             if op.consume_x() == 1 && op.consume_y() == 2 {
                 if op.can_apply(word_1char.as_bytes(), input_2chars.as_bytes()) {
                     // Complete phonetic split (cost was already applied on enter)
-                    // Split consumes 1 word char, so advance offset by 1
-                    let new_offset = offset + 1;
+                    // Phase 4: offset UNCHANGED on completion (per PhoneticOperations.v)
+                    let new_offset = offset;  // Phase 4 FIX: unchanged (was offset+1)
                     if let Ok(succ) = GeneralizedPosition::new_m(
-                        new_offset,  // Keep same (net +1 due to entry offset-1)
+                        new_offset,  // Phase 4 FIX: unchanged (was offset+1)
                         errors,      // Keep same errors (cost was already applied)
                         self.max_distance
                     ) {

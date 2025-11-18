@@ -234,7 +234,9 @@ impl GeneralizedAutomaton {
                     // Accept if we can delete/skip remaining characters with available errors
                     // Proposition 11: p - i ≤ n - e
                     // where p = word_len, i = current_word_pos, e = errors used, n = max_distance
-                    remaining_chars >= 0 && remaining_chars <= remaining_errors
+                    // Phase 4: If remaining_chars < 0, we're past the word end (acceptable)
+                    // If remaining_chars >= 0, we need enough errors to delete them
+                    remaining_chars <= remaining_errors
                 }
                 // Phase 2d: Transposing and splitting positions are intermediate states
                 // They are not accepting states (operation must complete first)
@@ -331,15 +333,26 @@ impl GeneralizedAutomaton {
             // From thesis page 51: s_n(w, i) = w_{i-n}...w_{min(|w|, i+n+1)}
             let subword = self.relevant_subword(word, i + 1);
 
+            #[cfg(debug_assertions)]
+            eprintln!("\n[DEBUG] === Input position i={}, char='{}' ===", i, input_char);
+            #[cfg(debug_assertions)]
+            eprintln!("  Subword: {:?}", subword);
+            #[cfg(debug_assertions)]
+            eprintln!("  State before transition: {} positions", state.positions().count());
+
             // Compute characteristic vector β(x_i, s_n(w, i))
             let bit_vector = CharacteristicVector::new(input_char, &subword);
 
             // Apply transition: state := δ^∀,χ_n(state, β)
             // Phase 3b: Pass full word, word slice, and input character for phonetic operations
             if let Some(next_state) = state.transition(&self.operations, &bit_vector, word, &subword, input_char, i + 1) {
+                #[cfg(debug_assertions)]
+                eprintln!("  State after transition: {} positions", next_state.positions().count());
                 state = next_state;
             } else {
                 // Transition failed, reject
+                #[cfg(debug_assertions)]
+                eprintln!("  ✗ Transition failed, rejecting");
                 return false;
             }
         }
@@ -347,7 +360,17 @@ impl GeneralizedAutomaton {
         // Check acceptance using Proposition 11 criterion (thesis page 24)
         // A position i#e is accepting if: p - i ≤ n - e
         // (remaining characters ≤ remaining error budget)
-        self.is_accepting(&state, word.len(), input.len())
+        #[cfg(debug_assertions)]
+        {
+            eprintln!("\n[DEBUG] Final state positions:");
+            for pos in state.positions() {
+                eprintln!("[DEBUG]   {}", pos);
+            }
+        }
+        let accepted = self.is_accepting(&state, word.len(), input.len());
+        #[cfg(debug_assertions)]
+        eprintln!("[DEBUG] Accepted: {}", accepted);
+        accepted
     }
 
     /// Compute relevant subword s_n(w, i)

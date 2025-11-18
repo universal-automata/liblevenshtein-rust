@@ -236,6 +236,14 @@ mod cost_correctness {
                     if succ.is_non_final() {
                         let error_diff = succ.errors() as i32 - errors as i32;
 
+                        // Skip-to-match optimization can create successors with error_diff > 1
+                        // (one error per skipped position). These are tested separately in
+                        // proptest_skip_to_match.rs and validated by i_skip_to_match_preserves_invariant.
+                        // This test only validates i_successor_cost_correct (standard operations).
+                        if error_diff > 1 {
+                            continue; // Skip skip-to-match successors
+                        }
+
                         // Standard operations have cost 0 (match) or 1 (delete/insert/substitute)
                         prop_assert!(error_diff == 0 || error_diff == 1,
                             "Successor error diff {} not in {{0, 1}}", error_diff);
