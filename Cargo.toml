@@ -67,6 +67,11 @@ name = "benchmarks"
 harness = false
 
 [[bench]]
+name = "phonetic_rules"
+harness = false
+required-features = ["phonetic-rules"]
+
+[[bench]]
 name = "micro_benchmarks"
 harness = false
 
