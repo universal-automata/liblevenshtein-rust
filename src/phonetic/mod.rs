@@ -74,8 +74,8 @@ pub mod matching;
 pub mod rules;
 pub mod types;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod properties;
 
 // Re-export main types (byte-level)
 pub use application::{apply_rule_at, apply_rules_seq, MAX_EXPANSION_FACTOR};
