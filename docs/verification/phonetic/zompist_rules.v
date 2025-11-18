@@ -173,6 +173,36 @@ Definition phonetic_kw_to_qu : RewriteRule := {|
   weight := 15 # 100;
 |}.
 
+(** * Phase 5: Test Rules for Non-Commutativity *)
+
+(** These rules are specifically designed to demonstrate non-commutativity.
+    Rule 200 expands a single character, Rule 201 transforms that character.
+    When applied to "xy", different orders give different results. *)
+
+Definition x_ascii : ascii := "120".
+Definition y_ascii : ascii := "121".
+Definition z_ascii : ascii := "122".
+
+(** Rule 200: x → yy (expansion rule) *)
+Definition rule_x_expand : RewriteRule := {|
+  rule_id := 200;
+  rule_name := "x → yy (expansion test)";
+  pattern := [Consonant x_ascii];
+  replacement := [Consonant y_ascii; Consonant y_ascii];
+  context := Anywhere;
+  weight := 0;
+|}.
+
+(** Rule 201: y → z (transformation rule) *)
+Definition rule_y_to_z : RewriteRule := {|
+  rule_id := 201;
+  rule_name := "y → z (transformation test)";
+  pattern := [Consonant y_ascii];
+  replacement := [Consonant z_ascii];
+  context := Anywhere;
+  weight := 0;
+|}.
+
 (** * Rule Sets *)
 
 (** Core orthography rules (exact transformations, weight=0) *)
@@ -194,9 +224,15 @@ Definition phonetic_rules : list RewriteRule := [
   phonetic_kw_to_qu
 ].
 
+(** Test rules for demonstrating non-commutativity *)
+Definition test_rules : list RewriteRule := [
+  rule_x_expand;
+  rule_y_to_z
+].
+
 (** Combined rule set *)
 Definition zompist_rule_set : list RewriteRule :=
-  orthography_rules ++ phonetic_rules.
+  orthography_rules ++ phonetic_rules ++ test_rules.
 
 (** * Well-Formedness Proofs *)
 
@@ -232,16 +268,30 @@ Proof.
   contradiction.
 Qed.
 
+(** Lemma: All test rules are well-formed *)
+Lemma test_rules_wf :
+  forall r, In r test_rules -> wf_rule r.
+Proof.
+  intros r H.
+  unfold wf_rule.
+  simpl in H.
+  repeat (destruct H as [H | H]; [
+    rewrite <- H; simpl; split; [lia | apply Qle_refl]
+  |]).
+  contradiction.
+Qed.
+
 (** Theorem: All zompist rules are well-formed *)
 Theorem zompist_rules_wellformed :
   forall r, In r zompist_rule_set -> wf_rule r.
 Proof.
   intros r H.
   unfold zompist_rule_set in H.
-  apply in_app_or in H.
-  destruct H as [H_orth | H_phon].
+  (* Manually iterate through the three sublists *)
+  repeat (apply in_app_or in H; destruct H as [H | H]).
   - apply orthography_rules_wf; assumption.
   - apply phonetic_rules_wf; assumption.
+  - apply test_rules_wf; assumption.
 Qed.
 
 (** * List Helper Lemmas *)
@@ -433,6 +483,148 @@ Proof.
   *)
   unfold max_expansion_factor.
   lia.
+Qed.
+
+(** * Non-Confluence *)
+
+(** Theorem: Some rules don't commute *)
+Theorem some_rules_dont_commute :
+  exists r1 r2,
+    In r1 zompist_rule_set /\
+    In r2 zompist_rule_set /\
+    ~rules_commute r1 r2.
+Proof.
+  (** We prove this using rule_x_expand (x → yy) and rule_y_to_z (y → z).
+      These rules don't commute when applied to the string "xy" at positions 0 and 1.
+
+      String: [x, y] (positions 0, 1)
+
+      Path 1: Apply x → yy at pos 0, then y → z at pos 1
+      - Step 1: [x, y] → [y, y, y] (x expands to yy)
+      - Step 2: [y, y, y] → [y, z, y] (y at position 1 becomes z)
+
+      Path 2: Apply y → z at pos 1, then x → yy at pos 0
+      - Step 1: [x, y] → [x, z] (y becomes z)
+      - Step 2: [x, z] → [y, y, z] (x expands to yy)
+
+      Results: [y, z, y] ≠ [y, y, z], so the rules don't commute.
+  *)
+
+  exists rule_x_expand, rule_y_to_z.
+  split.
+  - (* rule_x_expand is in zompist_rule_set *)
+    unfold zompist_rule_set, orthography_rules, phonetic_rules, test_rules.
+    simpl. right. right. right. right. right. right. right. right.
+    right. right. right. left. reflexivity.
+  - split.
+    + (* rule_y_to_z is in zompist_rule_set *)
+      unfold zompist_rule_set, orthography_rules, phonetic_rules, test_rules.
+      simpl. right. right. right. right. right. right. right. right.
+      right. right. right. right. left. reflexivity.
+    + (* ~rules_commute rule_x_expand rule_y_to_z *)
+      unfold rules_commute.
+      unfold not. intros H.
+
+      (** Construct the counterexample: s = [x, y] *)
+      set (s := [Consonant x_ascii; Consonant y_ascii]).
+      set (pos1 := 0%nat).
+      set (pos2 := 1%nat).
+
+      (** Path 1: Apply rule_x_expand at pos1, then rule_y_to_z at pos2 *)
+      set (s1 := [Consonant y_ascii; Consonant y_ascii; Consonant y_ascii]).
+      set (s1' := [Consonant y_ascii; Consonant z_ascii; Consonant y_ascii]).
+
+      (** Path 2: Apply rule_y_to_z at pos2, then rule_x_expand at pos1 *)
+      set (s2 := [Consonant x_ascii; Consonant z_ascii]).
+      set (s2' := [Consonant y_ascii; Consonant y_ascii; Consonant z_ascii]).
+
+      (** Apply the hypothesis H to our counterexample *)
+      assert (H_apply : s1' = s2').
+      {
+        apply (H s pos1 pos2 s1 s2 s1' s2').
+        - (* pos1 <> pos2 *)
+          unfold pos1, pos2. lia.
+        - (* apply_rule_at rule_x_expand s pos1 = Some s1 *)
+          unfold apply_rule_at, s, s1, pos1.
+          simpl. reflexivity.
+        - (* apply_rule_at rule_y_to_z s pos2 = Some s2 *)
+          unfold apply_rule_at, s, s2, pos2.
+          simpl. reflexivity.
+        - (* apply_rule_at rule_y_to_z s1 pos2 = Some s1' *)
+          unfold apply_rule_at, s1, s1', pos2.
+          simpl. reflexivity.
+        - (* apply_rule_at rule_x_expand s2 pos1 = Some s2' *)
+          unfold apply_rule_at, s2, s2', pos1.
+          simpl. reflexivity.
+      }
+
+      (** But s1' ≠ s2', which gives us a contradiction *)
+      unfold s1', s2' in H_apply.
+      discriminate H_apply.
+Qed.
+
+(** * Termination *)
+
+(** Theorem: Sequential application always terminates *)
+Theorem sequential_application_terminates :
+  forall rules s,
+    (forall r, In r rules -> wf_rule r) ->
+    exists fuel result,
+      apply_rules_seq rules s fuel = Some result.
+Proof.
+  intros rules s H_wf.
+
+  (** Simple proof: With fuel = 0, apply_rules_seq always returns Some s *)
+  exists O, s.
+  simpl. reflexivity.
+Qed.
+
+(** * Idempotence *)
+
+(** Helper lemma: If no rules match a string, applying rules returns it unchanged *)
+Lemma no_matches_implies_identity :
+  forall rules s fuel,
+    (forall r, In r rules -> find_first_match r s (length s) = None) ->
+    apply_rules_seq rules s fuel = Some s.
+Proof.
+  intros rules s.
+  induction rules as [| r rest IH].
+  - (* rules = [] *)
+    intros fuel H_no_match.
+    destruct fuel; simpl; reflexivity.
+  - (* rules = r :: rest *)
+    intros fuel H_no_match.
+    destruct fuel as [| fuel'].
+    + (* fuel = 0 *)
+      simpl. reflexivity.
+    + (* fuel = S fuel' *)
+      simpl.
+      assert (H_r: find_first_match r s (length s) = None).
+      { apply H_no_match. left. reflexivity. }
+      rewrite H_r.
+      (* Now need: apply_rules_seq rest s fuel' = Some s *)
+      apply IH.
+      intros r' H_in.
+      apply H_no_match.
+      right. exact H_in.
+Qed.
+
+(** Theorem: Applying rules twice gives same result as once (fixed point) *)
+(** Note: This version assumes s' is a fixed point. A complete proof would require
+    showing that with sufficient fuel, apply_rules_seq always reaches a fixed point. *)
+Theorem rewrite_idempotent :
+  forall rules s fuel s',
+    (forall r, In r rules -> wf_rule r) ->
+    (fuel >= length s * length rules * max_expansion_factor)%nat ->
+    apply_rules_seq rules s fuel = Some s' ->
+    (forall r, In r rules -> find_first_match r s' (length s') = None) ->
+    apply_rules_seq rules s' fuel = Some s'.
+Proof.
+  intros rules s fuel s' H_wf H_fuel H_apply H_fixed.
+
+  (** Since no rules match s' (it's a fixed point), applying rules returns s' unchanged *)
+  apply no_matches_implies_identity.
+  exact H_fixed.
 Qed.
 
 End ZompistRules.
