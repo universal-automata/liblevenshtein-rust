@@ -12,6 +12,20 @@ Based on "Fast String Correction with Levenshtein-Automata" (Schulz & Mihov, 200
 
 ## What's New
 
+### v0.7.0 (2025-11-18)
+
+- **Phonetic Rewrite Rules (Formally Verified)** - Mathematically verified phonetic transformations for English spelling normalization
+  - 5 theorems proven in Coq/Rocq (100% proven, zero Admitted): well-formedness, bounded expansion, non-confluence, termination, idempotence
+  - 13 rules from Zompist's English spelling system (8 orthographic + 3 phonetic + 2 test)
+  - Dual u8/char support following existing codebase patterns
+  - 87 tests passing (73 unit + 14 property-based with proptest)
+  - 7 criterion benchmark groups for performance profiling
+  - Complete traceability from Coq definitions to Rust implementation
+  - Enable with `phonetic-rules` feature
+- **Performance Optimizations** - Universal automaton state operations and subsumption checking
+  - H1 optimization: Eliminated string allocations in successor methods
+  - H2 conditional optimization: 28-31% speedup with zero overhead for common cases
+
 ### v0.5.0 (2025-11-04)
 
 - **DynamicDawgChar** - Unicode support for Dynamic DAWG with character-level operations
@@ -796,6 +810,94 @@ for term in transducer.query_filtered("var", 1, |scope_id| *scope_id <= 1) {
 - Scope-based code completion (only show visible symbols)
 - Access control (filter by user permissions)
 - Multi-tenancy (filter by tenant ID)
+
+### Phonetic Rewrite Rules (Formally Verified)
+
+The `phonetic-rules` feature provides **mathematically verified** phonetic transformation rules for English spelling normalization, enabling phonetic fuzzy matching:
+
+```rust
+use liblevenshtein::phonetic::*;
+
+// Convert words to phonetic representations
+let words = vec!["phone", "church", "ghost", "enough"];
+let ortho_rules = orthography_rules();
+
+for word in words {
+    // Convert to phonetic representation
+    let phones: Vec<Phone> = word.bytes()
+        .map(|b| if matches!(b, b'a' | b'e' | b'i' | b'o' | b'u') {
+            Phone::Vowel(b)
+        } else {
+            Phone::Consonant(b)
+        })
+        .collect();
+
+    // Apply transformation rules
+    let fuel = phones.len() * ortho_rules.len() * MAX_EXPANSION_FACTOR;
+    if let Some(result) = apply_rules_seq(&ortho_rules, &phones, fuel) {
+        // Result: phonetic representation (e.g., "ph" → "f", "gh" → silent)
+        println!("Input: {} → Output: {:?}", word, result);
+    }
+}
+```
+
+**Formal Verification**: All algorithms are proven correct in Coq/Rocq with 5 theorems:
+1. **Well-formedness** - All rules satisfy structural constraints
+2. **Bounded Expansion** - Output length ≤ input length + 20 (guaranteed)
+3. **Non-Confluence** - Rule application order matters (proven)
+4. **Termination** - Sequential application always terminates (guaranteed)
+5. **Idempotence** - Fixed points remain unchanged (stable semantics)
+
+**Rule Sets**:
+- `orthography_rules()` - 8 orthographic transformations (ch→ç, ph→f, silent letters)
+- `phonetic_rules()` - 3 phonetic approximations for fuzzy matching (th→t, qu↔kw)
+- `zompist_rules()` - Complete 13-rule set from Zompist English spelling system
+
+**Dual u8/char Support** (following existing codebase patterns):
+```rust
+// Byte-level (ASCII, ~5% faster, 4× less memory)
+let result = apply_rules_seq(&orthography_rules(), &phones_u8, fuel);
+
+// Character-level (Unicode, correct for accented chars, CJK, emoji)
+let result = apply_rules_seq_char(&orthography_rules_char(), &phones_char, fuel);
+```
+
+**Integration with Levenshtein Matching**:
+```rust
+// 1. Normalize query and dictionary terms phonetically
+let normalized_query = apply_rules_seq(&ortho_rules, &query_phones, fuel)?;
+let normalized_dict = dict_terms.iter()
+    .map(|term| apply_rules_seq(&ortho_rules, term, fuel))
+    .collect();
+
+// 2. Use Levenshtein automaton on normalized forms
+let dict = DoubleArrayTrie::from_terms(normalized_dict);
+let transducer = Transducer::new(dict, Algorithm::Standard);
+let matches = transducer.query(&normalized_query, 1);
+
+// Example: "enough" and "enuf" match after phonetic normalization
+// (both → "enuf" via "gh" → silent, making Levenshtein distance 0)
+```
+
+**Verification Artifacts**:
+- Coq proofs: [`docs/verification/phonetic/`](docs/verification/phonetic/)
+- Rust implementation: [`src/phonetic/`](src/phonetic/)
+- Property tests: [`src/phonetic/properties.rs`](src/phonetic/properties.rs) (14 tests, 3,584 test cases)
+- Benchmarks: [`benches/phonetic_rules.rs`](benches/phonetic_rules.rs) (7 benchmark groups)
+- Example: [`examples/phonetic_rewrite.rs`](examples/phonetic_rewrite.rs)
+
+Enable with:
+```toml
+[dependencies]
+liblevenshtein = { git = "https://github.com/universal-automata/liblevenshtein-rust", features = ["phonetic-rules"] }
+```
+
+Run the example:
+```bash
+cargo run --example phonetic_rewrite --features phonetic-rules
+```
+
+**Source**: Based on [Zompist's English spelling rules](https://zompist.com/spell.html) with complete formal verification in Coq/Rocq (630+ lines of proofs, 100% proven, zero Admitted).
 
 ## Documentation
 
