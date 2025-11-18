@@ -18,6 +18,9 @@ PHONETIC_FILES := \
 	$(PHONETIC_DIR)/rewrite_rules.v \
 	$(PHONETIC_DIR)/zompist_rules.v
 
+# Extraction file
+EXTRACTION_FILE := $(PHONETIC_DIR)/extraction.v
+
 # Compiled objects
 PHONETIC_VO := $(PHONETIC_FILES:.v=.vo)
 
@@ -46,7 +49,11 @@ html: $(PHONETIC_VO)
 extract: $(PHONETIC_VO)
 	@echo "Extracting OCaml code..."
 	@mkdir -p $(EXTRACT_DIR)
-	@echo "Extraction will be added once extraction directives are complete"
+	$(COQC) -Q $(PHONETIC_DIR) PhoneticRewrites $(EXTRACTION_FILE)
+	@echo "Moving extracted files to $(EXTRACT_DIR)/..."
+	@mv *.ml *.mli $(EXTRACT_DIR)/ 2>/dev/null || true
+	@echo "✓ Extraction complete! Generated files:"
+	@ls -lh $(EXTRACT_DIR)/ 2>/dev/null || echo "No files generated"
 
 # Check proofs without compiling
 check:
