@@ -81,3 +81,9 @@ rocq/**/*.glob
 rocq/**/Makefile
 rocq/**/Makefile.conf
 rocq/**/.Makefile.d
+
+# Profiling artifacts
+*.perf.data
+*.perf.data.old
+perf.data*
+flamegraph.svg
