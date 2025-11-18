@@ -34,6 +34,14 @@ pub mod dictionary;
 pub mod distance;
 pub mod transducer;
 
+/// Phonetic rewrite rules for approximate string matching
+///
+/// This module provides verified phonetic transformation rules with formal
+/// correctness guarantees from Coq/Rocq proofs. It implements Zompist's
+/// English spelling rules for normalizing text before fuzzy matching.
+#[cfg(feature = "phonetic-rules")]
+pub mod phonetic;
+
 #[cfg(feature = "serialization")]
 pub mod serialization;
 

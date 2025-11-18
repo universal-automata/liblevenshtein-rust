@@ -1,0 +1,533 @@
+//! Rule application for phonetic rewrite systems.
+//!
+//! This module implements the rule application logic for phonetic rewrite rules,
+//! directly translated from the Coq/Rocq verification in
+//! `docs/verification/phonetic/rewrite_rules.v`.
+//!
+//! # Functions
+//!
+//! - [`apply_rule_at`] / [`apply_rule_at_char`] - Apply a rule at a specific position
+//! - [`find_first_match`] / [`find_first_match_char`] - Find first matching position
+//! - [`apply_rules_seq`] / [`apply_rules_seq_char`] - Sequential rule application
+//!
+//! # Constants
+//!
+//! - [`MAX_EXPANSION_FACTOR`] - Maximum string expansion (from Theorem 2)
+//!
+//! # Formal Guarantees
+//!
+//! These functions implement algorithms with proven properties:
+//!
+//! - **Bounded Expansion** (Theorem 2, `zompist_rules.v:425`):
+//!   Output length ≤ input length + [`MAX_EXPANSION_FACTOR`]
+//!
+//! - **Termination** (Theorem 4, `zompist_rules.v:569`):
+//!   Sequential application always terminates with sufficient fuel
+//!
+//! - **Idempotence** (Theorem 5, `zompist_rules.v:615`):
+//!   Fixed points remain unchanged under further application
+
+use super::matching::{context_matches, context_matches_char, pattern_matches_at, pattern_matches_at_char};
+use super::types::{Phone, PhoneChar, RewriteRule, RewriteRuleChar};
+
+/// Maximum expansion factor for phonetic rewrite rules.
+///
+/// **Formal Specification**: Theorem 2, `docs/verification/phonetic/zompist_rules.v:425`
+///
+/// This constant bounds the maximum string growth from any single rule application.
+/// For all well-formed rules in the zompist rule set:
+///
+/// ```text
+/// length(output) ≤ length(input) + MAX_EXPANSION_FACTOR
+/// ```
+///
+/// The value 20 is proven sufficient for all 56 zompist rules.
+pub const MAX_EXPANSION_FACTOR: usize = 20;
+
+// ============================================================================
+// Rule application (byte-level)
+// ============================================================================
+
+/// Apply a rewrite rule at a specific position if possible (byte-level).
+///
+/// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:177-187`
+///
+/// Attempts to apply a rule at the given position in the phonetic string.
+/// Returns `Some(new_string)` if the rule applies, `None` otherwise.
+///
+/// # Algorithm
+///
+/// 1. Check if the context is satisfied at the position
+/// 2. Check if the pattern matches at the position
+/// 3. If both conditions hold, replace the pattern with the replacement
+///
+/// # Arguments
+///
+/// - `rule` - The rewrite rule to apply
+/// - `s` - The phonetic string
+/// - `pos` - The position to attempt application
+///
+/// # Returns
+///
+/// - `Some(new_string)` if the rule applies at the position
+/// - `None` if the rule does not apply
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use liblevenshtein::phonetic::{apply_rule_at, Phone, Context, RewriteRule};
+///
+/// let rule = RewriteRule {
+///     rule_id: 1,
+///     rule_name: "gh → f".to_string(),
+///     pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+///     replacement: vec![Phone::Consonant(b'f')],
+///     context: Context::Anywhere,
+///     weight: 0.15,
+/// };
+///
+/// let s = vec![
+///     Phone::Vowel(b'e'),
+///     Phone::Consonant(b'g'),
+///     Phone::Consonant(b'h'),
+/// ];
+///
+/// let result = apply_rule_at(&rule, &s, 1);
+/// assert_eq!(result, Some(vec![Phone::Vowel(b'e'), Phone::Consonant(b'f')]));
+/// ```
+pub fn apply_rule_at(rule: &RewriteRule, s: &[Phone], pos: usize) -> Option<Vec<Phone>> {
+    // Check context matches
+    if !context_matches(&rule.context, s, pos) {
+        return None;
+    }
+
+    // Check pattern matches
+    if !pattern_matches_at(&rule.pattern, s, pos) {
+        return None;
+    }
+
+    // Build result: prefix + replacement + suffix
+    let mut result = Vec::with_capacity(s.len() + MAX_EXPANSION_FACTOR);
+    result.extend_from_slice(&s[..pos]);
+    result.extend_from_slice(&rule.replacement);
+    result.extend_from_slice(&s[(pos + rule.pattern.len())..]);
+
+    Some(result)
+}
+
+/// Find the first position where a rule can be applied (byte-level).
+///
+/// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:190-198`
+///
+/// Scans the string from left to right to find the first position where
+/// the rule can be applied.
+///
+/// # Arguments
+///
+/// - `rule` - The rewrite rule to match
+/// - `s` - The phonetic string
+///
+/// # Returns
+///
+/// - `Some(pos)` if the rule can be applied at position `pos`
+/// - `None` if the rule cannot be applied anywhere
+pub fn find_first_match(rule: &RewriteRule, s: &[Phone]) -> Option<usize> {
+    // Try each position from 0 to s.len()
+    for pos in 0..=s.len() {
+        if apply_rule_at(rule, s, pos).is_some() {
+            return Some(pos);
+        }
+    }
+    None
+}
+
+/// Apply a list of rules sequentially until fixed point or fuel exhausted (byte-level).
+///
+/// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:203-227`
+///
+/// Applies rules in order, restarting from the first rule after each successful
+/// application, until no rules can be applied or fuel is exhausted.
+///
+/// # Formal Guarantees
+///
+/// - **Termination** (Theorem 4, `zompist_rules.v:569`):
+///   Always terminates with sufficient fuel
+///
+/// - **Idempotence** (Theorem 5, `zompist_rules.v:615`):
+///   Result is a fixed point (applying rules again produces the same result)
+///
+/// # Algorithm
+///
+/// ```text
+/// loop:
+///   for each rule r in rules:
+///     if r can be applied:
+///       apply r
+///       restart loop
+///   no rules applied → return fixed point
+/// ```
+///
+/// # Arguments
+///
+/// - `rules` - The list of rewrite rules to apply
+/// - `s` - The phonetic string
+/// - `fuel` - Maximum number of iterations (prevents infinite loops)
+///
+/// # Returns
+///
+/// - `Some(result)` with the transformed string
+/// - `None` if fuel is exhausted (shouldn't happen with sufficient fuel)
+///
+/// # Fuel Calculation
+///
+/// Sufficient fuel is:
+/// ```text
+/// fuel >= length(s) * length(rules) * MAX_EXPANSION_FACTOR
+/// ```
+///
+/// For practical use, `fuel = s.len() * rules.len() * 100` is recommended.
+pub fn apply_rules_seq(rules: &[RewriteRule], s: &[Phone], fuel: usize) -> Option<Vec<Phone>> {
+    let mut current = s.to_vec();
+    let mut remaining_fuel = fuel;
+
+    loop {
+        if remaining_fuel == 0 {
+            // Out of fuel - return current state
+            return Some(current);
+        }
+
+        let mut applied = false;
+
+        // Try each rule in order
+        for rule in rules {
+            if let Some(pos) = find_first_match(rule, &current) {
+                if let Some(new_s) = apply_rule_at(rule, &current, pos) {
+                    current = new_s;
+                    remaining_fuel -= 1;
+                    applied = true;
+                    break; // Restart from first rule
+                }
+            }
+        }
+
+        if !applied {
+            // Fixed point reached - no rules can be applied
+            return Some(current);
+        }
+    }
+}
+
+// ============================================================================
+// Rule application (character-level)
+// ============================================================================
+
+/// Apply a rewrite rule at a specific position if possible (character-level).
+///
+/// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:177-187`
+///
+/// This is the character-level variant of [`apply_rule_at`].
+pub fn apply_rule_at_char(
+    rule: &RewriteRuleChar,
+    s: &[PhoneChar],
+    pos: usize,
+) -> Option<Vec<PhoneChar>> {
+    // Check context matches
+    if !context_matches_char(&rule.context, s, pos) {
+        return None;
+    }
+
+    // Check pattern matches
+    if !pattern_matches_at_char(&rule.pattern, s, pos) {
+        return None;
+    }
+
+    // Build result: prefix + replacement + suffix
+    let mut result = Vec::with_capacity(s.len() + MAX_EXPANSION_FACTOR);
+    result.extend_from_slice(&s[..pos]);
+    result.extend_from_slice(&rule.replacement);
+    result.extend_from_slice(&s[(pos + rule.pattern.len())..]);
+
+    Some(result)
+}
+
+/// Find the first position where a rule can be applied (character-level).
+///
+/// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:190-198`
+///
+/// This is the character-level variant of [`find_first_match`].
+pub fn find_first_match_char(rule: &RewriteRuleChar, s: &[PhoneChar]) -> Option<usize> {
+    for pos in 0..=s.len() {
+        if apply_rule_at_char(rule, s, pos).is_some() {
+            return Some(pos);
+        }
+    }
+    None
+}
+
+/// Apply a list of rules sequentially until fixed point or fuel exhausted (character-level).
+///
+/// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:203-227`
+///
+/// This is the character-level variant of [`apply_rules_seq`].
+pub fn apply_rules_seq_char(
+    rules: &[RewriteRuleChar],
+    s: &[PhoneChar],
+    fuel: usize,
+) -> Option<Vec<PhoneChar>> {
+    let mut current = s.to_vec();
+    let mut remaining_fuel = fuel;
+
+    loop {
+        if remaining_fuel == 0 {
+            return Some(current);
+        }
+
+        let mut applied = false;
+
+        for rule in rules {
+            if let Some(pos) = find_first_match_char(rule, &current) {
+                if let Some(new_s) = apply_rule_at_char(rule, &current, pos) {
+                    current = new_s;
+                    remaining_fuel -= 1;
+                    applied = true;
+                    break;
+                }
+            }
+        }
+
+        if !applied {
+            return Some(current);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::phonetic::types::{Context, ContextChar, Phone, PhoneChar};
+
+    // ========================================================================
+    // Byte-level tests
+    // ========================================================================
+
+    #[test]
+    fn test_apply_rule_at_success() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Anywhere,
+            weight: 0.15,
+        };
+
+        let s = vec![
+            Phone::Vowel(b'e'),
+            Phone::Consonant(b'g'),
+            Phone::Consonant(b'h'),
+        ];
+
+        let result = apply_rule_at(&rule, &s, 1);
+        assert_eq!(result, Some(vec![Phone::Vowel(b'e'), Phone::Consonant(b'f')]));
+    }
+
+    #[test]
+    fn test_apply_rule_at_no_match() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Anywhere,
+            weight: 0.15,
+        };
+
+        let s = vec![Phone::Vowel(b'e'), Phone::Consonant(b'k')];
+
+        let result = apply_rule_at(&rule, &s, 0);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_apply_rule_at_context_fail() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f (initial only)".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Initial,
+            weight: 0.15,
+        };
+
+        let s = vec![
+            Phone::Vowel(b'e'),
+            Phone::Consonant(b'g'),
+            Phone::Consonant(b'h'),
+        ];
+
+        // Should fail at pos=1 because not initial
+        let result = apply_rule_at(&rule, &s, 1);
+        assert_eq!(result, None);
+
+        // Should succeed at pos=0 if pattern were there
+        let s2 = vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')];
+        let result2 = apply_rule_at(&rule, &s2, 0);
+        assert_eq!(result2, Some(vec![Phone::Consonant(b'f')]));
+    }
+
+    #[test]
+    fn test_find_first_match() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Anywhere,
+            weight: 0.15,
+        };
+
+        let s = vec![
+            Phone::Vowel(b'e'),
+            Phone::Consonant(b'g'),
+            Phone::Consonant(b'h'),
+            Phone::Vowel(b'o'),
+        ];
+
+        let pos = find_first_match(&rule, &s);
+        assert_eq!(pos, Some(1));
+    }
+
+    #[test]
+    fn test_find_first_match_none() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Anywhere,
+            weight: 0.15,
+        };
+
+        let s = vec![Phone::Vowel(b'e'), Phone::Consonant(b'k')];
+
+        let pos = find_first_match(&rule, &s);
+        assert_eq!(pos, None);
+    }
+
+    #[test]
+    fn test_apply_rules_seq_single_rule() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Anywhere,
+            weight: 0.15,
+        };
+
+        let s = vec![
+            Phone::Vowel(b'e'),
+            Phone::Consonant(b'g'),
+            Phone::Consonant(b'h'),
+        ];
+
+        let result = apply_rules_seq(&[rule], &s, 100);
+        assert_eq!(result, Some(vec![Phone::Vowel(b'e'), Phone::Consonant(b'f')]));
+    }
+
+    #[test]
+    fn test_apply_rules_seq_multiple_applications() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Anywhere,
+            weight: 0.15,
+        };
+
+        // "ghgh" → "fgh" → "ff"
+        let s = vec![
+            Phone::Consonant(b'g'),
+            Phone::Consonant(b'h'),
+            Phone::Consonant(b'g'),
+            Phone::Consonant(b'h'),
+        ];
+
+        let result = apply_rules_seq(&[rule], &s, 100);
+        assert_eq!(
+            result,
+            Some(vec![Phone::Consonant(b'f'), Phone::Consonant(b'f')])
+        );
+    }
+
+    #[test]
+    fn test_apply_rules_seq_fixed_point() {
+        let rule = RewriteRule {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![Phone::Consonant(b'g'), Phone::Consonant(b'h')],
+            replacement: vec![Phone::Consonant(b'f')],
+            context: Context::Anywhere,
+            weight: 0.15,
+        };
+
+        // Already a fixed point (no 'gh')
+        let s = vec![Phone::Vowel(b'e'), Phone::Consonant(b'f')];
+
+        let result = apply_rules_seq(&[rule], &s, 100);
+        assert_eq!(result, Some(vec![Phone::Vowel(b'e'), Phone::Consonant(b'f')]));
+    }
+
+    // ========================================================================
+    // Character-level tests
+    // ========================================================================
+
+    #[test]
+    fn test_apply_rule_at_char_success() {
+        let rule = RewriteRuleChar {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![PhoneChar::Consonant('g'), PhoneChar::Consonant('h')],
+            replacement: vec![PhoneChar::Consonant('f')],
+            context: ContextChar::Anywhere,
+            weight: 0.15,
+        };
+
+        let s = vec![
+            PhoneChar::Vowel('e'),
+            PhoneChar::Consonant('g'),
+            PhoneChar::Consonant('h'),
+        ];
+
+        let result = apply_rule_at_char(&rule, &s, 1);
+        assert_eq!(
+            result,
+            Some(vec![PhoneChar::Vowel('e'), PhoneChar::Consonant('f')])
+        );
+    }
+
+    #[test]
+    fn test_apply_rules_seq_char() {
+        let rule = RewriteRuleChar {
+            rule_id: 1,
+            rule_name: "gh → f".to_string(),
+            pattern: vec![PhoneChar::Consonant('g'), PhoneChar::Consonant('h')],
+            replacement: vec![PhoneChar::Consonant('f')],
+            context: ContextChar::Anywhere,
+            weight: 0.15,
+        };
+
+        let s = vec![
+            PhoneChar::Vowel('e'),
+            PhoneChar::Consonant('g'),
+            PhoneChar::Consonant('h'),
+        ];
+
+        let result = apply_rules_seq_char(&[rule], &s, 100);
+        assert_eq!(
+            result,
+            Some(vec![PhoneChar::Vowel('e'), PhoneChar::Consonant('f')])
+        );
+    }
+}

@@ -286,6 +286,7 @@ serialization = ["serde", "bincode", "serde_json"]
 protobuf = ["prost", "bytes", "prost-build", "serialization"]
 compression = ["flate2", "serialization"]
 cli = ["clap", "anyhow", "rustyline", "colored", "dirs", "pathmap-backend", "serialization"]
+phonetic-rules = []  # Phonetic rewrite rules with formal verification
 
 # Eviction wrapper optimization features
 eviction-parking-lot = ["parking_lot"]
