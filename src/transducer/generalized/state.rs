@@ -274,6 +274,10 @@ impl GeneralizedState {
         // H2 Optimization: Collect word_slice characters once instead of repeatedly
         let word_slice_chars: Vec<char> = word_slice.chars().collect();
 
+        // H1 Optimization: Pre-encode input_char once to avoid repeated String allocations
+        let mut input_char_buf = [0u8; 4];
+        let input_char_bytes = input_char.encode_utf8(&mut input_char_buf).as_bytes();
+
         // Bit vector index for current position: offset + n
         let match_index = (offset + n) as usize;
 
@@ -294,9 +298,10 @@ impl GeneralizedState {
                     if has_match {
                         // Phase 3: For match, check can_apply() with actual characters
                         if match_index < word_slice_chars.len() {
-                            let word_char_str = word_slice_chars[match_index].to_string();
-                            let input_char_str = input_char.to_string();
-                            if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                            // H1 Optimization: Use stack buffer instead of heap allocation
+                            let mut word_char_buf = [0u8; 4];
+                            let word_char_bytes = word_slice_chars[match_index].encode_utf8(&mut word_char_buf).as_bytes();
+                            if op.can_apply(word_char_bytes, input_char_bytes) {
                                 // δ^D,ε_e: (t+1)#e → I^ε → I+t#e
                                 if let Ok(succ) = GeneralizedPosition::new_i(offset, errors, self.max_distance) {
                                     successors.push(succ);
@@ -313,8 +318,10 @@ impl GeneralizedState {
                         if new_errors <= self.max_distance {
                             // H2 Optimization: Using word_slice_chars from method beginning
                             if match_index < word_slice_chars.len() {
-                                let word_char_str = word_slice_chars[match_index].to_string();
-                                if op.can_apply(word_char_str.as_bytes(), &[]) {
+                                // H1 Optimization: Use stack buffer instead of heap allocation
+                                let mut word_char_buf = [0u8; 4];
+                                let word_char_bytes = word_slice_chars[match_index].encode_utf8(&mut word_char_buf).as_bytes();
+                                if op.can_apply(word_char_bytes, &[]) {
                                     // δ^D,ε_e: t#(e+w) → I^ε → I+(t-1)#(e+w)
                                     if let Ok(succ) = GeneralizedPosition::new_i(offset - 1, new_errors, self.max_distance) {
                                         successors.push(succ);
@@ -329,8 +336,8 @@ impl GeneralizedState {
                     if errors < self.max_distance {
                         let new_errors = errors + op.weight() as u8;
                         if new_errors <= self.max_distance {
-                            let input_char_str = input_char.to_string();
-                            if op.can_apply(&[], input_char_str.as_bytes()) {
+                            // H1 Optimization: Use pre-encoded input_char_bytes (no allocation)
+                            if op.can_apply(&[], input_char_bytes) {
                                 // δ^D,ε_e: (t+1)#(e+w) → I^ε → I+t#(e+w)
                                 if let Ok(succ) = GeneralizedPosition::new_i(offset, new_errors, self.max_distance) {
                                     successors.push(succ);
@@ -346,9 +353,10 @@ impl GeneralizedState {
                         if new_errors <= self.max_distance {
                             // H2 Optimization: Using word_slice_chars from method beginning
                             if match_index < word_slice_chars.len() {
-                                let word_char_str = word_slice_chars[match_index].to_string();
-                                let input_char_str = input_char.to_string();
-                                if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                                // H1 Optimization: Use stack buffer instead of heap allocation
+                                let mut word_char_buf = [0u8; 4];
+                                let word_char_bytes = word_slice_chars[match_index].encode_utf8(&mut word_char_buf).as_bytes();
+                                if op.can_apply(word_char_bytes, input_char_bytes) {
                                     // δ^D,ε_e: (t+1)#(e+w) → I^ε → I+t#(e+w)
                                     if let Ok(succ) = GeneralizedPosition::new_i(offset, new_errors, self.max_distance) {
                                         successors.push(succ);
@@ -413,16 +421,23 @@ impl GeneralizedState {
                 if match_index + 1 < word_slice_chars.len()
                     && word_slice_chars[match_index] != '$'
                     && word_slice_chars[match_index + 1] != '$' {
-                    // Extract 2 word characters
-                    let word_2chars: String = word_slice_chars[match_index..match_index+2].iter().collect();
-                    let input_1char = input_char.to_string();
+                    // H1 Optimization: Encode 2 word characters using stack buffers
+                    let mut word_2chars_buf = [0u8; 8];  // Max 4 bytes per char, 2 chars = 8 bytes
+                    let mut word_2chars_len = 0usize;
+                    {
+                        let char1_bytes = word_slice_chars[match_index].encode_utf8(&mut word_2chars_buf[0..4]);
+                        word_2chars_len += char1_bytes.len();
+                        let char2_bytes = word_slice_chars[match_index + 1].encode_utf8(&mut word_2chars_buf[word_2chars_len..word_2chars_len+4]);
+                        word_2chars_len += char2_bytes.len();
+                    }
+                    let word_2chars_bytes = &word_2chars_buf[..word_2chars_len];
 
                     // Check all ⟨2,1⟩ operations
                     for op in operations.operations() {
                         if op.consume_x() == 2 && op.consume_y() == 1 {
                             // Phase 3: Use can_apply() for phonetic operations
                             // Don't check bit_vector - phonetic ops don't require char matches
-                            if op.can_apply(word_2chars.as_bytes(), input_1char.as_bytes()) {
+                            if op.can_apply(word_2chars_bytes, input_char_bytes) {
                                 let weight_as_errors = op.weight() as u8;
                                 let new_errors = errors + weight_as_errors;
 
@@ -467,18 +482,21 @@ impl GeneralizedState {
                     // Check standard operations (bit_vector match)
                     let standard_match = match_index < bit_vector.len() && bit_vector.is_match(match_index);
 
+                    // H1 Optimization: Encode word character using stack buffer
+                    let mut word_1char_buf = [0u8; 4];
+                    let word_1char_bytes = word_slice_chars[match_index].encode_utf8(&mut word_1char_buf).as_bytes();
+
                     // For phonetic operations, check if THIS word character can be split
                     // We need at least one split operation that can apply to this word char
                     // AND the current input char must match the first char of the split target
-                    let word_1char = word_slice_chars[match_index].to_string();
                     let can_phonetic_split = split_ops.iter().any(|op| {
                         if op.weight() < 1.0 && op.consume_x() == 1 {
                             // Check TWO conditions:
                             // 1. This word character can be split (source check)
                             // 2. Current input character matches first char of target (prevents wrong split entry)
                             // This fixes the double-split bug where t→th was entered when reading 'a' instead of 't'
-                            op.can_apply_to_source(word_1char.as_bytes())
-                                && op.matches_first_target_char(word_1char.as_bytes(), input_char)
+                            op.can_apply_to_source(word_1char_bytes)
+                                && op.matches_first_target_char(word_1char_bytes, input_char)
                         } else {
                             false
                         }
@@ -587,6 +605,10 @@ impl GeneralizedState {
         // H2 Optimization: Collect word_slice characters once instead of repeatedly
         let word_slice_chars: Vec<char> = word_slice.chars().collect();
 
+        // H1 Optimization: Pre-encode input_char once to avoid repeated String allocations
+        let mut input_char_buf = [0u8; 4];
+        let input_char_bytes = input_char.encode_utf8(&mut input_char_buf).as_bytes();
+
         // For M-type, bit vector index is computed differently
         // M + offset#errors at input k corresponds to word position m + offset
         // where m is the word length (not known here, so we use simplified logic)
@@ -608,9 +630,10 @@ impl GeneralizedState {
                 // Phase 3: Check can_apply() with actual characters
                 // H2 Optimization: Using word_slice_chars from method beginning
                 if bit_index >= 0 && (bit_index as usize) < word_slice_chars.len() {
-                    let word_char_str = word_slice_chars[bit_index as usize].to_string();
-                    let input_char_str = input_char.to_string();
-                    if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                    // H1 Optimization: Use stack buffer instead of heap allocation
+                    let mut word_char_buf = [0u8; 4];
+                    let word_char_bytes = word_slice_chars[bit_index as usize].encode_utf8(&mut word_char_buf).as_bytes();
+                    if op.can_apply(word_char_bytes, input_char_bytes) {
                         let new_offset = offset + 1;
                         // Phase 4: M-type invariant is -2n ≤ offset ≤ 0
                         // If new_offset > 0, create I-type instead (I-type allows -n ≤ offset ≤ n)
@@ -632,8 +655,10 @@ impl GeneralizedState {
                 if new_errors <= self.max_distance {
                     // H2 Optimization: Using word_slice_chars from method beginning
                     if bit_index >= 0 && (bit_index as usize) < word_slice_chars.len() {
-                        let word_char_str = word_slice_chars[bit_index as usize].to_string();
-                        if op.can_apply(word_char_str.as_bytes(), &[]) {
+                        // H1 Optimization: Use stack buffer instead of heap allocation
+                        let mut word_char_buf = [0u8; 4];
+                        let word_char_bytes = word_slice_chars[bit_index as usize].encode_utf8(&mut word_char_buf).as_bytes();
+                        if op.can_apply(word_char_bytes, &[]) {
                             if let Ok(succ) = GeneralizedPosition::new_m(offset, new_errors, self.max_distance) {
                                 successors.push(succ);
                             }
@@ -645,8 +670,8 @@ impl GeneralizedState {
                 // Phase 3: Check can_apply() with empty word and input character
                 let new_errors = errors + op.weight() as u8;
                 if new_errors <= self.max_distance {
-                    let input_char_str = input_char.to_string();
-                    if op.can_apply(&[], input_char_str.as_bytes()) {
+                    // H1 Optimization: Use pre-encoded input_char_bytes (no allocation)
+                    if op.can_apply(&[], input_char_bytes) {
                         let new_offset = offset + 1;
                         // Phase 4: M-type invariant is -2n ≤ offset ≤ 0
                         // If new_offset > 0, create I-type instead (I-type allows -n ≤ offset ≤ n)
@@ -668,9 +693,10 @@ impl GeneralizedState {
                 if new_errors <= self.max_distance {
                     // H2 Optimization: Using word_slice_chars from method beginning
                     if bit_index >= 0 && (bit_index as usize) < word_slice_chars.len() {
-                        let word_char_str = word_slice_chars[bit_index as usize].to_string();
-                        let input_char_str = input_char.to_string();
-                        if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
+                        // H1 Optimization: Use stack buffer instead of heap allocation
+                        let mut word_char_buf = [0u8; 4];
+                        let word_char_bytes = word_slice_chars[bit_index as usize].encode_utf8(&mut word_char_buf).as_bytes();
+                        if op.can_apply(word_char_bytes, input_char_bytes) {
                             let new_offset = offset + 1;
                             // Phase 4: M-type invariant is -2n ≤ offset ≤ 0
                             // If new_offset > 0, create I-type instead (I-type allows -n ≤ offset ≤ n)
@@ -738,7 +764,7 @@ impl GeneralizedState {
         // Merge: consume 2 word chars, match 1 input char (direct operation)
         // Phase 3: Supports phonetic operations like "ch"→"k", "ph"→"f"
         if errors < self.max_distance {
-            let word_chars: Vec<char> = word_slice.chars().collect();
+            // H1 Optimization: Reuse word_slice_chars collected at method start (no redundant collection)
             let next_match_index_i32 = offset + bit_vector.len() as i32 + 1;
 
             // Check if index is valid (non-negative) before converting to usize
@@ -748,18 +774,25 @@ impl GeneralizedState {
 
                 // Check if we have enough word characters (need 2 consecutive chars)
                 // Skip padding chars '$'
-                if next_match_index + 1 < word_chars.len()
-                    && word_chars[next_match_index] != '$'
-                    && word_chars[next_match_index + 1] != '$' {
-                // Extract 2 word characters
-                let word_2chars: String = word_chars[next_match_index..next_match_index+2].iter().collect();
-                let input_1char = input_char.to_string();
+                if next_match_index + 1 < word_slice_chars.len()
+                    && word_slice_chars[next_match_index] != '$'
+                    && word_slice_chars[next_match_index + 1] != '$' {
+                // H1 Optimization: Encode 2 word characters using stack buffers
+                let mut word_2chars_buf = [0u8; 8];  // Max 4 bytes per char, 2 chars = 8 bytes
+                let mut word_2chars_len = 0usize;
+                {
+                    let char1_bytes = word_slice_chars[next_match_index].encode_utf8(&mut word_2chars_buf[0..4]);
+                    word_2chars_len += char1_bytes.len();
+                    let char2_bytes = word_slice_chars[next_match_index + 1].encode_utf8(&mut word_2chars_buf[word_2chars_len..word_2chars_len+4]);
+                    word_2chars_len += char2_bytes.len();
+                }
+                let word_2chars_bytes = &word_2chars_buf[..word_2chars_len];
 
                 // Check all ⟨2,1⟩ operations
                 for op in operations.operations() {
                     if op.consume_x() == 2 && op.consume_y() == 1 {
                         // Phase 3: Use can_apply() for phonetic operations
-                        if op.can_apply(word_2chars.as_bytes(), input_1char.as_bytes()) {
+                        if op.can_apply(word_2chars_bytes, input_char_bytes) {
                             let weight_as_errors = op.weight() as u8;
                             let new_errors = errors + weight_as_errors;
 
@@ -804,16 +837,19 @@ impl GeneralizedState {
                 let standard_match = bit_index >= 0 && (bit_index as usize) < bit_vector.len()
                     && bit_vector.is_match(bit_index as usize);
 
+                // H1 Optimization: Encode word character using stack buffer
+                let mut word_1char_buf = [0u8; 4];
+                let word_1char_bytes = word_slice_chars[next_match_index].encode_utf8(&mut word_1char_buf).as_bytes();
+
                 // For phonetic operations, check if THIS word character can be split
                 // AND the current input char must match the first char of the split target
-                let word_1char = word_slice_chars[next_match_index].to_string();
                 let can_phonetic_split = split_ops.iter().any(|op| {
                     if op.weight() < 1.0 && op.consume_x() == 1 {
                         // Check TWO conditions:
                         // 1. This word character can be split (source check)
                         // 2. Current input character matches first char of target (prevents wrong split entry)
-                        op.can_apply_to_source(word_1char.as_bytes())
-                            && op.matches_first_target_char(word_1char.as_bytes(), input_char)
+                        op.can_apply_to_source(word_1char_bytes)
+                            && op.matches_first_target_char(word_1char_bytes, input_char)
                     } else {
                         false
                     }
