@@ -1,0 +1,100 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 1169
+#
+# Samples: 639K of event 'cycles:Pu'
+# Event count (approx.): 2093351154139
+#
+# Overhead  Command          Shared Object                                      Symbol                                                                                                                                                                                                                                                                                                                                                                      
+# ........  ...............  .................................................  ............................................................................................................................................................................................................................................................................................................................................................................
+#
+    11.35%  generalized_aut  libm.so.6                                          [.] exp
+            |
+            ---exp
+               |          
+               |--8.87%--std::f64::<impl f64>::exp (inlined)
+               |          <f64 as num_traits::float::Float>::exp (inlined)
+               |          <criterion::stats::univariate::kde::kernel::Gaussian as criterion::stats::univariate::kde::kernel::Kernel<A>>::evaluate (inlined)
+               |          criterion::stats::univariate::kde::Kde<A,K>::estimate::{{closure}} (inlined)
+               |          <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold (inlined)
+               |          criterion::stats::univariate::kde::Kde<A,K>::estimate (inlined)
+               |          |          
+               |           --8.85%--criterion::stats::univariate::kde::Kde<A,K>::map::{{closure}} (inlined)
+               |                     core::ops::function::impls::<impl core::ops::function::FnMut<A> for &F>::call_mut (inlined)
+               |                     core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once (inlined)
+               |                     core::option::Option<T>::map (inlined)
+               |                     <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next (inlined)
+               |                     rayon::iter::plumbing::Folder::consume_iter (inlined)
+               |                     <rayon::iter::map::MapFolder<C,F> as rayon::iter::plumbing::Folder<T>>::consume_iter (inlined)
+               |                     rayon::iter::plumbing::Producer::fold_with (inlined)
+               |                     rayon::iter::plumbing::bridge_producer_consumer::helper
+               |          
+               |--1.80%--0x8348c37e0f486652
+               |          
+                --0.50%--0x7f456272f31f
+                          0x8348c37e0f486652
+
+     9.11%  generalized_aut  generalized_automaton_benchmarks-dca0ec5bac20c675  [.] liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+            |          
+            |--0.78%--liblevenshtein::transducer::generalized::state::GeneralizedState::transition (inlined)
+            |          liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+            |          
+            |--0.71%--liblevenshtein::transducer::generalized::subsumption::subsumes_standard (inlined)
+            |          liblevenshtein::transducer::generalized::subsumption::subsumes (inlined)
+            |          
+            |--0.64%--<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::advance_by (inlined)
+            |          core::iter::traits::iterator::Iterator::nth (inlined)
+            |          liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::relevant_subword (inlined)
+            |          liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+            |          
+             --0.51%--core::str::validations::next_code_point (inlined)
+                       <core::str::iter::Chars as core::iter::traits::iterator::Iterator>::next (inlined)
+
+     8.51%  generalized_aut  generalized_automaton_benchmarks-dca0ec5bac20c675  [.] rayon::iter::plumbing::bridge_producer_consumer::helper
+            |          
+            |--1.93%--core::f64::<impl f64>::recip (inlined)
+            |          <f64 as num_traits::float::Float>::recip (inlined)
+            |          <criterion::stats::univariate::kde::kernel::Gaussian as criterion::stats::univariate::kde::kernel::Kernel<A>>::evaluate (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::estimate::{{closure}} (inlined)
+            |          <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::estimate (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::map::{{closure}} (inlined)
+            |          core::ops::function::impls::<impl core::ops::function::FnMut<A> for &F>::call_mut (inlined)
+            |          core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once (inlined)
+            |          core::option::Option<T>::map (inlined)
+            |          <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next (inlined)
+            |          rayon::iter::plumbing::Folder::consume_iter (inlined)
+            |          <rayon::iter::map::MapFolder<C,F> as rayon::iter::plumbing::Folder<T>>::consume_iter (inlined)
+            |          rayon::iter::plumbing::Producer::fold_with (inlined)
+            |          rayon::iter::plumbing::bridge_producer_consumer::helper
+            |          
+            |--1.58%--std::f64::<impl f64>::exp (inlined)
+            |          <f64 as num_traits::float::Float>::exp (inlined)
+            |          <criterion::stats::univariate::kde::kernel::Gaussian as criterion::stats::univariate::kde::kernel::Kernel<A>>::evaluate (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::estimate::{{closure}} (inlined)
+            |          <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::estimate (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::map::{{closure}} (inlined)
+            |          core::ops::function::impls::<impl core::ops::function::FnMut<A> for &F>::call_mut (inlined)
+            |          core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once (inlined)
+            |          core::option::Option<T>::map (inlined)
+            |          <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next (inlined)
+            |          rayon::iter::plumbing::Folder::consume_iter (inlined)
+            |          <rayon::iter::map::MapFolder<C,F> as rayon::iter::plumbing::Folder<T>>::consume_iter (inlined)
+            |          rayon::iter::plumbing::Producer::fold_with (inlined)
+            |          rayon::iter::plumbing::bridge_producer_consumer::helper
+            |          
+            |--1.53%--<f64 as core::ops::arith::Add>::add (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::estimate::{{closure}} (inlined)
+            |          <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::estimate (inlined)
+            |          criterion::stats::univariate::kde::Kde<A,K>::map::{{closure}} (inlined)
+            |          core::ops::function::impls::<impl core::ops::function::FnMut<A> for &F>::call_mut (inlined)
+            |          core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once (inlined)
+            |          core::option::Option<T>::map (inlined)
+            |          <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next (inlined)
+            |          rayon::iter::plumbing::Folder::consume_iter (inlined)
+            |          <rayon::iter::map::MapFolder<C,F> as rayon::iter::plumbing::Folder<T>>::consume_iter (inlined)
+            |          rayon::iter::plumbing::Producer::fold_with (inlined)
+            |          rayon::iter::plumbing::bridge_producer_consumer::helper

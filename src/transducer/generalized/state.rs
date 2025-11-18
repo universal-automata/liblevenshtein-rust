@@ -156,6 +156,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
         input_position: usize,  // Phase 4: Renamed from _input_length, now used for split word_pos calculation
@@ -175,7 +176,8 @@ impl GeneralizedState {
 
             // Compute successors using runtime-configurable operations
             // Phase 3b/4: Pass full_word, word_slice, and input_position for phonetic operations
-            let successors = self.successors(pos, operations, bit_vector, full_word, word_slice, input_char, input_position);
+            // H2 Optimization: Pass word_chars to eliminate repeated char().collect() calls
+            let successors = self.successors(pos, operations, bit_vector, full_word, word_chars, word_slice, input_char, input_position);
 
             // Add all successors to next state
             for succ in successors {
@@ -204,38 +206,39 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
         input_position: usize,
     ) -> Vec<GeneralizedPosition> {
         match pos {
             GeneralizedPosition::INonFinal { offset, errors } => {
-                self.successors_i_type(*offset, *errors, operations, bit_vector, full_word, word_slice, input_char)
+                self.successors_i_type(*offset, *errors, operations, bit_vector, full_word, word_chars, word_slice, input_char)
             }
             GeneralizedPosition::MFinal { offset, errors } => {
-                self.successors_m_type(*offset, *errors, operations, bit_vector, full_word, word_slice, input_char)
+                self.successors_m_type(*offset, *errors, operations, bit_vector, full_word, word_chars, word_slice, input_char)
             }
             // Phase 2d: Multi-character operation intermediate states
             GeneralizedPosition::ITransposing { offset, errors } => {
                 // Complete transposition for I-type positions
                 // Phase 3b: Pass full_word, word_slice, input_char for phonetic validation
-                self.successors_i_transposing(*offset, *errors, operations, bit_vector, full_word, word_slice, input_char)
+                self.successors_i_transposing(*offset, *errors, operations, bit_vector, full_word, word_chars, word_slice, input_char)
             }
             GeneralizedPosition::MTransposing { offset, errors } => {
                 // Complete transposition for M-type positions
                 // Phase 3b: Pass full_word, word_slice, input_char for phonetic validation
-                self.successors_m_transposing(*offset, *errors, operations, bit_vector, full_word, word_slice, input_char)
+                self.successors_m_transposing(*offset, *errors, operations, bit_vector, full_word, word_chars, word_slice, input_char)
             }
             // Phase 2d.5: Splitting positions
             GeneralizedPosition::ISplitting { offset, errors, entry_char } => {
                 // Complete split for I-type positions
                 // Phase 3b/4: Pass full_word, word_slice, input_char, input_position for phonetic validation and word_pos calc
-                self.successors_i_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char, input_position)
+                self.successors_i_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_chars, word_slice, input_char, input_position)
             }
             GeneralizedPosition::MSplitting { offset, errors, entry_char } => {
                 // Complete split for M-type positions
                 // Phase 3b/4: Pass full_word, word_slice, input_char, input_position for phonetic validation and word_pos calc
-                self.successors_m_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_slice, input_char, input_position)
+                self.successors_m_splitting(*offset, *errors, *entry_char, operations, bit_vector, full_word, word_chars, word_slice, input_char, input_position)
             }
         }
     }
@@ -261,11 +264,15 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
         let mut successors = Vec::new();
         let n = self.max_distance as i32;
+
+        // H2 Optimization: Collect word_slice characters once instead of repeatedly
+        let word_slice_chars: Vec<char> = word_slice.chars().collect();
 
         // Bit vector index for current position: offset + n
         let match_index = (offset + n) as usize;
@@ -286,9 +293,8 @@ impl GeneralizedState {
                     // Match operation: ⟨1, 1, 0.0⟩
                     if has_match {
                         // Phase 3: For match, check can_apply() with actual characters
-                        let word_chars: Vec<char> = word_slice.chars().collect();
-                        if match_index < word_chars.len() {
-                            let word_char_str = word_chars[match_index].to_string();
+                        if match_index < word_slice_chars.len() {
+                            let word_char_str = word_slice_chars[match_index].to_string();
                             let input_char_str = input_char.to_string();
                             if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
                                 // δ^D,ε_e: (t+1)#e → I^ε → I+t#e
@@ -305,9 +311,9 @@ impl GeneralizedState {
                     if errors < self.max_distance {
                         let new_errors = errors + op.weight() as u8;
                         if new_errors <= self.max_distance {
-                            let word_chars: Vec<char> = word_slice.chars().collect();
-                            if match_index < word_chars.len() {
-                                let word_char_str = word_chars[match_index].to_string();
+                            // H2 Optimization: Using word_slice_chars from method beginning
+                            if match_index < word_slice_chars.len() {
+                                let word_char_str = word_slice_chars[match_index].to_string();
                                 if op.can_apply(word_char_str.as_bytes(), &[]) {
                                     // δ^D,ε_e: t#(e+w) → I^ε → I+(t-1)#(e+w)
                                     if let Ok(succ) = GeneralizedPosition::new_i(offset - 1, new_errors, self.max_distance) {
@@ -338,9 +344,9 @@ impl GeneralizedState {
                     if errors < self.max_distance {
                         let new_errors = errors + op.weight() as u8;
                         if new_errors <= self.max_distance {
-                            let word_chars: Vec<char> = word_slice.chars().collect();
-                            if match_index < word_chars.len() {
-                                let word_char_str = word_chars[match_index].to_string();
+                            // H2 Optimization: Using word_slice_chars from method beginning
+                            if match_index < word_slice_chars.len() {
+                                let word_char_str = word_slice_chars[match_index].to_string();
                                 let input_char_str = input_char.to_string();
                                 if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
                                     // δ^D,ε_e: (t+1)#(e+w) → I^ε → I+t#(e+w)
@@ -361,11 +367,11 @@ impl GeneralizedState {
                 .collect();
 
             if !transpose_ops.is_empty() && errors < self.max_distance {
-                let word_chars: Vec<char> = word_slice.chars().collect();
+                // H2 Optimization: Using word_slice_chars from method beginning
                 let next_match_index = (offset + n + 1) as usize;
 
                 // Check if we have enough word characters for transpose
-                if next_match_index < word_chars.len() && word_chars[next_match_index] != '$' {
+                if next_match_index < word_slice_chars.len() && word_slice_chars[next_match_index] != '$' {
                     // Check standard operations (bit_vector match at next position)
                     let standard_match = next_match_index < bit_vector.len()
                         && bit_vector.is_match(next_match_index);
@@ -400,15 +406,15 @@ impl GeneralizedState {
             // Merge: consume 2 word chars, match 1 input char (direct operation)
             // Phase 3: Supports phonetic operations like "ch"→"k", "ph"→"f"
             if errors < self.max_distance {
-                let word_chars: Vec<char> = word_slice.chars().collect();
+                // H2 Optimization: Using word_slice_chars from method beginning
 
                 // Check if we have enough word characters (need 2 consecutive chars)
                 // Skip padding chars '$'
-                if match_index + 1 < word_chars.len()
-                    && word_chars[match_index] != '$'
-                    && word_chars[match_index + 1] != '$' {
+                if match_index + 1 < word_slice_chars.len()
+                    && word_slice_chars[match_index] != '$'
+                    && word_slice_chars[match_index + 1] != '$' {
                     // Extract 2 word characters
-                    let word_2chars: String = word_chars[match_index..match_index+2].iter().collect();
+                    let word_2chars: String = word_slice_chars[match_index..match_index+2].iter().collect();
                     let input_1char = input_char.to_string();
 
                     // Check all ⟨2,1⟩ operations
@@ -454,17 +460,17 @@ impl GeneralizedState {
             let can_enter_split = errors < self.max_distance || has_phonetic_split;
 
             if !split_ops.is_empty() && can_enter_split {
-                let word_chars: Vec<char> = word_slice.chars().collect();
+                // H2 Optimization: Using word_slice_chars from method beginning
 
                 // Check if we can enter split state
-                if match_index < word_chars.len() && word_chars[match_index] != '$' {
+                if match_index < word_slice_chars.len() && word_slice_chars[match_index] != '$' {
                     // Check standard operations (bit_vector match)
                     let standard_match = match_index < bit_vector.len() && bit_vector.is_match(match_index);
 
                     // For phonetic operations, check if THIS word character can be split
                     // We need at least one split operation that can apply to this word char
                     // AND the current input char must match the first char of the split target
-                    let word_1char = word_chars[match_index].to_string();
+                    let word_1char = word_slice_chars[match_index].to_string();
                     let can_phonetic_split = split_ops.iter().any(|op| {
                         if op.weight() < 1.0 && op.consume_x() == 1 {
                             // Check TWO conditions:
@@ -572,10 +578,14 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
         let mut successors = Vec::new();
+
+        // H2 Optimization: Collect word_slice characters once instead of repeatedly
+        let word_slice_chars: Vec<char> = word_slice.chars().collect();
 
         // For M-type, bit vector index is computed differently
         // M + offset#errors at input k corresponds to word position m + offset
@@ -596,9 +606,9 @@ impl GeneralizedState {
             if op.is_match() && has_match {
                 // Match operation: ⟨1, 1, 0.0⟩
                 // Phase 3: Check can_apply() with actual characters
-                let word_chars: Vec<char> = word_slice.chars().collect();
-                if bit_index >= 0 && (bit_index as usize) < word_chars.len() {
-                    let word_char_str = word_chars[bit_index as usize].to_string();
+                // H2 Optimization: Using word_slice_chars from method beginning
+                if bit_index >= 0 && (bit_index as usize) < word_slice_chars.len() {
+                    let word_char_str = word_slice_chars[bit_index as usize].to_string();
                     let input_char_str = input_char.to_string();
                     if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
                         let new_offset = offset + 1;
@@ -620,9 +630,9 @@ impl GeneralizedState {
                 // Phase 3: Check can_apply() with word character and empty input
                 let new_errors = errors + op.weight() as u8;
                 if new_errors <= self.max_distance {
-                    let word_chars: Vec<char> = word_slice.chars().collect();
-                    if bit_index >= 0 && (bit_index as usize) < word_chars.len() {
-                        let word_char_str = word_chars[bit_index as usize].to_string();
+                    // H2 Optimization: Using word_slice_chars from method beginning
+                    if bit_index >= 0 && (bit_index as usize) < word_slice_chars.len() {
+                        let word_char_str = word_slice_chars[bit_index as usize].to_string();
                         if op.can_apply(word_char_str.as_bytes(), &[]) {
                             if let Ok(succ) = GeneralizedPosition::new_m(offset, new_errors, self.max_distance) {
                                 successors.push(succ);
@@ -656,9 +666,9 @@ impl GeneralizedState {
                 // Phase 3: Check can_apply() with word and input characters
                 let new_errors = errors + op.weight() as u8;
                 if new_errors <= self.max_distance {
-                    let word_chars: Vec<char> = word_slice.chars().collect();
-                    if bit_index >= 0 && (bit_index as usize) < word_chars.len() {
-                        let word_char_str = word_chars[bit_index as usize].to_string();
+                    // H2 Optimization: Using word_slice_chars from method beginning
+                    if bit_index >= 0 && (bit_index as usize) < word_slice_chars.len() {
+                        let word_char_str = word_slice_chars[bit_index as usize].to_string();
                         let input_char_str = input_char.to_string();
                         if op.can_apply(word_char_str.as_bytes(), input_char_str.as_bytes()) {
                             let new_offset = offset + 1;
@@ -687,10 +697,10 @@ impl GeneralizedState {
 
         if !transpose_ops.is_empty() && errors < self.max_distance {
             let next_match_index = (offset + bit_vector.len() as i32 + 1) as usize;
-            let word_chars: Vec<char> = word_slice.chars().collect();
+            // H2 Optimization: Using word_slice_chars from method beginning
 
             // Check if we have enough word characters for transpose
-            if next_match_index < word_chars.len() && word_chars[next_match_index] != '$' {
+            if next_match_index < word_slice_chars.len() && word_slice_chars[next_match_index] != '$' {
                 let next_bit_index = offset + bit_vector.len() as i32 + 1;
 
                 // Check standard operations (bit_vector match at next position)
@@ -786,17 +796,17 @@ impl GeneralizedState {
 
         if !split_ops.is_empty() && can_enter_split {
             let next_match_index = (offset + bit_vector.len() as i32) as usize;
-            let word_chars: Vec<char> = word_slice.chars().collect();
+            // H2 Optimization: Using word_slice_chars from method beginning
 
             // Check if we can enter split state
-            if next_match_index < word_chars.len() && word_chars[next_match_index] != '$' {
+            if next_match_index < word_slice_chars.len() && word_slice_chars[next_match_index] != '$' {
                 // Check standard operations (bit_vector match)
                 let standard_match = bit_index >= 0 && (bit_index as usize) < bit_vector.len()
                     && bit_vector.is_match(bit_index as usize);
 
                 // For phonetic operations, check if THIS word character can be split
                 // AND the current input char must match the first char of the split target
-                let word_1char = word_chars[next_match_index].to_string();
+                let word_1char = word_slice_chars[next_match_index].to_string();
                 let can_phonetic_split = split_ops.iter().any(|op| {
                     if op.weight() < 1.0 && op.consume_x() == 1 {
                         // Check TWO conditions:
@@ -862,6 +872,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
@@ -869,16 +880,18 @@ impl GeneralizedState {
         let n = self.max_distance as i32;
         let match_index = (offset + n) as usize;
 
+        // H2 Optimization: Collect word_slice characters once
+        let word_slice_chars: Vec<char> = word_slice.chars().collect();
+
         // Phase 3b: Complete transpose with phonetic validation
         // Extract 2 word characters that are being transposed
-        let word_chars: Vec<char> = word_slice.chars().collect();
-        if match_index + 1 >= word_chars.len()
-            || word_chars[match_index] == '$'
-            || word_chars[match_index + 1] == '$'
+        if match_index + 1 >= word_slice_chars.len()
+            || word_slice_chars[match_index] == '$'
+            || word_slice_chars[match_index + 1] == '$'
         {
             return successors;
         }
-        let word_2chars: String = word_chars[match_index..match_index + 2].iter().collect();
+        let word_2chars: String = word_slice_chars[match_index..match_index + 2].iter().collect();
 
         // Get both input characters (previous + current)
         let prev_char = self.previous_input_char.unwrap_or('\0');
@@ -935,23 +948,26 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
     ) -> Vec<GeneralizedPosition> {
         let mut successors = Vec::new();
         let bit_index = offset + bit_vector.len() as i32;
 
+        // H2 Optimization: Collect word_slice characters once
+        let word_slice_chars: Vec<char> = word_slice.chars().collect();
+
         // Phase 3b: Complete transpose with phonetic validation
         // Extract 2 word characters that are being transposed
         let next_match_index = (offset + bit_vector.len() as i32) as usize;
-        let word_chars: Vec<char> = word_slice.chars().collect();
-        if next_match_index + 1 >= word_chars.len()
-            || word_chars[next_match_index] == '$'
-            || word_chars[next_match_index + 1] == '$'
+        if next_match_index + 1 >= word_slice_chars.len()
+            || word_slice_chars[next_match_index] == '$'
+            || word_slice_chars[next_match_index + 1] == '$'
         {
             return successors;
         }
-        let word_2chars: String = word_chars[next_match_index..next_match_index + 2].iter().collect();
+        let word_2chars: String = word_slice_chars[next_match_index..next_match_index + 2].iter().collect();
 
         // Get both input characters (previous + current)
         let prev_char = self.previous_input_char.unwrap_or('\0');
@@ -1019,6 +1035,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
         input_position: usize,  // Phase 4: For correct word_pos calculation
@@ -1031,17 +1048,18 @@ impl GeneralizedState {
         let n = self.max_distance as i32;
         let match_index_i32 = offset + n;
 
+        // H2 Optimization: Collect word_slice characters once
+        let word_slice_chars: Vec<char> = word_slice.chars().collect();
+
         // Phase 3b: Complete split with phonetic validation
         // Extract word character that was split
-        let word_chars: Vec<char> = word_slice.chars().collect();
 
         #[cfg(debug_assertions)]
-        eprintln!("[DEBUG]   match_index_i32={}, word_chars.len()={}", match_index_i32, word_chars.len());
+        eprintln!("[DEBUG]   match_index_i32={}, word_slice_chars.len()={}", match_index_i32, word_slice_chars.len());
 
         // Phase 3b fix: Handle negative match_index or empty word_slice by using full_word
-        let word_1char = if match_index_i32 < 0 || word_chars.is_empty() {
-            // Need to use full_word instead of word_slice
-            let full_word_chars: Vec<char> = full_word.chars().collect();
+        let word_1char = if match_index_i32 < 0 || word_slice_chars.is_empty() {
+            // H2 Optimization: Use pre-computed word_slice_chars instead of collecting
             // Phase 4 FIX: input_position is 1-indexed (thesis notation)
             // Split entered at (input_position-1), word_pos (1-indexed) = (input_position-1) + offset
             // Convert to 0-indexed: word_pos = ((input_position-1) + offset) - 1 = input_position + offset - 2
@@ -1051,14 +1069,14 @@ impl GeneralizedState {
             eprintln!("[DEBUG] Split completion fallback: input_pos={}, offset={}, word_pos={}",
                       input_position, offset, word_pos);
 
-            if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
+            if word_pos < word_chars.len() && word_chars[word_pos] != '$' {
                 #[cfg(debug_assertions)]
-                eprintln!("[DEBUG]   → Found char '{}' at word_pos={}", full_word_chars[word_pos], word_pos);
-                full_word_chars[word_pos].to_string()
+                eprintln!("[DEBUG]   → Found char '{}' at word_pos={}", word_chars[word_pos], word_pos);
+                word_chars[word_pos].to_string()
             } else {
                 #[cfg(debug_assertions)]
                 eprintln!("[DEBUG]   → word_pos={} out of bounds or padding (len={}), returning empty",
-                         word_pos, full_word_chars.len());
+                         word_pos, word_chars.len());
                 // Past word end - no character to validate
                 return successors;
             }
@@ -1070,15 +1088,15 @@ impl GeneralizedState {
             let adjusted_index = if match_index > 0 { match_index - 1 } else { 0 };
 
             #[cfg(debug_assertions)]
-            eprintln!("[DEBUG]   Normal case: match_index={}, adjusted_index={}, word_chars[adjusted_index]='{}'",
-                     match_index, adjusted_index, if adjusted_index < word_chars.len() { word_chars[adjusted_index].to_string() } else { "OUT_OF_BOUNDS".to_string() });
+            eprintln!("[DEBUG]   Normal case: match_index={}, adjusted_index={}, word_slice_chars[adjusted_index]='{}'",
+                     match_index, adjusted_index, if adjusted_index < word_slice_chars.len() { word_slice_chars[adjusted_index].to_string() } else { "OUT_OF_BOUNDS".to_string() });
 
-            if adjusted_index >= word_chars.len() || word_chars[adjusted_index] == '$' {
+            if adjusted_index >= word_slice_chars.len() || word_slice_chars[adjusted_index] == '$' {
                 #[cfg(debug_assertions)]
                 eprintln!("[DEBUG]   → Returning early (out of bounds or padding)");
                 return successors;
             }
-            word_chars[adjusted_index].to_string()
+            word_slice_chars[adjusted_index].to_string()
         };
 
         // Get both input characters (entry_char + current)
@@ -1208,6 +1226,7 @@ impl GeneralizedState {
         operations: &crate::transducer::OperationSet,
         bit_vector: &CharacteristicVector,
         full_word: &str,
+        word_chars: &[char],  // H2 Optimization: Pre-computed character vector
         word_slice: &str,
         input_char: char,
         input_position: usize,  // Phase 4: For correct word_pos calculation
@@ -1215,21 +1234,22 @@ impl GeneralizedState {
         let mut successors = Vec::new();
         let bit_index = offset + bit_vector.len() as i32;
 
+        // H2 Optimization: Collect word_slice characters once
+        let word_slice_chars: Vec<char> = word_slice.chars().collect();
+
         // Phase 3b: Complete split with phonetic validation
         // Extract word character that was split
         let next_match_index_i32 = offset + bit_vector.len() as i32;
-        let word_chars: Vec<char> = word_slice.chars().collect();
 
         // Phase 3b fix: Handle negative or out-of-bounds index by using full_word
-        let word_1char = if next_match_index_i32 < 0 || word_chars.is_empty() {
-            // Need to use full_word instead of word_slice
-            let full_word_chars: Vec<char> = full_word.chars().collect();
+        let word_1char = if next_match_index_i32 < 0 || word_slice_chars.is_empty() {
+            // H2 Optimization: Use pre-computed word_slice_chars instead of collecting
 
             // Phase 4 FIX: input_position is 1-indexed, convert to 0-indexed word position
             let word_pos = (input_position as i32 + offset - 2) as usize;
 
-            if word_pos < full_word_chars.len() && full_word_chars[word_pos] != '$' {
-                full_word_chars[word_pos].to_string()
+            if word_pos < word_chars.len() && word_chars[word_pos] != '$' {
+                word_chars[word_pos].to_string()
             } else {
                 // Past word end - no character to validate
                 return successors;
@@ -1241,10 +1261,10 @@ impl GeneralizedState {
             let next_match_index = next_match_index_i32 as usize;
             let adjusted_index = if next_match_index > 0 { next_match_index - 1 } else { 0 };
 
-            if adjusted_index >= word_chars.len() || word_chars[adjusted_index] == '$' {
+            if adjusted_index >= word_slice_chars.len() || word_slice_chars[adjusted_index] == '$' {
                 return successors;
             }
-            word_chars[adjusted_index].to_string()
+            word_slice_chars[adjusted_index].to_string()
         };
 
         // Get both input characters (entry_char + current)

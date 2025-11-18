@@ -95,7 +95,7 @@ mod i_type_invariant_preservation {
             let cv = CharacteristicVector::new(input_ch, &word);
 
             // Compute successor state
-            if let Some(next_state) = state.transition(&operations, &cv, &word, &word, input_ch, 1) {
+            let word_chars: Vec<char> = word.chars().collect(); if let Some(next_state) = state.transition(&operations, &cv, &word, &word_chars, &word, input_ch, 1) {
                 // VALIDATE: Every successor must satisfy i_invariant
                 for succ in next_state.positions() {
                     let succ_offset = succ.offset();
@@ -167,7 +167,7 @@ mod m_type_invariant_preservation {
             let cv = CharacteristicVector::new(input_ch, &word);
 
             // Compute successor state
-            if let Some(next_state) = state.transition(&operations, &cv, &word, &word, input_ch, 1) {
+            let word_chars: Vec<char> = word.chars().collect(); if let Some(next_state) = state.transition(&operations, &cv, &word, &word_chars, &word, input_ch, 1) {
                 // VALIDATE: Every successor must satisfy m_invariant
                 for succ in next_state.positions() {
                     let succ_offset = succ.offset();
@@ -231,7 +231,7 @@ mod cost_correctness {
             let operations = OperationSet::standard();
             let cv = CharacteristicVector::new(input_ch, &word);
 
-            if let Some(next_state) = state.transition(&operations, &cv, &word, &word, input_ch, 1) {
+            let word_chars: Vec<char> = word.chars().collect(); if let Some(next_state) = state.transition(&operations, &cv, &word, &word_chars, &word, input_ch, 1) {
                 for succ in next_state.positions() {
                     if succ.is_non_final() {
                         let error_diff = succ.errors() as i32 - errors as i32;
@@ -275,7 +275,7 @@ mod cost_correctness {
             let operations = OperationSet::standard();
             let cv = CharacteristicVector::new(input_ch, &word);
 
-            if let Some(next_state) = state.transition(&operations, &cv, &word, &word, input_ch, 1) {
+            let word_chars: Vec<char> = word.chars().collect(); if let Some(next_state) = state.transition(&operations, &cv, &word, &word_chars, &word, input_ch, 1) {
                 for succ in next_state.positions() {
                     if succ.is_final() {
                         let error_diff = succ.errors() as i32 - errors as i32;
@@ -322,7 +322,7 @@ mod offset_semantics {
             let operations = OperationSet::standard();
             let cv = CharacteristicVector::new(input_ch, &word);
 
-            if let Some(next_state) = state.transition(&operations, &cv, &word, &word, input_ch, 1) {
+            let word_chars: Vec<char> = word.chars().collect(); if let Some(next_state) = state.transition(&operations, &cv, &word, &word_chars, &word, input_ch, 1) {
                 for succ in next_state.positions() {
                     if succ.is_non_final() {
                         let offset_diff = succ.offset() - offset;
@@ -365,7 +365,7 @@ mod offset_semantics {
             let operations = OperationSet::standard();
             let cv = CharacteristicVector::new(input_ch, &word);
 
-            if let Some(next_state) = state.transition(&operations, &cv, &word, &word, input_ch, 1) {
+            let word_chars: Vec<char> = word.chars().collect(); if let Some(next_state) = state.transition(&operations, &cv, &word, &word_chars, &word, input_ch, 1) {
                 for succ in next_state.positions() {
                     if succ.is_final() {
                         let offset_diff = succ.offset() - offset;

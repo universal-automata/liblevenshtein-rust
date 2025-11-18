@@ -1,0 +1,84 @@
+     9.11%  generalized_aut  generalized_automaton_benchmarks-dca0ec5bac20c675  [.] liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+            |          
+            |--0.78%--liblevenshtein::transducer::generalized::state::GeneralizedState::transition (inlined)
+            |          liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+            |          
+            |--0.71%--liblevenshtein::transducer::generalized::subsumption::subsumes_standard (inlined)
+            |          liblevenshtein::transducer::generalized::subsumption::subsumes (inlined)
+            |          
+            |--0.64%--<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::advance_by (inlined)
+            |          core::iter::traits::iterator::Iterator::nth (inlined)
+            |          liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::relevant_subword (inlined)
+            |          liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+            |          
+             --0.51%--core::str::validations::next_code_point (inlined)
+                       <core::str::iter::Chars as core::iter::traits::iterator::Iterator>::next (inlined)
+
+     8.51%  generalized_aut  generalized_automaton_benchmarks-dca0ec5bac20c675  [.] rayon::iter::plumbing::bridge_producer_consumer::helper
+--
+     7.77%  generalized_aut  generalized_automaton_benchmarks-dca0ec5bac20c675  [.] liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+            |          
+            |--2.75%--liblevenshtein::transducer::generalized::state::GeneralizedState::successors_i_type (inlined)
+            |          liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+            |          |          
+            |           --0.90%--liblevenshtein::transducer::generalized::state::GeneralizedState::transition (inlined)
+            |                     liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+            |          
+             --0.98%--<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::next (inlined)
+                       |          
+                        --0.85%--liblevenshtein::transducer::generalized::state::GeneralizedState::successors_i_type (inlined)
+                                  liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+
+     4.39%  generalized_aut  libc.so.6                                          [.] cfree
+            |
+            ---cfree
+               |          
+--
+               |                     |           --1.87%--liblevenshtein::transducer::generalized::state::GeneralizedState::successors_i_type (inlined)
+               |                     |                     liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+               |                     |                     |          
+               |                     |                      --0.55%--liblevenshtein::transducer::generalized::state::GeneralizedState::transition (inlined)
+               |                     |                                liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+               |                     |          
+               |                     |--0.54%--core::ptr::drop_in_place<alloc::raw_vec::RawVec<char>> (inlined)
+               |                     |          core::ptr::drop_in_place<alloc::vec::Vec<char>> (inlined)
+               |                     |          liblevenshtein::transducer::generalized::state::GeneralizedState::successors_i_type (inlined)
+               |                     |          liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+               |                     |          
+               |                      --0.51%--core::ptr::drop_in_place<alloc::raw_vec::RawVec<bool>> (inlined)
+               |                                core::ptr::drop_in_place<alloc::vec::Vec<bool>> (inlined)
+               |                                core::ptr::drop_in_place<liblevenshtein::transducer::generalized::bit_vector::CharacteristicVector> (inlined)
+               |                                liblevenshtein::transducer::generalized::automaton::GeneralizedAutomaton::accepts
+               |          
+                --0.72%--liblevenshtein::transducer::generalized::state::GeneralizedState::successors_i_type (inlined)
+                          liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+
+     4.08%  generalized_aut  generalized_automaton_benchmarks-dca0ec5bac20c675  [.] core::iter::traits::iterator::Iterator::collect
+            |          
+            |--0.64%--core::str::validations::next_code_point (inlined)
+            |          <core::str::iter::Chars as core::iter::traits::iterator::Iterator>::next (inlined)
+--
+               |                     liblevenshtein::transducer::generalized::state::GeneralizedState::successors_i_type (inlined)
+               |                     liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+               |          
+               |--1.31%--std::sys::alloc::unix::<impl core::alloc::global::GlobalAlloc for std::alloc::System>::alloc (inlined)
+               |          __rustc::__rdl_alloc (inlined)
+               |          alloc::alloc::alloc (inlined)
+               |          |          
+--
+     0.79%  generalized_aut  generalized_automaton_benchmarks-dca0ec5bac20c675  [.] liblevenshtein::transducer::operation_type::OperationType::can_apply
+            |          
+             --0.63%--liblevenshtein::transducer::operation_type::OperationType::can_apply
+
+     0.78%  generalized_aut  libm.so.6                                          [.] 0x0000000000080e1e
+            |
+            ---0x7f456275ee1e
+               exp
+--
+                          liblevenshtein::transducer::generalized::state::GeneralizedState::successors_i_type (inlined)
+                          liblevenshtein::transducer::generalized::state::GeneralizedState::successors
+
+     0.56%  generalized_aut  libm.so.6                                          [.] 0x0000000000080e38
+            |
+            ---0x7f456275ee38
+               exp
