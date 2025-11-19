@@ -48,6 +48,36 @@ pub const MAX_EXPANSION_FACTOR: usize = 20;
 // Rule application (byte-level)
 // ============================================================================
 
+/// Check if a rewrite rule can be applied at a specific position (byte-level).
+///
+/// **Performance Optimization**: This function checks rule applicability without
+/// allocating a result vector, making it much faster for position scanning.
+///
+/// # Arguments
+///
+/// - `rule` - The rewrite rule to check
+/// - `s` - The phonetic string
+/// - `pos` - The position to check
+///
+/// # Returns
+///
+/// - `true` if the rule can be applied at the position
+/// - `false` otherwise
+#[inline]
+fn can_apply_at(rule: &RewriteRule, s: &[Phone], pos: usize) -> bool {
+    // Check context matches
+    if !context_matches(&rule.context, s, pos) {
+        return false;
+    }
+
+    // Check pattern matches
+    if !pattern_matches_at(&rule.pattern, s, pos) {
+        return false;
+    }
+
+    true
+}
+
 /// Apply a rewrite rule at a specific position if possible (byte-level).
 ///
 /// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:177-187`
@@ -96,13 +126,8 @@ pub const MAX_EXPANSION_FACTOR: usize = 20;
 /// assert_eq!(result, Some(vec![Phone::Vowel(b'e'), Phone::Consonant(b'f')]));
 /// ```
 pub fn apply_rule_at(rule: &RewriteRule, s: &[Phone], pos: usize) -> Option<Vec<Phone>> {
-    // Check context matches
-    if !context_matches(&rule.context, s, pos) {
-        return None;
-    }
-
-    // Check pattern matches
-    if !pattern_matches_at(&rule.pattern, s, pos) {
+    // Check if rule can be applied (no allocation)
+    if !can_apply_at(rule, s, pos) {
         return None;
     }
 
@@ -133,8 +158,9 @@ pub fn apply_rule_at(rule: &RewriteRule, s: &[Phone], pos: usize) -> Option<Vec<
 /// - `None` if the rule cannot be applied anywhere
 pub fn find_first_match(rule: &RewriteRule, s: &[Phone]) -> Option<usize> {
     // Try each position from 0 to s.len()
+    // Optimization: use can_apply_at() to avoid allocating vectors during search
     for pos in 0..=s.len() {
-        if apply_rule_at(rule, s, pos).is_some() {
+        if can_apply_at(rule, s, pos) {
             return Some(pos);
         }
     }
@@ -221,6 +247,36 @@ pub fn apply_rules_seq(rules: &[RewriteRule], s: &[Phone], fuel: usize) -> Optio
 // Rule application (character-level)
 // ============================================================================
 
+/// Check if a rewrite rule can be applied at a specific position (character-level).
+///
+/// **Performance Optimization**: This function checks rule applicability without
+/// allocating a result vector, making it much faster for position scanning.
+///
+/// # Arguments
+///
+/// - `rule` - The rewrite rule to check
+/// - `s` - The phonetic string
+/// - `pos` - The position to check
+///
+/// # Returns
+///
+/// - `true` if the rule can be applied at the position
+/// - `false` otherwise
+#[inline]
+fn can_apply_at_char(rule: &RewriteRuleChar, s: &[PhoneChar], pos: usize) -> bool {
+    // Check context matches
+    if !context_matches_char(&rule.context, s, pos) {
+        return false;
+    }
+
+    // Check pattern matches
+    if !pattern_matches_at_char(&rule.pattern, s, pos) {
+        return false;
+    }
+
+    true
+}
+
 /// Apply a rewrite rule at a specific position if possible (character-level).
 ///
 /// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:177-187`
@@ -231,13 +287,8 @@ pub fn apply_rule_at_char(
     s: &[PhoneChar],
     pos: usize,
 ) -> Option<Vec<PhoneChar>> {
-    // Check context matches
-    if !context_matches_char(&rule.context, s, pos) {
-        return None;
-    }
-
-    // Check pattern matches
-    if !pattern_matches_at_char(&rule.pattern, s, pos) {
+    // Check if rule can be applied (no allocation)
+    if !can_apply_at_char(rule, s, pos) {
         return None;
     }
 
@@ -256,8 +307,9 @@ pub fn apply_rule_at_char(
 ///
 /// This is the character-level variant of [`find_first_match`].
 pub fn find_first_match_char(rule: &RewriteRuleChar, s: &[PhoneChar]) -> Option<usize> {
+    // Optimization: use can_apply_at_char() to avoid allocating vectors during search
     for pos in 0..=s.len() {
-        if apply_rule_at_char(rule, s, pos).is_some() {
+        if can_apply_at_char(rule, s, pos) {
             return Some(pos);
         }
     }
