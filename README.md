@@ -10,52 +10,6 @@ A Rust implementation of [liblevenshtein](https://github.com/universal-automata/
 
 Based on "Fast String Correction with Levenshtein-Automata" (Schulz & Mihov, 2002).
 
-## What's New
-
-### v0.7.0 (2025-11-18)
-
-- **Phonetic Rewrite Rules (Formally Verified)** - Mathematically verified phonetic transformations for English spelling normalization
-  - 5 theorems proven in Coq/Rocq (100% proven, zero Admitted): well-formedness, bounded expansion, non-confluence, termination, idempotence
-  - 13 rules from Zompist's English spelling system (8 orthographic + 3 phonetic + 2 test)
-  - Dual u8/char support following existing codebase patterns
-  - 87 tests passing (73 unit + 14 property-based with proptest)
-  - 7 criterion benchmark groups for performance profiling
-  - Complete traceability from Coq definitions to Rust implementation
-  - Enable with `phonetic-rules` feature
-- **Performance Optimizations** - Universal automaton state operations and subsumption checking
-  - H1 optimization: Eliminated string allocations in successor methods
-  - H2 conditional optimization: 28-31% speedup with zero overhead for common cases
-
-### v0.5.0 (2025-11-04)
-
-- **DynamicDawgChar** - Unicode support for Dynamic DAWG with character-level operations
-- **Contextual Code Completion** - Hierarchical scope-aware completion engine with zipper-based navigation
-- **Performance Optimizations** - DynamicDawg with Bloom filters, auto-minimization, and sorted batch insertion
-- **UTF-8 Optimization Analysis** - Comprehensive documentation of Unicode performance characteristics
-- **Bug Fixes** - Fixed suffix sharing bug, test compilation, GitHub Actions workflow, and all clippy warnings
-
-### v0.4.0 (2025-10-30)
-
-- **Unicode Support** - Character-level dictionary variants for correct Unicode Levenshtein distances
-  - `DoubleArrayTrieChar` and `PathMapDictionaryChar` for character-level operations
-  - Proper handling of multi-byte UTF-8 sequences (accented chars, CJK, emoji)
-  - ~5% performance overhead, 4x memory for edge labels
-  - Full test coverage with 19 Unicode-specific tests
-- **Phase 4: SIMD Optimization** - Comprehensive SIMD acceleration with **20-64% performance gains**
-  - 8 SIMD-optimized components across critical performance paths
-  - Data-driven threshold tuning based on empirical benchmarking
-  - AVX2/SSE4.1 implementations with runtime CPU feature detection
-  - Extensive documentation (950+ lines across 3 analysis documents)
-
-### v0.3.0 (2025-10-26)
-
-- **Package Support**: Debian (.deb), RPM (.rpm), and Arch Linux (.pkg.tar.zst) packages
-- **CI Improvements**: Explicit CPU features for better compatibility across platforms
-- **Code Quality**: Fixed all clippy warnings without suppressing checks
-- **Bug Fixes**: Fixed CLI format auto-detection for text dictionaries
-
-See [CHANGELOG.md](CHANGELOG.md) for complete details.
-
 ## Overview
 
 This library provides efficient fuzzy string matching against large dictionaries using finite state automata. It supports multiple Levenshtein distance algorithms and pluggable dictionary backends.
