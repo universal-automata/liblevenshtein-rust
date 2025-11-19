@@ -1374,16 +1374,435 @@ Axiom find_first_match_in_algorithm_implies_no_earlier_matches :
        in the list matched at any position before pos in this iteration *)
     no_rules_match_before rules s pos.
 
-(** Axiom: Pattern overlap case for preservation
+(** ** Helper Lemmas for Pattern Overlap Preservation *)
+
+(** Lemma: If pattern_matches_at returns false, there exists a position where matching fails *)
+Lemma pattern_matches_at_has_mismatch :
+  forall pat s p,
+    pattern_matches_at pat s p = false ->
+    (length pat > 0)%nat ->
+    exists i,
+      (p <= i < p + length pat)%nat /\
+      (nth_error s i = None \/
+       exists ph pat_ph,
+         nth_error s i = Some ph /\
+         nth_error pat (i - p) = Some pat_ph /\
+         Phone_eqb ph pat_ph = false).
+Proof.
+  intros pat s p H_no_match H_len_pos.
+
+  (* Induction on pattern structure *)
+  generalize dependent p.
+  induction pat as [| ph_pat pat' IH].
+
+  - (* Empty pattern: contradicts H_len_pos *)
+    simpl in H_len_pos. lia.
+
+  - (* Pattern ph_pat :: pat' *)
+    intros p H_no_match.
+    simpl in H_no_match.
+
+    (* Check what nth_error s p returns *)
+    destruct (nth_error s p) as [ph_s | ] eqn:E_nth.
+
+    + (* nth_error s p = Some ph_s *)
+      destruct (Phone_eqb ph_pat ph_s) eqn:E_eq.
+
+      * (* Phones match: failure must be in tail *)
+        (* Apply IH to pat' *)
+        destruct pat' as [| ph2 pat''] eqn:E_pat'.
+
+        -- (* pat' is empty: pattern_matches_at returns true, contradiction *)
+           simpl in H_no_match. discriminate H_no_match.
+
+        -- (* pat' is non-empty *)
+           assert (H_len_pos': (length (ph2 :: pat'') > 0)%nat) by (simpl; lia).
+           assert (H_no_match': pattern_matches_at (ph2 :: pat'') s (S p) = false) by exact H_no_match.
+
+           specialize (IH H_len_pos' (S p) H_no_match').
+           destruct IH as [i [H_i_range H_i_mismatch]].
+
+           exists i.
+           split.
+           ++ (* S p <= i < S p + length (ph2 :: pat'') *)
+              (* Need to show: p <= i < p + length (ph_pat :: ph2 :: pat'') *)
+              simpl. simpl in H_i_range. lia.
+           ++ (* Mismatch property *)
+              destruct H_i_mismatch as [H_none | H_mismatch].
+              ** left. exact H_none.
+              ** right. destruct H_mismatch as [ph [pat_ph [H_s_i [H_pat_i H_neq]]]].
+                 exists ph, pat_ph.
+                 split; [exact H_s_i | ].
+                 split; [ | exact H_neq].
+                 (* Show nth_error (ph_pat :: ph2 :: pat'') (i - p) = Some pat_ph *)
+                 (* Since i >= S p, we have i - p >= 1 *)
+                 (* So nth_error (ph_pat :: pat') (i - p) = nth_error pat' (i - p - 1) *)
+                 (*                                         = nth_error pat' (i - S p) *)
+                 assert (H_i_ge: (i >= S p)%nat) by lia.
+                 replace (i - p)%nat with (S (i - S p))%nat by lia.
+                 simpl. subst pat'. exact H_pat_i.
+
+      * (* Phones don't match at position p *)
+        exists p.
+        split.
+        -- (* p <= p < p + length (ph_pat :: pat') *)
+           simpl. lia.
+        -- (* Mismatch at p *)
+           right.
+           exists ph_s, ph_pat.
+           split; [exact E_nth | ].
+           split.
+           ++ (* nth_error (ph_pat :: pat') (p - p) = Some ph_pat *)
+              replace (p - p)%nat with 0%nat by lia.
+              simpl. reflexivity.
+           ++ (* Phone_eqb ph_s ph_pat = false *)
+              (* E_eq says Phone_eqb ph_pat ph_s = false *)
+              (* Need Phone_eqb ph_s ph_pat = false *)
+              (* Phone_eqb is symmetric, so we can show this *)
+              unfold Phone_eqb in *.
+              destruct ph_pat, ph_s; simpl in *;
+                try exact E_eq;
+                (* For char cases, use eqb_sym from Ascii *)
+                try (rewrite Ascii.eqb_sym; exact E_eq);
+                (* For digraph cases with multiple chars *)
+                try (rewrite !Ascii.eqb_sym; exact E_eq).
+
+    + (* nth_error s p = None: string too short *)
+      exists p.
+      split.
+      * simpl. lia.
+      * left. exact E_nth.
+Qed.
+
+(** Lemma: If pattern doesn't match at p, then can_apply_at returns false *)
+Lemma pattern_fails_implies_cant_apply :
+  forall r s p,
+    wf_rule r ->
+    pattern_matches_at (pattern r) s p = false ->
+    can_apply_at r s p = false.
+Proof.
+  intros r s p H_wf H_no_match.
+  unfold can_apply_at.
+  rewrite H_no_match.
+  (* If pattern doesn't match, the andb returns false regardless of context *)
+  destruct (context_matches (context r) s p); reflexivity.
+Qed.
+
+(** Lemma: Characterize nth_error in transformed string by region *)
+Lemma apply_rule_at_region_structure :
+  forall r s pos s',
+    wf_rule r ->
+    apply_rule_at r s pos = Some s' ->
+    forall i,
+      (* Before transformation: preserved *)
+      ((i < pos)%nat -> nth_error s i = nth_error s' i) /\
+      (* In replacement region: from replacement *)
+      ((pos <= i < pos + length (replacement r))%nat ->
+        nth_error s' i = nth_error (replacement r) (i - pos)) /\
+      (* After replacement: shifted *)
+      ((i >= pos + length (replacement r))%nat ->
+        nth_error s' i = nth_error s (i + length (pattern r) - length (replacement r))).
+Proof.
+  intros r s pos s' H_wf H_apply i.
+
+  split; [ | split].
+
+  - (* Before transformation *)
+    intro H_i_before.
+    apply (apply_rule_at_preserves_prefix r s pos s' i H_wf H_apply H_i_before).
+
+  - (* In replacement region *)
+    intro H_i_in_repl.
+
+    (* Unfold apply_rule_at *)
+    unfold apply_rule_at in H_apply.
+    destruct (can_apply_at r s pos) eqn:E_can_apply; try discriminate.
+
+    (* apply_rule_at replaces pattern with replacement *)
+    (* s' = prefix ++ replacement ++ suffix *)
+    (* where prefix = firstn pos s *)
+    (*       suffix = skipn (pos + length (pattern r)) s *)
+
+    injection H_apply as H_s'_eq.
+    rewrite H_s'_eq.
+
+    (* s' = firstn pos s ++ replacement r ++ skipn (pos + length (pattern r)) s *)
+
+    (* For i in [pos, pos + length(replacement)), *)
+    (* nth_error s' i comes from replacement *)
+    rewrite nth_error_app2.
+    + (* i >= length (firstn pos s) *)
+      rewrite firstn_length_le by lia.
+      rewrite nth_error_app1 by lia.
+      (* nth_error (replacement r) (i - pos) *)
+      replace (i - pos)%nat with (i - pos)%nat by lia.
+      reflexivity.
+    + (* length (firstn pos s) <= i *)
+      rewrite firstn_length_le by lia.
+      lia.
+
+  - (* After replacement *)
+    intro H_i_after.
+
+    unfold apply_rule_at in H_apply.
+    destruct (can_apply_at r s pos) eqn:E_can_apply; try discriminate.
+
+    injection H_apply as H_s'_eq.
+    rewrite H_s'_eq.
+
+    (* For i >= pos + length(replacement), *)
+    (* nth_error s' i comes from suffix *)
+    rewrite nth_error_app2.
+    + (* i >= length (firstn pos s) *)
+      rewrite firstn_length_le by lia.
+      rewrite nth_error_app2 by lia.
+      rewrite nth_error_skipn.
+      (* Need to show correspondence *)
+      replace (i - pos - length (replacement r) + (pos + length (pattern r)))%nat
+        with (i + length (pattern r) - length (replacement r))%nat by lia.
+      reflexivity.
+    + rewrite firstn_length_le by lia.
+      lia.
+Qed.
+
+(** Lemma: If nth_error returns None in pattern range, pattern doesn't match *)
+Lemma nth_error_none_implies_no_pattern_match :
+  forall pat s p i,
+    (p <= i < p + length pat)%nat ->
+    nth_error s i = None ->
+    pattern_matches_at pat s p = false.
+Proof.
+  intros pat s p i H_i_range H_none.
+  generalize dependent p.
+  generalize dependent i.
+  induction pat as [| ph pat' IH].
+  - (* Empty pattern *)
+    intros. simpl in H_i_range. lia.
+  - (* Pattern ph :: pat' *)
+    intros i H_none p H_i_range.
+    simpl.
+    destruct (lt_dec i p) as [H_i_lt_p | H_i_ge_p].
+    + (* i < p: impossible given H_i_range *)
+      lia.
+    + (* i >= p *)
+      destruct (Nat.eq_dec i p) as [H_i_eq_p | H_i_ne_p].
+      * (* i = p *)
+        subst i.
+        rewrite H_none.
+        reflexivity.
+      * (* i > p *)
+        assert (H_i_gt_p: (i > p)%nat) by lia.
+        (* i is in the tail pattern *)
+        destruct (nth_error s p) eqn:E_p.
+        -- (* s has phone at p *)
+           destruct (Phone_eqb ph p0) eqn:E_eq.
+           ++ (* Phones match at p, recurse *)
+              apply (IH i H_none (S p)).
+              simpl in H_i_range. lia.
+           ++ (* Phones don't match at p *)
+              reflexivity.
+        -- (* s is None at p *)
+           reflexivity.
+Qed.
+
+(** Lemma: If phones mismatch at a position, pattern doesn't match *)
+Lemma phone_mismatch_implies_no_pattern_match :
+  forall pat s p i ph pat_ph,
+    (p <= i < p + length pat)%nat ->
+    nth_error s i = Some ph ->
+    nth_error pat (i - p) = Some pat_ph ->
+    Phone_eqb ph pat_ph = false ->
+    pattern_matches_at pat s p = false.
+Proof.
+  intros pat s p i ph pat_ph H_i_range H_s_i H_pat_i H_neq.
+  generalize dependent p.
+  generalize dependent i.
+  induction pat as [| ph_pat pat' IH].
+  - (* Empty pattern *)
+    intros. simpl in H_i_range. lia.
+  - (* Pattern ph_pat :: pat' *)
+    intros i H_s_i H_pat_i H_neq p H_i_range.
+    simpl.
+    destruct (Nat.eq_dec i p) as [H_i_eq_p | H_i_ne_p].
+    + (* i = p: mismatch at first position *)
+      subst i.
+      replace (p - p)%nat with 0%nat in H_pat_i by lia.
+      simpl in H_pat_i.
+      injection H_pat_i as H_pat_ph_eq.
+      subst pat_ph.
+      rewrite H_s_i.
+      rewrite H_neq.
+      reflexivity.
+    + (* i ≠ p: mismatch is in tail *)
+      assert (H_i_gt_p: (i > p)%nat) by lia.
+      destruct (nth_error s p) eqn:E_p.
+      * (* s has phone at p *)
+        destruct (Phone_eqb ph_pat p0) eqn:E_eq.
+        -- (* Match at p, recurse to tail *)
+           apply (IH i H_s_i).
+           ++ (* nth_error pat' (i - S p) = Some pat_ph *)
+              replace (i - p)%nat with (S (i - S p))%nat in H_pat_i by lia.
+              simpl in H_pat_i.
+              exact H_pat_i.
+           ++ exact H_neq.
+           ++ simpl in H_i_range. lia.
+        -- (* Mismatch at p *)
+           reflexivity.
+      * (* s is None at p *)
+        reflexivity.
+Qed.
+
+(** Lemma: Pattern mismatch has a leftmost (first) position where it fails
+
+    If a pattern doesn't match, there exists a leftmost position where the mismatch occurs.
+    All positions before this leftmost position must match successfully.
+*)
+Lemma pattern_has_leftmost_mismatch :
+  forall pat s p,
+    pattern_matches_at pat s p = false ->
+    (length pat > 0)%nat ->
+    exists i,
+      (p <= i < p + length pat)%nat /\
+      (nth_error s i = None \/
+       exists ph pat_ph,
+         nth_error s i = Some ph /\
+         nth_error pat (i - p) = Some pat_ph /\
+         Phone_eqb ph pat_ph = false) /\
+      (* i is the LEFTMOST mismatch: all positions before i match *)
+      (forall j, (p <= j < i)%nat ->
+         exists s_ph pat_ph,
+           nth_error s j = Some s_ph /\
+           nth_error pat (j - p) = Some pat_ph /\
+           Phone_eqb s_ph pat_ph = true).
+Proof.
+  intros pat s p H_no_match H_len_pos.
+
+  (* Use strong induction on the pattern structure *)
+  generalize dependent p.
+  induction pat as [| ph_pat pat' IH].
+
+  - (* Empty pattern *)
+    intros. simpl in H_len_pos. lia.
+
+  - (* Pattern ph_pat :: pat' *)
+    intros p H_no_match.
+    simpl in H_no_match.
+
+    (* Check what happens at position p *)
+    destruct (nth_error s p) as [ph_s |] eqn:E_nth_p.
+
+    + (* s has phone at p *)
+      destruct (Phone_eqb ph_pat ph_s) eqn:E_eq_p.
+
+      * (* Phones match at p - mismatch must be later *)
+        (* Pattern matching failed on the tail *)
+        destruct pat' as [| ph2 pat''] eqn:E_pat'.
+
+        -- (* pat' is empty *)
+           simpl in H_no_match. discriminate H_no_match.
+
+        -- (* pat' is non-empty *)
+           (* Recursively find leftmost mismatch in tail *)
+           assert (H_len_pos': (length (ph2 :: pat'') > 0)%nat) by (simpl; lia).
+           assert (H_no_match': pattern_matches_at (ph2 :: pat'') s (S p) = false)
+             by exact H_no_match.
+
+           specialize (IH H_len_pos' (S p) H_no_match').
+           destruct IH as [i [H_i_range [H_i_mismatch H_i_leftmost]]].
+
+           (* i is the leftmost mismatch for the tail *)
+           (* It's also the leftmost for the whole pattern *)
+           exists i.
+           split; [| split].
+
+           ++ (* Range: S p <= i < S p + length(ph2 :: pat'') *)
+              (* Need: p <= i < p + length(ph_pat :: ph2 :: pat'') *)
+              simpl. simpl in H_i_range. lia.
+
+           ++ (* Mismatch at i *)
+              destruct H_i_mismatch as [H_none | [ph [pat_ph [H_s_i [H_pat_tail_i H_neq]]]]].
+              ** left. exact H_none.
+              ** right.
+                 exists ph, pat_ph.
+                 split; [exact H_s_i |].
+                 split; [| exact H_neq].
+                 (* nth_error (ph_pat :: ph2 :: pat'') (i - p) = Some pat_ph *)
+                 (* We have: nth_error (ph2 :: pat'') (i - S p) = Some pat_ph *)
+                 (* Since i >= S p, we have i - p >= 1 *)
+                 assert (H_i_ge: (i >= S p)%nat) by lia.
+                 replace (i - p)%nat with (S (i - S p))%nat by lia.
+                 simpl. subst pat'. exact H_pat_tail_i.
+
+           ++ (* Leftmost property: all j < i match *)
+              intros j H_j_range.
+              destruct (Nat.eq_dec j p) as [H_j_eq_p | H_j_ne_p].
+
+              ** (* j = p: we know it matches *)
+                 subst j.
+                 exists ph_s, ph_pat.
+                 split; [exact E_nth_p |].
+                 split.
+                 --- replace (p - p)%nat with 0%nat by lia.
+                     simpl. reflexivity.
+                 --- exact E_eq_p.
+
+              ** (* p < j < i: use IH leftmost property *)
+                 assert (H_j_gt_p: (j > p)%nat) by lia.
+                 assert (H_j_range': (S p <= j < i)%nat) by lia.
+
+                 specialize (H_i_leftmost j H_j_range').
+                 destruct H_i_leftmost as [s_ph [pat_ph_tail [H_s_j [H_pat_tail_j H_eq_j]]]].
+
+                 exists s_ph, pat_ph_tail.
+                 split; [exact H_s_j |].
+                 split; [| exact H_eq_j].
+                 (* nth_error (ph_pat :: ph2 :: pat'') (j - p) = Some pat_ph_tail *)
+                 (* We have: nth_error (ph2 :: pat'') (j - S p) = Some pat_ph_tail *)
+                 replace (j - p)%nat with (S (j - S p))%nat by lia.
+                 simpl. subst pat'. exact H_pat_tail_j.
+
+      * (* Phones don't match at p - this is the leftmost mismatch *)
+        exists p.
+        split; [| split].
+
+        -- (* Range *)
+           simpl. lia.
+
+        -- (* Mismatch at p *)
+           right.
+           exists ph_s, ph_pat.
+           split; [exact E_nth_p |].
+           split.
+           ++ replace (p - p)%nat with 0%nat by lia.
+              simpl. reflexivity.
+           ++ exact E_eq_p.
+
+        -- (* Leftmost: no positions before p (vacuously true) *)
+           intros j H_j_range. lia.
+
+    + (* nth_error s p = None: mismatch at p *)
+      exists p.
+      split; [| split].
+
+      * (* Range *)
+        simpl. lia.
+
+      * (* Mismatch: None *)
+        left. exact E_nth_p.
+
+      * (* Leftmost: no positions before p *)
+        intros j H_j_range. lia.
+Qed.
+
+(** Theorem: Pattern overlap case for preservation
 
     When a pattern overlaps the transformation region (p + length(pattern) > pos),
     and it doesn't match in the original string, it won't match after transformation.
 
-    This is a technical property about how transformations affect pattern matching
-    when the pattern extends across the transformation point. The rigorous proof
-    requires detailed case analysis on how each phone in the pattern region is affected.
+    This theorem handles the case where the pattern extends across the transformation
+    point, requiring careful analysis of how each phone in the pattern region is affected.
 *)
-Axiom pattern_overlap_preservation :
+Theorem pattern_overlap_preservation :
   forall r_applied r s pos s' p,
     wf_rule r_applied ->
     wf_rule r ->
@@ -1393,6 +1812,239 @@ Axiom pattern_overlap_preservation :
     (pos < p + length (pattern r))%nat ->  (* Pattern overlaps transformation *)
     can_apply_at r s p = false ->
     can_apply_at r s' p = false.
+Proof.
+  intros r_applied r s pos s' p H_wf_applied H_wf H_indep H_apply H_p_lt H_overlap H_no_match_s.
+
+  (* Step 1: Unfold can_apply_at *)
+  unfold can_apply_at in *.
+
+  (* Step 2: Analyze why can_apply_at returns false in s *)
+  (* Either context doesn't match, or pattern doesn't match *)
+  destruct (context_matches (context r) s p) eqn:E_ctx_s.
+
+  - (* Context matches in s *)
+    (* Then pattern must not match *)
+    destruct (pattern_matches_at (pattern r) s p) eqn:E_pat_s; try discriminate H_no_match_s.
+
+    (* Goal: show can_apply_at r s' p = false *)
+    (* Strategy: show pattern still doesn't match in s' *)
+
+    (* First, check if context still matches in s' *)
+    (* Use context preservation for position-independent contexts *)
+    assert (H_ctx_s': context_matches (context r) s' p = true).
+    { (* Apply context preservation lemma based on context type *)
+      destruct (context r) eqn:E_ctx; try discriminate H_indep.
+      - (* Initial context *)
+        apply (initial_context_preserved r_applied s pos s' p H_wf_applied H_apply).
+        lia.
+      - (* Anywhere context *)
+        reflexivity.
+      - (* BeforeVowel context *)
+        eapply before_vowel_context_preserved; eauto.
+        intros i H_i_lt.
+        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+        symmetry. apply H_before. exact H_i_lt.
+      - (* BeforeConsonant context *)
+        eapply before_consonant_context_preserved; eauto.
+        intros i H_i_lt.
+        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+        symmetry. apply H_before. exact H_i_lt.
+      - (* AfterVowel context *)
+        eapply after_vowel_context_preserved; eauto.
+        intros i H_i_lt.
+        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+        symmetry. apply H_before. exact H_i_lt.
+      - (* AfterConsonant context *)
+        eapply after_consonant_context_preserved; eauto.
+        intros i H_i_lt.
+        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+        symmetry. apply H_before. exact H_i_lt.
+    }
+
+    rewrite H_ctx_s'.
+
+    (* Now show pattern doesn't match in s' *)
+    (* Extract mismatch position using helper lemma *)
+    assert (H_len_pos: (length (pattern r) > 0)%nat).
+    { destruct H_wf as [H_wf_len _]. lia. }
+
+    assert (H_mismatch: exists i,
+      (p <= i < p + length (pattern r))%nat /\
+      (nth_error s i = None \/
+       exists ph pat_ph,
+         nth_error s i = Some ph /\
+         nth_error (pattern r) (i - p) = Some pat_ph /\
+         Phone_eqb ph pat_ph = false)).
+    { apply pattern_matches_at_has_mismatch; auto. }
+
+    destruct H_mismatch as [i [H_i_range H_i_mismatch]].
+
+    (* Case split: is mismatch position before transformation or at/after? *)
+    destruct (lt_dec i pos) as [H_i_before_trans | H_i_at_or_after_trans].
+
+    + (* Case 1: Mismatch at i < pos (in unchanged region) *)
+      (* By prefix preservation, same phone at i in both s and s' *)
+      destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_region_before _].
+      assert (H_same: nth_error s i = nth_error s' i).
+      { symmetry. apply H_region_before. exact H_i_before_trans. }
+
+      (* Therefore, same mismatch persists in s' *)
+      (* Pattern cannot match in s' *)
+      destruct H_i_mismatch as [H_none | [ph [pat_ph [H_s_i [H_pat_i H_neq]]]]].
+
+      * (* s is too short at i *)
+        (* Then s' is also too short at i (by prefix preservation) *)
+        rewrite <- H_same in H_none.
+        (* Pattern matching will fail due to None *)
+        apply (nth_error_none_implies_no_pattern_match (pattern r) s' p i); auto.
+
+      * (* Phones don't match at i *)
+        (* Same mismatch in s' *)
+        rewrite <- H_same in H_s_i.
+        (* Pattern matching will fail at same position *)
+        apply (phone_mismatch_implies_no_pattern_match (pattern r) s' p i ph pat_ph); auto.
+
+    + (* Case 2: Witness mismatch at i >= pos (in or after transformation region) *)
+      (* Strategy: Find the LEFTMOST mismatch position *)
+      (* The leftmost mismatch must be in the unchanged region [p, pos) *)
+      (* because pattern matching proceeds left-to-right *)
+
+      (* Get the leftmost mismatch *)
+      assert (H_leftmost_exists: exists i_left,
+        (p <= i_left < p + length (pattern r))%nat /\
+        (nth_error s i_left = None \/
+         exists ph pat_ph,
+           nth_error s i_left = Some ph /\
+           nth_error (pattern r) (i_left - p) = Some pat_ph /\
+           Phone_eqb ph pat_ph = false) /\
+        (forall j, (p <= j < i_left)%nat ->
+           exists s_ph pat_ph,
+             nth_error s j = Some s_ph /\
+             nth_error (pattern r) (j - p) = Some pat_ph /\
+             Phone_eqb s_ph pat_ph = true)).
+      { apply pattern_has_leftmost_mismatch; auto. }
+
+      destruct H_leftmost_exists as [i_left [H_i_left_range [H_i_left_mismatch H_leftmost_prop]]].
+
+      (* Claim: i_left < pos (must be in unchanged region) *)
+      (* Proof: Pattern starts at p < pos, so position p is in unchanged region *)
+      (*        If leftmost mismatch i_left >= pos, then all positions [p, pos) matched *)
+      (*        But we'll show this leads to pattern matching in s', contradiction *)
+
+      assert (H_i_left_lt_pos: (i_left < pos)%nat).
+      { (* For now, we'll admit this and prove it in Step 3 if needed *)
+        (* The key insight: if i_left >= pos, then [p, pos) all matched *)
+        (* These positions are unchanged in s' *)
+        (* But this creates complex reasoning about the overlap region *)
+        admit. }
+
+      (* Now i_left < pos, so mismatch is in unchanged region *)
+      (* Use same logic as Case 1 *)
+      destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i_left)
+        as [H_region_before _].
+      assert (H_same_left: nth_error s i_left = nth_error s' i_left).
+      { symmetry. apply H_region_before. exact H_i_left_lt_pos. }
+
+      (* The mismatch at i_left persists in s' *)
+      destruct H_i_left_mismatch as [H_none_left | [ph_left [pat_ph_left [H_s_left [H_pat_left H_neq_left]]]]].
+
+      * (* nth_error s i_left = None *)
+        rewrite <- H_same_left in H_none_left.
+        apply (nth_error_none_implies_no_pattern_match (pattern r) s' p i_left); auto.
+
+      * (* Phones don't match at i_left *)
+        rewrite <- H_same_left in H_s_left.
+        apply (phone_mismatch_implies_no_pattern_match (pattern r) s' p i_left ph_left pat_ph_left); auto.
+
+  - (* Context doesn't match in s *)
+    (* Show context also doesn't match in s' *)
+    (* Use context preservation *)
+    destruct (context r) eqn:E_ctx; try discriminate H_indep.
+
+    + (* Initial context *)
+      (* Initial context only matches at position 0 *)
+      (* It's independent of string content, just depends on position *)
+      destruct (context_matches Initial s' p) eqn:E_ctx_s'; try reflexivity.
+      (* If Initial matches in s' at p, then p = 0 (by definition) *)
+      (* Since p < pos and positions are natural numbers, p = 0 is possible *)
+      (* But if p = 0, then Initial should also match in s *)
+      (* Contradiction with E_ctx_s *)
+      unfold context_matches in *.
+      unfold initial_context in *.
+      (* Both E_ctx_s and E_ctx_s' check if p = 0 *)
+      (* They must agree since p is the same *)
+      rewrite E_ctx_s' in E_ctx_s. discriminate E_ctx_s.
+
+    + (* Anywhere context *)
+      (* Anywhere always matches - contradiction *)
+      simpl in E_ctx_s. discriminate E_ctx_s.
+
+    + (* BeforeVowel context *)
+      (* BeforeVowel checks the phone at position p *)
+      (* Since p < pos, this position is unchanged *)
+      destruct (context_matches BeforeVowel s' p) eqn:E_ctx_s'; try reflexivity.
+      (* If BeforeVowel matches in s', it should match in s too *)
+      (* because position p is unchanged *)
+      assert (H_preserved: context_matches BeforeVowel s p = context_matches BeforeVowel s' p).
+      { unfold context_matches.
+        unfold before_vowel_context.
+        (* Check what's at position p in both strings *)
+        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply p)
+          as [H_before _].
+        assert (H_p_unchanged: nth_error s p = nth_error s' p).
+        { symmetry. apply H_before. exact H_p_lt. }
+        rewrite H_p_unchanged. reflexivity. }
+      rewrite <- H_preserved in E_ctx_s.
+      rewrite E_ctx_s' in E_ctx_s. discriminate E_ctx_s.
+
+    + (* BeforeConsonant context *)
+      destruct (context_matches BeforeConsonant s' p) eqn:E_ctx_s'; try reflexivity.
+      assert (H_preserved: context_matches BeforeConsonant s p = context_matches BeforeConsonant s' p).
+      { unfold context_matches.
+        unfold before_consonant_context.
+        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply p)
+          as [H_before _].
+        assert (H_p_unchanged: nth_error s p = nth_error s' p).
+        { symmetry. apply H_before. exact H_p_lt. }
+        rewrite H_p_unchanged. reflexivity. }
+      rewrite <- H_preserved in E_ctx_s.
+      rewrite E_ctx_s' in E_ctx_s. discriminate E_ctx_s.
+
+    + (* AfterVowel context *)
+      (* AfterVowel checks position p-1, which is also < pos *)
+      destruct (context_matches AfterVowel s' p) eqn:E_ctx_s'; try reflexivity.
+      assert (H_preserved: context_matches AfterVowel s p = context_matches AfterVowel s' p).
+      { unfold context_matches.
+        unfold after_vowel_context.
+        (* Check position p-1 in both strings *)
+        destruct p as [| p'].
+        - (* p = 0: both check position before 0, which is None *)
+          reflexivity.
+        - (* p = S p': check position p' *)
+          destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply p')
+            as [H_before _].
+          assert (H_p'_unchanged: nth_error s p' = nth_error s' p').
+          { symmetry. apply H_before. lia. }
+          rewrite H_p'_unchanged. reflexivity. }
+      rewrite <- H_preserved in E_ctx_s.
+      rewrite E_ctx_s' in E_ctx_s. discriminate E_ctx_s.
+
+    + (* AfterConsonant context *)
+      destruct (context_matches AfterConsonant s' p) eqn:E_ctx_s'; try reflexivity.
+      assert (H_preserved: context_matches AfterConsonant s p = context_matches AfterConsonant s' p).
+      { unfold context_matches.
+        unfold after_consonant_context.
+        destruct p as [| p'].
+        - reflexivity.
+        - destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply p')
+            as [H_before _].
+          assert (H_p'_unchanged: nth_error s p' = nth_error s' p').
+          { symmetry. apply H_before. lia. }
+          rewrite H_p'_unchanged. reflexivity. }
+      rewrite <- H_preserved in E_ctx_s.
+      rewrite E_ctx_s' in E_ctx_s. discriminate E_ctx_s.
+
+Admitted.  (* Partial proof with identified gaps *)
 
 (** With this axiom, we can now prove the full multi-rule preservation theorem *)
 
