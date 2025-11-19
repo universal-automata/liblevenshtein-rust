@@ -97,3 +97,4 @@ docs/verification/**/extracted/
 *.perf.data.old
 perf.data*
 flamegraph.svg
+.lia.cache

@@ -296,6 +296,7 @@ protobuf = ["prost", "bytes", "prost-build", "serialization"]
 compression = ["flate2", "serialization"]
 cli = ["clap", "anyhow", "rustyline", "colored", "dirs", "pathmap-backend", "serialization"]
 phonetic-rules = []  # Phonetic rewrite rules with formal verification
+perf-instrumentation = []  # Performance instrumentation for optimization analysis (dev only)
 
 # Eviction wrapper optimization features
 eviction-parking-lot = ["parking_lot"]

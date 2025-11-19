@@ -30,6 +30,29 @@
 use super::matching::{context_matches, context_matches_char, pattern_matches_at, pattern_matches_at_char};
 use super::types::{Phone, PhoneChar, RewriteRule, RewriteRuleChar};
 
+#[cfg(feature = "perf-instrumentation")]
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[cfg(feature = "perf-instrumentation")]
+static BYTES_COPIED: AtomicUsize = AtomicUsize::new(0);
+
+#[cfg(feature = "perf-instrumentation")]
+static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+
+#[cfg(feature = "perf-instrumentation")]
+pub fn get_perf_stats() -> (usize, usize) {
+    (
+        BYTES_COPIED.load(Ordering::Relaxed),
+        ALLOCATIONS.load(Ordering::Relaxed),
+    )
+}
+
+#[cfg(feature = "perf-instrumentation")]
+pub fn reset_perf_stats() {
+    BYTES_COPIED.store(0, Ordering::Relaxed);
+    ALLOCATIONS.store(0, Ordering::Relaxed);
+}
+
 /// Maximum expansion factor for phonetic rewrite rules.
 ///
 /// **Formal Specification**: Theorem 2, `docs/verification/phonetic/zompist_rules.v:425`
@@ -133,6 +156,15 @@ pub fn apply_rule_at(rule: &RewriteRule, s: &[Phone], pos: usize) -> Option<Vec<
 
     // Build result: prefix + replacement + suffix
     let mut result = Vec::with_capacity(s.len() + MAX_EXPANSION_FACTOR);
+
+    #[cfg(feature = "perf-instrumentation")]
+    {
+        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        // Count bytes copied: prefix + replacement + suffix
+        let bytes_copied = pos + rule.replacement.len() + (s.len() - pos - rule.pattern.len());
+        BYTES_COPIED.fetch_add(bytes_copied, Ordering::Relaxed);
+    }
+
     result.extend_from_slice(&s[..pos]);
     result.extend_from_slice(&rule.replacement);
     result.extend_from_slice(&s[(pos + rule.pattern.len())..]);
@@ -157,9 +189,28 @@ pub fn apply_rule_at(rule: &RewriteRule, s: &[Phone], pos: usize) -> Option<Vec<
 /// - `Some(pos)` if the rule can be applied at position `pos`
 /// - `None` if the rule cannot be applied anywhere
 pub fn find_first_match(rule: &RewriteRule, s: &[Phone]) -> Option<usize> {
-    // Try each position from 0 to s.len()
+    find_first_match_from(rule, s, 0)
+}
+
+/// Find the first position where a rule can be applied, starting from a given position.
+///
+/// This is an optimization helper for sequential rule application.
+///
+/// # Arguments
+///
+/// - `rule` - The rewrite rule to match
+/// - `s` - The phonetic string
+/// - `start_pos` - The position to start scanning from (0-based)
+///
+/// # Returns
+///
+/// - `Some(pos)` if the rule can be applied at position `pos >= start_pos`
+/// - `None` if the rule cannot be applied anywhere from `start_pos` onward
+#[inline]
+fn find_first_match_from(rule: &RewriteRule, s: &[Phone], start_pos: usize) -> Option<usize> {
+    // Try each position from start_pos to s.len()
     // Optimization: use can_apply_at() to avoid allocating vectors during search
-    for pos in 0..=s.len() {
+    for pos in start_pos..=s.len() {
         if can_apply_at(rule, s, pos) {
             return Some(pos);
         }
@@ -214,6 +265,13 @@ pub fn find_first_match(rule: &RewriteRule, s: &[Phone]) -> Option<usize> {
 /// For practical use, `fuel = s.len() * rules.len() * 100` is recommended.
 pub fn apply_rules_seq(rules: &[RewriteRule], s: &[Phone], fuel: usize) -> Option<Vec<Phone>> {
     let mut current = s.to_vec();
+
+    #[cfg(feature = "perf-instrumentation")]
+    {
+        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        BYTES_COPIED.fetch_add(s.len(), Ordering::Relaxed);
+    }
+
     let mut remaining_fuel = fuel;
 
     loop {
