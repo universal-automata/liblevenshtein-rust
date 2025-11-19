@@ -1932,11 +1932,85 @@ Proof.
       (*        But we'll show this leads to pattern matching in s', contradiction *)
 
       assert (H_i_left_lt_pos: (i_left < pos)%nat).
-      { (* For now, we'll admit this and prove it in Step 3 if needed *)
-        (* The key insight: if i_left >= pos, then [p, pos) all matched *)
-        (* These positions are unchanged in s' *)
-        (* But this creates complex reasoning about the overlap region *)
-        admit. }
+      { (* Proof: The leftmost mismatch must occur before the transformation point *)
+        (*
+           Key insight: Pattern matching proceeds sequentially from position p.
+
+           We have:
+           - Pattern starts at p where p < pos  (H_p_lt)
+           - Pattern overlaps: pos < p + length(pattern)  (H_overlap)
+           - Pattern doesn't match at p in s  (E_pat_s: false)
+           - i_left is the leftmost position where matching fails
+
+           If i_left >= pos, then all positions [p, pos) matched successfully.
+           But these positions are unchanged by the transformation (< pos).
+
+           This creates an impossible situation: the pattern would have to match
+           up through position pos-1 in s, but we know it fails overall.
+           Since [p, pos) is a non-empty prefix of the pattern that matches,
+           and this prefix is completely before the transformation point,
+           the failure cannot be "caused by" the transformation.
+
+           Therefore the leftmost mismatch must be in [p, pos).
+        *)
+
+        (* Proof by cases on i_left vs pos *)
+        destruct (lt_dec i_left pos) as [H_lt | H_ge].
+        - (* i_left < pos: this is exactly what we want *)
+          exact H_lt.
+
+        - (* i_left >= pos: derive contradiction *)
+          (* The pattern starts at p and has length > 0 *)
+          (* (otherwise H_i_left_range would be contradictory) *)
+          assert (H_len_pos: (length (pattern r) > 0)%nat).
+          { destruct (pattern r) eqn:E_pat.
+            - (* Empty pattern *)
+              simpl in H_i_left_range. lia.
+            - (* Non-empty pattern *)
+              simpl. lia. }
+
+          (* From H_p_lt and H_ge: p < pos <= i_left *)
+          (* So the interval [p, pos) is non-empty *)
+          assert (H_interval_nonempty: (p < pos)%nat) by lia.
+
+          (* All positions in [p, i_left) matched in s (by H_leftmost_prop) *)
+          (* In particular, all positions in [p, pos) matched *)
+          (* Since pos <= i_left, we have [p, pos) ⊆ [p, i_left) *)
+
+          (* These matched positions are in the unchanged region *)
+          (* (they're all < pos, before the transformation) *)
+
+          (* The contradiction: if the pattern starts at p < pos, *)
+          (* and all phones from p up to (but not including) pos match, *)
+          (* and these phones are unchanged in s', *)
+          (* then the pattern would also match these positions in s' *)
+
+          (* But we need to show pattern DOESN'T match in s' *)
+          (* The failure point i_left >= pos is in/after transformation *)
+          (* This means the transformation "causes" the mismatch *)
+
+          (* However, this reasoning requires proving that *)
+          (* the transformation at pos actually changes something *)
+          (* which we cannot guarantee without more information *)
+
+          (* Alternative: use the structure of pattern_matches_at *)
+          (* It checks positions p, p+1, ..., p+length-1 sequentially *)
+          (* If it fails, there's a leftmost failure position *)
+          (* That position must be where something goes wrong *)
+
+          (* For a pattern starting before pos with leftmost mismatch at/after pos: *)
+          (* All positions [p, pos) must match (from H_leftmost_prop) *)
+          (* These are unchanged, so they match in both s and s' *)
+
+          (* Now: can the pattern fail in s but not fail in s' at position i_left? *)
+          (* If i_left >= pos, then i_left might be affected by transformation *)
+          (* So the mismatch at i_left in s might not persist in s' *)
+
+          (* This suggests we cannot complete this proof without additional lemmas *)
+          (* about how transformations affect mismatches at/after pos *)
+
+          (* For now, we'll use admit to acknowledge this gap *)
+          admit. }
 
       (* Now i_left < pos, so mismatch is in unchanged region *)
       (* Use same logic as Case 1 *)
