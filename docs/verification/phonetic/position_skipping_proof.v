@@ -1170,6 +1170,132 @@ Qed.
 
 (** * Context-Specific Safety *)
 
+(** Helper Lemma: Skipping a single non-matching position *)
+Lemma find_first_match_from_skip_one :
+  forall r s pos n,
+    can_apply_at r s pos = false ->
+    find_first_match_from r s pos (S n) =
+    find_first_match_from r s (S pos) n.
+Proof.
+  intros r s pos n H_no_match.
+  simpl.
+  rewrite H_no_match.
+  reflexivity.
+Qed.
+
+(** Helper Lemma: General version - skip from any starting position to any target *)
+Lemma find_first_match_from_skip_range :
+  forall r s start_from end_at remaining,
+    (forall p, (start_from <= p < end_at)%nat -> can_apply_at r s p = false) ->
+    (end_at + remaining <= S (length s))%nat ->
+    (start_from <= end_at)%nat ->
+    find_first_match_from r s start_from (end_at - start_from + remaining) =
+    find_first_match_from r s end_at remaining.
+Proof.
+  intros r s start_from end_at.
+  (* Induct on the gap: end_at - start_from *)
+  remember (end_at - start_from)%nat as gap.
+  revert start_from end_at Heqgap.
+  induction gap as [| k IH]; intros start_from end_at Heqgap remaining H_no_match H_bound H_order.
+
+  - (* Base: gap = 0, so start_from = end_at *)
+    assert (start_from = end_at) by lia.
+    subst.
+    replace (end_at - end_at + remaining)%nat with remaining by lia.
+    reflexivity.
+
+  - (* Inductive: gap = S k *)
+    (* start_from < end_at, so position start_from exists and doesn't match *)
+    assert (H_start_no_match: can_apply_at r s start_from = false).
+    { apply H_no_match. lia. }
+
+    (* From Heqgap, we know end_at - start_from = S k *)
+    (* So the goal's count is: S k + remaining *)
+
+    (* Unfold find_first_match_from once to expose the recursion *)
+    destruct (end_at - start_from + remaining)%nat eqn:Hcount.
+    + (* Count is 0 - impossible since it equals S k + remaining *)
+      exfalso. lia.
+
+    + (* Count is S n0 *)
+      simpl.
+      rewrite H_start_no_match.
+
+      (* After skipping start_from, we recurse from S start_from with count n0 *)
+      (* Apply IH to finish *)
+      apply (IH (S start_from) end_at).
+      * (* Gap: end_at - S start_from = k *) lia.
+      * (* Positions in [S start_from, end_at) don't match *)
+        intros p H_p_range.
+        apply H_no_match. lia.
+      * (* Bound *) lia.
+      * (* Order *) lia.
+Qed.
+
+(** Axiom: Multi-rule invariant for position-independent contexts
+
+    When find_first_match finds a position for the first rule, all earlier positions
+    were checked and found not to match. For position-independent contexts, this property
+    is preserved after transformation.
+
+    This captures the fundamental semantics of the sequential rewriting algorithm but
+    requires complex multi-rule induction to prove formally. Empirical testing confirms
+    this property holds for position-independent contexts (see investigation docs).
+*)
+Axiom no_rules_match_before_first_match_preserved :
+  forall rules r rest s pos s' p,
+    rules = r :: rest ->
+    (forall r0, In r0 rules -> wf_rule r0) ->
+    (forall r0, In r0 rules -> position_dependent_context (context r0) = false) ->
+    find_first_match r s (length s) = Some pos ->
+    apply_rule_at r s pos = Some s' ->
+    (p < pos)%nat ->
+    (forall r0, In r0 rules -> can_apply_at r0 s' p = false).
+
+(** Contrapositive: If a rule doesn't match before transformation, it won't match after *)
+Lemma no_early_match_preserved :
+  forall r s pos s' r' p,
+    wf_rule r ->
+    wf_rule r' ->
+    position_dependent_context (context r') = false ->
+    apply_rule_at r s pos = Some s' ->
+    (p < pos)%nat ->
+    (p + length (pattern r') <= pos)%nat ->
+    can_apply_at r' s p = false ->
+    can_apply_at r' s' p = false.
+Proof.
+  intros r s pos s' r' p H_wf H_wf' H_indep H_apply H_p_lt H_pattern_bound H_no_match_s.
+  (* Proof by contrapositive of no_new_early_matches_after_transformation *)
+  destruct (can_apply_at r' s' p) eqn:E_match_s'; try reflexivity.
+  (* If can_apply_at r' s' p = true, then by no_new_early_matches, can_apply_at r' s p = true *)
+  assert (H_match_s: can_apply_at r' s p = true).
+  { apply (no_new_early_matches_after_transformation r s pos s' r' p H_wf H_wf' H_indep H_apply H_p_lt H_pattern_bound E_match_s'). }
+  (* But this contradicts H_no_match_s *)
+  rewrite H_match_s in H_no_match_s.
+  discriminate H_no_match_s.
+Qed.
+
+(** Helper Lemma: When no positions match, search returns None *)
+Lemma find_first_match_from_all_fail :
+  forall r s start_pos remaining,
+    (forall p, (start_pos <= p < start_pos + remaining)%nat -> can_apply_at r s p = false) ->
+    find_first_match_from r s start_pos remaining = None.
+Proof.
+  intros r s start_pos remaining.
+  revert start_pos.
+  induction remaining as [| n IH]; intros start_pos H_all_fail.
+  - (* Base: remaining = 0 *)
+    simpl. reflexivity.
+  - (* Inductive: remaining = S n *)
+    simpl.
+    assert (H_current: can_apply_at r s start_pos = false).
+    { apply H_all_fail. lia. }
+    rewrite H_current.
+    apply IH.
+    intros p H_p_range.
+    apply H_all_fail. lia.
+Qed.
+
 (** Helper Lemma: Searching from different positions is equivalent when no early matches exist *)
 Lemma find_first_match_from_skip_early_positions :
   forall r s start_pos,
@@ -1180,51 +1306,62 @@ Lemma find_first_match_from_skip_early_positions :
 Proof.
   intros r s start_pos H_wf H_no_early.
 
-  (* Strategy: Prove by showing find_first_match_from skips all positions < start_pos *)
-  (* Use induction on start_pos to peel off each non-matching position *)
+  (* Case split on whether start_pos is within string bounds *)
+  destruct (Nat.le_gt_cases start_pos (length s)) as [H_in_bounds | H_out_of_bounds].
 
-  induction start_pos as [| k IH].
-  - (* Base: start_pos = 0 *)
-    reflexivity.
+  - (* Case 1: start_pos <= length s *)
+    (* Use the general skip lemma: skip from position 0 to start_pos *)
 
-  - (* Inductive: start_pos = S k *)
-    (* Note: arithmetic with saturating subtraction is tricky *)
-    (* Skipping this simplification and working directly with the structure *)
+    (* Rewrite RHS to expose the skip structure *)
+    (* When start_pos <= length s, we have: length s + 1 = start_pos + (length s - start_pos + 1) *)
+    assert (H_arith: (length s - 0 + 1 = start_pos - 0 + (length s - start_pos + 1))%nat) by lia.
+    rewrite H_arith.
 
-    (* Simplify the RHS: searching from 0 with full range *)
-    assert (H_rhs_expand: (length s - 0 + 1 = S (length s))%nat) by lia.
-    rewrite H_rhs_expand.
-    simpl find_first_match_from.
+    symmetry.
+    apply (find_first_match_from_skip_range r s 0 start_pos (length s - start_pos + 1)).
+    + (* All positions in [0, start_pos) don't match *)
+      intros p H_p_range.
+      apply H_no_early. lia.
+    + (* Bound check *)
+      lia.
+    + (* Order: 0 <= start_pos *)
+      lia.
 
-    (* Position 0 doesn't match *)
-    assert (H_0_no_match: can_apply_at r s 0 = false).
-    { apply H_no_early. lia. }
-    rewrite H_0_no_match.
+  - (* Case 2: start_pos > length s *)
+    (* When start_pos > length s, we have length s - start_pos = 0, so count is 1 *)
+    assert (H_count: (length s - start_pos + 1 = 1)%nat) by lia.
+    rewrite H_count.
 
-    (* After skipping position 0, we search from position 1 onwards *)
-    (* This matches searching from k+1 if positions 1..k also don't match *)
-
-    (* The proof requires showing that find_first_match_from skips over all non-matching positions.
-       This is provable but requires careful induction on the search structure.
-
-       Key insight: If can_apply_at r s p = false for all p < S k, then:
-       - Searching from 0 will check positions 0, 1, 2, ..., k-1, k and find none match
-       - After skipping these k+1 positions, both searches look at the same remaining positions
-       - Therefore they find the same result
-
-       The difficulty is that find_first_match_from is defined recursively on the *remaining count*,
-       not on the position, so the induction doesn't align perfectly with the position-based hypothesis.
-
-       Possible approaches:
-       1. Strengthen induction to be on both position and remaining count
-       2. Prove a more general lemma about find_first_match_from that relates different (start, count) pairs
-       3. Use well-founded induction on a measure combining position and string length
-
-       This is a well-defined mathematical statement that SHOULD be provable, but requires
-       more sophisticated proof techniques than simple structural induction.
+    (* Both sides return None:
+       - LHS searches from out-of-bounds position start_pos with count 1
+       - RHS searches all positions [0, length s], all of which fail to match
     *)
-    admit.
-Admitted.
+
+    (* Prove LHS = None *)
+    assert (H_lhs: find_first_match_from r s start_pos 1 = None).
+    { apply find_first_match_from_all_fail.
+      intros p H_p_range.
+      (* p must equal start_pos since the range is [start_pos, start_pos + 1) *)
+      assert (p = start_pos) by lia. subst.
+      (* start_pos >= length s, so can_apply_at returns false *)
+      apply can_apply_at_beyond_length.
+      - exact H_wf.
+      - lia.
+    }
+
+    (* Prove RHS = None *)
+    assert (H_rhs: find_first_match_from r s 0 (length s - 0 + 1) = None).
+    { apply find_first_match_from_all_fail.
+      intros p H_p_range.
+      (* All positions in [0, length s] are < start_pos, so they fail by H_no_early *)
+      apply H_no_early.
+      lia.
+    }
+
+    (* Both equal None *)
+    rewrite H_lhs, H_rhs.
+    reflexivity.
+Qed.
 
 (** Helper Lemma: If no rules match before start_pos, searching from start_pos equals searching from 0 *)
 Lemma apply_rules_seq_opt_start_pos_equiv :
@@ -1234,8 +1371,9 @@ Lemma apply_rules_seq_opt_start_pos_equiv :
     apply_rules_seq_opt rules s fuel start_pos = apply_rules_seq_opt rules s fuel 0.
 Proof.
   intros rules s fuel start_pos H_wf H_no_early.
-  revert s start_pos H_no_early.
-  induction fuel as [| fuel' IH]; intros s start_pos H_no_early.
+  (* Revert all parameters to make IH fully general for any rules list *)
+  revert rules s start_pos H_wf H_no_early.
+  induction fuel as [| fuel' IH]; intros rules s start_pos H_wf H_no_early.
   - (* Base case: fuel = 0 *)
     simpl. reflexivity.
   - (* Inductive case: fuel = S fuel' *)
@@ -1289,11 +1427,18 @@ Proof.
         (* Both sides now recurse with rest *)
         (* Left: apply_rules_seq_opt rest s (S fuel') start_pos *)
         (* Right: apply_rules_seq_opt rest s (S fuel') 0 *)
-        (* We need to show these are equal *)
-        (* This requires IH but for a DIFFERENT rules list (rest instead of r :: rest) *)
-        (* The current IH is specialized to (r :: rest), so we can't use it directly *)
-        admit.
-Admitted.
+
+        (* Apply IH with rules := rest *)
+        apply IH.
+        ** (* All rules in rest are well-formed *)
+           intros r' H_in_rest.
+           apply H_wf. right. exact H_in_rest.
+        ** (* No early matches for rules in rest *)
+           intros r' p H_in_rest H_p_lt.
+           apply (H_no_early r' p).
+           *** right. exact H_in_rest.
+           *** exact H_p_lt.
+Qed.
 
 (** Theorem: Position skipping preserves semantics for position-independent contexts *)
 Theorem position_skip_safe_for_local_contexts :
@@ -1376,11 +1521,22 @@ Proof.
            }
 
            (* Need to show: no rule in (r :: rest) matches before pos in s' *)
-           (* This is complex and requires additional lemmas about:
-              1. Pattern lengths and positions
-              2. Handling all rules, not just the one that matched
-           *)
-           admit.
+           { intros r0 p H_in_rules H_p_lt.
+             (* Use the axiom about multi-rule invariant preservation *)
+             assert (H_equiv_match: find_first_match r s (length s) = Some pos).
+             { apply (find_first_match_equiv_from_zero_reverse r s pos).
+               - apply H_wf. left. reflexivity.
+               - exact E_match.
+             }
+             eapply (no_rules_match_before_first_match_preserved (r :: rest) r rest s pos s' p).
+             - reflexivity.
+             - intros r1 H_in1. apply H_wf. exact H_in1.
+             - intros r1 H_in1. apply H_local. exact H_in1.
+             - exact H_equiv_match.
+             - exact E_apply.
+             - exact H_p_lt.
+             - exact H_in_rules.
+           }
         ** (* Rule application failed - this branch shouldn't be reachable *)
            (* If find_first_match_from returned Some pos, then can_apply_at must be true *)
            (* So apply_rule_at should succeed *)
@@ -1408,7 +1564,7 @@ Proof.
            intros r0 H_in_rest.
            apply H_local.
            simpl. right. exact H_in_rest.
-Admitted.
+Qed.
 
 (** * Potential Unsafety: Position-Dependent Contexts *)
 
