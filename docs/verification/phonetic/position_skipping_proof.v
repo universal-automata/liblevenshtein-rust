@@ -1232,6 +1232,124 @@ Proof.
       * (* Order *) lia.
 Qed.
 
+(** * Multi-Rule Invariant: Infrastructure for Proving Position-Skipping Safety *)
+
+(** ** Invariant Predicate Definitions *)
+
+(** The fundamental invariant: no rules in the list match at any position before max_pos *)
+Definition no_rules_match_before (rules : list RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  forall r, In r rules -> forall p, (p < max_pos)%nat -> can_apply_at r s p = false.
+
+(** Variant with pattern length constraint: only positions where patterns fit *)
+Definition no_rules_match_before_with_space (rules : list RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  forall r, In r rules ->
+    forall p, (p < max_pos)%nat ->
+      (p + length (pattern r) <= max_pos)%nat ->
+      can_apply_at r s p = false.
+
+(** ** Establishment Lemmas: find_first_match establishes the invariant *)
+
+(** Lemma: When find_first_match finds a position for a single rule,
+    all earlier positions don't match *)
+Lemma find_first_match_establishes_invariant_single :
+  forall r s pos,
+    wf_rule r ->
+    find_first_match r s (length s) = Some pos ->
+    no_rules_match_before [r] s pos.
+Proof.
+  intros r s pos H_wf H_find.
+  unfold no_rules_match_before.
+  intros r0 H_in p H_p_lt.
+  (* r0 must be r since [r] is a singleton list *)
+  destruct H_in as [H_eq | H_in_empty].
+  - (* r0 = r *)
+    subst r0.
+    (* Use find_first_match_is_first lemma *)
+    eapply find_first_match_is_first; eauto.
+    (* Need to show: length s - length s <= p *)
+    lia.
+  - (* r0 ∈ [] - impossible *)
+    inversion H_in_empty.
+Qed.
+
+(** Lemma: The invariant holds for the empty rule list (vacuously true) *)
+Lemma no_rules_match_before_empty :
+  forall s pos,
+    no_rules_match_before [] s pos.
+Proof.
+  intros s pos.
+  unfold no_rules_match_before.
+  intros r H_in.
+  inversion H_in.  (* No rules in empty list *)
+Qed.
+
+(** ** Preservation Lemmas: The invariant is preserved by transformation *)
+
+(** Lemma: If a single rule doesn't match before pos in s,
+    it won't match after transformation to s' (with pattern bound constraint) *)
+Lemma single_rule_no_match_preserved :
+  forall r r_applied s pos s' p,
+    wf_rule r_applied ->
+    wf_rule r ->
+    position_dependent_context (context r) = false ->
+    apply_rule_at r_applied s pos = Some s' ->
+    (p < pos)%nat ->
+    (p + length (pattern r) <= pos)%nat ->  (* Pattern fits before transformation point *)
+    can_apply_at r s p = false ->
+    can_apply_at r s' p = false.
+Proof.
+  intros r r_applied s pos s' p H_wf_applied H_wf H_indep H_apply H_p_lt H_pattern_bound H_no_match_s.
+  (* Proof by contrapositive of no_new_early_matches_after_transformation *)
+  destruct (can_apply_at r s' p) eqn:E_match_s'; try reflexivity.
+  (* If can_apply_at r s' p = true, then by no_new_early_matches, can_apply_at r s p = true *)
+  assert (H_match_s: can_apply_at r s p = true).
+  { apply (no_new_early_matches_after_transformation r_applied s pos s' r p H_wf_applied H_wf H_indep H_apply H_p_lt H_pattern_bound E_match_s'). }
+  (* But this contradicts H_no_match_s *)
+  rewrite H_match_s in H_no_match_s.
+  discriminate H_no_match_s.
+Qed.
+
+(** Lemma: If no rules in a list match before pos in s,
+    and patterns all fit, then no rules match after transformation *)
+Lemma all_rules_no_match_preserved :
+  forall rules r_applied s pos s' p,
+    wf_rule r_applied ->
+    (forall r0, In r0 rules -> wf_rule r0) ->
+    (forall r0, In r0 rules -> position_dependent_context (context r0) = false) ->
+    (forall r0, In r0 rules -> (p + length (pattern r0) <= pos)%nat) ->  (* All patterns fit *)
+    apply_rule_at r_applied s pos = Some s' ->
+    (p < pos)%nat ->
+    no_rules_match_before rules s pos ->
+    no_rules_match_before rules s' p.
+Proof.
+  intros rules r_applied s pos s' p H_wf_applied H_wf_all H_indep_all H_pattern_bounds H_apply H_p_lt H_inv_before.
+  unfold no_rules_match_before in *.
+  intros r0 H_in_r0 p0 H_p0_lt.
+
+  (* Get the hypothesis that r0 doesn't match in s *)
+  assert (H_r0_no_match_s: can_apply_at r0 s p0 = false).
+  { apply H_inv_before.
+    - exact H_in_r0.
+    - (* p0 < p < pos, so p0 < pos *)
+      lia.
+  }
+
+  (* Apply single-rule preservation *)
+  eapply single_rule_no_match_preserved.
+  - exact H_wf_applied.
+  - apply H_wf_all. exact H_in_r0.
+  - apply H_indep_all. exact H_in_r0.
+  - exact H_apply.
+  - (* p0 < p < pos *)
+    lia.
+  - (* Pattern bound: p0 + length(pattern r0) <= pos *)
+    assert (H_bound: (p + length (pattern r0) <= pos)%nat).
+    { apply H_pattern_bounds. exact H_in_r0. }
+    (* Since p0 < p, we have p0 + length(pattern) <= p + length(pattern) <= pos *)
+    lia.
+  - exact H_r0_no_match_s.
+Qed.
+
 (** Axiom: Multi-rule invariant for position-independent contexts
 
     When find_first_match finds a position for the first rule, all earlier positions
