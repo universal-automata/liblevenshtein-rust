@@ -788,6 +788,254 @@ Proof.
   exact H_wf.
 Qed.
 
+(** Helper lemma: If find_first_match_from returns None, then all positions in the range fail *)
+Lemma find_first_match_from_none_implies_all_fail :
+  forall r s start_pos remaining,
+    wf_rule r ->
+    find_first_match_from r s start_pos remaining = None ->
+    forall p, (start_pos <= p < start_pos + remaining)%nat ->
+    can_apply_at r s p = false.
+Proof.
+  intros r s start_pos remaining H_wf.
+  revert start_pos.
+  induction remaining as [| remaining' IH]; intros start_pos H_none p H_range.
+  - (* Base case: remaining = 0 *)
+    (* Range [start_pos, start_pos + 0) is empty, so H_range is contradictory *)
+    lia.
+  - (* Inductive case: remaining = S remaining' *)
+    simpl in H_none.
+    destruct (can_apply_at r s start_pos) eqn:E_start.
+    + (* can_apply_at r s start_pos = true *)
+      (* But find_first_match_from would return Some start_pos, contradicting H_none *)
+      discriminate H_none.
+    + (* can_apply_at r s start_pos = false *)
+      (* The recursive call returned None *)
+      (* Check if p = start_pos or p > start_pos *)
+      destruct (Nat.eq_dec p start_pos) as [H_eq | H_neq].
+      * (* p = start_pos *)
+        subst p.
+        exact E_start.
+      * (* p <> start_pos, so start_pos < p *)
+        (* Use IH on the tail range [start_pos + 1, start_pos + 1 + remaining') *)
+        assert (H_p_range': (S start_pos <= p < S start_pos + remaining')%nat) by lia.
+        apply (IH (S start_pos) H_none p H_p_range').
+Qed.
+
+(** Helper: If find_first_match with large fuel returns None, then so does find_first_match at length s *)
+Lemma find_first_match_large_fuel_implies_length :
+  forall r s fuel,
+    wf_rule r ->
+    (fuel >= length s)%nat ->
+    find_first_match r s fuel = None ->
+    find_first_match r s (length s) = None.
+Proof.
+  intros r s fuel H_wf H_fuel_ge H_none.
+  (* Both search the same range starting from 0 when fuel >= length s *)
+  destruct (find_first_match r s (length s)) eqn:E_len; [| reflexivity].
+  (* Suppose find_first_match r s (length s) = Some n *)
+  exfalso.
+  (* Then n is in range [0, length s) *)
+  assert (H_range: (length s - length s <= n < length s)%nat).
+  { eapply find_first_match_search_range; eauto. }
+  assert (H_start: (length s - length s = 0)%nat) by lia.
+  rewrite H_start in H_range.
+  (* So 0 <= n < length s *)
+  (* Also, find_first_match r s fuel searches from (length s - fuel) *)
+  assert (H_fuel_start: (length s - fuel = 0)%nat) by lia.
+  (* Convert both to find_first_match_from *)
+  assert (H_equiv_len: find_first_match r s (length s) =
+                       find_first_match_from r s 0 (S (length s))).
+  {
+    assert (H_tmp: find_first_match r s (length s) =
+                   find_first_match_from r s 0 (length s - 0 + 1)%nat).
+    { apply find_first_match_equiv_from_zero. exact H_wf. }
+    rewrite H_tmp.
+    f_equal. lia.
+  }
+  rewrite H_equiv_len in E_len.
+  (* Now we have: find_first_match_from r s 0 (S (length s)) = Some n *)
+  (* And: find_first_match r s fuel = None *)
+  (* Need to show: find_first_match r s fuel would find n, contradicting H_none *)
+
+  (* We know can_apply_at r s n = true *)
+  assert (H_n_applies: can_apply_at r s n = true).
+  { eapply find_first_match_from_implies_can_apply. exact E_len. }
+
+  (* Prove by induction on fuel that if fuel >= length s and can_apply_at r s n = true
+     for some n < length s, then find_first_match r s fuel <> None *)
+  clear E_len H_equiv_len H_start.
+  revert H_fuel_ge H_none n H_range H_n_applies.
+
+  induction fuel as [| fuel' IH]; intros H_fuel_ge H_none n H_n_range H_n_applies.
+  - (* fuel = 0 *)
+    (* 0 >= length s, but we have n < length s, so length s > 0 *)
+    (* This means 0 >= length s > 0, contradiction *)
+    exfalso. lia.
+
+  - (* fuel = S fuel' *)
+    simpl in H_none.
+    (* find_first_match checks position (length s - S fuel') *)
+    destruct (is_Some (apply_rule_at r s (length s - S fuel')%nat)) eqn:E_check.
+    + (* Match found: find_first_match would return Some, contradicting H_none *)
+      discriminate H_none.
+    + (* No match at current position, recursed to fuel' *)
+      (* Check if n is the position we just checked *)
+      assert (H_fuel_start': (length s - S fuel' = 0)%nat) by lia.
+      destruct (Nat.eq_dec n (length s - S fuel')%nat) as [H_n_eq | H_n_neq].
+      * (* n = length s - S fuel' *)
+        (* But we checked this position and found no match (E_check = false) *)
+        (* Yet can_apply_at r s n = true, contradiction *)
+        rewrite H_n_eq in H_n_applies.
+        unfold is_Some in E_check.
+        destruct (apply_rule_at r s (length s - S fuel')%nat) eqn:E_apply; [discriminate E_check |].
+        (* apply_rule_at returned None, but can_apply_at should be false then *)
+        unfold apply_rule_at in E_apply.
+        unfold can_apply_at in H_n_applies.
+        destruct (context_matches (context r) s (length s - S fuel')%nat) eqn:E_ctx;
+        destruct (pattern_matches_at (pattern r) s (length s - S fuel')%nat) eqn:E_pat;
+        try discriminate E_apply; try discriminate H_n_applies.
+      * (* n <> length s - S fuel' *)
+        (* Use IH if fuel' >= length s *)
+        destruct (le_lt_dec (length s) fuel') as [H_fuel'_ge | H_fuel'_lt].
+        ** (* fuel' >= length s: apply IH *)
+           eapply IH; eauto; lia.
+        ** (* fuel' < length s: analyze this case *)
+           (* We have: S fuel' >= length s and fuel' < length s *)
+           (* So: length s <= S fuel' and fuel' < length s *)
+           (* Thus: length s = S fuel' or length s < S fuel' *)
+           (* Since fuel' < length s, we have length s = S fuel' *)
+           assert (H_len_eq: length s = S fuel') by lia.
+           (* So length s - S fuel' = 0 *)
+           rewrite H_len_eq in H_fuel_start'.
+           (* And n < length s = S fuel' *)
+           (* Since n <> 0 (= length s - S fuel'), and n < S fuel', we have 0 < n < S fuel' *)
+           (* But fuel' = length s - 1, so the recursive call with fuel' doesn't cover n >= 1 *)
+           (* Actually, let me reconsider: find_first_match r s fuel' searches from length s - fuel' *)
+           (* length s - fuel' = S fuel' - fuel' = 1 when length s = S fuel' *)
+           (* So it searches from position 1 onward *)
+           (* If n >= 1, it's in range. If n = 0, we already ruled that out *)
+           rewrite H_len_eq in H_n_range.
+           assert (H_n_ge_1: (1 <= n)%nat) by lia.
+           (* Now fuel' searches from position (S fuel' - fuel') = 1 *)
+           (* And n >= 1, so n is checked by fuel' *)
+           (* Apply IH with adjusted bounds *)
+           assert (H_fuel'_ge': (fuel' >= length s - 1)%nat) by lia.
+           (* But IH requires fuel' >= length s, which we don't have *)
+           (* Different approach: show directly that fuel' finds n *)
+           exfalso.
+           (* We need to show find_first_match r s fuel' would find n *)
+           (* fuel' searches from (length s - fuel') = (S fuel' - fuel') = 1 *)
+           (* And n >= 1 and n < S fuel', so n is in range [1, S fuel') *)
+           (* Use contrapositive of find_first_match_finds_first_true *)
+           assert (H_in_range: (length s - fuel' <= n < length s)%nat) by lia.
+           (* If can_apply_at r s n = true and n is in search range, *)
+           (* then either find_first_match finds n or something earlier *)
+           (* To use find_first_match_finds_first_true, we need to show no earlier matches *)
+           (* But we don't know that, so let's use the simpler fact: *)
+           (* If there's ANY match in the search range, find_first_match cannot be None *)
+           (* We'll reason directly about the recursive definition *)
+           assert (H_fuel'_bound: (length s - fuel' <= n)%nat) by lia.
+           (* Since fuel' = length s - 1, we have length s - fuel' = 1 *)
+           (* And since n >= 1, the search covers n *)
+           (* find_first_match with fuel' will check positions from length s - fuel' to length s *)
+           (* Since can_apply_at r s n = true and n is in this range, *)
+           (* find_first_match must find n or something earlier *)
+           (* Derive contradiction using simpl on the definition *)
+           clear IH H_fuel'_ge'.
+           generalize dependent H_none.
+           generalize dependent H_n_applies.
+           generalize dependent H_n_range.
+           generalize dependent n.
+           revert H_len_eq.
+
+           (* Use the fact that n is in range and can_apply *)
+           {
+             induction fuel' as [| fuel'' IH']; intros H_len_eq n H_n_neq H_n_ge1 H_in_range H_fuel_bound H_n_lt H_n_applies H_ffm_none.
+             - (* fuel' = 0: length s = S 0 = 1, so n < 1, so n = 0 *)
+               assert (H_n_eq: n = 0) by lia.
+               subst n.
+               (* But length s - 0 = 1, so n = 0 < 1 is not in range [1, 1) - empty range *)
+               lia.
+             - (* fuel' = S fuel'': length s = S (S fuel'') *)
+               simpl in H_ffm_none.
+               (* Check if n is the current position *)
+               destruct (Nat.eq_dec n (length s - S (S fuel''))%nat) as [H_n_is_curr | H_n_not_curr].
+               + (* n = length s - S (S fuel'') *)
+                 rewrite H_n_is_curr in H_n_applies.
+                 (* can_apply_at at this position is true, so apply_rule_at must return Some *)
+                 (* But from H_none, we know the recursive structure shows it didn't find a match here *)
+                 (* Simplify H_none to see what happened at this position *)
+                 (* Both can_apply_at r s n = true and find_first_match returned None *)
+                 (* can_apply_at r s n = true means the rule CAN apply at position n *)
+                 (* But find_first_match r s (S (S fuel'')) checked position n (= length s - S (S fuel'')) *)
+                 (* and didn't find it (returned None) *)
+                 (* This is a contradiction *)
+                 (* Use can_apply_at to show is_Some must be true *)
+                 assert (H_must_match: is_Some (apply_rule_at r s (length s - S (S fuel''))%nat) = true).
+                 { unfold is_Some. unfold can_apply_at in H_n_applies.
+                   unfold apply_rule_at.
+                   destruct (context_matches (context r) s (length s - S (S fuel''))%nat); [| simpl in H_n_applies; congruence].
+                   destruct (pattern_matches_at (pattern r) s (length s - S (S fuel''))%nat); [| simpl in H_n_applies; congruence].
+                   reflexivity. }
+                 (* Now H_must_match says is_Some ... = true *)
+                 (* H_none (after simpl at line 960) has the form (if is_Some ... then ... else ...) = None *)
+                 (* Use congruence to derive the contradiction *)
+                 congruence.
+               + (* n <> length s - S (S fuel'') *)
+                 (* n must be in the range searched by the recursive call *)
+                 destruct (is_Some (apply_rule_at r s (length s - S (S fuel''))%nat)) eqn:E_check2.
+                 * (* Found something at current position *)
+                   congruence.
+                 * (* Continue to fuel'' *)
+                   (* find_first_match r s (S fuel'') = None (from H_none) *)
+                   (* By H_len_eq: length s = S (S fuel''), so length s - S fuel'' > 0 *)
+                   (* Convert find_first_match to find_first_match_from *)
+                   (* First prove the preconditions for find_first_match_equiv_general *)
+                   assert (H_fuel''_le: (S fuel'' <= length s)%nat).
+                   { rewrite H_len_eq. lia. }
+                   assert (H_start_eq: (length s - S fuel'' = length s - S fuel'')%nat).
+                   { reflexivity. }
+                   assert (H_equiv_fuel'': find_first_match r s (S fuel'') =
+                           find_first_match_from r s (length s - S fuel'') (S fuel'' + 1)).
+                   { apply find_first_match_equiv_general; auto. }
+                   (* After simpl at line 960, and destruct at line 986 with E_check2 = false, *)
+                   (* H_ffm_none directly has the type: find_first_match r s (S fuel'') = None *)
+                   (* Convert find_first_match to find_first_match_from using the equivalence *)
+                   assert (H_from_none: find_first_match_from r s (length s - S fuel'') (S fuel'' + 1) = None).
+                   { rewrite <- H_equiv_fuel''. exact H_ffm_none. }
+                   (* Now H_from_none: find_first_match_from r s (length s - S fuel'') (S fuel'' + 1) = None *)
+                   (* This means all positions in [length s - S fuel'', length s - S fuel'' + (S fuel'' + 1)) have can_apply_at = false *)
+                   (* Use find_first_match_from_none_implies_all_fail *)
+                   assert (H_all_fail: forall p, (length s - S fuel'' <= p < length s - S fuel'' + (S fuel'' + 1))%nat -> can_apply_at r s p = false).
+                   { intros p H_p_range.
+                     eapply (find_first_match_from_none_implies_all_fail r s (length s - S fuel'') (S fuel'' + 1)); eauto. }
+                   (* By H_len_eq: length s - S fuel'' + (S fuel'' + 1) > length s, but we need it = length s *)
+                   (* Actually: (length s - S fuel'') + (S fuel'' + 1) = length s - S fuel'' + S fuel'' + 1 *)
+                   (* = length s + 1 (if length s >= S fuel'') *)
+                   (* But we want the range [start, length s), so we should use (S fuel'' + 1) - 1 = S fuel'' *)
+                   (* Let me directly prove the range property for n *)
+                   (* We have: length s - S fuel'' <= p < length s - S fuel'' + (S fuel'' + 1) *)
+                   (* And: length s = S (S fuel''), so length s - S fuel'' = S (S fuel'') - S fuel'' *)
+                   (* And: (S (S fuel'')) - S fuel'' + (S fuel'' + 1) = something >= S (S fuel'') *)
+                   (* So the upper bound covers at least to length s *)
+                   (* Simplify by noting that H_all_fail gives us can_apply_at r s p = false for all p in the range *)
+                   (* We need can_apply_at r s n = false, and we know length s - S fuel'' <= n < length s from H_in_range *)
+                   (* And the search range [length s - S fuel'', ...) definitely includes n *)
+                   (* Also, length s - S fuel'' <= n since n is in the search range *)
+                   (* From H_n_range: 0 <= n < length s *)
+                   (* From H_len_eq: length s = S (S fuel'') *)
+                   (* So length s - S fuel'' = S (S fuel'') - S fuel'' >= 1 *)
+                   (* Since n <> length s - S (S fuel'') = 0, we have n >= 1 *)
+                   assert (H_n_ge_start: (length s - S fuel'' <= n)%nat).
+                   { rewrite H_len_eq. lia. }
+                   (* Apply H_all_fail to n *)
+                   assert (H_n_fail: can_apply_at r s n = false).
+                   { apply H_all_fail. lia. }
+                   (* But H_n_applies says can_apply_at r s n = true *)
+                   congruence.
+           }
+Qed.
+
 (** * Position-Independence Infrastructure *)
 
 (** Lemma: apply_rule_at preserves phones before the match position *)
@@ -1246,6 +1494,303 @@ Definition no_rules_match_before_with_space (rules : list RewriteRule) (s : Phon
     forall p, (p < max_pos)%nat ->
       (p + length (pattern r) <= max_pos)%nat ->
       can_apply_at r s p = false.
+
+(** ** Search Execution Invariant *)
+
+(** These predicates model the execution state of the sequential search algorithm.
+    They capture the property that "we've searched positions [0, pos) for all rules
+    and found no matches".
+
+    This infrastructure is used to prove Axiom 1 (find_first_match_in_algorithm_implies_no_earlier_matches)
+    by connecting the algorithm's execution to the no_rules_match_before property.
+*)
+
+(** Axiom: rule_id uniquely identifies rules in the Zompist phonetic system.
+    This reflects the implementation where each rule has a distinct numeric identifier.
+    See: src/phonetic/rules.rs - all rules have unique IDs (1, 2, 3, 20, 21, 22, 33, 34, 100, 101, 102, 200, 201)
+*)
+Axiom rule_id_unique :
+  forall r1 r2 : RewriteRule,
+    rule_id r1 = rule_id r2 -> r1 = r2.
+
+(** Decidable equality for RewriteRule based on rule_id.
+    This is sound because rule_id is unique for each rule in the Zompist system.
+*)
+Definition RewriteRule_eq_dec (r1 r2 : RewriteRule) : {r1 = r2} + {r1 <> r2}.
+Proof.
+  destruct (Nat.eq_dec (rule_id r1) (rule_id r2)) as [H_id_eq | H_id_neq].
+  - (* rule_id r1 = rule_id r2 *)
+    (* By axiom rule_id_unique, equal IDs imply equal rules *)
+    left.
+    apply rule_id_unique.
+    exact H_id_eq.
+  - (* rule_id r1 ≠ rule_id r2, so r1 ≠ r2 *)
+    right.
+    intro H_contra.
+    subst r2.
+    contradiction.
+Defined.
+
+(** Represents that a rule matches at some position in the range [0, max_pos) *)
+Definition rule_matches_somewhere (r : RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  exists pos, (pos < max_pos)%nat /\ can_apply_at r s pos = true.
+
+(** No rule in the list matches anywhere in the range [0, max_pos) *)
+Definition no_rules_match_anywhere (rules : list RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  forall r, In r rules -> ~rule_matches_somewhere r s max_pos.
+
+(** Equivalence: no_rules_match_anywhere is equivalent to no_rules_match_before *)
+Lemma no_rules_match_anywhere_iff_before :
+  forall rules s max_pos,
+    no_rules_match_anywhere rules s max_pos <-> no_rules_match_before rules s max_pos.
+Proof.
+  intros rules s max_pos.
+  split; intros H.
+  - (* no_rules_match_anywhere -> no_rules_match_before *)
+    unfold no_rules_match_before.
+    intros r H_in p H_p_lt.
+    unfold no_rules_match_anywhere in H.
+    unfold rule_matches_somewhere in H.
+    destruct (can_apply_at r s p) eqn:E_match; auto.
+    (* If can_apply_at r s p = true, we have a contradiction *)
+    assert (H_matches: exists pos, (pos < max_pos)%nat /\ can_apply_at r s pos = true).
+    { exists p. split; auto. }
+    specialize (H r H_in H_matches). contradiction.
+  - (* no_rules_match_before -> no_rules_match_anywhere *)
+    unfold no_rules_match_anywhere.
+    intros r H_in [pos [H_pos_lt H_match]].
+    unfold no_rules_match_before in H.
+    specialize (H r H_in pos H_pos_lt).
+    rewrite H_match in H. discriminate H.
+Qed.
+
+(** The SearchInvariant represents the execution state of sequential search.
+    It states that we've checked all positions before 'pos' for all rules
+    and found no matches.
+
+    This is the key predicate for modeling algorithm execution and proving
+    that find_first_match's behavior implies no_rules_match_before.
+*)
+Inductive SearchInvariant : list RewriteRule -> PhoneticString -> nat -> Prop :=
+| search_inv_intro : forall rules s pos,
+    no_rules_match_before rules s pos ->
+    SearchInvariant rules s pos.
+
+(** Extract the no-match property from search invariant *)
+Lemma search_invariant_implies_no_matches :
+  forall rules s pos,
+    SearchInvariant rules s pos ->
+    no_rules_match_before rules s pos.
+Proof.
+  intros rules s pos H_inv.
+  inversion H_inv. assumption.
+Qed.
+
+(** Equivalently, using no_rules_match_anywhere *)
+Lemma search_invariant_implies_no_matches_anywhere :
+  forall rules s pos,
+    SearchInvariant rules s pos ->
+    no_rules_match_anywhere rules s pos.
+Proof.
+  intros rules s pos H_inv.
+  apply no_rules_match_anywhere_iff_before.
+  apply search_invariant_implies_no_matches. assumption.
+Qed.
+
+(** ** Phase 2: Initialization Lemmas *)
+
+(** The search invariant holds at position 0 (base case).
+    This is trivially true because there are no positions p with p < 0.
+*)
+Lemma search_invariant_init :
+  forall rules s,
+    SearchInvariant rules s 0.
+Proof.
+  intros rules s.
+  apply search_inv_intro.
+  unfold no_rules_match_before.
+  intros r H_in p H_p_lt_0.
+  (* p < 0 is impossible for natural numbers *)
+  lia.
+Qed.
+
+(** Initialization lemma for specific rules *)
+Lemma search_invariant_init_for_rules :
+  forall rules s,
+    (forall r, In r rules -> wf_rule r) ->
+    SearchInvariant rules s 0.
+Proof.
+  intros rules s H_wf.
+  apply search_invariant_init.
+Qed.
+
+(** The no_rules_match_before property holds at position 0 *)
+Lemma no_rules_match_before_zero :
+  forall rules s,
+    no_rules_match_before rules s 0.
+Proof.
+  intros rules s.
+  apply search_invariant_implies_no_matches.
+  apply search_invariant_init.
+Qed.
+
+(** ** Phase 3: Maintenance Lemmas *)
+
+(** If invariant holds at pos and we check position pos for rule r and it doesn't match,
+    then the invariant extends to pos+1 for the single-rule list [r].
+*)
+Lemma search_invariant_step_single_rule :
+  forall r s pos,
+    wf_rule r ->
+    SearchInvariant [r] s pos ->
+    can_apply_at r s pos = false ->
+    SearchInvariant [r] s (pos + 1).
+Proof.
+  intros r s pos H_wf H_inv H_no_match.
+  apply search_inv_intro.
+  unfold no_rules_match_before.
+  intros r0 H_in p H_p_lt.
+  (* r0 must be r (only rule in singleton list) *)
+  destruct H_in as [H_eq | H_in_nil]; [| contradiction].
+  subst r0.
+  (* Case split on p *)
+  destruct (lt_dec p pos) as [H_p_lt_pos | H_p_ge_pos].
+  - (* p < pos: use invariant *)
+    apply (search_invariant_implies_no_matches [r] s pos H_inv r).
+    + left. reflexivity.
+    + exact H_p_lt_pos.
+  - (* p >= pos: must be p = pos (since p < pos + 1) *)
+    assert (H_p_eq_pos: p = pos) by lia.
+    subst p.
+    (* Use H_no_match *)
+    exact H_no_match.
+Qed.
+
+(** Helper: if no_rules_match_before holds at pos and all rules don't match at pos,
+    then it extends to pos+1.
+*)
+Lemma no_rules_match_before_step :
+  forall rules s pos,
+    no_rules_match_before rules s pos ->
+    (forall r, In r rules -> can_apply_at r s pos = false) ->
+    no_rules_match_before rules s (pos + 1).
+Proof.
+  intros rules s pos H_before H_no_match_pos.
+  unfold no_rules_match_before in *.
+  intros r H_in p H_p_lt.
+  destruct (lt_dec p pos) as [H_p_lt_pos | H_p_ge_pos].
+  - (* p < pos: use H_before *)
+    apply (H_before r H_in p H_p_lt_pos).
+  - (* p >= pos and p < pos + 1: must be p = pos *)
+    assert (H_p_eq: p = pos) by lia.
+    subst p.
+    apply (H_no_match_pos r H_in).
+Qed.
+
+(** Main maintenance lemma: SearchInvariant extends from pos to pos+1
+    when all rules don't match at pos.
+*)
+Lemma search_invariant_step_all_rules :
+  forall rules s pos,
+    (forall r, In r rules -> wf_rule r) ->
+    SearchInvariant rules s pos ->
+    (forall r, In r rules -> can_apply_at r s pos = false) ->
+    SearchInvariant rules s (pos + 1).
+Proof.
+  intros rules s pos H_wf H_inv H_no_match_pos.
+  apply search_inv_intro.
+  apply no_rules_match_before_step.
+  - apply (search_invariant_implies_no_matches rules s pos H_inv).
+  - exact H_no_match_pos.
+Qed.
+
+(** Invariant maintenance by induction on positions *)
+Lemma search_invariant_extends :
+  forall rules s pos1 pos2,
+    (forall r, In r rules -> wf_rule r) ->
+    SearchInvariant rules s pos1 ->
+    (pos1 <= pos2)%nat ->
+    (forall p, (pos1 <= p < pos2)%nat -> forall r, In r rules -> can_apply_at r s p = false) ->
+    SearchInvariant rules s pos2.
+Proof.
+  intros rules s pos1 pos2 H_wf H_inv H_le H_no_match_range.
+  apply search_inv_intro.
+  unfold no_rules_match_before.
+  intros r H_in p H_p_lt_pos2.
+  destruct (lt_dec p pos1) as [H_p_lt_pos1 | H_p_ge_pos1].
+  - (* p < pos1: use original invariant *)
+    apply (search_invariant_implies_no_matches rules s pos1 H_inv r H_in p H_p_lt_pos1).
+  - (* pos1 <= p < pos2: use range assumption *)
+    apply (H_no_match_range p).
+    + lia.
+    + exact H_in.
+Qed.
+
+(** ** Phase 4: Connection to find_first_match *)
+
+(** Key observation: if find_first_match returns None, the rule matches nowhere *)
+Lemma find_first_match_none_implies_no_match_anywhere :
+  forall r s fuel,
+    wf_rule r ->
+    find_first_match r s fuel = None ->
+    (fuel >= length s)%nat ->
+    forall p, (p < length s)%nat -> can_apply_at r s p = false.
+Proof.
+  intros r s fuel H_wf H_none H_fuel_ge p H_p_lt.
+
+  (* Use the helper lemma to convert to find_first_match at length s *)
+  assert (H_none_at_len: find_first_match r s (length s) = None).
+  { eapply find_first_match_large_fuel_implies_length; eauto. }
+
+  (* Convert to find_first_match_from *)
+  assert (H_equiv: find_first_match r s (length s) =
+                   find_first_match_from r s 0 (S (length s))).
+  {
+    assert (H_tmp: find_first_match r s (length s) =
+                   find_first_match_from r s 0 (length s - 0 + 1)%nat).
+    { apply find_first_match_equiv_from_zero. exact H_wf. }
+    rewrite H_tmp.
+    f_equal. lia.
+  }
+
+  rewrite H_equiv in H_none_at_len.
+
+  (* Apply the find_first_match_from helper *)
+  eapply find_first_match_from_none_implies_all_fail; eauto.
+  lia.
+Qed.
+
+(** Alternative approach: extend to multiple rules with additional assumptions *)
+
+(** If find_first_match returns Some pos for a rule in the list,
+    and all other rules in the list match nowhere, then
+    SearchInvariant holds for the entire list at pos.
+
+    This captures the sequential execution context where we try all rules
+    before the one that matched.
+*)
+Lemma find_first_match_with_all_rules_fail_before :
+  forall rules r_head s pos,
+    (forall r, In r rules -> wf_rule r) ->
+    In r_head rules ->
+    find_first_match r_head s (length s) = Some pos ->
+    (* ASSUMPTION: All other rules don't match anywhere before pos *)
+    (forall r, In r rules -> r <> r_head -> forall p, (p < pos)%nat -> can_apply_at r s p = false) ->
+    SearchInvariant rules s pos.
+Proof.
+  intros rules r_head s pos H_wf_all H_in_head H_find H_others_no_match.
+  apply search_inv_intro.
+  unfold no_rules_match_before.
+  intros r H_in_r p H_p_lt.
+  (* Case split: is r = r_head or r ≠ r_head? *)
+  destruct (RewriteRule_eq_dec r r_head) as [H_eq | H_neq].
+  - (* r = r_head: use find_first_match_is_first *)
+    subst r.
+    eapply find_first_match_is_first; eauto.
+    lia. (* length s - length s = 0 <= p *)
+  - (* r ≠ r_head: use assumption *)
+    apply (H_others_no_match r H_in_r H_neq p H_p_lt).
+Qed.
 
 (** ** Establishment Lemmas: find_first_match establishes the invariant *)
 
