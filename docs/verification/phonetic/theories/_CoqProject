@@ -1,0 +1,20 @@
+-R . Liblevenshtein.Phonetic.Verification
+
+# Auxiliary modules
+Auxiliary/Types.v
+Auxiliary/Lib.v
+
+# Core operations
+Core/Rules.v
+
+# Pattern modules
+Patterns/PatternHelpers.v
+Patterns/PatternOverlap.v
+
+# Invariant modules
+Invariants/SearchInvariant.v
+Invariants/NoMatch.v
+Invariants/AlgoState.v
+
+# Main proof
+Position_Skipping_Proof.v

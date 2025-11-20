@@ -1,0 +1,169 @@
+(** * Type Definitions and Predicates - Position Skipping Optimization
+
+    This module contains core type definitions, predicates, and axioms
+    used throughout the position skipping optimization proof.
+
+    Part of: Liblevenshtein.Phonetic.Verification.Auxiliary
+*)
+
+Require Import String List Arith Ascii Bool Nat Lia.
+Require Import PhoneticRewrites.rewrite_rules.
+Import ListNotations.
+
+(** * Core Type Definitions and Predicates *)
+
+(** ** Basic Matching Predicate *)
+
+(** Check if a rule can apply at a position without allocating result.
+    This is a lightweight check that combines context and pattern matching.
+*)
+Definition can_apply_at (r : RewriteRule) (s : PhoneticString) (pos : nat) : bool :=
+  if context_matches (context r) s pos then
+    pattern_matches_at (pattern r) s pos
+  else
+    false.
+
+(** ** No-Match Predicates *)
+
+(** No rules in the list match before a given position.
+    This is the central invariant maintained by the search algorithm.
+*)
+Definition no_rules_match_before (rules : list RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  forall r, In r rules -> forall p, (p < max_pos)%nat -> can_apply_at r s p = false.
+
+(** Variant with pattern length constraint: only positions where patterns fit *)
+Definition no_rules_match_before_with_space (rules : list RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  forall r, In r rules ->
+    forall p, (p < max_pos)%nat ->
+      (p + length (pattern r) <= max_pos)%nat ->
+      can_apply_at r s p = false.
+
+(** ** Rule Matching Predicates *)
+
+(** Represents that a rule matches at some position in the range [0, max_pos) *)
+Definition rule_matches_somewhere (r : RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  exists pos, (pos < max_pos)%nat /\ can_apply_at r s pos = true.
+
+(** No rule in the list matches anywhere in the range [0, max_pos) *)
+Definition no_rules_match_anywhere (rules : list RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
+  forall r, In r rules -> ~rule_matches_somewhere r s max_pos.
+
+(** ** Context and Position-Dependent Properties *)
+
+(** Context is preserved at positions before the transformation point *)
+Definition context_preserved_at_earlier_positions (ctx : Context) (s s' : PhoneticString) (transform_pos : nat) : Prop :=
+  forall check_pos,
+    (check_pos < transform_pos)%nat ->
+    context_matches ctx s check_pos = context_matches ctx s' check_pos.
+
+(** Check if a context depends on position.
+    Only Final context depends on position (string length).
+*)
+Definition position_dependent_context (ctx : Context) : bool :=
+  match ctx with
+  | Final => true  (* Depends on string length *)
+  | Initial => false  (* Position 0 is invariant *)
+  | BeforeVowel _ => false  (* Depends only on local structure *)
+  | AfterConsonant _ => false
+  | BeforeConsonant _ => false
+  | AfterVowel _ => false
+  | Anywhere => false
+  end.
+
+(** ** Search Invariants *)
+
+(** The SearchInvariant represents the execution state of sequential search.
+    It states that we've checked all positions before 'pos' for all rules
+    and found no matches.
+
+    This is the key predicate for modeling algorithm execution and proving
+    that find_first_match's behavior implies no_rules_match_before.
+*)
+Inductive SearchInvariant : list RewriteRule -> PhoneticString -> nat -> Prop :=
+| search_inv_intro : forall rules s pos,
+    no_rules_match_before rules s pos ->
+    SearchInvariant rules s pos.
+
+(** ** Algorithm State Model *)
+
+(** Models the execution state of the sequential search algorithm.
+    This inductive type captures how the algorithm advances through positions
+    and restarts after applying a rule.
+
+    Used to prove that the algorithm maintains the no_rules_match_before invariant.
+*)
+Inductive AlgoState : list RewriteRule -> PhoneticString -> nat -> Prop :=
+| algo_init : forall rules s,
+    (* Initial state: start searching from position 0 *)
+    AlgoState rules s 0
+
+| algo_step_no_match : forall rules s pos,
+    (* Current state at position pos *)
+    AlgoState rules s pos ->
+    (* No rules in the list match at position pos *)
+    (forall r, In r rules -> can_apply_at r s pos = false) ->
+    (* Advance to next position *)
+    AlgoState rules s (pos + 1)
+
+| algo_step_match_restart : forall rules r s pos s',
+    (* Current state at position pos *)
+    AlgoState rules s pos ->
+    (* Rule r from the list matches at pos *)
+    In r rules ->
+    can_apply_at r s pos = true ->
+    (* Apply the rule *)
+    apply_rule_at r s pos = Some s' ->
+    (* Restart from position 0 with transformed string *)
+    AlgoState rules s' 0.
+
+(** * Axioms *)
+
+(** ** Rule Identity *)
+
+(** Axiom: rule_id uniquely identifies rules in the Zompist phonetic system.
+    This reflects the implementation where each rule has a distinct numeric identifier.
+    See: src/phonetic/rules.rs - all rules have unique IDs (1, 2, 3, 20, 21, 22, 33, 34, 100, 101, 102, 200, 201)
+*)
+Axiom rule_id_unique :
+  forall r1 r2 : RewriteRule,
+    rule_id r1 = rule_id r2 -> r1 = r2.
+
+(** ** Algorithm Correctness Axiom *)
+
+(** Axiom 1: If find_first_match finds a position for a rule in the algorithm's execution,
+    then no rules matched before that position.
+
+    This axiom connects the behavior of find_first_match to the no_rules_match_before property,
+    which is essential for proving that position skipping preserves semantics.
+
+    Status: This axiom represents a key property that needs formal proof.
+    See AXIOM1_COMPLETION_GUIDE.md for the proof strategy.
+*)
+Axiom find_first_match_in_algorithm_implies_no_earlier_matches :
+  forall rules r_head s pos,
+    (forall r, In r rules -> wf_rule r) ->
+    In r_head rules ->
+    find_first_match r_head s (length s) = Some pos ->
+    (* Then: in the context of apply_rules_seq execution, we know that no rules
+       in the list matched at any position before pos in this iteration *)
+    no_rules_match_before rules s pos.
+
+(** * Decidable Equality for RewriteRule *)
+
+(** Decidable equality for RewriteRule based on rule_id.
+    This is sound because rule_id is unique for each rule in the Zompist system.
+*)
+Definition RewriteRule_eq_dec (r1 r2 : RewriteRule) : {r1 = r2} + {r1 <> r2}.
+Proof.
+  destruct (Nat.eq_dec (rule_id r1) (rule_id r2)) as [H_id_eq | H_id_neq].
+  - (* rule_id r1 = rule_id r2 *)
+    (* By axiom rule_id_unique, equal IDs imply equal rules *)
+    left.
+    apply rule_id_unique.
+    exact H_id_eq.
+  - (* rule_id r1 ≠ rule_id r2, so r1 ≠ r2 *)
+    right.
+    intro H_contra.
+    subst r2.
+    contradiction.
+Defined.

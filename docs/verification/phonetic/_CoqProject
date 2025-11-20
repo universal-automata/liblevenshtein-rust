@@ -1,0 +1,30 @@
+# Coq Project Configuration for Liblevenshtein Phonetic Verification
+
+# Namespace mapping: theories/ directory maps to Liblevenshtein.Phonetic.Verification
+-R theories Liblevenshtein.Phonetic.Verification
+
+# Namespace mapping: current directory for PhoneticRewrites (contains rewrite_rules.v)
+-Q . PhoneticRewrites
+
+# Coq standard library imports
+-arg -w -arg -deprecated-missing-stdlib
+
+# Module files (dependency order)
+
+# Auxiliary layer
+theories/Auxiliary/Types.v
+theories/Auxiliary/Lib.v
+
+# Core layer
+theories/Core/Rules.v
+
+# Invariants layer
+theories/Invariants/InvariantProperties.v
+theories/Invariants/AlgoState.v
+
+# Patterns layer (Axiom 2 - FULLY PROVEN)
+theories/Patterns/PatternHelpers.v
+theories/Patterns/PatternOverlap.v
+
+# Main proof module
+theories/Position_Skipping_Proof.v

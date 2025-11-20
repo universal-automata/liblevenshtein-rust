@@ -91,6 +91,9 @@ docs/verification/**/*.glob
 docs/verification/**/.*.aux
 docs/verification/**/html/
 docs/verification/**/extracted/
+docs/verification/**/Makefile
+docs/verification/**/Makefile.conf
+docs/verification/**/.Makefile.coq.d
 
 # Profiling artifacts
 *.perf.data
