@@ -93,7 +93,10 @@ docs/verification/**/html/
 docs/verification/**/extracted/
 docs/verification/**/Makefile
 docs/verification/**/Makefile.conf
+docs/verification/**/Makefile.coq
+docs/verification/**/Makefile.coq.conf
 docs/verification/**/.Makefile.coq.d
+docs/verification/**/.Makefile.d
 
 # Profiling artifacts
 *.perf.data
