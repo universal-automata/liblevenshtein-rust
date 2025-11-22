@@ -1150,6 +1150,273 @@ Proof.
   - exact H2_kC.
 Qed.
 
+(** * Infrastructure for Trace Validity Preservation *)
+
+(**
+   Extract order preservation from compatible_pairs.
+
+   If two pairs are compatible and have different components, then their
+   first and second components preserve the same order.
+*)
+Lemma compatible_pairs_order :
+  forall (i1 j1 i2 j2 : nat),
+    i1 <> i2 ->
+    j1 <> j2 ->
+    compatible_pairs (i1, j1) (i2, j2) = true ->
+    (i1 < i2 <-> j1 < j2).
+Proof.
+  intros i1 j1 i2 j2 H_i_neq H_j_neq H_compat.
+  unfold compatible_pairs in H_compat.
+  simpl in H_compat.
+
+  (* The compatible_pairs definition checks:
+     if i1 =? i2 && j1 =? j2 then true  (rejected by H_i_neq, H_j_neq)
+     else if i1 =? i2 || j1 =? j2 then false  (must be false for H_compat to be true)
+     else if i1 <? i2 then j1 <? j2 else j2 <? j1
+  *)
+
+  (* Case analysis based on the structure of compatible_pairs *)
+  destruct (i1 =? i2) eqn:H_i_eq.
+  - (* i1 = i2 - contradiction *)
+    apply Nat.eqb_eq in H_i_eq.
+    exfalso. apply H_i_neq. exact H_i_eq.
+  - (* i1 <> i2 *)
+    destruct (j1 =? j2) eqn:H_j_eq.
+    + (* j1 = j2 - contradiction *)
+      apply Nat.eqb_eq in H_j_eq.
+      exfalso. apply H_j_neq. exact H_j_eq.
+    + (* j1 <> j2 *)
+      (* Now we're in the third case: if i1 <? i2 then j1 <? j2 else j2 <? j1 *)
+      simpl in H_compat.
+      destruct (i1 <? i2) eqn:H_i_ltb.
+      * (* i1 < i2 *)
+        apply Nat.ltb_lt in H_i_ltb.
+        apply Nat.ltb_lt in H_compat.
+        split; intro; assumption.
+      * (* i1 >= i2, so i2 < i1 (since i1 <> i2) *)
+        apply Nat.ltb_ge in H_i_ltb.
+        apply Nat.ltb_lt in H_compat.
+        assert (H_i2_lt: i2 < i1).
+        { apply Nat.eqb_neq in H_i_eq. lia. }
+        split; intro H; exfalso; lia.
+Qed.
+
+(**
+   Valid traces have unique first components.
+
+   If a valid trace contains two pairs with the same first component,
+   they must have the same second component (i.e., each position in the
+   source can match at most one position in the target).
+*)
+Lemma valid_trace_unique_first :
+  forall (T : list (nat * nat)) (i j1 j2 : nat),
+    is_valid_trace_aux T = true ->
+    In (i, j1) T ->
+    In (i, j2) T ->
+    j1 = j2.
+Proof.
+  intros T i j1 j2 H_valid H_in1 H_in2.
+  induction T as [| [i' j'] T' IH].
+  - (* Base case: T = [] *)
+    contradiction.
+  - (* Inductive case: T = (i', j') :: T' *)
+    simpl in H_valid.
+    apply andb_true_iff in H_valid as [H_forall H_valid'].
+
+    simpl in H_in1, H_in2.
+    destruct H_in1 as [H_eq1 | H_in1]; destruct H_in2 as [H_eq2 | H_in2].
+
+    + (* (i, j1) = (i', j') and (i, j2) = (i', j') *)
+      inversion H_eq1; inversion H_eq2; subst.
+      reflexivity.
+
+    + (* (i, j1) = (i', j') and (i, j2) ∈ T' *)
+      inversion H_eq1; subst.
+      clear H_eq1.
+      (* Use compatibility: (i, j1) must be compatible with all pairs in T' *)
+      rewrite forallb_forall in H_forall.
+      specialize (H_forall (i, j2) H_in2).
+      unfold compatible_pairs in H_forall.
+      simpl in H_forall.
+      (* Check if i =? i and j1 =? j2 *)
+      rewrite Nat.eqb_refl in H_forall.
+      simpl in H_forall.
+      destruct (j1 =? j2) eqn:H_j_eq.
+      * (* j1 = j2 *)
+        apply Nat.eqb_eq in H_j_eq.
+        exact H_j_eq.
+      * (* j1 <> j2, but (i =? i) || (j1 =? j2) = true, making compatible_pairs false *)
+        (* The definition says: if i1=i2 || j1=j2 then false (when not both equal) *)
+        (* We have i=i (true) and j1≠j2, so the orb is true, result should be false *)
+        discriminate H_forall.
+
+    + (* (i, j1) ∈ T' and (i, j2) = (i', j') *)
+      inversion H_eq2; subst.
+      clear H_eq2.
+      (* Similar to previous case, symmetric *)
+      rewrite forallb_forall in H_forall.
+      specialize (H_forall (i, j1) H_in1).
+      unfold compatible_pairs in H_forall.
+      simpl in H_forall.
+      rewrite Nat.eqb_refl in H_forall.
+      simpl in H_forall.
+      destruct (j2 =? j1) eqn:H_j_eq.
+      * apply Nat.eqb_eq in H_j_eq.
+        symmetry. exact H_j_eq.
+      * discriminate H_forall.
+
+    + (* Both (i, j1) ∈ T' and (i, j2) ∈ T' *)
+      apply IH; assumption.
+Qed.
+
+(**
+   Valid traces have unique second components (symmetric version).
+
+   If a valid trace contains two pairs with the same second component,
+   they must have the same first component (i.e., each position in the
+   target can be matched by at most one position in the source).
+*)
+Lemma valid_trace_unique_second :
+  forall (T : list (nat * nat)) (i1 i2 j : nat),
+    is_valid_trace_aux T = true ->
+    In (i1, j) T ->
+    In (i2, j) T ->
+    i1 = i2.
+Proof.
+  intros T i1 i2 j H_valid H_in1 H_in2.
+  induction T as [| [i' j'] T' IH].
+  - (* Base case: T = [] *)
+    contradiction.
+  - (* Inductive case: T = (i', j') :: T' *)
+    simpl in H_valid.
+    apply andb_true_iff in H_valid as [H_forall H_valid'].
+
+    simpl in H_in1, H_in2.
+    destruct H_in1 as [H_eq1 | H_in1]; destruct H_in2 as [H_eq2 | H_in2].
+
+    + (* (i1, j) = (i', j') and (i2, j) = (i', j') *)
+      inversion H_eq1; inversion H_eq2; subst.
+      reflexivity.
+
+    + (* (i1, j) = (i', j') and (i2, j) ∈ T' *)
+      inversion H_eq1; subst.
+      clear H_eq1.
+      (* Use compatibility: (i1, j) must be compatible with all pairs in T' *)
+      rewrite forallb_forall in H_forall.
+      specialize (H_forall (i2, j) H_in2).
+      unfold compatible_pairs in H_forall.
+      simpl in H_forall.
+      (* Check if i1 =? i2 and j =? j *)
+      destruct (i1 =? i2) eqn:H_i_eq.
+      * (* i1 = i2 *)
+        apply Nat.eqb_eq in H_i_eq.
+        exact H_i_eq.
+      * (* i1 <> i2, but j = j, so the orb (i1 =? i2) || (j =? j) = true *)
+        rewrite Nat.eqb_refl in H_forall.
+        simpl in H_forall.
+        discriminate H_forall.
+
+    + (* (i1, j) ∈ T' and (i2, j) = (i', j') *)
+      inversion H_eq2; subst.
+      clear H_eq2.
+      (* Symmetric *)
+      rewrite forallb_forall in H_forall.
+      specialize (H_forall (i1, j) H_in1).
+      unfold compatible_pairs in H_forall.
+      simpl in H_forall.
+      destruct (i2 =? i1) eqn:H_i_eq.
+      * apply Nat.eqb_eq in H_i_eq.
+        symmetry. exact H_i_eq.
+      * rewrite Nat.eqb_refl in H_forall.
+        simpl in H_forall.
+        discriminate H_forall.
+
+    + (* Both (i1, j) ∈ T' and (i2, j) ∈ T' *)
+      apply IH; assumption.
+Qed.
+
+(**
+   Order preservation in valid traces.
+
+   If two distinct pairs are in a valid trace, their first and second
+   components preserve the same ordering relationship.
+*)
+Lemma valid_trace_order_preserved :
+  forall (T : list (nat * nat)) (i1 j1 i2 j2 : nat),
+    is_valid_trace_aux T = true ->
+    In (i1, j1) T ->
+    In (i2, j2) T ->
+    i1 <> i2 ->
+    (i1 < i2 <-> j1 < j2).
+Proof.
+  intros T i1 j1 i2 j2 H_valid H_in1 H_in2 H_neq.
+
+  (* First, prove that j1 <> j2 *)
+  assert (H_j_neq: j1 <> j2).
+  {
+    intro H_j_eq.
+    subst j2.
+    (* If j1 = j2, then by uniqueness of second components, i1 = i2 *)
+    assert (H_eq: i1 = i2).
+    { apply (valid_trace_unique_second T i1 i2 j1 H_valid H_in1 H_in2). }
+    contradiction.
+  }
+
+  (* Now extract compatibility from the valid trace *)
+  induction T as [| [i' j'] T' IH].
+  - (* Base: T = [] *)
+    contradiction.
+  - (* Inductive: T = (i', j') :: T' *)
+    simpl in H_valid.
+    apply andb_true_iff in H_valid as [H_forall H_valid'].
+
+    simpl in H_in1, H_in2.
+    destruct H_in1 as [H_eq1 | H_in1]; destruct H_in2 as [H_eq2 | H_in2].
+
+    + (* Both equal (i', j') - contradiction with i1 <> i2 *)
+      inversion H_eq1; inversion H_eq2; subst.
+      exfalso. apply H_neq. reflexivity.
+
+    + (* (i1, j1) = (i', j') and (i2, j2) ∈ T' *)
+      inversion H_eq1; subst.
+      clear H_eq1.
+      (* Apply compatibility *)
+      rewrite forallb_forall in H_forall.
+      specialize (H_forall (i2, j2) H_in2).
+      apply compatible_pairs_order; assumption.
+
+    + (* (i1, j1) ∈ T' and (i2, j2) = (i', j') *)
+      inversion H_eq2; subst.
+      clear H_eq2.
+      (* Apply compatibility - compatible_pairs (i2, j2) (i1, j1) *)
+      rewrite forallb_forall in H_forall.
+      specialize (H_forall (i1, j1) H_in1).
+      (* Use compatible_pairs_order with swapped arguments *)
+      assert (H_neq_sym: i2 <> i1).
+      { intro H_eq. symmetry in H_eq. contradiction. }
+      assert (H_j_neq_sym: j2 <> j1).
+      { intro H_eq. symmetry in H_eq. contradiction. }
+      apply compatible_pairs_order in H_forall; [| exact H_neq_sym | exact H_j_neq_sym].
+      (* H_forall now gives us: i2 < i1 <-> j2 < j1 *)
+      (* We need: i1 < i2 <-> j1 < j2, which is the contrapositive *)
+      split; intro H.
+      * (* i1 < i2 -> j1 < j2 *)
+        assert (H_not_i2_lt: ~ (i2 < i1)).
+        { lia. }
+        assert (H_not_j2_lt: ~ (j2 < j1)).
+        { intro H_j2_lt. apply H_not_i2_lt. apply H_forall. exact H_j2_lt. }
+        lia.
+      * (* j1 < j2 -> i1 < i2 *)
+        assert (H_not_j2_lt: ~ (j2 < j1)).
+        { lia. }
+        assert (H_not_i2_lt: ~ (i2 < i1)).
+        { intro H_i2_lt. apply H_not_j2_lt. apply H_forall. exact H_i2_lt. }
+        lia.
+
+    + (* Both in T' *)
+      apply IH; assumption.
+Qed.
+
 (**
    Compatible pairs compose transitively.
 
@@ -1184,26 +1451,112 @@ Proof.
       rewrite Nat.eqb_refl.
       reflexivity.
     + (* k1 ≠ k2 but i1 = i2 *)
-      (* This means j1 must equal j2 (since T1 is valid and can't have two pairs with same i) *)
-      (* Then in T2, we'd have (j1,k1) and (j1,k2) with j1=j2, k1≠k2 *)
-      (* But valid traces can't have multiple pairs with same first component *)
-      (* This is a contradiction, but proving it requires more infrastructure about valid traces *)
-      admit.
+      (* Since T1 is valid and contains (i1,j1) and (i1,j2), we must have j1 = j2 *)
+      assert (H_j_eq: j1 = j2).
+      { apply (valid_trace_unique_first T1 i1 j1 j2 H_valid1 H_in11 H_in12). }
+      subst j2.
+      (* Now T2 contains (j1,k1) and (j1,k2) with k1 ≠ k2 *)
+      (* By uniqueness of first components in T2, this is impossible *)
+      assert (H_k_eq: k1 = k2).
+      { apply (valid_trace_unique_first T2 j1 k1 k2 H_valid2 H_in21 H_in22). }
+      (* But we have k1 ≠ k2, contradiction *)
+      exfalso. apply H_k_neq. exact H_k_eq.
   - (* i1 ≠ i2 *)
     destruct (Nat.eq_dec k1 k2) as [H_k_eq | H_k_neq].
     + (* k1 = k2 but i1 ≠ i2 *)
-      (* Similar to above - would require j1 ≠ j2 but (j1,k1) and (j2,k1) in T2 *)
-      (* Contradiction with validity *)
-      admit.
+      (* Since T2 is valid and contains (j1,k1) and (j2,k2) with k1=k2, we must have j1 = j2 *)
+      subst k2.
+      assert (H_j_eq: j1 = j2).
+      { apply (valid_trace_unique_second T2 j1 j2 k1 H_valid2 H_in21 H_in22). }
+      subst j2.
+      (* Now T1 contains (i1,j1) and (i2,j1) with i1 ≠ i2 *)
+      (* By uniqueness of second components in T1, this is impossible *)
+      assert (H_i_eq: i1 = i2).
+      { apply (valid_trace_unique_second T1 i1 i2 j1 H_valid1 H_in11 H_in12). }
+      (* But we have i1 ≠ i2, contradiction *)
+      exfalso. apply H_i_neq. exact H_i_eq.
     + (* i1 ≠ i2 and k1 ≠ k2 *)
-      (* Need to show order preservation: i1 < i2 ⟺ k1 < k2 *)
-      (* This follows from transitivity: *)
-      (* - If i1 < i2, then j1 < j2 (by T1 compatibility) *)
-      (* - If j1 < j2, then k1 < k2 (by T2 compatibility) *)
-      (* - Thus i1 < i2 ⟹ k1 < k2 *)
-      (* Similarly for the other direction *)
-      admit.
-Admitted.
+      (* Show order preservation: i1 < i2 ⟺ k1 < k2 *)
+      (* By transitivity through the intermediate string B *)
+
+      (* Get order preservation for T1: i1 < i2 ⟺ j1 < j2 *)
+      assert (H_order1: i1 < i2 <-> j1 < j2).
+      { apply (valid_trace_order_preserved T1 i1 j1 i2 j2 H_valid1 H_in11 H_in12 H_i_neq). }
+
+      (* Get order preservation for T2: j1 < j2 ⟺ k1 < k2 *)
+      (* First check if j1 = j2 *)
+      destruct (Nat.eq_dec j1 j2) as [H_j_eq | H_j_neq].
+      * (* j1 = j2 - then from T1, we'd have i1 = i2, contradiction *)
+        subst j2.
+        assert (H_i_eq: i1 = i2).
+        { apply (valid_trace_unique_second T1 i1 i2 j1 H_valid1 H_in11 H_in12). }
+        exfalso. apply H_i_neq. exact H_i_eq.
+      * (* j1 ≠ j2 *)
+        assert (H_order2: j1 < j2 <-> k1 < k2).
+        { apply (valid_trace_order_preserved T2 j1 k1 j2 k2 H_valid2 H_in21 H_in22 H_j_neq). }
+
+        (* Combine the two: i1 < i2 ⟺ j1 < j2 ⟺ k1 < k2 *)
+        (* This gives us i1 < i2 ⟺ k1 < k2 *)
+        (* Work directly with the boolean conditions *)
+        destruct (i1 =? i2) eqn:H_i_eqb.
+        -- (* i1 = i2 - contradiction *)
+           apply Nat.eqb_eq in H_i_eqb.
+           exfalso. apply H_i_neq. exact H_i_eqb.
+        -- (* i1 <> i2 *)
+           destruct (k1 =? k2) eqn:H_k_eqb.
+           ++ (* k1 = k2 - contradiction *)
+              apply Nat.eqb_eq in H_k_eqb.
+              exfalso. apply H_k_neq. exact H_k_eqb.
+           ++ (* Both different, check order *)
+              simpl.
+              destruct (i1 <? i2) eqn:H_i_ltb.
+              ** (* i1 < i2 *)
+                 destruct (k1 <? k2) eqn:H_k_ltb.
+                 --- (* k1 < k2 - both orders match, result true *)
+                     reflexivity.
+                 --- (* k1 >= k2 - orders don't match, contradiction *)
+                     apply Nat.ltb_lt in H_i_ltb.
+                     apply Nat.ltb_ge in H_k_ltb.
+                     apply H_order1 in H_i_ltb as H_j_lt.
+                     apply H_order2 in H_j_lt as H_k_lt.
+                     exfalso. lia.
+              ** (* i1 >= i2, so i2 < i1 (since i1 <> i2) *)
+                 destruct (k1 <? k2) eqn:H_k_ltb.
+                 --- (* k1 < k2 - orders don't match, contradiction *)
+                     apply Nat.ltb_ge in H_i_ltb.
+                     apply Nat.ltb_lt in H_k_ltb.
+                     assert (H_j_lt: j1 < j2).
+                     { apply H_order2. exact H_k_ltb. }
+                     assert (H_i_lt: i1 < i2).
+                     { apply H_order1. exact H_j_lt. }
+                     exfalso. lia.
+                 --- (* k1 >= k2, so k2 < k1 (since k1 <> k2) - both reversed, result is k2 <? k1 *)
+                     (* The goal is (if i2 <? i1 then k2 <? k1 else k1 <? k2) = true *)
+                     (* Since i1 >= i2 and i1 <> i2, we have i2 < i1 *)
+                     apply Nat.ltb_ge in H_i_ltb.
+                     apply Nat.ltb_ge in H_k_ltb.
+                     assert (H_i2_lt: i2 < i1).
+                     { apply Nat.eqb_neq in H_i_eqb. lia. }
+                     (* We have i2 < i1, so we need to show k2 < k1 *)
+                     (* From i2 < i1, we get j2 < j1 (contrapositive of H_order1) *)
+                     assert (H_j2_lt: j2 < j1).
+                     { destruct H_order1 as [H_fwd H_bwd].
+                       assert (H_not_i_lt: ~ (i1 < i2)).
+                       { lia. }
+                       assert (H_not_j_lt: ~ (j1 < j2)).
+                       { intro H_j_lt. apply H_not_i_lt. apply H_bwd. exact H_j_lt. }
+                       lia. }
+                     (* From j2 < j1, we get k2 < k1 (by H_order2 contrapositive) *)
+                     assert (H_k2_lt: k2 < k1).
+                     { destruct H_order2 as [H_fwd H_bwd].
+                       assert (H_not_j_lt: ~ (j1 < j2)).
+                       { lia. }
+                       assert (H_not_k_lt: ~ (k1 < k2)).
+                       { intro H_k_lt. apply H_not_j_lt. apply H_bwd. exact H_k_lt. }
+                       lia. }
+                     (* Now apply Nat.ltb_lt to convert k2 < k1 to k2 <? k1 = true *)
+                     apply Nat.ltb_lt. exact H_k2_lt.
+Qed.
 
 (**
    Trace Composition Preserves Validity
