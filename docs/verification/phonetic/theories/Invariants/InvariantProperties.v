@@ -18,6 +18,7 @@ Require Import PhoneticRewrites.rewrite_rules.
 From Liblevenshtein.Phonetic.Verification Require Import Auxiliary.Types.
 From Liblevenshtein.Phonetic.Verification Require Import Auxiliary.Lib.
 From Liblevenshtein.Phonetic.Verification Require Import Core.Rules.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.Preservation.
 Import ListNotations.
 
 (** * Basic No-Match Lemmas *)
@@ -478,114 +479,6 @@ Proof.
   - exact H_r0_no_match_s.
 Qed.
 
-(** * Context Preservation Lemmas *)
-
-(** These lemmas prove that position-independent contexts remain valid
-    at earlier positions after a transformation.
-*)
-
-(** Lemma: Initial context is always preserved (only depends on pos = 0) *)
-Lemma initial_context_preserved :
-  forall s s' transform_pos,
-    (transform_pos > 0)%nat ->
-    context_preserved_at_earlier_positions Initial s s' transform_pos.
-Proof.
-  intros s s' transform_pos H_pos_gt.
-  unfold context_preserved_at_earlier_positions.
-  intros pos H_lt.
-  (* Initial only matches at position 0 *)
-  unfold context_matches.
-  destruct (Nat.eq_dec pos 0) as [H_eq | H_ne].
-  - (* pos = 0, and transform_pos > 0, so position 0 is unchanged *)
-    subst pos.
-    reflexivity.
-  - (* pos <> 0, so Initial doesn't match in either case *)
-    reflexivity.
-Qed.
-
-(** Lemma: Anywhere context is always preserved (always matches) *)
-Lemma anywhere_context_preserved :
-  forall s s' transform_pos,
-    context_preserved_at_earlier_positions Anywhere s s' transform_pos.
-Proof.
-  intros s s' transform_pos.
-  unfold context_preserved_at_earlier_positions.
-  intros pos H_lt.
-  unfold context_matches.
-  reflexivity.
-Qed.
-
-(** Lemma: BeforeVowel context is preserved at earlier positions *)
-Lemma before_vowel_context_preserved :
-  forall vowels s s' transform_pos,
-    (forall i, (i < transform_pos)%nat -> nth_error s i = nth_error s' i) ->
-    context_preserved_at_earlier_positions (BeforeVowel vowels) s s' transform_pos.
-Proof.
-  intros vowels s s' transform_pos H_prefix.
-  unfold context_preserved_at_earlier_positions.
-  intros pos H_lt.
-  unfold context_matches.
-  (* BeforeVowel checks nth_error s pos *)
-  (* We need to show: (match nth_error s pos with ...) = (match nth_error s' pos with ...) *)
-  rewrite <- (H_prefix pos H_lt).
-  reflexivity.
-Qed.
-
-(** Lemma: BeforeConsonant context is preserved at earlier positions *)
-Lemma before_consonant_context_preserved :
-  forall consonants s s' transform_pos,
-    (forall i, (i < transform_pos)%nat -> nth_error s i = nth_error s' i) ->
-    context_preserved_at_earlier_positions (BeforeConsonant consonants) s s' transform_pos.
-Proof.
-  intros consonants s s' transform_pos H_prefix.
-  unfold context_preserved_at_earlier_positions.
-  intros pos H_lt.
-  unfold context_matches.
-  (* BeforeConsonant checks nth_error s pos *)
-  rewrite <- (H_prefix pos H_lt).
-  reflexivity.
-Qed.
-
-(** Lemma: AfterConsonant context is preserved at earlier positions *)
-Lemma after_consonant_context_preserved :
-  forall consonants s s' transform_pos,
-    (forall i, (i < transform_pos)%nat -> nth_error s i = nth_error s' i) ->
-    context_preserved_at_earlier_positions (AfterConsonant consonants) s s' transform_pos.
-Proof.
-  intros consonants s s' transform_pos H_prefix.
-  unfold context_preserved_at_earlier_positions.
-  intros pos H_lt.
-  unfold context_matches.
-  (* AfterConsonant checks nth_error s (pos - 1) when pos > 0 *)
-  destruct pos as [| pos'].
-  - (* pos = 0: AfterConsonant returns false in both cases *)
-    reflexivity.
-  - (* pos = S pos': need to show nth_error s pos' = nth_error s' pos' *)
-    assert (H_pos'_lt: (pos' < transform_pos)%nat) by lia.
-    rewrite <- (H_prefix pos' H_pos'_lt).
-    reflexivity.
-Qed.
-
-(** Lemma: AfterVowel context is preserved at earlier positions *)
-Lemma after_vowel_context_preserved :
-  forall vowels s s' transform_pos,
-    (forall i, (i < transform_pos)%nat -> nth_error s i = nth_error s' i) ->
-    context_preserved_at_earlier_positions (AfterVowel vowels) s s' transform_pos.
-Proof.
-  intros vowels s s' transform_pos H_prefix.
-  unfold context_preserved_at_earlier_positions.
-  intros pos H_lt.
-  unfold context_matches.
-  (* AfterVowel checks nth_error s (pos - 1) when pos > 0 *)
-  destruct pos as [| pos'].
-  - (* pos = 0: AfterVowel returns false in both cases *)
-    reflexivity.
-  - (* pos = S pos': need to show nth_error s pos' = nth_error s' pos' *)
-    assert (H_pos'_lt: (pos' < transform_pos)%nat) by lia.
-    rewrite <- (H_prefix pos' H_pos'_lt).
-    reflexivity.
-Qed.
-
 (** * Multi-Rule Invariant Preservation *)
 
 (** Axiomatic Gap: Algorithm Semantic Property
@@ -611,6 +504,27 @@ Axiom find_first_match_in_algorithm_implies_no_earlier_matches :
     (* Then: in the context of apply_rules_seq execution, we know that no rules
        in the list matched at any position before pos in this iteration *)
     no_rules_match_before rules s pos.
+
+(** Axiomatic Gap: Pattern Overlap Preservation (Axiom 2)
+
+    This is the fundamental gap identified in the Axiom 2 proof attempt.
+    When a pattern overlaps with the transformation region, we cannot currently
+    prove that a non-match is preserved after transformation.
+
+    This axiom is proven in PatternOverlap.v (Axiom 2), but since that module
+    is compiled after this one, we declare it here as well.
+*)
+
+Axiom pattern_overlap_preservation :
+  forall r s pos s' r' p,
+    wf_rule r ->
+    wf_rule r' ->
+    position_dependent_context (context r') = false ->
+    apply_rule_at r s pos = Some s' ->
+    (p < pos)%nat ->
+    (pos < p + length (pattern r'))%nat ->  (* Pattern overlaps transformation *)
+    can_apply_at r' s p = false ->
+    can_apply_at r' s' p = false.
 
 (** Theorem: Multi-rule invariant for position-independent contexts
 

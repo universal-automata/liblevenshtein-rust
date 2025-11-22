@@ -1,0 +1,28 @@
+# Liblevenshtein Core Verification Library
+#
+# This library contains reusable formal proofs for core algorithms and data structures
+# used across multiple liblevenshtein components (contextual completion, transducer,
+# phonetic transformation, etc.).
+#
+# Namespace: Liblevenshtein.Core.Verification
+#
+# Dependencies: Coq Standard Library, Lia (linear integer arithmetic)
+#
+# Author: Formal Verification Team
+# Date: 2025-11-21
+
+-R theories Liblevenshtein.Core.Verification
+
+# Core theory files (to be compiled in dependency order)
+
+# Distance metrics and string similarity
+theories/Distance.v
+
+# TODO: UTF-8 string operations and character validity
+# theories/Strings.v
+
+# TODO: Generic tree operations, well-formedness, and traversal
+# theories/Trees.v
+
+# TODO: Checkpoint stack with undo/redo semantics
+# theories/Checkpoints.v

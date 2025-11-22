@@ -1,0 +1,19 @@
+-Q theories Liblevenshtein.Grammar.Verification
+-arg -w -arg -notation-overridden
+-arg -w -arg -deprecated-syntactic-definition
+
+theories/Core/Types.v
+theories/Core/Edit.v
+theories/Core/Lattice.v
+theories/Core/Program.v
+
+theories/Layers/Layer1.v
+theories/Layers/Layer2.v
+theories/Layers/Layer3.v
+theories/Layers/Layer4.v
+theories/Layers/Layer5.v
+
+theories/Composition/Forward.v
+theories/Composition/Backward.v
+theories/Composition/Pipeline.v
+theories/Composition/Correctness.v

@@ -104,6 +104,17 @@ Definition Phone_eqb (p1 p2 : Phone) : bool :=
   | _, _ => false
   end.
 
+(** Phone_eqb is symmetric *)
+Lemma Phone_eqb_sym : forall p1 p2, Phone_eqb p1 p2 = Phone_eqb p2 p1.
+Proof.
+  intros p1 p2.
+  destruct p1, p2; unfold Phone_eqb; simpl;
+  try reflexivity;
+  try (apply Ascii.eqb_sym).
+  (* Digraph case *)
+  f_equal; apply Ascii.eqb_sym.
+Qed.
+
 (** Check if an option is Some *)
 Definition is_Some {A : Type} (o : option A) : bool :=
   match o with

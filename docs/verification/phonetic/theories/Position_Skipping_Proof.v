@@ -28,7 +28,11 @@ From Liblevenshtein.Phonetic.Verification Require Import
   Auxiliary.Types Auxiliary.Lib
   Core.Rules
   Invariants.InvariantProperties Invariants.AlgoState
-  Patterns.PatternHelpers Patterns.PatternOverlap.
+  Patterns.PatternHelpers_Basic
+  Patterns.PatternHelpers_Mismatch_Simple
+  Patterns.PatternHelpers_Mismatch_Complex
+  Patterns.PatternHelpers_Leftmost
+  Patterns.PatternOverlap.
 
 Import ListNotations.
 

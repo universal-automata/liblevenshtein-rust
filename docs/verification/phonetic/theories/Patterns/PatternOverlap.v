@@ -21,7 +21,10 @@ Require Import PhoneticRewrites.rewrite_rules.
 From Liblevenshtein.Phonetic.Verification Require Import Auxiliary.Types.
 From Liblevenshtein.Phonetic.Verification Require Import Auxiliary.Lib.
 From Liblevenshtein.Phonetic.Verification Require Import Core.Rules.
-From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Basic.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Mismatch_Simple.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Mismatch_Complex.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Leftmost.
 Import ListNotations.
 
 (** * Helper Lemma: Leftmost Mismatch Location *)
@@ -107,7 +110,10 @@ Proof.
     intros. simpl in H_overlap. lia.
 
   - (* Non-empty pattern: ph_first :: pat_rest *)
-    intros i_left H_i_range H_i_mismatch H_all_before p H_p_lt_pos H_overlap H_no_match H_ge H_prefix_len H_prefix_matches.
+    intros i_left H_ge_new p H_p_lt_pos H_overlap H_i_range H_no_match H_i_mismatch H_all_before H_prefix_len H_prefix_matches.
+    (* NOTE: Hypothesis order from induction doesn't match original proof.
+       Rename to avoid confusion in proof body. *)
+    rename H_ge_new into H_ge.
 
     (* Position p must match (since p < pos <= i_left) *)
     assert (H_p_matches: exists s_ph pat_ph,
@@ -125,6 +131,8 @@ Proof.
     unfold pattern_matches_at in H_no_match.
     simpl in H_no_match.
     rewrite H_nth_p in H_no_match.
+    (* Need to flip H_eq_p due to Phone_eqb argument order *)
+    rewrite Phone_eqb_sym in H_eq_p.
     rewrite H_eq_p in H_no_match.
 
     (* Pattern matching continues with rest of pattern *)
@@ -168,6 +176,7 @@ Proof.
            replace (p - p)%nat with 0%nat in H_pat_p by lia.
            simpl in H_pat_p.
            injection H_pat_p as H_eq_pat. subst pat_ph.
+           rewrite <- Phone_eqb_sym in H_neq.
            rewrite H_eq_p in H_neq.
            discriminate H_neq.
 
@@ -176,7 +185,10 @@ Proof.
 
         (* i_left must be in tail range *)
         simpl in H_i_range.
-        assert (H_i_in_tail: (S p <= i_left < S p + length (ph_second :: pat_tail))%nat) by lia.
+        (* H_i_range now: p <= i_left < p + S (S (length pat_tail)) *)
+        (* Need: S p <= i_left < S p + S (length pat_tail) *)
+        assert (H_i_in_tail: (S p <= i_left < S p + length (ph_second :: pat_tail))%nat).
+        { simpl. lia. }
 
         (* Leftmost mismatch in tail is at i_left *)
         (* All positions [S p, i_left) match in tail *)
@@ -186,9 +198,9 @@ Proof.
             nth_error (ph_second :: pat_tail) (j - S p) = Some pat_ph /\
             Phone_eqb s_ph pat_ph = true).
         { intros j H_j_range.
-          destruct (H_all_before j) as [s_ph [pat_ph [H_s_j [H_pat_j H_eq_j]]]].
+          destruct (H_all_before j) as [s_ph_j [pat_ph_j [H_s_j [H_pat_j H_eq_j]]]].
           { lia. }
-          exists s_ph, pat_ph.
+          exists s_ph_j, pat_ph_j.
           split; [exact H_s_j | split].
           - simpl in H_pat_j.
             (* Need to adjust index: pattern index was (j - p), now need (j - S p) *)
@@ -218,20 +230,66 @@ Proof.
         (* Now apply IH to tail *)
         (* Need: S p < pos (follows from p < pos) *)
         (* Need: pos < S p + length (ph_second :: pat_tail) (follows from overlap) *)
-        assert (H_Sp_lt_pos: (S p < pos)%nat) by lia.
+        assert (H_Sp_lt_pos: (S p < pos)%nat).
+        { (* We have p < pos (H_p_lt_pos) which gives us S p <= pos.
+             We need strict inequality S p < pos.
+
+             Key insight: We're seeking a contradiction (exfalso).
+             We have i_left > p (from H_i_ne_p and i_left >= S p).
+             From H_ge, we have i_left >= pos.
+             From H_i_in_tail, we have i_left < S p + length (ph_second :: pat_tail).
+
+             If pos = S p, then i_left >= pos = S p.
+             But we showed that position p matches, so if all positions [p, pos) match,
+             and pos = S p, then only position p matches, and position S p is where
+             the pattern tail starts.
+
+             However, pattern matching would check position S p next.
+             Since i_left >= S p and pattern has length >= 2 (we have ph_second :: pat_tail),
+             if pos = S p, then the interval [p, pos) = [p, S p) contains only p.
+
+             But we're in a contradiction: all positions [p, pos) matched,
+             yet the leftmost mismatch i_left >= pos. If pos = S p, then
+             i_left >= S p, but we need i_left to be in the pattern range.
+
+             From simpl in H_overlap, we have pos < p + S (S (length pat_tail)).
+             This is pos < p + 2 + length pat_tail.
+
+             Actually, the correct way is to use the fact that we're deriving a
+             contradiction. Let's try lia with all the constraints. *)
+          lia. }
         simpl in H_overlap.
         assert (H_tail_overlap: (pos < S p + length (ph_second :: pat_tail))%nat) by lia.
 
         (* Apply IH *)
-        eapply IH; try eassumption.
-        -- exact H_i_in_tail.
-        -- exact H_tail_fail.
-        -- lia. (* i_left >= pos, so not < pos *)
-        -- lia. (* pos - S p > 0 since p + 1 < pos means S p < pos *)
+        eapply IH.
+        -- exact H_ge. (* ~ i_left < pos *)
+        -- exact H_Sp_lt_pos. (* S p < pos *)
+        -- exact H_tail_overlap. (* pos < S p + length tail *)
+        -- exact H_i_in_tail. (* S p <= i_left < S p + length tail *)
+        -- exact H_tail_fail. (* pattern doesn't match *)
+        -- exact H_tail_mismatch. (* mismatch at i_left *)
+        -- exact H_tail_before. (* all before i_left match *)
+        -- (* pos - S p > 0 *)
+           (* This follows from H_Sp_lt_pos: S p < pos means pos > S p,
+              which is equivalent to pos - S p > 0 *)
+           lia.
         -- (* Prefix matches for tail *)
            intros j H_j_range.
-           apply H_prefix_matches.
-           lia.
+           (* H_prefix_matches gives us info about the full pattern at j *)
+           (* We need info about the tail pattern at j *)
+           destruct (H_prefix_matches j) as [s_ph_j [pat_ph_j [H_s_j [H_pat_j H_eq_j]]]].
+           { lia. (* S p <= j < pos means p <= j < pos *) }
+           exists s_ph_j, pat_ph_j.
+           split; [exact H_s_j | split].
+           ++ (* nth_error (ph_second :: pat_tail) (j - S p) = Some pat_ph_j *)
+              (* We have: nth_error (ph_first :: ph_second :: pat_tail) (j - p) = Some pat_ph_j *)
+              (* Since j >= S p, we have j - p >= 1 *)
+              (* So (j - p) = S (j - S p) *)
+              replace (j - p)%nat with (S (j - S p)) in H_pat_j by lia.
+              simpl in H_pat_j.
+              exact H_pat_j.
+           ++ exact H_eq_j.
 Qed.
 
 (** * Main Theorem: Pattern Overlap Preservation (Axiom 2) *)
@@ -290,30 +348,35 @@ Proof.
     { (* Apply context preservation lemma based on context type *)
       destruct (context r) eqn:E_ctx; try discriminate H_indep.
       - (* Initial context *)
-        apply (initial_context_preserved r_applied s pos s' p H_wf_applied H_apply).
-        lia.
+        rewrite <- (initial_context_preserved r_applied s pos s' p H_wf_applied H_apply).
+        + exact E_ctx_s.
+        + lia.
+      - (* BeforeVowel context *)
+        rewrite <- (before_vowel_context_preserved l r_applied s pos s' p H_wf_applied H_apply H_p_lt).
+        + exact E_ctx_s.
+        + intros i H_i_lt.
+          destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+          symmetry. exact (H_before H_i_lt).
+      - (* AfterConsonant context *)
+        rewrite <- (after_consonant_context_preserved l r_applied s pos s' p H_wf_applied H_apply H_p_lt).
+        + exact E_ctx_s.
+        + intros i H_i_lt.
+          destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+          symmetry. exact (H_before H_i_lt).
+      - (* BeforeConsonant context *)
+        rewrite <- (before_consonant_context_preserved l r_applied s pos s' p H_wf_applied H_apply H_p_lt).
+        + exact E_ctx_s.
+        + intros i H_i_lt.
+          destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+          symmetry. exact (H_before H_i_lt).
+      - (* AfterVowel context *)
+        rewrite <- (after_vowel_context_preserved l r_applied s pos s' p H_wf_applied H_apply H_p_lt).
+        + exact E_ctx_s.
+        + intros i H_i_lt.
+          destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
+          symmetry. exact (H_before H_i_lt).
       - (* Anywhere context *)
         reflexivity.
-      - (* BeforeVowel context *)
-        eapply before_vowel_context_preserved; eauto.
-        intros i H_i_lt.
-        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
-        symmetry. apply H_before. exact H_i_lt.
-      - (* BeforeConsonant context *)
-        eapply before_consonant_context_preserved; eauto.
-        intros i H_i_lt.
-        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
-        symmetry. apply H_before. exact H_i_lt.
-      - (* AfterVowel context *)
-        eapply after_vowel_context_preserved; eauto.
-        intros i H_i_lt.
-        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
-        symmetry. apply H_before. exact H_i_lt.
-      - (* AfterConsonant context *)
-        eapply after_consonant_context_preserved; eauto.
-        intros i H_i_lt.
-        destruct (apply_rule_at_region_structure r_applied s pos s' H_wf_applied H_apply i) as [H_before _].
-        symmetry. apply H_before. exact H_i_lt.
     }
 
     rewrite H_ctx_s'.

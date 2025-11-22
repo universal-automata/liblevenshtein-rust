@@ -1,0 +1,18 @@
+-Q . Liblevenshtein.Grammar.Verification.NFA
+
+-arg -w -arg -notation-overridden
+-arg -w -arg -deprecated-syntactic-definition
+-arg -w -arg -undeclared-scope
+
+Types.v
+Operations.v
+Automaton.v
+Transitions.v
+Completeness.v
+Soundness.v
+Optimality.v
+Properties.v
+StateSpace.v
+TimeComplexity.v
+Layer1Integration.v
+Correctness.v

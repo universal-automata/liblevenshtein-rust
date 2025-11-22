@@ -1,6 +1,6 @@
 # Formal Verification of Levenshtein Automata
 
-**Project Status**: 🚧 Phase 1 Complete - Foundation established
+**Project Status**: 🚧 Phase 1 & 9 Complete - Foundation + Contextual Completion
 **Proof Assistant**: Rocq (formerly Coq)
 **Started**: 2025-11-17
 **Team**: Formal Verification Team
@@ -105,7 +105,16 @@ docs/formal-verification/      # Human-readable documentation
     ├── 02_position_invariants.md     # Phase 2 (TODO)
     ├── 03_standard_operations.md     # Phase 3 (TODO)
     ├── 04_multi_step_operations.md   # Phase 4 (TODO)
-    └── 05_state_management.md        # Phase 5 (TODO)
+    ├── 05_state_management.md        # Phase 5 (TODO)
+    └── 06_contextual_completion/      # Phase 9 ✓
+        ├── README.md                  # Category overview
+        ├── 01_context_visibility.md   # Context tree visibility
+        ├── 02_draft_consistency.md    # UTF-8 draft buffer operations
+        ├── 03_checkpoint_stack.md     # Undo/redo correctness
+        ├── 04_query_fusion.md         # Completion result correctness
+        ├── 05_distance_correctness.md # Levenshtein distance algorithm
+        ├── 06_hierarchical_visibility.md # Scope isolation
+        └── 07_finalization.md         # Atomicity of draft→dictionary
 ```
 
 ---
@@ -438,6 +447,58 @@ mod formal_verification_tests {
 - Extract Coq to OCaml/Haskell
 - Generate verified Rust via transpilation
 - CompCert-style certified compilation
+
+### Phase 9: Contextual Completion Correctness ✅ COMPLETE
+
+**Completed**: 2025-01-21
+
+**Goal**: Establish formal foundation for contextual completion engine used by rholang-language-server
+
+**Deliverables**:
+1. ✅ Category structure created (`proofs/06_contextual_completion/`)
+2. ✅ Category README (280 lines) - Overview, reading paths, dependencies
+3. ✅ **Theorem 1**: Context Tree Visibility (550 lines)
+   - Proves `visible_contexts()` returns all ancestors in order
+   - Soundness, completeness, correct ordering
+4. ✅ **Theorem 2**: Draft Buffer Consistency (650 lines)
+   - Proves UTF-8 validity preserved during insert/delete
+   - Leverages Rust's `char` type guarantees
+5. ✅ **Theorem 3**: Checkpoint Stack Correctness (600 lines)
+   - Proves undo/redo exactness and idempotence
+   - Length-only checkpoint design (8 bytes vs full buffer)
+6. ✅ **Theorem 4**: Query Fusion Completeness (concise)
+   - Proves `complete()` returns union of draft + finalized
+   - Soundness, completeness, deduplication, draft priority
+7. ✅ **Theorem 5**: Levenshtein Distance Correctness (full)
+   - Proves naive O(n·m) implementation matches Wagner-Fischer
+   - Triangle inequality, symmetry, identity proofs
+8. ✅ **Theorem 6**: Hierarchical Visibility Soundness (full)
+   - Proves children see parents, parents don't see children
+   - No lateral visibility (siblings isolated)
+9. ✅ **Theorem 7**: Finalization Atomicity (full)
+   - Proves draft→dictionary is all-or-nothing
+   - No partial states observable by concurrent queries
+
+**Key Insights**:
+- **Hybrid approach**: Documentation first (Phase 9.1), Coq formalization deferred (Phase 9.2)
+- **Digestible chunks**: 550-650 lines per theorem (3-6 pages)
+- **Implementation traceability**: Every theorem mapped to exact Rust source lines
+- **Downstream impact**: Enables formal verification of rholang-language-server scope detection
+
+**Verification Status**:
+- Documentation: ✅ Complete (7 theorems + category README)
+- Coq formalization: ⏳ TODO (Phase 9.2)
+- Property-based tests: ⏳ TODO (Phase 9.3)
+
+**Files Created**:
+- `proofs/06_contextual_completion/README.md`
+- `proofs/06_contextual_completion/01_context_visibility.md`
+- `proofs/06_contextual_completion/02_draft_consistency.md`
+- `proofs/06_contextual_completion/03_checkpoint_stack.md`
+- `proofs/06_contextual_completion/04_query_fusion.md`
+- `proofs/06_contextual_completion/05_distance_correctness.md`
+- `proofs/06_contextual_completion/06_hierarchical_visibility.md`
+- `proofs/06_contextual_completion/07_finalization.md`
 
 ---
 

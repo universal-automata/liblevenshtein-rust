@@ -256,6 +256,10 @@ name = "phonetic_rewrite"
 required-features = ["phonetic-rules"]
 
 [[example]]
+name = "phonetic_fuzzy_matching"
+required-features = ["phonetic-rules"]
+
+[[example]]
 name = "hierarchical_scope_completion"
 required-features = ["pathmap-backend"]
 

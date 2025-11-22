@@ -11,6 +11,9 @@
 
 # Module files (dependency order)
 
+# Phonetic rewrite rules (base layer)
+rewrite_rules.v
+
 # Auxiliary layer
 theories/Auxiliary/Types.v
 theories/Auxiliary/Lib.v
@@ -18,12 +21,23 @@ theories/Auxiliary/Lib.v
 # Core layer
 theories/Core/Rules.v
 
+# Patterns layer - Preservation (before Invariants to break circular dependency)
+theories/Patterns/Preservation.v
+
 # Invariants layer
 theories/Invariants/InvariantProperties.v
 theories/Invariants/AlgoState.v
 
 # Patterns layer (Axiom 2 - FULLY PROVEN)
-theories/Patterns/PatternHelpers.v
+# PatternHelpers split into 4 files to manage memory during compilation:
+# - Basic: lightweight lemmas (~10GB)
+# - Mismatch_Simple: simple helper lemmas (~5-10GB)
+# - Mismatch_Complex: pattern_matches_at_has_mismatch with nested induction (~60-80GB)
+# - Leftmost: leftmost mismatch analysis with deep nested induction (~80GB)
+theories/Patterns/PatternHelpers_Basic.v
+theories/Patterns/PatternHelpers_Mismatch_Simple.v
+theories/Patterns/PatternHelpers_Mismatch_Complex.v
+theories/Patterns/PatternHelpers_Leftmost.v
 theories/Patterns/PatternOverlap.v
 
 # Main proof module
