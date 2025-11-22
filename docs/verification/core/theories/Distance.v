@@ -2157,6 +2157,29 @@ Admitted.
    Note: This lemma is the main technical obstacle in Phase 3. Everything else
    (including the triangle inequality proof) works once this is proven.
 *)
+(**
+   Helper: Each element of the composition contributes at most the sum of corresponding
+   elements from T1 and T2.
+*)
+Lemma compose_trace_elem_bound :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k : nat),
+    In (i, k) (compose_trace T1 T2) ->
+    exists j,
+      In (i, j) T1 /\
+      In (j, k) T2 /\
+      subst_cost (nth (i-1) A default_char) (nth (k-1) C default_char) <=
+      subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char) +
+      subst_cost (nth (j-1) B default_char) (nth (k-1) C default_char).
+Proof.
+  intros A B C T1 T2 i k H_in.
+  (* Use In_compose_trace to get the witness *)
+  apply In_compose_trace in H_in as [j [H_T1 H_T2]].
+  exists j.
+  split; [exact H_T1 | split; [exact H_T2 |]].
+  (* Apply triangle inequality *)
+  apply subst_cost_triangle.
+Qed.
+
 Lemma change_cost_compose_bound :
   forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
     fold_left (fun acc p =>
@@ -2173,7 +2196,46 @@ Lemma change_cost_compose_bound :
       acc + subst_cost (nth (j-1) B default_char) (nth (k-1) C default_char)
     ) T2 0.
 Proof.
-  (* TODO Phase 4: Requires fold_left summation infrastructure *)
+  intros A B C T1 T2.
+
+  (* Strategy: The key insight is that the RHS is a FIXED SUM over T1 and T2.
+     Every element (i,k) in the composition has a witness j with (i,j) ∈ T1 and (j,k) ∈ T2.
+     The cost of (i,k) is bounded by cost(i,j) + cost(j,k) by triangle inequality.
+
+     The challenge: Multiple elements in the composition might share the same witness.
+     But that's okay! The RHS sums over ALL pairs in T1 and T2, including ones
+     that might not be used as witnesses.
+
+     So even if witnesses repeat, we're upper-bounding by the full sums.
+  *)
+
+  (* Let's try a direct approach: show that the LHS sum is bounded by a constant
+     that is itself bounded by the RHS.
+
+     Actually, this is still tricky because we need to relate sums over different lists.
+
+     Alternative: Use the fact that each cost in the composition is bounded.
+     Since fold_left just accumulates, if each element is bounded, the sum is bounded.
+     But we need to show: sum of bounds ≤ RHS.
+
+     The issue is that the "sum of bounds" involves witnesses that may repeat,
+     so we can't directly use fold_left_add_monotone.
+  *)
+
+  (* Let me try yet another approach: prove a stronger lemma about fold_left
+     where elements come from a different list but are bounded by sums. *)
+
+  (* Actually, the simplest approach: just admit this for now since it requires
+     the witness infrastructure we decided to skip. *)
+
+  (* TODO Option A: Requires more sophisticated approach than initially expected.
+     The witness multiplicity issue is fundamental.
+
+     Possible fixes:
+     1. Prove fold_left_sum_bound_witness after all
+     2. Use a different composition cost metric
+     3. Strengthen assumptions about uniqueness of witnesses
+  *)
   admit.
 Admitted.
 
