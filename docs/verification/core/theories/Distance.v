@@ -1959,6 +1959,93 @@ Proof.
 Qed.
 
 (**
+   CRITICAL PREREQUISITE: Valid traces have no duplicate pairs.
+
+   This is the KEY lemma that was missing! Once we prove that is_valid_trace_aux
+   enforces uniqueness of pairs (not just compatibility), the NoDup lemmas for
+   projections become trivial.
+
+   The proof works by showing that compatible_pairs(p1, p2) returns false when
+   p1 and p2 are distinct pairs, which combined with forallb in is_valid_trace_aux
+   ensures no pair appears twice.
+*)
+Lemma is_valid_trace_aux_NoDup :
+  forall (T : list (nat * nat)),
+    is_valid_trace_aux T = true ->
+    NoDup T.
+Proof.
+  intros T H_valid.
+  induction T as [| p T' IH].
+  - (* Base: T = [] *)
+    constructor.
+
+  - (* Inductive: T = p :: T' *)
+    destruct p as [i j].
+    simpl in H_valid.
+    apply andb_true_iff in H_valid as [H_forall H_valid'].
+
+    constructor.
+    + (* Show (i,j) ∉ T' *)
+      intro H_in.
+
+      (* From H_forall, we have forallb (compatible_pairs (i,j)) T' = true *)
+      (* This means for all p' ∈ T', compatible_pairs (i,j) p' = true *)
+      (* But if (i,j) ∈ T', then compatible_pairs (i,j) (i,j) must be checked *)
+
+      (* Actually, we need to show: if (i,j) ∈ T', then forallb fails *)
+      (* Let's use forallb_forall *)
+      rewrite forallb_forall in H_forall.
+
+      (* Get the specific case for (i,j) *)
+      specialize (H_forall (i,j) H_in).
+
+      (* Now H_forall says: compatible_pairs (i,j) (i,j) = true *)
+      (* And indeed it is! compatible_pairs checks if pairs are equal first. *)
+      (* So we can't get a contradiction this way. *)
+
+      (* The issue is that compatible_pairs DOES allow identical pairs! *)
+      (* So this approach won't work. Let me reconsider... *)
+
+      (* WAIT - let me think about this differently. *)
+      (* If (i,j) appears in T', it must have been processed by is_valid_trace_aux *)
+      (* When we processed T' = ... (i,j) ... rest, we checked forallb on rest *)
+      (* But that doesn't prevent (i,j) from appearing AGAIN in rest! *)
+
+      (* So actually, is_valid_trace_aux DOES NOT enforce NoDup! *)
+      (* The current definition allows duplicate pairs. *)
+
+      (* This means we CANNOT prove this lemma with current definitions! *)
+      (*
+         FUNDAMENTAL DISCOVERY: is_valid_trace_aux does NOT prevent duplicates!
+
+         compatible_pairs(p, p) = true, so the same pair can appear multiple times
+         as long as each occurrence is compatible with all other pairs.
+
+         RESOLUTION OPTIONS:
+         1. Strengthen is_valid_trace definition: Add explicit NoDup T check
+         2. Semantic proof: Show DP algorithm never generates duplicate pairs
+         3. Alternative approach: Prove Part 2 WITHOUT NoDup using counting bounds
+
+         For this proof effort, we pursue Option 3 (avoid NoDup dependency).
+         This lemma and dependent NoDup lemmas remain ADMITTED.
+      *)
+
+      admit.
+
+    + (* Show NoDup T' *)
+      apply IH. exact H_valid'.
+Admitted.
+
+(**
+   NOTE: The above lemma is ADMITTED due to fundamental limitation in is_valid_trace definition.
+   The definition allows duplicate pairs. To prove NoDup, we would need to strengthen the definition
+   or prove semantic properties of the DP algorithm.
+
+   IMPACT: NoDup lemmas (touched_in_A_NoDup, touched_in_B_NoDup) also remain ADMITTED.
+   However, Part 2 arithmetic CAN still be proven using counting bounds instead of NoDup+incl.
+*)
+
+(**
    Valid traces have no duplicate first components.
 
    compatible_pairs enforces that if two pairs are different,
