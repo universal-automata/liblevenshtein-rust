@@ -114,9 +114,9 @@ Theorem lev_distance_triangle_inequality :
 
 **Significance**: Provides clean abstraction layer that makes triangle inequality trivial, avoiding complex nested min3 arithmetic
 
-### 5. Supporting Lemmas (Admitted) ⏳
+### 5. Supporting Lemmas (Phase 1 - Trace Composition) ✅
 
-#### 5.1 `compose_trace_preserves_validity` ⏳
+#### 5.1 `compose_trace_preserves_validity` ✅ (Part 1 Complete, Part 2 Admitted)
 
 ```coq
 Lemma compose_trace_preserves_validity :
@@ -126,14 +126,110 @@ Lemma compose_trace_preserves_validity :
     is_valid_trace A C (compose_trace T1 T2) = true.
 ```
 
-**Status**: ⏳ **ADMITTED** (structure in place, proof pending)
+**Status**: ✅ **PARTIALLY COMPLETE**
+- Part 1 (bounds preservation): ✅ **PROVEN** with `valid_pair_compose`
+- Part 2 (pairwise compatibility): ⏳ **ADMITTED** (requires `compatible_pairs_compose`)
 
-**Proof Requirements**:
-- Show composed pairs have valid positions (transitivity)
-- Show order preservation through composition
-- Show each position touched at most once
+**Proof Strategy**:
+- Part 1 shows composed pairs have valid positions using transitivity
+- Part 2 requires showing order preservation through composition
 
-**Lines**: 888-914
+**Lines**: 1224-1266
+
+**Helper Lemmas**:
+
+##### 5.1.1 `In_fold_left_cons_pairs` ✅
+```coq
+Lemma In_fold_left_cons_pairs :
+  forall (i : nat) (matches acc : list (nat * nat)) (k : nat),
+    In (i, k) (fold_left (fun acc2 p2 => let '(_, k') := p2 in (i, k') :: acc2) matches acc) <->
+    In (i, k) acc \/ exists j, In (j, k) matches.
+```
+**Status**: ✅ **PROVEN** (with `Qed`)
+**Lines**: 880-908
+
+##### 5.1.2 `In_filter_eq` ✅
+```coq
+Lemma In_filter_eq :
+  forall (j_target : nat) (T2 : list (nat * nat)) (j k : nat),
+    In (j, k) (filter (fun p2 => let '(j2, _) := p2 in j_target =? j2) T2) <->
+    In (j, k) T2 /\ j_target = j.
+```
+**Status**: ✅ **PROVEN** (with `Qed`)
+**Lines**: 910-922
+
+##### 5.1.3 `In_fold_preserves_acc` ✅
+```coq
+Lemma In_fold_preserves_acc :
+  forall (i' : nat) (matches acc : list (nat * nat)) (p : nat * nat),
+    In p acc ->
+    In p (fold_left (fun acc2 p2 => let '(_, k') := p2 in (i', k') :: acc2) matches acc).
+```
+**Status**: ✅ **PROVEN** (with `Qed`)
+**Lines**: 945-956
+
+##### 5.1.4 `In_fold_diff_first` ✅
+```coq
+Lemma In_fold_diff_first :
+  forall (i i' : nat) (matches acc : list (nat * nat)) (k : nat),
+    i <> i' ->
+    In (i, k) (fold_left (fun acc2 p2 => let '(_, k') := p2 in (i', k') :: acc2) matches acc) ->
+    In (i, k) acc.
+```
+**Status**: ✅ **PROVEN** (with `Qed`)
+**Lines**: 958-970
+
+##### 5.1.5 `In_compose_trace_fold` ✅
+```coq
+Lemma In_compose_trace_fold :
+  forall (T1 : list (nat * nat)) (T2 : list (nat * nat)) (acc : list (nat * nat)) (i k : nat),
+    In (i, k) (fold_left (fun acc' p1 =>
+      let '(i', j) := p1 in
+      let matches := filter (fun p2 => let '(j2, _) := p2 in j =? j2) T2 in
+      fold_left (fun acc2 p2 => let '(_, k') := p2 in (i', k') :: acc2) matches acc'
+    ) T1 acc) <->
+    In (i, k) acc \/ exists j, In (i, j) T1 /\ In (j, k) T2.
+```
+**Status**: ✅ **PROVEN** (with `Qed`)
+**Proof Technique**: Induction on T1 with case split on `i = i'` to handle type unification
+**Lines**: 978-1082
+
+##### 5.1.6 `In_compose_trace` ✅
+```coq
+Lemma In_compose_trace :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k : nat),
+    In (i, k) (compose_trace T1 T2) <->
+    exists j, In (i, j) T1 /\ In (j, k) T2.
+```
+**Status**: ✅ **PROVEN** (with `Qed`)
+**Lines**: 1090-1107
+
+##### 5.1.7 `valid_pair_compose` ✅
+```coq
+Lemma valid_pair_compose :
+  forall (lenA lenB lenC : nat) (i j k : nat),
+    valid_pair lenA lenB (i, j) = true ->
+    valid_pair lenB lenC (j, k) = true ->
+    valid_pair lenA lenC (i, k) = true.
+```
+**Status**: ✅ **PROVEN** (with `Qed`)
+**Proof Technique**: Extract bounds from nested boolean conjunctions using `andb_true_iff`, then reconstruct
+**Lines**: 1118-1151
+
+##### 5.1.8 `compatible_pairs_compose` ⏳
+```coq
+Lemma compatible_pairs_compose :
+  forall (T1 T2 : list (nat * nat)) (i1 j1 k1 i2 j2 k2 : nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In (i1, j1) T1 ->
+    In (i2, j2) T1 ->
+    In (j1, k1) T2 ->
+    In (j2, k2) T2 ->
+    compatible_pairs (i1, k1) (i2, k2) = true.
+```
+**Status**: ⏳ **ADMITTED** (requires infrastructure about unique first components in valid traces)
+**Lines**: 1163-1206
 
 #### 5.2 `trace_composition_cost_bound` (Lemma 1) ⏳
 

@@ -869,6 +869,342 @@ Definition compose_trace {A B C : list Char} (T1 : Trace A B) (T2 : Trace B C) :
     ) matches acc
   ) T1 [].
 
+(** Helper lemmas for compose_trace_preserves_validity *)
+
+(**
+   Helper: Membership in fold_left for the inner fold pattern used in compose_trace.
+
+   When we fold over matches to build pairs (i,k), an element appears in the result
+   if it was already in the accumulator or it's one of the newly added pairs.
+*)
+Lemma In_fold_left_cons_pairs :
+  forall (i : nat) (matches : list (nat * nat)) (acc : list (nat * nat)) (k : nat),
+    In (i, k) (fold_left (fun acc2 p2 => let '(_, k') := p2 in (i, k') :: acc2) matches acc) <->
+    In (i, k) acc \/ exists j, In (j, k) matches.
+Proof.
+  intros i matches.
+  induction matches as [| [j' k'] matches' IH]; intros acc k.
+  - (* Base case: matches = [] *)
+    simpl.
+    split; intro H.
+    + left. exact H.
+    + destruct H as [H | [j H]].
+      * exact H.
+      * contradiction.
+  - (* Inductive case: matches = (j', k') :: matches' *)
+    simpl.
+    rewrite IH.
+    split; intro H.
+    + destruct H as [H | [j H]].
+      * (* (i,k) was in the new acc after adding (i,k') *)
+        simpl in H.
+        destruct H as [H | H].
+        -- (* (i,k) = (i,k') *)
+           inversion H; subst.
+           right. exists j'. left. reflexivity.
+        -- (* (i,k) was in original acc *)
+           left. exact H.
+      * (* exists j witness in matches' *)
+        right. exists j. right. exact H.
+    + destruct H as [H | [j H]].
+      * (* (i,k) in original acc *)
+        left. simpl. right. exact H.
+      * (* exists j witness in full matches *)
+        simpl in H.
+        destruct H as [H | H].
+        -- (* j = j', k was paired with j' *)
+           inversion H; subst.
+           left. simpl. left. reflexivity.
+        -- (* j witness is in matches' *)
+           right. exists j. exact H.
+Qed.
+
+(**
+   Helper: Connection between filter and membership.
+
+   A pair (j,k) is in the filtered list iff it's in T2 and j matches the filter criterion.
+*)
+Lemma In_filter_eq :
+  forall (j_target : nat) (T2 : list (nat * nat)) (j k : nat),
+    In (j, k) (filter (fun p2 => let '(j2, _) := p2 in j_target =? j2) T2) <->
+    In (j, k) T2 /\ j_target = j.
+Proof.
+  intros j_target T2 j k.
+  rewrite filter_In.
+  split; intro H.
+  - destruct H as [H_in H_eq].
+    simpl in H_eq.
+    apply Nat.eqb_eq in H_eq.
+    split; assumption.
+  - destruct H as [H_in H_eq].
+    split.
+    + exact H_in.
+    + simpl. apply Nat.eqb_eq. exact H_eq.
+Qed.
+
+(**
+   Helper: The inner fold preserves membership from accumulator.
+
+   Any pair in the accumulator remains in the result.
+*)
+Lemma In_fold_preserves_acc :
+  forall (i' : nat) (matches acc : list (nat * nat)) (p : nat * nat),
+    In p acc ->
+    In p (fold_left (fun acc2 p2 => let '(_, k') := p2 in (i', k') :: acc2) matches acc).
+Proof.
+  intros i' matches.
+  induction matches as [| [j_m k_m] matches' IH]; intros acc p H_in.
+  - (* Base: matches = [] *)
+    simpl. exact H_in.
+  - (* Inductive: matches = (j_m, k_m) :: matches' *)
+    simpl.
+    apply IH.
+    simpl. right. exact H_in.
+Qed.
+
+(**
+   Helper: If i ≠ i', then pairs (i, k) in the fold result must have been in acc.
+
+   The fold only adds pairs of form (i', k'), so pairs with a different first component
+   must have come from the accumulator.
+*)
+Lemma In_fold_diff_first :
+  forall (i i' : nat) (matches acc : list (nat * nat)) (k : nat),
+    i <> i' ->
+    In (i, k) (fold_left (fun acc2 p2 => let '(_, k') := p2 in (i', k') :: acc2) matches acc) ->
+    In (i, k) acc.
+Proof.
+  intros i i' matches.
+  induction matches as [| [j_m k_m] matches' IH]; intros acc k H_neq H_in.
+  - (* Base: matches = [] *)
+    simpl in H_in. exact H_in.
+  - (* Inductive: matches = (j_m, k_m) :: matches' *)
+    simpl in H_in.
+    apply IH in H_in; [| exact H_neq].
+    simpl in H_in.
+    destruct H_in as [H_eq | H_in].
+    + (* (i, k) = (i', k_m) - contradiction since i ≠ i' *)
+      inversion H_eq; subst.
+      exfalso. apply H_neq. reflexivity.
+    + (* (i, k) was in original acc *)
+      exact H_in.
+Qed.
+
+(**
+   Helper: Membership in the outer fold_left of compose_trace.
+
+   This lemma characterizes when a pair appears in the accumulating result
+   of the composition fold operation.
+*)
+Lemma In_compose_trace_fold :
+  forall (T1 : list (nat * nat)) (T2 : list (nat * nat)) (acc : list (nat * nat)) (i k : nat),
+    In (i, k) (fold_left (fun acc' p1 =>
+      let '(i', j) := p1 in
+      let matches := filter (fun p2 => let '(j2, _) := p2 in j =? j2) T2 in
+      fold_left (fun acc2 p2 => let '(_, k') := p2 in (i', k') :: acc2) matches acc'
+    ) T1 acc) <->
+    In (i, k) acc \/ exists j, In (i, j) T1 /\ In (j, k) T2.
+Proof.
+  intros T1 T2.
+  induction T1 as [| [i' j'] T1' IH]; intros acc i k.
+  - (* Base case: T1 = [] *)
+    simpl.
+    split; intro H.
+    + left. exact H.
+    + destruct H as [H | [j [H _]]].
+      * exact H.
+      * contradiction.
+  - (* Inductive case: T1 = (i',j') :: T1' *)
+    simpl.
+    split; intro H.
+    + (* Forward: membership in result -> witness or in acc *)
+      rewrite IH in H.
+      destruct H as [H | [j [H_in1 H_in2]]].
+      * (* (i,k) is in the new accumulator after processing (i',j') *)
+        (* Key insight: the inner fold ONLY adds pairs of form (i', k').
+           So if In (i,k) holds in the result, either:
+           - (i,k) was already in acc, OR
+           - i = i' and k came from a match *)
+        destruct (Nat.eq_dec i i') as [H_eq | H_neq].
+        -- (* Case: i = i' *)
+           subst i'.
+           set (matches := filter (fun p2 : nat * nat => let '(j2, _) := p2 in j' =? j2) T2) in H.
+           pose proof (In_fold_left_cons_pairs i matches acc k) as H_inner.
+           rewrite H_inner in H. clear H_inner.
+           destruct H as [H_acc | [j_m H_match]].
+           ++ (* Was in acc *)
+              left. exact H_acc.
+           ++ (* Came from match *)
+              unfold matches in H_match.
+              rewrite In_filter_eq in H_match.
+              destruct H_match as [H_in_T2 H_j_eq].
+              subst j_m.
+              (* We have (j', k) ∈ T2, and the pair (i, j') is in the current position of T1 *)
+              right. exists j'. split.
+              ** left. reflexivity.
+              ** exact H_in_T2.
+        -- (* Case: i ≠ i' *)
+           (* The fold only adds pairs (i', k'), so In (i, k) must have been in acc *)
+           set (matches := filter (fun p2 : nat * nat => let '(j2, _) := p2 in j' =? j2) T2) in H.
+           apply In_fold_diff_first in H; [| exact H_neq].
+           left. exact H.
+      * (* There's a witness in T1' *)
+        right. exists j. split.
+        -- right. exact H_in1.
+        -- exact H_in2.
+    + (* Backward: witness or in acc -> membership in result *)
+      rewrite IH.
+      destruct H as [H | [j [H_in1 H_in2]]].
+      * (* Was in original acc *)
+        (* Since (i,k) is in acc, it remains in the fold result *)
+        set (matches := filter (fun p2 : nat * nat => let '(j2, _) := p2 in j' =? j2) T2).
+        left.
+        apply In_fold_preserves_acc.
+        exact H.
+      * (* There's a witness *)
+        simpl in H_in1.
+        destruct H_in1 as [H_eq | H_in1].
+        -- (* Witness is (i',j') itself *)
+           inversion H_eq; subst.
+           (* Now i=i', j=j', and we have (j',k) ∈ T2 *)
+           (* We need to show (i,k) is in fold result after processing (i,j') *)
+           (* The filter will find (j',k) in T2, and fold will add (i,k) *)
+           set (matches := filter (fun p2 : nat * nat => let '(j2, _) := p2 in j =? j2) T2).
+           pose proof (In_fold_left_cons_pairs i matches acc k) as H_inner.
+           left.
+           rewrite H_inner.
+           right. exists j.
+           unfold matches.
+           rewrite In_filter_eq.
+           split; [exact H_in2 | reflexivity].
+        -- (* Witness is in T1' *)
+           right. exists j. split; assumption.
+Qed.
+
+(**
+   Characterization of membership in composed trace.
+
+   A pair (i,k) appears in the composed trace iff there exists some j
+   such that (i,j) is in T1 and (j,k) is in T2.
+*)
+Lemma In_compose_trace :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k : nat),
+    In (i, k) (compose_trace T1 T2) <->
+    exists j, In (i, j) T1 /\ In (j, k) T2.
+Proof.
+  intros A B C T1 T2 i k.
+  unfold compose_trace.
+  rewrite In_compose_trace_fold with (acc := []).
+  split; intro H.
+  - (* Forward direction *)
+    destruct H as [H | H].
+    + (* In empty list - contradiction *)
+      contradiction.
+    + (* Exists witness *)
+      exact H.
+  - (* Backward direction *)
+    right. exact H.
+Qed.
+
+(** Helper lemmas for compose_trace_preserves_validity *)
+
+(**
+   Valid pairs compose transitively.
+
+   If (i,j) is valid for strings of length |A| and |B|,
+   and (j,k) is valid for strings of length |B| and |C|,
+   then (i,k) is valid for strings of length |A| and |C|.
+*)
+Lemma valid_pair_compose :
+  forall (lenA lenB lenC : nat) (i j k : nat),
+    valid_pair lenA lenB (i, j) = true ->
+    valid_pair lenB lenC (j, k) = true ->
+    valid_pair lenA lenC (i, k) = true.
+Proof.
+  intros lenA lenB lenC i j k H1 H2.
+  unfold valid_pair in *.
+  simpl in *.
+  (* Structure after unfolding:
+     H1: (1 <=? i) && (i <=? lenA) && (1 <=? j) && (j <=? lenB) = true
+     H2: (1 <=? j) && (j <=? lenB) && (1 <=? k) && (k <=? lenC) = true
+     Goal: (1 <=? i) && (i <=? lenA) && (1 <=? k) && (k <=? lenC) = true
+  *)
+
+  (* Extract bounds from H1: need (1 <=? i) and (i <=? lenA) *)
+  apply andb_true_iff in H1 as [H1_left H1_jB].
+  apply andb_true_iff in H1_left as [H1_left2 H1_jlow].
+  apply andb_true_iff in H1_left2 as [H1_ilow H1_ihigh].
+
+  (* Extract bounds from H2: need (1 <=? k) and (k <=? lenC) *)
+  apply andb_true_iff in H2 as [H2_left H2_kC].
+  apply andb_true_iff in H2_left as [H2_left2 H2_klow].
+  apply andb_true_iff in H2_left2 as [H2_jlow H2_jB].
+
+  (* Construct the result: (1 <=? i) && (i <=? lenA) && (1 <=? k) && (k <=? lenC) *)
+  apply andb_true_intro. split.
+  - apply andb_true_intro. split.
+    + apply andb_true_intro. split.
+      * exact H1_ilow.
+      * exact H1_ihigh.
+    + exact H2_klow.
+  - exact H2_kC.
+Qed.
+
+(**
+   Compatible pairs compose transitively.
+
+   If two pairs from a composed trace have witnesses in the original traces,
+   then they are compatible (order-preserving, no crossing).
+
+   Key insight: If (i₁,j₁) and (i₂,j₂) are compatible in T1,
+   and (j₁,k₁) and (j₂,k₂) are compatible in T2,
+   then (i₁,k₁) and (i₂,k₂) are compatible (transitivity of order).
+*)
+Lemma compatible_pairs_compose :
+  forall (T1 T2 : list (nat * nat)) (i1 j1 k1 i2 j2 k2 : nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In (i1, j1) T1 ->
+    In (i2, j2) T1 ->
+    In (j1, k1) T2 ->
+    In (j2, k2) T2 ->
+    compatible_pairs (i1, k1) (i2, k2) = true.
+Proof.
+  intros T1 T2 i1 j1 k1 i2 j2 k2 H_valid1 H_valid2 H_in11 H_in12 H_in21 H_in22.
+  unfold compatible_pairs.
+  simpl.
+  (* Case analysis on whether the pairs are the same *)
+  destruct (Nat.eq_dec i1 i2) as [H_i_eq | H_i_neq].
+  - (* i1 = i2 *)
+    subst i2.
+    destruct (Nat.eq_dec k1 k2) as [H_k_eq | H_k_neq].
+    + (* k1 = k2: pairs are equal *)
+      subst k2.
+      rewrite Nat.eqb_refl.
+      rewrite Nat.eqb_refl.
+      reflexivity.
+    + (* k1 ≠ k2 but i1 = i2 *)
+      (* This means j1 must equal j2 (since T1 is valid and can't have two pairs with same i) *)
+      (* Then in T2, we'd have (j1,k1) and (j1,k2) with j1=j2, k1≠k2 *)
+      (* But valid traces can't have multiple pairs with same first component *)
+      (* This is a contradiction, but proving it requires more infrastructure about valid traces *)
+      admit.
+  - (* i1 ≠ i2 *)
+    destruct (Nat.eq_dec k1 k2) as [H_k_eq | H_k_neq].
+    + (* k1 = k2 but i1 ≠ i2 *)
+      (* Similar to above - would require j1 ≠ j2 but (j1,k1) and (j2,k1) in T2 *)
+      (* Contradiction with validity *)
+      admit.
+    + (* i1 ≠ i2 and k1 ≠ k2 *)
+      (* Need to show order preservation: i1 < i2 ⟺ k1 < k2 *)
+      (* This follows from transitivity: *)
+      (* - If i1 < i2, then j1 < j2 (by T1 compatibility) *)
+      (* - If j1 < j2, then k1 < k2 (by T2 compatibility) *)
+      (* - Thus i1 < i2 ⟹ k1 < k2 *)
+      (* Similarly for the other direction *)
+      admit.
+Admitted.
+
 (**
    Trace Composition Preserves Validity
 
@@ -892,25 +1228,41 @@ Lemma compose_trace_preserves_validity :
     is_valid_trace A C (compose_trace T1 T2) = true.
 Proof.
   intros A B C T1 T2 H_valid1 H_valid2.
-  (* This proof requires showing:
-     1. All pairs in compose_trace T1 T2 have valid positions
-     2. All pairs are pairwise compatible
+  unfold is_valid_trace in *.
+  rewrite andb_true_iff in *.
+  destruct H_valid1 as [H_bounds1 H_compat1].
+  destruct H_valid2 as [H_bounds2 H_compat2].
+  split.
 
-     The key insights:
-     - If (i,j) ∈ T1 with 1 ≤ i ≤ |A|, 1 ≤ j ≤ |B|
-       and (j,k) ∈ T2 with 1 ≤ j ≤ |B|, 1 ≤ k ≤ |C|
-       then (i,k) has 1 ≤ i ≤ |A|, 1 ≤ k ≤ |C|
+  - (* Part 1: All pairs in composed trace have valid bounds *)
+    apply forallb_forall.
+    intros [i k] H_in.
+    rewrite In_compose_trace in H_in.
+    destruct H_in as [j [H_in1 H_in2]].
+    (* Use valid_pair_compose with witnesses *)
+    rewrite forallb_forall in H_bounds1.
+    rewrite forallb_forall in H_bounds2.
+    apply valid_pair_compose with (lenB := length B) (j := j).
+    + apply H_bounds1. exact H_in1.
+    + apply H_bounds2. exact H_in2.
 
-     - If i₁ < i₂ in T1, then j₁ < j₂ (order preserving)
-       If j₁ < j₂ in T2, then k₁ < k₂ (order preserving)
-       Thus i₁ < i₂ implies k₁ < k₂ (transitivity of order preservation)
-
-     This requires careful analysis of the compose_trace definition
-     and properties of valid traces.
-
-     For now, admit this lemma to complete the triangle inequality proof structure.
-  *)
-  admit.
+  - (* Part 2: All pairs in composed trace are pairwise compatible *)
+    unfold compose_trace.
+    (* Need to show is_valid_trace_aux (fold_left ... [] ) = true *)
+    (* Strategy: show that any two pairs in the result are compatible *)
+    (* This would require:
+       1. Induction on the fold_left structure
+       2. For each pair added from (i,j) ∈ T1 and (j,k) ∈ T2:
+          - Show it's compatible with pairs already in accumulator
+          - Use compatible_pairs_compose with witnesses
+       3. Prove that fold_left preserves is_valid_trace_aux
+    *)
+    (* The core logic would use compatible_pairs_compose to show that
+       if (i1,k1) and (i2,k2) are both in compose_trace via witnesses
+       (i1,j1),(j1,k1) and (i2,j2),(j2,k2), then compatible_pairs_compose
+       with H_compat1 and H_compat2 proves they're compatible *)
+    (* This requires significant additional infrastructure, so we admit it *)
+    admit.
 Admitted.
 
 (**
