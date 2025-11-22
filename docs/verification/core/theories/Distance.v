@@ -1417,6 +1417,140 @@ Proof.
       apply IH; assumption.
 Qed.
 
+(** * Helper Lemmas for Trace Validity Preservation *)
+
+(**
+   Extract pairwise compatibility from valid trace.
+
+   If a trace is valid (is_valid_trace_aux = true), then any two pairs
+   in the trace are compatible with each other.
+*)
+Lemma is_valid_trace_aux_In_compatible :
+  forall (T : list (nat * nat)) (p1 p2 : nat * nat),
+    is_valid_trace_aux T = true ->
+    In p1 T ->
+    In p2 T ->
+    compatible_pairs p1 p2 = true.
+Proof.
+  intros T p1 p2 H_valid H_in1 H_in2.
+  induction T as [| p T' IH].
+  - (* Base: T = [] *)
+    contradiction.
+  - (* Inductive: T = p :: T' *)
+    simpl in H_valid.
+    apply andb_true_iff in H_valid as [H_forall H_valid'].
+
+    simpl in H_in1, H_in2.
+    destruct H_in1 as [H_eq1 | H_in1]; destruct H_in2 as [H_eq2 | H_in2].
+
+    + (* p1 = p and p2 = p *)
+      subst p1 p2.
+      unfold compatible_pairs.
+      destruct p as [i j].
+      simpl.
+      rewrite Nat.eqb_refl.
+      rewrite Nat.eqb_refl.
+      reflexivity.
+
+    + (* p1 = p and p2 ∈ T' *)
+      subst p1.
+      rewrite forallb_forall in H_forall.
+      apply H_forall.
+      exact H_in2.
+
+    + (* p1 ∈ T' and p2 = p *)
+      subst p2.
+      rewrite forallb_forall in H_forall.
+      (* Need to use symmetry of compatible_pairs *)
+      assert (H_compat: compatible_pairs p p1 = true).
+      { apply H_forall. exact H_in1. }
+      (* compatible_pairs is symmetric *)
+      unfold compatible_pairs in *.
+      destruct p as [i_p j_p].
+      destruct p1 as [i1 j1].
+      simpl in *.
+      destruct (i_p =? i1) eqn:H_i_eq; destruct (j_p =? j1) eqn:H_j_eq.
+      * (* Both equal - use symmetry of =? *)
+        apply Nat.eqb_eq in H_i_eq, H_j_eq.
+        subst i1 j1.
+        rewrite Nat.eqb_refl.
+        rewrite Nat.eqb_refl.
+        reflexivity.
+      * simpl in H_compat. discriminate.
+      * simpl in H_compat. discriminate.
+      * simpl in H_compat.
+        (* Need to show compatible_pairs (i1,j1) (i_p,j_p) given compatible_pairs (i_p,j_p) (i1,j1) *)
+        (* Both i and j are different, so check order *)
+        destruct (i1 =? i_p) eqn:H_i_eq2.
+        -- (* i1 = i_p contradicts i_p <> i1 *)
+           apply Nat.eqb_eq in H_i_eq2.
+           apply Nat.eqb_neq in H_i_eq.
+           exfalso. apply H_i_eq. symmetry. exact H_i_eq2.
+        -- destruct (j1 =? j_p) eqn:H_j_eq2.
+           ++ (* j1 = j_p contradicts j_p <> j1 *)
+              apply Nat.eqb_eq in H_j_eq2.
+              apply Nat.eqb_neq in H_j_eq.
+              exfalso. apply H_j_eq. symmetry. exact H_j_eq2.
+           ++ (* Both different - use order reversal *)
+              simpl.
+              destruct (i_p <? i1) eqn:H_i_lt.
+              ** (* i_p < i1, so we need i1 > i_p, which means i_p < i1, and j1 > j_p *)
+                 apply Nat.ltb_lt in H_i_lt.
+                 apply Nat.ltb_lt in H_compat.
+                 (* Goal: (if i1 <? i_p then j1 <? j_p else j_p <? j1) = true *)
+                 (* Since i_p < i1, we have ~(i1 < i_p), so the else branch applies *)
+                 destruct (i1 <? i_p) eqn:H_i1_lt.
+                 --- apply Nat.ltb_lt in H_i1_lt. exfalso. lia.
+                 --- (* else branch: j_p <? j1 *)
+                     apply Nat.ltb_lt. exact H_compat.
+              ** (* i_p >= i1 and i_p <> i1, so i1 < i_p, and j1 < j_p *)
+                 apply Nat.ltb_ge in H_i_lt.
+                 apply Nat.ltb_lt in H_compat.
+                 (* Since i1 < i_p, the then branch applies: need j1 < j_p *)
+                 assert (H_i1_lt: i1 < i_p).
+                 { apply Nat.eqb_neq in H_i_eq. lia. }
+                 apply Nat.ltb_lt in H_i1_lt.
+                 rewrite H_i1_lt.
+                 apply Nat.ltb_lt. exact H_compat.
+
+    + (* p1 ∈ T' and p2 ∈ T' *)
+      apply IH; assumption.
+Qed.
+
+(**
+   Build valid trace from pairwise compatibility.
+
+   If all pairs in a list are pairwise compatible, then the list
+   satisfies is_valid_trace_aux.
+*)
+Lemma is_valid_trace_aux_from_pairwise :
+  forall (T : list (nat * nat)),
+    (forall p1 p2, In p1 T -> In p2 T -> compatible_pairs p1 p2 = true) ->
+    is_valid_trace_aux T = true.
+Proof.
+  induction T as [| p ps IH].
+  - (* Base: T = [] *)
+    intro H_pairwise.
+    reflexivity.
+  - (* Inductive: T = p :: ps *)
+    intro H_pairwise.
+    simpl.
+    apply andb_true_iff.
+    split.
+    + (* forallb (compatible_pairs p) ps = true *)
+      apply forallb_forall.
+      intros p' H_in_ps.
+      apply H_pairwise.
+      * left. reflexivity.
+      * right. exact H_in_ps.
+    + (* is_valid_trace_aux ps = true *)
+      apply IH.
+      intros p1 p2 H_in1 H_in2.
+      apply H_pairwise.
+      * right. exact H_in1.
+      * right. exact H_in2.
+Qed.
+
 (**
    Compatible pairs compose transitively.
 
@@ -1559,6 +1693,39 @@ Proof.
 Qed.
 
 (**
+   Pairs in composed trace are pairwise compatible.
+
+   Any two pairs in compose_trace T1 T2 are compatible.
+   This follows from the transitivity of compatible_pairs.
+*)
+Lemma compose_trace_pairwise_compatible :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C)
+         (p1 p2 : nat * nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In p1 (compose_trace T1 T2) ->
+    In p2 (compose_trace T1 T2) ->
+    compatible_pairs p1 p2 = true.
+Proof.
+  intros A B C T1 T2 p1 p2 H_valid1 H_valid2 H_in1 H_in2.
+  (* Destruct pairs to get components *)
+  destruct p1 as [i1 k1].
+  destruct p2 as [i2 k2].
+  (* Extract witnesses for (i1, k1) using In_compose_trace *)
+  apply In_compose_trace in H_in1 as [j1 [H_in1_T1 H_in1_T2]].
+  (* Extract witnesses for (i2, k2) using In_compose_trace *)
+  apply In_compose_trace in H_in2 as [j2 [H_in2_T1 H_in2_T2]].
+  (* Apply transitivity of compatible_pairs *)
+  eapply compatible_pairs_compose.
+  - exact H_valid1.
+  - exact H_valid2.
+  - exact H_in1_T1.
+  - exact H_in2_T1.
+  - exact H_in1_T2.
+  - exact H_in2_T2.
+Qed.
+
+(**
    Trace Composition Preserves Validity
 
    If T1 is a valid trace from A to B and T2 is a valid trace from B to C,
@@ -1600,23 +1767,16 @@ Proof.
     + apply H_bounds2. exact H_in2.
 
   - (* Part 2: All pairs in composed trace are pairwise compatible *)
-    unfold compose_trace.
-    (* Need to show is_valid_trace_aux (fold_left ... [] ) = true *)
-    (* Strategy: show that any two pairs in the result are compatible *)
-    (* This would require:
-       1. Induction on the fold_left structure
-       2. For each pair added from (i,j) ∈ T1 and (j,k) ∈ T2:
-          - Show it's compatible with pairs already in accumulator
-          - Use compatible_pairs_compose with witnesses
-       3. Prove that fold_left preserves is_valid_trace_aux
-    *)
-    (* The core logic would use compatible_pairs_compose to show that
-       if (i1,k1) and (i2,k2) are both in compose_trace via witnesses
-       (i1,j1),(j1,k1) and (i2,j2),(j2,k2), then compatible_pairs_compose
-       with H_compat1 and H_compat2 proves they're compatible *)
-    (* This requires significant additional infrastructure, so we admit it *)
-    admit.
-Admitted.
+    (* Build is_valid_trace_aux from pairwise compatibility *)
+    apply is_valid_trace_aux_from_pairwise.
+    intros p1 p2 H_in1 H_in2.
+    (* Use compose_trace_pairwise_compatible with the helper lemmas *)
+    eapply compose_trace_pairwise_compatible.
+    + exact H_compat1.
+    + exact H_compat2.
+    + exact H_in1.
+    + exact H_in2.
+Qed.
 
 (**
    Lemma 1 (Wagner-Fischer, 1974, page 3):
