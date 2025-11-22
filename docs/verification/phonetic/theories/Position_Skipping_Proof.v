@@ -29,9 +29,9 @@ From Liblevenshtein.Phonetic.Verification Require Import
   Core.Rules
   Invariants.InvariantProperties Invariants.AlgoState
   Patterns.PatternHelpers_Basic
-  Patterns.PatternHelpers_Mismatch_Simple
-  Patterns.PatternHelpers_Mismatch_Complex
-  Patterns.PatternHelpers_Leftmost
+  Patterns.PatternMatching_Properties
+  Patterns.PatternMatching_Induction
+  Patterns.PatternMatching_Positioning
   Patterns.PatternOverlap.
 
 Import ListNotations.

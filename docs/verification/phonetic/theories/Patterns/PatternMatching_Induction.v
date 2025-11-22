@@ -1,10 +1,11 @@
-(** * Pattern Helper Lemmas - Complex Mismatch Analysis
+(** * Pattern Matching Induction - Complex Nested Induction Proofs
 
     This module contains the memory-intensive pattern_matches_at_has_mismatch lemma
-    with nested induction and extensive lia usage.
+    with complex nested induction and extensive lia usage. Provides reusable induction
+    patterns for pattern matching verification.
 
     Part of: Liblevenshtein.Phonetic.Verification.Patterns
-    Split from PatternHelpers.v to reduce memory usage during compilation.
+    Renamed from PatternHelpers_Mismatch_Complex.v for better reusability.
     Isolated into its own file due to high memory requirements (~60-80GB).
 *)
 

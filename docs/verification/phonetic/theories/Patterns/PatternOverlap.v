@@ -22,9 +22,9 @@ From Liblevenshtein.Phonetic.Verification Require Import Auxiliary.Types.
 From Liblevenshtein.Phonetic.Verification Require Import Auxiliary.Lib.
 From Liblevenshtein.Phonetic.Verification Require Import Core.Rules.
 From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Basic.
-From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Mismatch_Simple.
-From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Mismatch_Complex.
-From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternHelpers_Leftmost.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternMatching_Properties.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternMatching_Induction.
+From Liblevenshtein.Phonetic.Verification Require Import Patterns.PatternMatching_Positioning.
 Import ListNotations.
 
 (** * Helper Lemma: Leftmost Mismatch Location *)

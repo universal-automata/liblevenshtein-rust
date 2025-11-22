@@ -1,10 +1,11 @@
-(** * Pattern Helper Lemmas - Leftmost Mismatch Analysis
+(** * Pattern Matching Positioning - Positional Analysis
 
-    This module contains the leftmost mismatch lemma, which has the most
-    complex proof with deep nested induction.
+    This module contains positional analysis lemmas for pattern matching,
+    including leftmost position determination with deep nested induction.
+    Designed for reusability in pattern position verification tasks.
 
     Part of: Liblevenshtein.Phonetic.Verification.Patterns
-    Split from PatternHelpers.v to reduce memory usage during compilation.
+    Renamed from PatternHelpers_Leftmost.v for better reusability.
 *)
 
 Require Import String List Arith Ascii Bool Nat Lia.

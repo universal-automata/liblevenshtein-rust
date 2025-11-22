@@ -1,10 +1,11 @@
-(** * Pattern Helper Lemmas - Simple Mismatch Helpers
+(** * Pattern Matching Properties - Simple Helpers
 
-    This module contains simple helper lemmas for pattern mismatches
-    with lightweight proofs.
+    This module contains simple helper lemmas for pattern matching properties
+    with lightweight proofs. Designed for reusability across pattern matching
+    verification tasks.
 
     Part of: Liblevenshtein.Phonetic.Verification.Patterns
-    Split from PatternHelpers.v to reduce memory usage during compilation.
+    Renamed from PatternHelpers_Mismatch_Simple.v for better reusability.
 *)
 
 Require Import String List Arith Ascii Bool Nat Lia.

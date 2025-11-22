@@ -29,15 +29,15 @@ theories/Invariants/InvariantProperties.v
 theories/Invariants/AlgoState.v
 
 # Patterns layer (Axiom 2 - FULLY PROVEN)
-# PatternHelpers split into 4 files to manage memory during compilation:
-# - Basic: lightweight lemmas (~10GB)
-# - Mismatch_Simple: simple helper lemmas (~5-10GB)
-# - Mismatch_Complex: pattern_matches_at_has_mismatch with nested induction (~60-80GB)
-# - Leftmost: leftmost mismatch analysis with deep nested induction (~80GB)
+# Pattern matching modules split for memory management and reusability:
+# - Basic: lightweight infrastructure (prefix preservation, position validity) (~10GB)
+# - Properties: pattern matching properties and simple helpers (~5-10GB)
+# - Induction: complex nested induction proofs for pattern mismatch (~60-80GB)
+# - Positioning: leftmost/positional analysis with deep induction (~80GB)
 theories/Patterns/PatternHelpers_Basic.v
-theories/Patterns/PatternHelpers_Mismatch_Simple.v
-theories/Patterns/PatternHelpers_Mismatch_Complex.v
-theories/Patterns/PatternHelpers_Leftmost.v
+theories/Patterns/PatternMatching_Properties.v
+theories/Patterns/PatternMatching_Induction.v
+theories/Patterns/PatternMatching_Positioning.v
 theories/Patterns/PatternOverlap.v
 
 # Main proof module
