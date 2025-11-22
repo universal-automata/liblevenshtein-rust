@@ -2120,6 +2120,62 @@ Proof.
   admit.
 Admitted.
 
+(**
+   Witness-based summation bound for TWO witness lists (needed for composition).
+
+   Each element in comp has a pair of witnesses (w1, w2) from l1 × l2,
+   and the cost is bounded by the sum of witness costs.
+
+   This handles the witness multiplicity issue: even if multiple elements
+   share witnesses, the RHS sums over ALL of l1 and l2, providing the bound.
+*)
+(**
+   ADMITTED - This lemma requires a fundamentally different proof strategy.
+
+   The inductive approach fails because:
+   - IH gives: sum(comp') ≤ sum(l1) + sum(l2)
+   - For new element a: f a ≤ g1 w1 + g2 w2
+   - We need: f a + sum(comp') ≤ sum(l1) + sum(l2)
+
+   But we can't deduce this! The RHS is FIXED, and we can't show that
+   g1 w1 + g2 w2 "fits within" the remaining budget.
+
+   Alternative approaches needed:
+   1. Prove by constructing explicit mapping showing witness multiplicities
+   2. Use max/bound instead of sum (but changes the statement)
+   3. Add hypothesis about witness uniqueness or bounded multiplicity
+   4. Use completely different proof technique (e.g., bijection)
+
+   This lemma as stated may actually be UNPROVABLE without additional constraints!
+
+   Counterexample intuition:
+   - comp = [(a1, c1), (a2, c1)] both witness through same (b, c1)
+   - f(a1,c1) = f(a2,c1) = 1
+   - g1(a1,b) = g1(a2,b) = 1, g2(b,c1) = 0
+   - sum(comp) = 2
+   - sum(l1) + sum(l2) = 2 + 0 = 2
+   - Bound holds!
+
+   Actually it might be provable. The issue is the PROOF technique, not the statement.
+   We need to argue globally about the entire sum, not inductively.
+*)
+Lemma fold_left_sum_bound_two_witnesses :
+  forall {A B C : Type} (comp : list A) (l1 : list B) (l2 : list C)
+         (f : A -> nat) (g1 : B -> nat) (g2 : C -> nat),
+    (forall x, In x comp ->
+      exists (w1 : B) (w2 : C),
+        In w1 l1 /\ In w2 l2 /\ f x <= g1 w1 + g2 w2) ->
+    fold_left (fun acc x => acc + f x) comp 0 <=
+    fold_left (fun acc y => acc + g1 y) l1 0 +
+    fold_left (fun acc z => acc + g2 z) l2 0.
+Proof.
+  intros A B C comp l1 l2 f g1 g2 H_witness.
+  (* TODO: This requires a non-inductive proof technique *)
+  (* Possible approach: prove that sum can be rearranged as a sum over witnesses *)
+  (* with multiplicities, then bound by full sums *)
+  admit.
+Admitted.
+
 (** ** Sub-Phase 3.3: Change Cost Bound *)
 
 (**
