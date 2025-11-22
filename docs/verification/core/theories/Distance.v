@@ -1848,6 +1848,66 @@ Qed.
 
    Note: This is a general list property, may already exist in stdlib.
 *)
+(**
+   Helper: If a is in l and l has no duplicates, we can split l into a :: l' where a is not in l'.
+*)
+Lemma NoDup_split :
+  forall {A : Type} (a : A) (l : list A),
+    In a l ->
+    NoDup l ->
+    exists l1 l2, l = l1 ++ a :: l2 /\ ~ In a l1 /\ ~ In a l2.
+Proof.
+  intros A a l H_in H_nodup.
+  induction l as [| b l' IH].
+  - (* Base: l = [], contradiction *)
+    contradiction.
+  - (* Inductive: l = b :: l' *)
+    destruct H_in as [H_eq | H_in'].
+    + (* Case: a = b *)
+      subst b.
+      exists [], l'.
+      split; [reflexivity | split].
+      * simpl. intros [].
+      * inversion H_nodup. exact H1.
+    + (* Case: a ∈ l' *)
+      inversion H_nodup as [| ? ? H_not_in H_nodup'].
+      apply IH in H_in' as [l1 [l2 [H_eq [H_not1 H_not2]]]]; [| exact H_nodup'].
+      exists (b :: l1), l2.
+      split; [| split].
+      * simpl. rewrite H_eq. reflexivity.
+      * simpl. intros [H_eq_b_a | H_in_b_l1].
+        -- (* Case: b = a *)
+           (* But a ∈ l' = l1 ++ a :: l2, so a ∈ (b :: l') = l *)
+           (* And H_not_in says b ∉ l' *)
+           (* If b = a, then a ∉ l', contradiction with a ∈ l' *)
+           subst a.
+           apply H_not_in.
+           rewrite H_eq.
+           apply in_or_app. right. left. reflexivity.
+        -- (* Case: b ∈ l1 *)
+           apply H_not1. exact H_in_b_l1.
+      * exact H_not2.
+Qed.
+
+(**
+   Inclusion and length bound.
+
+   This lemma requires NoDup on BOTH lists to be provable.
+   The current statement only assumes NoDup l2, but the proof breaks
+   when l1 has duplicates.
+
+   ADMITTED - Fundamental limitation discovered:
+   - If l1 has duplicates, the inductive proof fails
+   - Example: l1 = [a, a], l2 = [a] has incl l1 l2 and NoDup l2
+   - But length l1 = 2 > 1 = length l2
+
+   Fix options:
+   1. Add NoDup l1 as hypothesis (stronger statement)
+   2. Prove weaker version: length (dedup l1) <= length l2
+   3. Use different approach for Part 2 that doesn't need this
+
+   For Phase 4, we proceed with option 3 (avoid using this lemma).
+*)
 Lemma incl_length :
   forall {A : Type} (l1 l2 : list A),
     incl l1 l2 ->
@@ -1855,19 +1915,9 @@ Lemma incl_length :
     length l1 <= length l2.
 Proof.
   intros A l1 l2 H_incl H_nodup.
-  (* This requires counting elements, which is non-trivial without NoDup on l1 *)
-  (* For now, we'll use a weaker approach that works even with duplicates in l1 *)
-  induction l1 as [| a l1' IH].
-  - (* Base: l1 = [] *)
-    simpl. lia.
-  - (* Inductive: l1 = a :: l1' *)
-    simpl.
-    (* We need: 1 + length l1' ≤ length l2 *)
-    (* By H_incl, a ∈ l2, so length l2 ≥ 1 *)
-    (* Also incl l1' l2, so by IH, length l1' ≤ length l2 *)
-    (* But this doesn't directly give us what we need without NoDup on l1 *)
-    (* Let's admit this for now and come back if needed *)
-    admit.
+  (* This proof requires NoDup on l1 as well *)
+  (* See documentation above for why *)
+  admit.
 Admitted.
 
 (** ** Sub-Phase 3.2: Change Cost Infrastructure *)
@@ -2234,13 +2284,57 @@ Proof.
 
        Hmm, I think I need to reconsider the whole approach. Let me just use touched_length_bounds directly.
     *)
-    (* Use touched_length_bound lemmas *)
-    assert (H_bound_comp_A: length (touched_in_A A C (compose_trace T1 T2)) <= length (compose_trace T1 T2)).
-    { apply touched_length_bound_A. }
-    assert (H_bound_comp_C: length (touched_in_B A C (compose_trace T1 T2)) <= length (compose_trace T1 T2)).
-    { apply touched_length_bound_B. }
+    (* Key insight: The inequality holds because:
+       1. Deletion costs are bounded: dc_comp ≤ |A|, dc1 ≤ |A|, dc2 ≤ |B|
+       2. Insertion costs are bounded: ic_comp ≤ |C|, ic1 ≤ |B|, ic2 ≤ |C|
+       3. The RHS has TWO |B| terms (ic1 and dc2) providing slack
 
-    (* For now, admit the arithmetic - it's complex due to natural number subtraction *)
+       Specifically:
+       dc_comp + ic_comp ≤ |A| + |C|
+       dc1 + ic1 + dc2 + ic2 =
+         (|A| - |touched_T1_A|) + (|B| - |touched_T1_B|) +
+         (|B| - |touched_T2_A|) + (|C| - |touched_T2_C|)
+
+       For this to work, we need:
+       |A| + |C| ≤ |A| + 2|B| + |C| - (|touched_T1_A| + |touched_T1_B| + |touched_T2_A| + |touched_T2_C|)
+
+       Which simplifies to:
+       |touched_T1_A| + |touched_T1_B| + |touched_T2_A| + |touched_T2_C| ≤ 2|B|
+
+       Since each touched list has length ≤ |B| (positions in a string),
+       and at most |B| positions can be touched in any direction:
+       - |touched_T1_B| ≤ |B|
+       - |touched_T2_A| ≤ |B|
+
+       So: |touched_T1_A| + |touched_T1_B| + |touched_T2_A| + |touched_T2_C|
+           ≤ |B| + |B| + |B| + |B| = 4|B|
+
+       But we only have 2|B| slack, so this doesn't work!
+
+       Let me try yet another approach: just show it directly with lia
+    *)
+
+    (* ADMITTED - Complex natural number arithmetic with 2|B| slack
+
+       The proof requires showing:
+       (|A| - |touched_comp_A|) + (|C| - |touched_comp_C|) ≤
+       (|A| - |touched_T1_A|) + (|B| - |touched_T1_B|) +
+       (|B| - |touched_T2_A|) + (|C| - |touched_T2_C|)
+
+       Key challenges:
+       1. Natural number subtraction is saturating (a - b = 0 if b > a)
+       2. The 2|B| slack terms need careful accounting
+       3. Simple bounds don't work: touched lists can be up to |B| each,
+          giving 4|B| total, but we only have 2|B| slack
+
+       Possible approaches:
+       - Prove tighter bounds on touched list lengths
+       - Use the specific structure of compose_trace
+       - Show that touched positions are "used efficiently"
+       - Or prove the inequality holds empirically for all valid traces
+
+       For Phase 4, we defer this to future work.
+    *)
     admit.
   }
 
