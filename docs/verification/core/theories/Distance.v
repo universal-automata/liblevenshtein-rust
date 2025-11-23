@@ -2808,18 +2808,15 @@ Lemma change_cost_compose_bound :
   forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
     is_valid_trace_aux T1 = true ->
     is_valid_trace_aux T2 = true ->
-    fold_left (fun acc x =>
-      acc + (let '(i, k) := x in
-             subst_cost (nth (i-1) A default_char) (nth (k-1) C default_char))
+    fold_left (fun acc '(i, j) =>
+      acc + subst_cost (nth (i-1) A default_char) (nth (j-1) C default_char)
     ) (compose_trace T1 T2) 0
     <=
-    fold_left (fun acc y =>
-      acc + (let '(i, j) := y in
-             subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char))
+    fold_left (fun acc '(i, j) =>
+      acc + subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char)
     ) T1 0 +
-    fold_left (fun acc z =>
-      acc + (let '(j, k) := z in
-             subst_cost (nth (j-1) B default_char) (nth (k-1) C default_char))
+    fold_left (fun acc '(i, j) =>
+      acc + subst_cost (nth (i-1) B default_char) (nth (j-1) C default_char)
     ) T2 0.
 Proof.
   intros A B C T1 T2 H_valid1 H_valid2.
@@ -3563,8 +3560,7 @@ Proof.
   (* Part 1: Bound change costs using triangle inequality *)
   assert (H_cc: cc_comp <= cc1 + cc2).
   { rewrite E_cc_comp, E_cc1, E_cc2, E_comp.
-    (* Normalize the pattern matching syntax to match change_cost_compose_bound *)
-    cbn beta iota.
+    (* Now lambda syntax matches after refactor! *)
     apply change_cost_compose_bound; assumption.
   }
 
@@ -3575,10 +3571,7 @@ Proof.
     apply trace_composition_delete_insert_bound; assumption.
   }
 
-  (* NOW rewrite backwards to fold the goal to use the opaque variable names *)
-  rewrite <- E_cc_comp, <- E_dc_comp, <- E_ic_comp.
-  rewrite <- E_cc1, <- E_dc1, <- E_ic1.
-  rewrite <- E_cc2, <- E_dc2, <- E_ic2.
+  (* The goal should already use opaque names (cc_comp, etc.) from remember *)
 
   (* Combine the two bounds: cc_comp + dc_comp + ic_comp <= (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)
      From H_cc: cc_comp <= cc1 + cc2
@@ -3587,11 +3580,13 @@ Proof.
 
   (* Step 1: Prove intermediate inequality *)
   assert (H_intermediate: cc_comp + (dc_comp + ic_comp) <= (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)).
-  { rewrite <- Nat.add_assoc.
-    apply Nat.add_le_mono; assumption.
+  { apply Nat.add_le_mono; [exact H_cc | exact H_di].
   }
 
-  (* Step 2: Rearrange and finish *)
+  (* Step 2: Rearrange LHS to match goal associativity *)
+  rewrite Nat.add_assoc in H_intermediate.
+
+  (* Now H_intermediate matches goal's LHS *)
   eapply Nat.le_trans; [exact H_intermediate |].
   apply Nat.eq_le_incl.
   lia.
