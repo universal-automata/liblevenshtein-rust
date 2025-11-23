@@ -900,6 +900,23 @@ Definition is_valid_trace (A B : list Char) (T : Trace A B) : bool :=
   is_valid_trace_aux T &&
   NoDup_dec pair_eq_dec T.
 
+(**
+   Valid traces have NoDup.
+
+   Since is_valid_trace now includes an explicit NoDup check,
+   this lemma is immediate from the definition.
+*)
+Lemma is_valid_trace_implies_NoDup :
+  forall (A B : list Char) (T : Trace A B),
+    is_valid_trace A B T = true -> NoDup T.
+Proof.
+  intros A B T H_valid.
+  unfold is_valid_trace in H_valid.
+  apply andb_true_iff in H_valid as [H_rest H_nodup].
+  apply andb_true_iff in H_rest as [H_bounds H_compat].
+  apply NoDup_dec_correct in H_nodup. exact H_nodup.
+Qed.
+
 (** Calculate which positions are touched by the trace *)
 Fixpoint touched_in_A (A B : list Char) (T : Trace A B) : list nat :=
   match T with
@@ -2119,20 +2136,55 @@ Proof.
 Admitted.
 
 (**
-   NOTE: The above lemma is ADMITTED due to fundamental limitation in is_valid_trace definition.
-   The definition allows duplicate pairs. To prove NoDup, we would need to strengthen the definition
-   or prove semantic properties of the DP algorithm.
+   NOTE: The above lemma is ADMITTED and UNPROVABLE with the current is_valid_trace_aux definition.
 
-   IMPACT: NoDup lemmas (touched_in_A_NoDup, touched_in_B_NoDup) also remain ADMITTED.
-   However, Part 2 arithmetic CAN still be proven using counting bounds instead of NoDup+incl.
+   REASON: is_valid_trace_aux allows duplicate pairs because compatible_pairs(p, p) = true.
+   This means the same pair can appear multiple times in a valid trace_aux.
+
+   RESOLUTION: We strengthened is_valid_trace to include an explicit NoDup check.
+   Therefore, is_valid_trace_implies_NoDup (proven above) provides the needed property.
+
+   This lemma (is_valid_trace_aux_NoDup) is kept for documentation purposes to show
+   why the strengthened definition was necessary. It is NOT used in any proofs.
 *)
+
+(**
+   Helper: If a value is in the touched list, the corresponding pair exists in the trace.
+*)
+Lemma in_touched_in_A_exists_pair :
+  forall (A B : list Char) (T : Trace A B) (i : nat),
+    In i (touched_in_A A B T) -> exists j, In (i, j) T.
+Proof.
+  intros A B T i H_in.
+  induction T as [| [i' j'] T' IH].
+  - simpl in H_in. contradiction.
+  - simpl in H_in.
+    destruct H_in as [H_eq | H_rest].
+    + exists j'. subst i'. left. reflexivity.
+    + destruct (IH H_rest) as [j'' H_in_T'].
+      exists j''. right. exact H_in_T'.
+Qed.
+
+Lemma in_touched_in_B_exists_pair :
+  forall (A B : list Char) (T : Trace A B) (j : nat),
+    In j (touched_in_B A B T) -> exists i, In (i, j) T.
+Proof.
+  intros A B T j H_in.
+  induction T as [| [i' j'] T' IH].
+  - simpl in H_in. contradiction.
+  - simpl in H_in.
+    destruct H_in as [H_eq | H_rest].
+    + exists i'. subst j'. left. reflexivity.
+    + destruct (IH H_rest) as [i'' H_in_T'].
+      exists i''. right. exact H_in_T'.
+Qed.
 
 (**
    Valid traces have no duplicate first components.
 
-   compatible_pairs enforces that if two pairs are different,
-   they cannot share the same first index (same i implies not compatible
-   unless they're identical pairs).
+   Since is_valid_trace now enforces NoDup on pairs, and valid_trace_unique_first
+   shows that pairs with the same first component must be identical, we can prove
+   that the list of first components has no duplicates.
 *)
 Lemma touched_in_A_NoDup :
   forall (A B : list Char) (T : Trace A B),
@@ -2140,8 +2192,12 @@ Lemma touched_in_A_NoDup :
     NoDup (touched_in_A A B T).
 Proof.
   intros A B T H_valid.
+  (* Get NoDup T from the strengthened is_valid_trace *)
+  assert (H_nodup_T: NoDup T) by (apply is_valid_trace_implies_NoDup; exact H_valid).
+  (* Also extract is_valid_trace_aux for later use *)
   unfold is_valid_trace in H_valid.
-  apply andb_true_iff in H_valid as [H_bounds H_compat].
+  apply andb_true_iff in H_valid as [H_rest H_nodup_dec].
+  apply andb_true_iff in H_rest as [H_bounds H_valid_aux].
 
   induction T as [| [i j] T' IH].
   - (* Base: T = [] *)
@@ -2149,122 +2205,101 @@ Proof.
 
   - (* Inductive: T = (i,j) :: T' *)
     simpl.
+    inversion H_nodup_T as [| ? ? H_not_in_T' H_nodup_T'].
     constructor.
     + (* Show i ∉ touched_in_A A B T' *)
-      unfold is_valid_trace_aux in H_compat.
-      simpl in H_compat.
-      apply andb_true_iff in H_compat as [H_forall H_compat'].
-
-      (* Prove by contradiction: assume i ∈ touched_in_A A B T' *)
-      intro H_in.
-
-      (* If i is in touched_in_A A B T', then there exists (i, j') in T' *)
-      induction T' as [| [i' j'] T'' IH'].
-      * (* T' = [] contradicts In i [] *)
-        simpl in H_in. contradiction.
-      * (* T' = (i',j') :: T'' *)
-        simpl in H_in.
-        destruct H_in as [H_eq | H_in'].
-        -- (* i = i' *)
-           subst i'.
-           (* But then (i,j) and (i,j') are not compatible (same i, different pairs) *)
-           (* From H_forall, compatible_pairs (i,j) (i,j') = true for all pairs in T' *)
-           unfold forallb in H_forall.
-           (* We need to show (i,j) is not compatible with (i,j'), contradiction *)
-           (* Actually, they COULD be the same pair if j = j' *)
-           (* Let me reconsider... *)
-
-           (* compatible_pairs (i,j) (i,j') says:
-              if i = i ∧ j = j' then true
-              else if i = i ∨ j = j' then false
-              else ...
-
-              Since i = i, we have two cases:
-              1. j = j': then pairs are identical, compatible
-              2. j ≠ j': then second clause fires (i = i), returns false
-           *)
-           unfold compatible_pairs in H_forall.
-           rewrite Nat.eqb_refl in H_forall. (* i =? i = true *)
-
-           destruct (j =? j') eqn:E_j.
-           ++ (* j = j' - pairs are identical *)
-              apply Nat.eqb_eq in E_j. subst j'.
-              (* So (i,j) = (i,j), which means it's in T' *)
-              (* But wait, this means the same pair appears twice: in head and in T' *)
-              (* This should not happen in a valid trace! But our definition doesn't
-                 explicitly forbid duplicate pairs... *)
-              (* Actually, let me check if forallb processes this correctly *)
-
-              (* H_forall is: forallb (compatible_pairs (i,j)) ((i,j) :: T'') *)
-              simpl in H_forall.
-              (* This evaluates compatible_pairs (i,j) (i,j) && forallb ... T'' *)
-              (* compatible_pairs (i,j) (i,j) = true (same pair) *)
-              (* So this doesn't give us a contradiction *)
-
-              (* Hmm, so actually NoDup might NOT hold if we allow duplicate pairs! *)
-              (* Let me check if is_valid_trace_aux prevents this... *)
-
-              (* Actually, I think the issue is that is_valid_trace_aux checks
-                 compatibility within the tail recursively, but compatible_pairs
-                 allows identical pairs. *)
-
-              (* Wait, let me reconsider the problem. If (i,j) appears twice,
-                 then when we check T' = (i,j) :: T'', the recursive call
-                 checks is_valid_trace_aux T'', which checks if all pairs in T''
-                 are mutually compatible. This doesn't check if (i,j) appears again in T''. *)
-
-              (* So actually, the current definition DOES allow duplicate pairs!
-                 This means NoDup might not hold. *)
-
-              (* But intuitively, a "trace" shouldn't have duplicate pairs.
-                 Let me check what the semantics should be... *)
-
-              (* Actually, I think for the application we need (Part 2 arithmetic),
-                 we need to use a DIFFERENT property. Let me admit this for now
-                 and reconsider the approach. *)
-              admit.
-           ++ (* j ≠ j' - then compatible_pairs returns false *)
-              apply Nat.eqb_neq in E_j.
-              (* (i =? i) = true, (j =? j') = false *)
-              (* So the second clause fires: (i =? i) || (j =? j') *)
-              (*                             = true || false = true *)
-              (* So compatible_pairs returns false *)
-              simpl in H_forall. (* forallb on (i,j')::T'' *)
-              (* compatible_pairs (i,j) (i,j') && forallb ... = true *)
-              (* But compatible_pairs (i,j) (i,j') = false *)
-              rewrite E_j in H_forall.
-              rewrite orb_true_r in H_forall.
-              (* Now H_forall says: false && ... = true, contradiction! *)
-              discriminate H_forall.
-        -- (* i ∈ touched_in_A A B T'' *)
-           apply IH'.
-           ++ (* Show forallb (compatible_pairs (i',j')) T'' = true *)
-              unfold forallb in H_forall.
-              simpl in H_forall.
-              apply andb_true_iff in H_forall as [_ H_forall'].
-              exact H_forall'.
-           ++ (* i ∈ T'' *)
-              exact H_in'.
-
+      intro H_in_touched.
+      (* Use helper lemma to get witness pair *)
+      apply in_touched_in_A_exists_pair in H_in_touched.
+      destruct H_in_touched as [j' H_in_pair].
+      (* Now use valid_trace_unique_first: since (i,j) and (i,j') are both in T,
+         and they have the same first component, they must be identical *)
+      assert (H_j_eq: j = j').
+      {
+        apply (valid_trace_unique_first ((i,j) :: T') i j j' H_valid_aux).
+        - left. reflexivity.
+        - right. exact H_in_pair.
+      }
+      subst j'.
+      (* So (i,j) ∈ T', contradicting H_not_in_T' *)
+      exact (H_not_in_T' H_in_pair).
     + (* Show NoDup (touched_in_A A B T') *)
       apply IH.
-      unfold is_valid_trace_aux in H_compat.
-      simpl in H_compat.
-      apply andb_true_iff in H_compat as [_ H_compat'].
-      exact H_compat'.
-Admitted.
+      * (* Extract valid_pair bounds for T' from H_bounds *)
+        simpl in H_bounds.
+        apply andb_true_iff in H_bounds as [_ H_bounds_T'].
+        exact H_bounds_T'.
+      * (* Extract is_valid_trace_aux T' from H_valid_aux *)
+        simpl in H_valid_aux.
+        apply andb_true_iff in H_valid_aux as [_ H_valid_T'].
+        exact H_valid_T'.
+      * (* Extract NoDup_dec T' from H_nodup_dec *)
+        simpl in H_nodup_dec.
+        apply andb_true_iff in H_nodup_dec as [_ H_nodup_dec_T'].
+        exact H_nodup_dec_T'.
+      * (* NoDup T' *)
+        exact H_nodup_T'.
+Qed.
 
 (**
    Valid traces have no duplicate second components.
+
+   Symmetric to touched_in_A_NoDup, using valid_trace_unique_second instead.
 *)
 Lemma touched_in_B_NoDup :
   forall (A B : list Char) (T : Trace A B),
     is_valid_trace A B T = true ->
     NoDup (touched_in_B A B T).
 Proof.
-  (* Same structure as touched_in_A_NoDup, but for second components *)
-  admit.
-Admitted.
+  intros A B T H_valid.
+  (* Get NoDup T from the strengthened is_valid_trace *)
+  assert (H_nodup_T: NoDup T) by (apply is_valid_trace_implies_NoDup; exact H_valid).
+  (* Also extract is_valid_trace_aux for later use *)
+  unfold is_valid_trace in H_valid.
+  apply andb_true_iff in H_valid as [H_rest H_nodup_dec].
+  apply andb_true_iff in H_rest as [H_bounds H_valid_aux].
+
+  induction T as [| [i j] T' IH].
+  - (* Base: T = [] *)
+    simpl. constructor.
+
+  - (* Inductive: T = (i,j) :: T' *)
+    simpl.
+    inversion H_nodup_T as [| ? ? H_not_in_T' H_nodup_T'].
+    constructor.
+    + (* Show j ∉ touched_in_B A B T' *)
+      intro H_in_touched.
+      (* Use helper lemma to get witness pair *)
+      apply in_touched_in_B_exists_pair in H_in_touched.
+      destruct H_in_touched as [i' H_in_pair].
+      (* Now use valid_trace_unique_second: since (i,j) and (i',j) are both in T,
+         and they have the same second component, they must be identical *)
+      assert (H_i_eq: i = i').
+      {
+        apply (valid_trace_unique_second ((i,j) :: T') i i' j H_valid_aux).
+        - left. reflexivity.
+        - right. exact H_in_pair.
+      }
+      subst i'.
+      (* So (i,j) ∈ T', contradicting H_not_in_T' *)
+      exact (H_not_in_T' H_in_pair).
+    + (* Show NoDup (touched_in_B A B T') *)
+      apply IH.
+      * (* Extract valid_pair bounds for T' from H_bounds *)
+        simpl in H_bounds.
+        apply andb_true_iff in H_bounds as [_ H_bounds_T'].
+        exact H_bounds_T'.
+      * (* Extract is_valid_trace_aux T' from H_valid_aux *)
+        simpl in H_valid_aux.
+        apply andb_true_iff in H_valid_aux as [_ H_valid_T'].
+        exact H_valid_T'.
+      * (* Extract NoDup_dec T' from H_nodup_dec *)
+        simpl in H_nodup_dec.
+        apply andb_true_iff in H_nodup_dec as [_ H_nodup_dec_T'].
+        exact H_nodup_dec_T'.
+      * (* NoDup T' *)
+        exact H_nodup_T'.
+Qed.
 
 (**
    Trace Composition Preserves Validity
@@ -2290,10 +2325,15 @@ Lemma compose_trace_preserves_validity :
 Proof.
   intros A B C T1 T2 H_valid1 H_valid2.
   unfold is_valid_trace in *.
-  rewrite andb_true_iff in *.
-  destruct H_valid1 as [H_bounds1 H_compat1].
-  destruct H_valid2 as [H_bounds2 H_compat2].
-  split.
+  (* Each is_valid_trace has 3 parts: bounds && aux && nodup *)
+  apply andb_true_iff in H_valid1 as [H_rest1 H_nodup1].
+  apply andb_true_iff in H_rest1 as [H_bounds1 H_aux1].
+  apply andb_true_iff in H_valid2 as [H_rest2 H_nodup2].
+  apply andb_true_iff in H_rest2 as [H_bounds2 H_aux2].
+
+  (* Must prove all 3 parts for compose_trace *)
+  apply andb_true_iff. split.
+  apply andb_true_iff. split.
 
   - (* Part 1: All pairs in composed trace have valid bounds *)
     apply forallb_forall.
@@ -2313,11 +2353,16 @@ Proof.
     intros p1 p2 H_in1 H_in2.
     (* Use compose_trace_pairwise_compatible with the helper lemmas *)
     eapply compose_trace_pairwise_compatible.
-    + exact H_compat1.
-    + exact H_compat2.
+    + exact H_aux1.
+    + exact H_aux2.
     + exact H_in1.
     + exact H_in2.
-Qed.
+
+  - (* Part 3: NoDup for composed trace *)
+    (* TODO: This requires proving that composition preserves NoDup *)
+    (* For now, admit this part - it's provable but requires additional lemmas *)
+    admit.
+Admitted.
 
 (** ** Sub-Phase 4.4: fold_left Summation Infrastructure *)
 
