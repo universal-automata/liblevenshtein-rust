@@ -1990,7 +1990,63 @@ Qed.
 
 (* Removed: incl_length - incorrect statement (needs NoDup on both lists), unused.
    Counterexample: l1 = [a,a], l2 = [a] satisfies hypotheses but violates conclusion.
-   Replaced by incl_length_correct later with proper NoDup hypotheses. *)
+   Replaced by incl_length_NoDup below with proper NoDup hypotheses. *)
+
+(**
+   If l1 is included in l2 and both have NoDup, then length l1 ≤ length l2.
+
+   This is the key lemma for Part 2 arithmetic: inclusion + uniqueness → length bound.
+*)
+Lemma incl_length_NoDup :
+  forall {A : Type} (l1 l2 : list A),
+    NoDup l1 ->
+    NoDup l2 ->
+    incl l1 l2 ->
+    length l1 <= length l2.
+Proof.
+  intros A l1.
+  induction l1 as [| a l1' IH].
+  - (* Base: l1 = [], length 0 ≤ anything *)
+    intros l2 H_nodup1 H_nodup2 H_incl.
+    simpl. lia.
+  - (* Inductive: l1 = a :: l1' *)
+    intros l2 H_nodup1 H_nodup2 H_incl.
+    inversion H_nodup1 as [| ? ? H_not_in H_nodup1'].
+    simpl.
+    (* Since a :: l1' ⊆ l2, we have a ∈ l2 and l1' ⊆ l2 *)
+    assert (H_a_in: In a l2).
+    { apply H_incl. left. reflexivity. }
+    (* Use NoDup_split to decompose l2 = l2_1 ++ a :: l2_2 *)
+    apply NoDup_split in H_a_in as [l2_1 [l2_2 [H_eq [H_not1 H_not2]]]]; [| exact H_nodup2].
+    (* Now length l2 = length l2_1 + 1 + length l2_2 *)
+    rewrite H_eq.
+    rewrite length_app. simpl. rewrite Nat.add_succ_r.
+    (* We need: 1 + length l1' ≤ length l2_1 + S (length l2_2) *)
+    (* Which is: length l1' ≤ length l2_1 + length l2_2 *)
+    apply le_n_S.
+    (* Apply IH with l2' = l2_1 ++ l2_2 *)
+    rewrite <- length_app.
+    apply (IH (l2_1 ++ l2_2)).
+    + (* Show NoDup l1' *)
+      exact H_nodup1'.
+    + (* Show NoDup (l2_1 ++ l2_2) *)
+      rewrite H_eq in H_nodup2.
+      apply NoDup_remove_1 in H_nodup2.
+      exact H_nodup2.
+    + (* Show l1' ⊆ (l2_1 ++ l2_2) *)
+      intros y H_y_in.
+      (* y ∈ l1', and l1' ⊆ l2, so y ∈ l2 = l2_1 ++ a :: l2_2 *)
+      assert (H_y_in_l2: In y l2).
+      { apply H_incl. right. exact H_y_in. }
+      rewrite H_eq in H_y_in_l2.
+      apply in_app_or in H_y_in_l2 as [H_in1 | [H_eq_y_a | H_in2]].
+      * (* y ∈ l2_1 *)
+        apply in_or_app. left. exact H_in1.
+      * (* y = a, but a ∉ l1' by H_not_in, contradiction *)
+        subst y. contradiction.
+      * (* y ∈ l2_2 *)
+        apply in_or_app. right. exact H_in2.
+Qed.
 
 (** ** Sub-Phase 3.2: Change Cost Infrastructure *)
 
