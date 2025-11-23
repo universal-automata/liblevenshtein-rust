@@ -815,8 +815,90 @@ Fixpoint is_valid_trace_aux (pairs : list (nat * nat)) : bool :=
       (forallb (compatible_pairs p) ps) && is_valid_trace_aux ps
   end.
 
+(**
+   NoDup Decision Procedure
+
+   We need to enforce that valid traces have no duplicate pairs.
+   This section provides a decidable check for NoDup on lists of pairs.
+
+   These definitions must come BEFORE is_valid_trace which uses them.
+*)
+
+(** Decidable equality for nat * nat pairs *)
+Definition pair_eq_dec (p1 p2 : nat * nat) : {p1 = p2} + {p1 <> p2}.
+Proof.
+  decide equality; apply Nat.eq_dec.
+Defined.
+
+(** Decidable NoDup check *)
+Fixpoint NoDup_dec {A : Type} (eq_dec : forall x y : A, {x = y} + {x <> y})
+                   (l : list A) : bool :=
+  match l with
+  | [] => true
+  | x :: xs =>
+      negb (existsb (fun y => if eq_dec x y then true else false) xs) &&
+      NoDup_dec eq_dec xs
+  end.
+
+(** Correctness of NoDup_dec *)
+Lemma NoDup_dec_correct :
+  forall {A : Type} (eq_dec : forall x y : A, {x = y} + {x <> y}) (l : list A),
+    NoDup_dec eq_dec l = true <-> NoDup l.
+Proof.
+  intros A eq_dec l.
+  split.
+  - (* -> direction: NoDup_dec true implies NoDup *)
+    induction l as [| x xs IH].
+    + (* Base: l = [] *)
+      intro. constructor.
+    + (* Inductive: l = x :: xs *)
+      intro H.
+      simpl in H.
+      apply andb_true_iff in H as [H_not_in H_dec_xs].
+      constructor.
+      * (* Show x ∉ xs *)
+        intro H_in.
+        (* H_not_in says: negb (existsb ...) = true, so existsb ... = false *)
+        apply negb_true_iff in H_not_in.
+        (* But if x ∈ xs, then existsb should be true - contradiction *)
+        assert (H_should_exist: existsb (fun y => if eq_dec x y then true else false) xs = true).
+        { rewrite existsb_exists. exists x. split; [exact H_in |].
+          destruct (eq_dec x x) as [_ | H_neq]; [reflexivity | exfalso; apply H_neq; reflexivity]. }
+        rewrite H_should_exist in H_not_in. discriminate.
+      * (* Show NoDup xs *)
+        apply IH. exact H_dec_xs.
+
+  - (* <- direction: NoDup implies NoDup_dec true *)
+    induction l as [| x xs IH].
+    + (* Base: l = [] *)
+      intro. simpl. reflexivity.
+    + (* Inductive: l = x :: xs *)
+      intro H.
+      inversion H as [| ? ? H_not_in H_nodup_xs].
+      simpl.
+      apply andb_true_iff.
+      split.
+      * (* Show negb (existsb ...) = true *)
+        apply negb_true_iff.
+        apply Bool.not_true_iff_false.
+        intro H_ex.
+        rewrite existsb_exists in H_ex.
+        destruct H_ex as [y [H_y_in H_eq]].
+        destruct (eq_dec x y) as [H_xy | H_neq].
+        -- subst y. contradiction.
+        -- discriminate H_eq.
+      * (* Show NoDup_dec eq_dec xs = true *)
+        apply IH. exact H_nodup_xs.
+Qed.
+
+(**
+   IMPORTANT: is_valid_trace now enforces NoDup to prevent duplicate pairs.
+   This is necessary for the NoDup lemmas and triangle inequality proof.
+*)
 Definition is_valid_trace (A B : list Char) (T : Trace A B) : bool :=
-  (forallb (valid_pair (length A) (length B)) T) && is_valid_trace_aux T.
+  (forallb (valid_pair (length A) (length B)) T) &&
+  is_valid_trace_aux T &&
+  NoDup_dec pair_eq_dec T.
 
 (** Calculate which positions are touched by the trace *)
 Fixpoint touched_in_A (A B : list Char) (T : Trace A B) : list nat :=
