@@ -2804,6 +2804,55 @@ Qed.
    For now, we admit this lemma to continue with the overall proof structure,
    and can return to prove it rigorously later.
 *)
+(**
+   Helper lemma: Map each element in comp to its witness pair, creating a list of
+   pairs from T1 × T2. The sum over comp is bounded by the sum over this witness list.
+
+   Since witnesses can repeat, we use the fact that the sum over the witness list
+   (allowing duplicates) is still bounded by length(comp) times the maximum costs.
+   But this gives a weak bound.
+
+   BETTER APPROACH: We observe that comp is constructed specifically by compose_trace,
+   which has special structure. Instead of generic induction, we should induct on
+   the CONSTRUCTION of compose_trace itself.
+*)
+
+(**
+   Key realization: We need to prove this using the DEFINITION of compose_trace,
+   not by generic induction on an arbitrary list that happens to equal comp.
+
+   The compose_trace function is defined as:
+   comp_helper T1 T2 = filter (has_witnesses T1 T2) (cartesian A_touched B_touched)
+
+   Each element in comp is CONSTRUCTED by finding witnesses, and we can leverage
+   this construction in the proof.
+*)
+
+(**
+   Revised helper: Prove pointwise bound for individual elements first, then
+   extend to full sums using a careful accounting argument.
+
+   The core insight: Although witnesses can be reused, the TOTAL usage is bounded.
+   Specifically, if we sum cost_comp(x) for all x in comp, each cost_comp(x)
+   is bounded by cost_T1(witness1(x)) + cost_T2(witness2(x)).
+
+   Even if witness1 maps multiple x values to the same element of T1, when we
+   sum over ALL of comp, the total cannot exceed sum(T1) + sum(T2) because...
+
+   Wait, that's not obviously true! If all elements of comp map to the same
+   witness pair (w1, w2), then sum(comp) = |comp| * (cost_T1(w1) + cost_T2(w2)),
+   which could be >> sum(T1) + sum(T2).
+
+   So the statement IS FALSE in general without additional constraints!
+
+   However, for our SPECIFIC case (compose_trace with valid traces), there
+   ARE additional constraints: the NoDup property and compatible_pairs ensure
+   that witnesses cannot be arbitrarily reused.
+
+   This confirms that we need the injective witness mapping infrastructure.
+   Let me develop it properly.
+*)
+
 Lemma change_cost_compose_bound :
   forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
     is_valid_trace_aux T1 = true ->
@@ -2821,14 +2870,37 @@ Lemma change_cost_compose_bound :
 Proof.
   intros A B C T1 T2 H_valid1 H_valid2.
 
-  (* Strategy:
-     1. Each (i,k) ∈ comp has witness (i,j) ∈ T1 and (j,k) ∈ T2 by In_compose_trace
-     2. The witnesses are unique by witness_j_unique_in_T1 and witness_k_unique_in_T2
-     3. The witness maps are injective (to be proven)
-     4. Sum over comp is bounded by sums over T1 and T2 (to be proven)
+  (* PROOF STRATEGY (requires 4-8h of infrastructure development):
 
-     This requires substantial infrastructure for reasoning about fold_left sums
-     over injective functions. We admit for now and return to complete later.
+     The proof CANNOT proceed by simple induction on compose_trace because:
+     - Induction gives: sum(comp') ≤ RHS (by IH)
+     - New element: cost(i,k) ≤ cost(i,j) + cost(j,k) via witnesses
+     - But adding these gives: sum(comp) ≤ sum(comp') + cost(i,j) + cost(j,k)
+                                         ≤ RHS + cost(i,j) + cost(j,k)
+     - This accumulates multiplicatively, giving a bound of |comp| * RHS, not RHS!
+
+     The key insight: This lemma is TRUE only because of witness INJECTIVITY.
+     The compatible_pairs constraint ensures:
+     1. No two pairs in T1 share the same first component
+     2. No two pairs in T2 share the same first component
+     3. Therefore, the witness mapping f: comp → T1 × T2 has special structure
+
+     Required infrastructure (not yet developed):
+     - Define witness extraction functions explicitly
+     - Prove witness uniqueness implies injectivity of the mapping
+     - Develop theory of fold_left sums over injective images:
+       * If f: L1 → L2 is injective, then sum over L1 via (g ∘ f) ≤ sum over L2 via g
+     - Apply this with the decomposition:
+       * cost_comp(i,k) ≤ cost_T1(f1(i,k)) + cost_T2(f2(i,k))  [triangle inequality]
+       * sum over comp ≤ sum over image(f1) + sum over image(f2)  [injectivity]
+       * sum over image(f1) ≤ sum over T1  [subset bound]
+       * sum over image(f2) ≤ sum over T2  [subset bound]
+
+     This requires dedicated development time. See PROOF_SESSION_LOGS.md Session 2
+     for detailed analysis of why simpler approaches fail.
+
+     For now, we admit this lemma and continue with proofs that have clearer paths,
+     returning later to build the necessary infrastructure.
   *)
   admit.
 Admitted.
