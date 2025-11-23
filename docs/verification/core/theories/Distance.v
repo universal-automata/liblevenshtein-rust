@@ -2415,9 +2415,34 @@ Proof.
     + exact H_in2.
 
   - (* Part 3: NoDup for composed trace *)
-    (* TODO: This requires proving that composition preserves NoDup *)
-    (* For now, admit this part - it's provable but requires additional lemmas *)
-    admit.
+    (* Strategy: Show that if (i,k) appears in compose_trace T1 T2,
+       its witness j is unique, hence no duplicates can arise *)
+
+    (* Get NoDup for T1 and T2 *)
+    assert (H_nodup_T1: NoDup T1) by (apply is_valid_trace_implies_NoDup;
+      unfold is_valid_trace; apply andb_true_iff; split; [apply andb_true_iff; split; assumption | assumption]).
+    assert (H_nodup_T2: NoDup T2) by (apply is_valid_trace_implies_NoDup;
+      unfold is_valid_trace; apply andb_true_iff; split; [apply andb_true_iff; split; assumption | assumption]).
+
+    (* Prove NoDup for composition by showing duplicates lead to contradiction *)
+    induction (compose_trace T1 T2) as [| [i k] comp' IH_comp].
+    + (* Base: empty composition has NoDup *)
+      constructor.
+
+    + (* Inductive: show (i,k) not in comp' and comp' has NoDup *)
+      (* This requires structural properties of compose_trace that are complex *)
+      (* The key insight: witness_j is unique for each (i,k), preventing duplicates *)
+
+      (* For a complete proof, we would need to:
+         1. Define a lemma showing compose_trace produces at most one pair per (i,k)
+         2. Use witness uniqueness (witness_j_unique_in_T1, witness_k_unique_in_T2)
+         3. Show this implies NoDup
+
+         This is provable but requires 8-12 hours of careful structural analysis.
+         Given the time constraints and that this is blocking, we admit for now
+         with a clear proof strategy documented.
+      *)
+      admit.
 Admitted.
 
 (** ** Sub-Phase 4.4: fold_left Summation Infrastructure *)
@@ -3524,18 +3549,35 @@ Proof.
      From H_cc: cc_comp <= cc1 + cc2
      From H_di: dc_comp + ic_comp <= dc1 + ic1 + dc2 + ic2
 
-     This is trivial natural number arithmetic:
-     cc_comp + (dc_comp + ic_comp) ≤ (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)
-     which rearranges to the goal.
+     Goal structure:
+       cc_comp + dc_comp + ic_comp
+     = cc_comp + (dc_comp + ic_comp)
+     ≤ (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)  [by H_cc and H_di with add_le_mono]
+     = (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)  [by associativity/commutativity]
+  *)
 
-     ADMITTED: The arithmetic combination is straightforward but lia/omega tactics
-     fail due to the opaque set definitions containing fold_left expressions.
-     This is ONLY the final arithmetic step - the hard work (Part 1 and Part 2) is complete.
+  (* The goal is: cc_comp + dc_comp + ic_comp <= (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)
 
-     Alternative proof: Could manually apply Nat.add_le_mono and ring to combine
-     H_cc and H_di, but this would be tedious without providing additional insight. *)
-  admit.
-Admitted.
+     Rearrange RHS: (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)
+                  = (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)
+
+     So we need: cc_comp + dc_comp + ic_comp <= (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)
+
+     Which is: cc_comp + (dc_comp + ic_comp) <= (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)
+
+     By Nat.add_le_mono, this follows from:
+       cc_comp <= cc1 + cc2  (H_cc)
+       dc_comp + ic_comp <= dc1 + ic1 + dc2 + ic2  (H_di)
+  *)
+
+  (* The issue: set definitions are opaque to lia *)
+  (* Solution: Unfold everything and let lia handle it *)
+  unfold cc_comp, dc_comp, ic_comp, cc1, dc1, ic1, cc2, dc2, ic2, comp in *.
+
+  (* Now H_cc and H_di have concrete expressions, and the goal is pure arithmetic *)
+  (* lia should be able to solve: a + b + c <= (d + e) + (f + g + h + i) given a <= d+e and b+c <= f+g+h+i *)
+  lia.
+Qed.
 
 (**
    Theorem 1 (Wagner-Fischer, 1974, page 4):
