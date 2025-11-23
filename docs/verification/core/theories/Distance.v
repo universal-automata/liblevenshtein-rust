@@ -3526,102 +3526,76 @@ Proof.
     exact H_aux.
   }
 
+  (* APPROACH #7: Use remember with EXACT syntax from trace_cost definition *)
+  (* First, create comp before unfolding *)
+  remember (compose_trace T1 T2) as comp eqn:E_comp.
+
+  (* Now unfold trace_cost - this will use "fun acc p" syntax *)
   unfold trace_cost.
 
-  (* Introduce convenient notation for the three cost components of each trace *)
-  set (comp := compose_trace T1 T2).
-  set (cc_comp := fold_left (fun acc x =>
-    acc + (let '(i, k) := x in
-           subst_cost (nth (i-1) A default_char) (nth (k-1) C default_char))
-  ) comp 0).
-  set (dc_comp := length A - length (touched_in_A A C comp)).
-  set (ic_comp := length C - length (touched_in_B A C comp)).
+  (* Remember with EXACT same lambda syntax as unfold produces *)
+  (* For comp (A to C): uses (i, j) pattern even though semantically it's (i,k) *)
+  remember (fold_left (fun acc p =>
+    let '(i, j) := p in
+    acc + subst_cost (nth (i-1) A default_char) (nth (j-1) C default_char)
+  ) comp 0) as cc_comp eqn:E_cc_comp.
+  remember (length A - length (touched_in_A A C comp)) as dc_comp eqn:E_dc_comp.
+  remember (length C - length (touched_in_B A C comp)) as ic_comp eqn:E_ic_comp.
 
-  set (cc1 := fold_left (fun acc y =>
-    acc + (let '(i, j) := y in
-           subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char))
-  ) T1 0).
-  set (dc1 := length A - length (touched_in_A A B T1)).
-  set (ic1 := length B - length (touched_in_B A B T1)).
+  (* For T1 (A to B): exact syntax from trace_cost *)
+  remember (fold_left (fun acc p =>
+    let '(i, j) := p in
+    acc + subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char)
+  ) T1 0) as cc1 eqn:E_cc1.
+  remember (length A - length (touched_in_A A B T1)) as dc1 eqn:E_dc1.
+  remember (length B - length (touched_in_B A B T1)) as ic1 eqn:E_ic1.
 
-  set (cc2 := fold_left (fun acc z =>
-    acc + (let '(j, k) := z in
-           subst_cost (nth (j-1) B default_char) (nth (k-1) C default_char))
-  ) T2 0).
-  set (dc2 := length B - length (touched_in_A B C T2)).
-  set (ic2 := length C - length (touched_in_B B C T2)).
+  (* For T2 (B to C): exact syntax from trace_cost *)
+  remember (fold_left (fun acc p =>
+    let '(i, j) := p in
+    acc + subst_cost (nth (i-1) B default_char) (nth (j-1) C default_char)
+  ) T2 0) as cc2 eqn:E_cc2.
+  remember (length B - length (touched_in_A B C T2)) as dc2 eqn:E_dc2.
+  remember (length C - length (touched_in_B B C T2)) as ic2 eqn:E_ic2.
 
   (* Goal: cc_comp + dc_comp + ic_comp <= (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2) *)
 
   (* Part 1: Bound change costs using triangle inequality *)
   assert (H_cc: cc_comp <= cc1 + cc2).
-  { unfold cc_comp, cc1, cc2, comp.
+  { rewrite E_cc_comp, E_cc1, E_cc2, E_comp.
+    (* Normalize the pattern matching syntax to match change_cost_compose_bound *)
+    cbn beta iota.
     apply change_cost_compose_bound; assumption.
   }
 
   (* Part 2: Bound delete + insert costs using axiomatized bound *)
   assert (H_di: dc_comp + ic_comp <= dc1 + ic1 + dc2 + ic2).
-  { unfold dc_comp, ic_comp, dc1, ic1, dc2, ic2, comp.
+  { rewrite E_dc_comp, E_ic_comp, E_dc1, E_ic1, E_dc2, E_ic2, E_comp.
     (* Apply the delete/insert bound (now proven up to structural lemmas) *)
     apply trace_composition_delete_insert_bound; assumption.
   }
 
+  (* NOW rewrite backwards to fold the goal to use the opaque variable names *)
+  rewrite <- E_cc_comp, <- E_dc_comp, <- E_ic_comp.
+  rewrite <- E_cc1, <- E_dc1, <- E_ic1.
+  rewrite <- E_cc2, <- E_dc2, <- E_ic2.
+
   (* Combine the two bounds: cc_comp + dc_comp + ic_comp <= (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)
      From H_cc: cc_comp <= cc1 + cc2
      From H_di: dc_comp + ic_comp <= dc1 + ic1 + dc2 + ic2
-
-     Goal structure:
-       cc_comp + dc_comp + ic_comp
-     = cc_comp + (dc_comp + ic_comp)
-     ≤ (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)  [by H_cc and H_di with add_le_mono]
-     = (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)  [by associativity/commutativity]
   *)
 
-  (* The goal is: cc_comp + dc_comp + ic_comp <= (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)
+  (* Step 1: Prove intermediate inequality *)
+  assert (H_intermediate: cc_comp + (dc_comp + ic_comp) <= (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)).
+  { rewrite <- Nat.add_assoc.
+    apply Nat.add_le_mono; assumption.
+  }
 
-     Rearrange RHS: (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)
-                  = (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)
-
-     So we need: cc_comp + dc_comp + ic_comp <= (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)
-
-     Which is: cc_comp + (dc_comp + ic_comp) <= (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)
-
-     By Nat.add_le_mono, this follows from:
-       cc_comp <= cc1 + cc2  (H_cc)
-       dc_comp + ic_comp <= dc1 + ic1 + dc2 + ic2  (H_di)
-  *)
-
-  (* The problem: lia cannot handle fold_left expressions, rewrite unfolds set
-     constants, and apply's unification fails with complex expressions.
-
-     After extensive experimentation, the core issue is that Coq's automation
-     (lia, ring) cannot handle the fold_left expressions that appear in the cost
-     definitions, even though the arithmetic is trivial.
-
-     The proof is MATHEMATICALLY VALID:
-       Given: cc_comp <= cc1 + cc2  and  dc_comp + ic_comp <= dc1 + ic1 + dc2 + ic2
-       Prove: cc_comp + dc_comp + ic_comp <= (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)
-
-     This follows by:
-       cc_comp + dc_comp + ic_comp
-         = cc_comp + (dc_comp + ic_comp)                    [associativity]
-         <= (cc1 + cc2) + (dc_comp + ic_comp)               [H_cc + mono_r]
-         <= (cc1 + cc2) + (dc1 + ic1 + dc2 + ic2)          [H_di + mono_l]
-         = (cc1 + dc1 + ic1) + (cc2 + dc2 + ic2)            [rearrangement]
-
-     The only missing piece is the final arithmetic rearrangement, which lia
-     cannot complete due to fold_left expressions being opaque to it.
-
-     DECISION: This lemma is complete up to a trivial (but technically challenging)
-     final arithmetic step. Parts 1 & 2 (the hard proofs) are complete with Qed.
-     Keeping this as Admitted is acceptable given 95% completion and clear
-     mathematical validity.
-
-     Estimated effort to complete: 2-4 hours of advanced Coq proof engineering
-     (custom tactics, or manually building proof terms with eq_rect).
-  *)
-  admit.
-Admitted.
+  (* Step 2: Rearrange and finish *)
+  eapply Nat.le_trans; [exact H_intermediate |].
+  apply Nat.eq_le_incl.
+  lia.
+Qed.
 
 (**
    Theorem 1 (Wagner-Fischer, 1974, page 4):
