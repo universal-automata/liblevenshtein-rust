@@ -2874,6 +2874,59 @@ Definition extract_witness_j (A B C : list Char) (T1 : Trace A B) (T2 : Trace B 
 (**
    Lemma: extract_witness_j is correct - it finds the unique witness.
 *)
+(**
+   Helper: find returns Some for elements in the list when predicate holds.
+*)
+Lemma find_some_in_iff :
+  forall {A : Type} (f : A -> bool) (l : list A) (x : A),
+    find f l = Some x -> In x l /\ f x = true.
+Proof.
+  intros A f l x.
+  induction l as [| a l' IH].
+  - (* l = [] *)
+    intro H. discriminate H.
+  - (* l = a :: l' *)
+    simpl. destruct (f a) eqn:Hfa.
+    + (* f a = true *)
+      intro H. inversion H; subst.
+      split.
+      * left. reflexivity.
+      * exact Hfa.
+    + (* f a = false *)
+      intro H. apply IH in H as [Hin Hfx].
+      split.
+      * right. exact Hin.
+      * exact Hfx.
+Qed.
+
+(**
+   Helper: If element satisfies predicate and is in list, find eventually returns it or earlier match.
+*)
+Lemma in_find_some :
+  forall {A : Type} (f : A -> bool) (l : list A) (x : A),
+    In x l -> f x = true -> exists y, find f l = Some y /\ f y = true.
+Proof.
+  intros A f l x Hin Hfx.
+  induction l as [| a l' IH].
+  - (* l = [] *)
+    contradiction.
+  - (* l = a :: l' *)
+    simpl. destruct (f a) eqn:Hfa.
+    + (* f a = true *)
+      exists a. split.
+      * reflexivity.
+      * exact Hfa.
+    + (* f a = false *)
+      destruct Hin as [Heq | Hin'].
+      * (* x = a *)
+        subst a. rewrite Hfx in Hfa. discriminate Hfa.
+      * (* x ∈ l' *)
+        apply IH in Hin' as [y [Hfind Hfy]].
+        exists y. split.
+        -- exact Hfind.
+        -- exact Hfy.
+Qed.
+
 Lemma extract_witness_j_correct :
   forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k j : nat),
     is_valid_trace_aux T1 = true ->
@@ -2887,20 +2940,32 @@ Proof.
 
   unfold extract_witness_j.
 
-  (* find returns Some (i,j') for some j' with i =? i = true *)
-  assert (Hfind: exists j', find (fun p1 => let '(i1, j1) := p1 in i =? i1) T1 = Some (i, j')).
+  (* find returns Some pair containing i *)
+  assert (Hfind_ex: exists p, find (fun p1 => let '(i1, j1) := p1 in i =? i1) T1 = Some p).
   {
-    (* Use In_find lemma or prove by induction *)
-    admit. (* TODO: Prove using find_some property *)
+    destruct (in_find_some (fun p1 => let '(i1, j1) := p1 in i =? i1) T1 (i, j) Hin1) as [p [Hfind Hpred]].
+    - simpl. apply Nat.eqb_refl.
+    - exists p. exact Hfind.
   }
 
-  destruct Hfind as [j' Hfind].
+  destruct Hfind_ex as [[i' j'] Hfind].
   rewrite Hfind.
+
+  (* From find result, we know (i',j') ∈ T1 and i =? i' = true *)
+  apply find_some_in_iff in Hfind as [Hin_ij' Hpred'].
+  simpl in Hpred'.
+
+  (* i =? i' = true implies i = i' *)
+  apply Nat.eqb_eq in Hpred' as Hi'_eq.
+  subst i'.
 
   (* By witness uniqueness, j' = j *)
   assert (Hj'_eq: j' = j).
   {
-    admit. (* TODO: Extract from find result and use witness_j_unique_in_T1 *)
+    eapply witness_j_unique_in_T1.
+    - exact Hval1.
+    - exact Hin_ij'.
+    - exact Hin1.
   }
 
   subst j'.
@@ -2917,7 +2982,7 @@ Proof.
 
   rewrite Hexists.
   reflexivity.
-Admitted. (* TODO: Complete proof with find lemmas *)
+Qed.
 
 (**
    Phase 2: List Cardinality via Injections
