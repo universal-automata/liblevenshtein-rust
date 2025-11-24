@@ -2985,6 +2985,113 @@ Proof.
 Qed.
 
 (**
+   Step 1.2: Witness Injectivity
+
+   Now that we can extract witnesses, we prove that the witness mappings are injective.
+   This is the crucial property that prevents unbounded accumulation in sum bounds.
+*)
+
+(**
+   Definition: A pair (i,k) uniquely determines its witness j in the composition.
+
+   For the mapping comp → T1: if (i1,k1) and (i2,k2) both map to the same (i,j) in T1,
+   then they must be the same pair.
+*)
+Lemma witness_pair_injective_T1 :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k1 k2 j : nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In (i, k1) (compose_trace T1 T2) ->
+    In (i, k2) (compose_trace T1 T2) ->
+    In (i, j) T1 ->
+    In (j, k1) T2 ->
+    In (j, k2) T2 ->
+    k1 = k2.
+Proof.
+  intros A B C T1 T2 i k1 k2 j Hval1 Hval2 Hin_comp1 Hin_comp2 Hin1 Hin2_k1 Hin2_k2.
+
+  (* Use witness_k_unique_in_T2: same j implies k1 = k2 *)
+  eapply witness_k_unique_in_T2.
+  - exact Hval2.
+  - exact Hin2_k1.
+  - exact Hin2_k2.
+Qed.
+
+(**
+   Symmetric: If two pairs share the same witness in T2, they must be identical.
+*)
+Lemma witness_pair_injective_T2 :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i1 i2 k j : nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In (i1, k) (compose_trace T1 T2) ->
+    In (i2, k) (compose_trace T1 T2) ->
+    In (i1, j) T1 ->
+    In (i2, j) T1 ->
+    In (j, k) T2 ->
+    i1 = i2.
+Proof.
+  intros A B C T1 T2 i1 i2 k j Hval1 Hval2 Hin_comp1 Hin_comp2 Hin1_i1 Hin1_i2 Hin2.
+
+  (* Use valid_trace_unique_second: same j implies i1 = i2 *)
+  eapply valid_trace_unique_second.
+  - exact Hval1.
+  - exact Hin1_i1.
+  - exact Hin1_i2.
+Qed.
+
+(**
+   Main injectivity result: Distinct pairs in comp have distinct witnesses.
+
+   If (i1,k1) ≠ (i2,k2), then their witness pairs (i1,j1), (j1,k1) and (i2,j2), (j2,k2)
+   cannot both be equal.
+*)
+Lemma compose_witness_distinct :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C)
+         (i1 k1 i2 k2 j1 j2 : nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In (i1, k1) (compose_trace T1 T2) ->
+    In (i2, k2) (compose_trace T1 T2) ->
+    In (i1, j1) T1 ->
+    In (j1, k1) T2 ->
+    In (i2, j2) T1 ->
+    In (j2, k2) T2 ->
+    (i1, k1) <> (i2, k2) ->
+    ((i1, j1) <> (i2, j2) \/ (j1, k1) <> (j2, k2)).
+Proof.
+  intros A B C T1 T2 i1 k1 i2 k2 j1 j2 Hval1 Hval2
+         Hin_comp1 Hin_comp2 Hin1_1 Hin2_1 Hin1_2 Hin2_2 Hneq.
+
+  (* Proof by contradiction: assume both pairs are equal *)
+  destruct (pair_eq_dec (i1, j1) (i2, j2)) as [Heq_ij | Hneq_ij].
+  - (* Case: (i1,j1) = (i2,j2) *)
+    inversion Heq_ij; subst i2 j2.
+
+    (* Then by witness_pair_injective_T1, k1 = k2 *)
+    assert (Hk_eq: k1 = k2).
+    {
+      eapply witness_pair_injective_T1 with (i := i1) (j := j1).
+      - exact Hval1.
+      - exact Hval2.
+      - exact Hin_comp1.
+      - exact Hin_comp2.
+      - exact Hin1_1.
+      - exact Hin2_1.
+      - exact Hin2_2.
+    }
+
+    subst k2.
+
+    (* But this contradicts (i1,k1) ≠ (i2,k2) *)
+    contradiction Hneq.
+    reflexivity.
+
+  - (* Case: (i1,j1) ≠ (i2,j2) *)
+    left. exact Hneq_ij.
+Qed.
+
+(**
    Phase 2: List Cardinality via Injections
 
    We prove that injective mappings preserve cardinality bounds.
