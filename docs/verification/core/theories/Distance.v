@@ -3092,6 +3092,154 @@ Proof.
 Qed.
 
 (**
+   Step 1.3: Connect Injectivity to Cardinality Bounds
+
+   Now that we have witness injectivity, we prove that injective mappings
+   preserve cardinality: if f: A → B injective and NoDup B, then |A| ≤ |B|.
+*)
+
+(**
+   Definition: A function is injective if distinct inputs map to distinct outputs.
+*)
+Definition injective {A B : Type} (f : A -> B) : Prop :=
+  forall x y, f x = f y -> x = y.
+
+(**
+   Lemma: Injective mapping preserves NoDup property.
+
+   If we map a NoDup list through an injective function, the result has NoDup.
+*)
+Lemma map_injective_NoDup :
+  forall {A B : Type} (f : A -> B) (l : list A),
+    injective f ->
+    NoDup l ->
+    NoDup (map f l).
+Proof.
+  intros A B f l Hinj Hnodup.
+  induction Hnodup as [| x l' Hnotin Hnodup' IH].
+  - (* Base: l = [] *)
+    simpl. constructor.
+  - (* Inductive: l = x :: l' *)
+    simpl. constructor.
+    + (* Show f x not in map f l' *)
+      intro Hin_fx.
+      apply in_map_iff in Hin_fx as [y [Heq_fy Hin_y]].
+      (* f x = f y and y ∈ l', so by injectivity x = y *)
+      apply Hinj in Heq_fy. subst y.
+      (* But x ∉ l', contradiction *)
+      contradiction.
+    + (* NoDup (map f l') by IH *)
+      exact IH.
+Qed.
+
+(**
+   Key lemma: Injective function from list with NoDup into list with NoDup
+   preserves cardinality bound.
+
+   If f maps all elements of l1 into l2, and f is injective, then |l1| ≤ |l2|.
+*)
+Lemma injective_image_bounded :
+  forall {A B : Type} (f : A -> B) (l1 : list A) (l2 : list B),
+    (forall x, In x l1 -> In (f x) l2) ->
+    injective f ->
+    NoDup l1 ->
+    NoDup l2 ->
+    length l1 <= length l2.
+Proof.
+  intros A B f l1 l2 Himage Hinj Hnodup1 Hnodup2.
+
+  (* Strategy: Show that map f l1 is a sublist of l2, and use incl_length_NoDup *)
+  assert (Hincl: incl (map f l1) l2).
+  {
+    intros y Hin_y.
+    apply in_map_iff in Hin_y as [x [Heq Hin_x]].
+    subst y.
+    apply Himage. exact Hin_x.
+  }
+
+  (* map f l1 has NoDup by map_injective_NoDup *)
+  assert (Hnodup_map: NoDup (map f l1)).
+  {
+    apply map_injective_NoDup; assumption.
+  }
+
+  (* Now use incl_length_NoDup (already proven at line 2000) *)
+  assert (Hlen_map: length (map f l1) <= length l2).
+  {
+    eapply incl_length_NoDup; eauto.
+  }
+
+  (* length (map f l1) = length l1 *)
+  rewrite map_length in Hlen_map.
+  exact Hlen_map.
+Qed.
+
+(**
+   Application: Composition is bounded by T1.
+
+   The witness mapping comp → T1 is injective, so |comp| ≤ |T1|.
+*)
+Lemma compose_witness_bounded_T1 :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
+    is_valid_trace A B T1 = true ->
+    is_valid_trace B C T2 = true ->
+    length (compose_trace T1 T2) <= length T1.
+Proof.
+  intros A B C T1 T2 Hval1 Hval2.
+
+  (* Extract validity components *)
+  unfold is_valid_trace in *.
+  apply andb_true_iff in Hval1 as [Hrest1 Hnodup1].
+  apply andb_true_iff in Hrest1 as [Hbounds1 Haux1].
+  apply andb_true_iff in Hval2 as [Hrest2 Hnodup2].
+  apply andb_true_iff in Hrest2 as [Hbounds2 Haux2].
+
+  (* Get NoDup for T1 *)
+  assert (HnodupT1: NoDup T1).
+  {
+    apply is_valid_trace_implies_NoDup.
+    unfold is_valid_trace.
+    apply andb_true_iff. split.
+    - apply andb_true_iff. split; assumption.
+    - assumption.
+  }
+
+  (* Define witness extraction function comp → T1 *)
+  (* For each (i,k) ∈ comp, extract witness (i,j) ∈ T1 *)
+  assert (Hwitness_exists: forall ik, In ik (compose_trace T1 T2) ->
+    exists ij, In ij T1 /\ fst ij = fst ik).
+  {
+    intros [i k] Hin_comp.
+    apply In_compose_trace in Hin_comp as [j [Hin1 Hin2]].
+    exists (i, j). split.
+    - exact Hin1.
+    - simpl. reflexivity.
+  }
+
+  (* The key insight: this mapping is injective due to witness_pair_injective_T1 *)
+  (* However, proving this formally requires more infrastructure about partial functions *)
+  (* For now, we can use a simpler approach via touched positions *)
+
+  (* Alternative: Use that comp is built from T1, so length is bounded *)
+  (* This is actually provable from the definition of compose_trace *)
+
+  admit. (* TODO: Complete using injectivity or direct structural argument *)
+Admitted.
+
+(**
+   Symmetric: Composition is bounded by T2.
+*)
+Lemma compose_witness_bounded_T2 :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
+    is_valid_trace A B T1 = true ->
+    is_valid_trace B C T2 = true ->
+    length (compose_trace T1 T2) <= length T2.
+Proof.
+  (* Symmetric to compose_witness_bounded_T1 *)
+  admit.
+Admitted.
+
+(**
    Phase 2: List Cardinality via Injections
 
    We prove that injective mappings preserve cardinality bounds.
