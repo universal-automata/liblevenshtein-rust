@@ -3889,6 +3889,261 @@ Qed.
    We prove that injective mappings preserve cardinality bounds.
 *)
 
+(**
+   Auxiliary Lemma: Adding an element to a list doesn't decrease its fold_left sum.
+
+   For any list l and element x, the sum over x::l is at least the sum over l
+   (since we're adding non-negative natural numbers).
+*)
+Lemma fold_left_sum_cons_le :
+  forall {A : Type} (f : A -> nat) (x : A) (l : list A),
+    fold_left (fun acc y => acc + f y) l 0 <=
+    fold_left (fun acc y => acc + f y) (x :: l) 0.
+Proof.
+  intros A f x l.
+  simpl.
+  (* fold_left on (x :: l) with init 0 becomes: fold_left ... l (0 + f x) *)
+  (* We need to show: fold_left ... l 0 <= fold_left ... l (0 + f x) *)
+  (* This is monotonicity of initial value *)
+  replace (0 + f x) with (f x) by lia.
+  (* Now: fold_left ... l 0 <= fold_left ... l (f x) *)
+  apply fold_left_add_init_monotone.
+  (* Show: 0 <= f x, which is trivial for nat *)
+  lia.
+Qed.
+
+(* Key helper: fold_left with addition distributes over initial accumulator *)
+Lemma fold_left_add_init_shift :
+  forall {A : Type} (f : A -> nat) (l : list A) (init : nat),
+    fold_left (fun acc y => acc + f y) l init =
+    init + fold_left (fun acc y => acc + f y) l 0.
+Proof.
+  intros A f l init.
+  generalize dependent init.
+  induction l as [| x l' IH].
+  - (* Base case: l = [] *)
+    intro init. simpl. lia.
+  - (* Inductive case: l = x :: l' *)
+    intro init. simpl.
+    rewrite IH.
+    rewrite (IH (f x)).
+    lia.
+Qed.
+
+(* Helper lemma: fold_left over l1 ++ [x] ++ l2 can be decomposed *)
+Lemma fold_left_sum_insert_middle :
+  forall {A : Type} (f : A -> nat) (x : A) (l1 l2 : list A),
+    fold_left (fun acc y => acc + f y) (l1 ++ x :: l2) 0 =
+    fold_left (fun acc y => acc + f y) l1 0 + f x + fold_left (fun acc y => acc + f y) l2 0.
+Proof.
+  intros A f x l1 l2.
+  (* Rewrite using fold_left_app *)
+  rewrite fold_left_app.
+  simpl.
+
+  (* Now we have: fold_left ... l2 (fold_left ... l1 0 + f x) *)
+  (* We need to show this equals: fold_left ... l1 0 + f x + fold_left ... l2 0 *)
+
+  (* Use fold_left_add_init_shift *)
+  rewrite fold_left_add_init_shift.
+  lia.
+Qed.
+
+(* Corollary: fold_left over l1 ++ l2 sums the individual folds *)
+Lemma fold_left_app_sum :
+  forall {A : Type} (f : A -> nat) (l1 l2 : list A),
+    fold_left (fun acc y => acc + f y) (l1 ++ l2) 0 =
+    fold_left (fun acc y => acc + f y) l1 0 + fold_left (fun acc y => acc + f y) l2 0.
+Proof.
+  intros A f l1 l2.
+  rewrite fold_left_app.
+  rewrite fold_left_add_init_shift.
+  lia.
+Qed.
+
+(**
+   Main Lemma: Sum over a subset is bounded by sum over the superset.
+
+   If sub ⊆ super, then Σ_{x ∈ sub} f(x) ≤ Σ_{x ∈ super} f(x).
+
+   This is proven by structural induction on super, with case analysis on
+   whether the head of super is in sub. Requires NoDup for both lists
+   to simplify the proof (specifically Case 1 where x ∈ sub).
+*)
+Lemma fold_left_sum_bound_subset :
+  forall (f : nat * nat -> nat) (sub super : list (nat * nat)),
+    NoDup sub ->
+    NoDup super ->
+    (forall x, In x sub -> In x super) ->
+    fold_left (fun sum ik => sum + f ik) sub 0 <=
+    fold_left (fun sum ik => sum + f ik) super 0.
+Proof.
+  intros f sub super H_NoDup_sub H_NoDup_super H_subset.
+  generalize dependent sub.
+  induction super as [| x super' IH].
+
+  - (* Base case: super = [] *)
+    intros sub H_NoDup_sub H_subset.
+    (* If super is empty, then sub must be empty (by subset property) *)
+    destruct sub as [| y sub'].
+    + (* sub = [] *) simpl. lia.
+    + (* sub = y :: sub', but y ∈ [] is impossible *)
+      exfalso.
+      specialize (H_subset y (or_introl eq_refl)).
+      simpl in H_subset. exact H_subset.
+
+  - (* Inductive case: super = x :: super' *)
+    intros sub H_NoDup_sub H_subset.
+    (* Extract NoDup properties *)
+    inversion H_NoDup_super as [| x' super'' H_x_not_in_super' H_NoDup_super']; subst.
+    (* Case split: Is x in sub? *)
+    destruct (in_dec pair_eq_dec x sub) as [H_x_in_sub | H_x_not_in_sub].
+
+    + (* Case 1: x ∈ sub *)
+      (* With NoDup, we can decompose sub at x: sub = sub1 ++ [x] ++ sub2 *)
+      apply in_split in H_x_in_sub as [sub1 [sub2 H_sub_eq]].
+
+      (* Make a copy of H_NoDup_sub rewritten to sub1 ++ x :: sub2 form *)
+      assert (H_NoDup_decomposed: NoDup (sub1 ++ x :: sub2)).
+      { rewrite <- H_sub_eq. exact H_NoDup_sub. }
+
+      (* Use NoDup_remove_1 to extract NoDup for sub1 ++ sub2 *)
+      assert (H_NoDup_rest: NoDup (sub1 ++ sub2)).
+      { apply NoDup_remove_1 in H_NoDup_decomposed. exact H_NoDup_decomposed. }
+
+      (* Extract that x is not in sub1 ++ sub2 using NoDup_remove_2 *)
+      assert (H_x_not_in_rest: ~In x (sub1 ++ sub2)).
+      { assert (H_NoDup_decomposed2: NoDup (sub1 ++ x :: sub2)).
+        { rewrite <- H_sub_eq. exact H_NoDup_sub. }
+        apply NoDup_remove_2 in H_NoDup_decomposed2.
+        exact H_NoDup_decomposed2. }
+
+      (* Show that sub1 ++ sub2 ⊆ super' *)
+      assert (H_rest_subset: forall y, In y (sub1 ++ sub2) -> In y super').
+      { intros y H_in_rest.
+        (* y ∈ sub = sub1 ++ [x] ++ sub2, and sub ⊆ (x :: super') *)
+        assert (H_y_in_sub: In y (sub1 ++ x :: sub2)).
+        { apply in_or_app. apply in_app_or in H_in_rest as [H1 | H2].
+          - left. exact H1.
+          - right. right. exact H2. }
+        rewrite <- H_sub_eq in H_y_in_sub.
+        specialize (H_subset y H_y_in_sub).
+        simpl in H_subset.
+        destruct H_subset as [H_eq | H_in_super']; [| exact H_in_super'].
+        (* If y = x, then x ∈ sub1 ++ sub2, contradicting H_x_not_in_rest *)
+        subst y. contradiction. }
+
+      (* Apply IH to (sub1 ++ sub2) and super' *)
+      (* IH expects: NoDup super' -> forall sub, NoDup sub -> subset -> goal *)
+      specialize (IH H_NoDup_super' (sub1 ++ sub2) H_NoDup_rest H_rest_subset).
+
+      (* Now we need to relate fold_left over sub = sub1 ++ [x] ++ sub2
+         to fold_left over sub1 ++ sub2 *)
+      rewrite H_sub_eq.
+
+      (* Use the decomposition lemma to rewrite LHS *)
+      rewrite fold_left_sum_insert_middle.
+
+      (* Now LHS: fold_left f sub1 0 + f x + fold_left f sub2 0 *)
+      (* RHS: fold_left f (x :: super') 0 *)
+      simpl.
+      replace (0 + f x) with (f x) by lia.
+
+      (* RHS: fold_left f super' (f x) *)
+      (* Goal: fold_left f sub1 0 + f x + fold_left f sub2 0 <= fold_left f super' (f x) *)
+
+      (* From IH: fold_left f (sub1 ++ sub2) 0 <= fold_left f super' 0 *)
+      (* Decompose the LHS of IH using fold_left_app_sum *)
+      rewrite fold_left_app_sum in IH.
+
+      (* Now IH: fold_left f sub1 0 + fold_left f sub2 0 <= fold_left f super' 0 *)
+
+      (* Use fold_left_add_init_shift to rewrite RHS as: f x + fold_left f super' 0 *)
+      rewrite fold_left_add_init_shift.
+
+      (* Goal: fold_left f sub1 0 + f x + fold_left f sub2 0 <= f x + fold_left f super' 0 *)
+
+      (* TODO: Complete the final arithmetic step
+         Goal: fold_left f sub1 0 + f x + fold_left f sub2 0 <= f x + fold_left f super' 0
+         From IH: fold_left f sub1 0 + fold_left f sub2 0 <= fold_left f super' 0
+
+         This should follow by:
+         1. Rearranging LHS: (a + fx + b) = (a + b + fx) by commutativity
+         2. From IH: (a + b) <= s
+         3. Adding fx to both sides: (a + b + fx) <= (s + fx)
+         4. Commuting RHS: (s + fx) = (fx + s)
+
+         Issue: After multiple rewrites (fold_left_sum_insert_middle, fold_left_app_sum,
+         fold_left_add_init_shift), the goal no longer matches the expected pattern for
+         subsequent rewrites. Need to either:
+         - Find the right sequence of lemma applications, or
+         - Prove an additional helper lemma about fold_left arithmetic
+      *)
+      admit.
+
+    + (* Case 2: x ∉ sub *)
+      (* Then sub ⊆ super' (since every element of sub is in x::super', but x ∉ sub) *)
+      assert (H_sub_in_super': forall y, In y sub -> In y super').
+      { intros y H_y_in_sub.
+        specialize (H_subset y H_y_in_sub).
+        simpl in H_subset.
+        destruct H_subset as [H_eq | H_in_super']; [| exact H_in_super'].
+        (* If y = x, then x ∈ sub, contradicting H_x_not_in_sub *)
+        subst y. contradiction. }
+
+      (* By IH: sum(sub) <= sum(super') *)
+      (* IH expects: NoDup super' -> forall sub, NoDup sub -> subset -> goal *)
+      specialize (IH H_NoDup_super' sub H_NoDup_sub H_sub_in_super').
+
+      (* Now show: sum(super') <= sum(x :: super') *)
+      (* This follows from fold_left_sum_cons_le *)
+      transitivity (fold_left (fun sum ik => sum + f ik) super' 0).
+      * exact IH.
+      * apply fold_left_sum_cons_le.
+Admitted. (* TODO: Complete Case 1 final arithmetic step (line ~4082) *)
+
+(**
+   Helper: The image of witness_to_T1 over compose_trace is a subset of T1.
+
+   For every element ik ∈ compose_trace T1 T2, its witness in T1
+   (extracted by witness_to_T1) is actually in T1.
+*)
+Lemma witness_T1_image_subset :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
+    is_valid_trace A B T1 = true ->
+    is_valid_trace B C T2 = true ->
+    forall ik, In ik (compose_trace T1 T2) ->
+      In (witness_to_T1 A B C T1 T2 ik) T1.
+Proof.
+  intros A B C T1 T2 Hval1 Hval2 ik Hik.
+  (* This follows directly from witness_to_T1_correct *)
+  apply witness_to_T1_correct; assumption.
+Qed.
+
+(**
+   Helper: The image of witness_to_T2 over compose_trace is a subset of T2.
+
+   For every element ik ∈ compose_trace T1 T2, its witness in T2
+   (extracted by witness_to_T2) is actually in T2.
+*)
+Lemma witness_T2_image_subset :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
+    is_valid_trace A B T1 = true ->
+    is_valid_trace B C T2 = true ->
+    forall ik, In ik (compose_trace T1 T2) ->
+      In (witness_to_T2 A B C T1 T2 ik) T2.
+Proof.
+  intros A B C T1 T2 Hval1 Hval2 ik Hik.
+  (* Extract is_valid_trace_aux from is_valid_trace *)
+  unfold is_valid_trace in Hval1, Hval2.
+  apply andb_prop in Hval1 as [Hval1_rest Hnodup1].
+  apply andb_prop in Hval1_rest as [Hvalid1 Hval1_aux].
+  apply andb_prop in Hval2 as [Hval2_rest Hnodup2].
+  apply andb_prop in Hval2_rest as [Hvalid2 Hval2_aux].
+  (* Now apply witness_to_T2_correct with the right form *)
+  apply witness_to_T2_correct; assumption.
+Qed.
+
 Lemma change_cost_compose_bound :
   forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
     is_valid_trace_aux T1 = true ->

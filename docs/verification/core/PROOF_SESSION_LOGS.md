@@ -534,3 +534,167 @@ Print Assumptions lemma_name.
 - [ ] DP Algorithm Correctness Complete (Theorem 9)
 - [ ] 100% Formal Verification Achieved
 
+## Session 5: 2025-11-24 - fold_left Infrastructure Development (Continued)
+
+### Objective
+Continue Phase 1 infrastructure development for `change_cost_compose_bound`: Build fold_left sum bound lemmas with NoDup preconditions.
+
+### Status
+🔄 **IN PROGRESS** - Infrastructure 90% complete, one arithmetic step remains
+
+### Activities
+
+#### 1. Fixed `fold_left_sum_cons_le` Compilation Error (Line 3909)
+**Problem**: Used incorrect lemma `fold_left_add_lower_bound` which had wrong type signature.
+
+**Solution**:
+```coq
+(* BEFORE - incorrect *)
+apply fold_left_add_lower_bound.
+
+(* AFTER - correct *)
+apply fold_left_add_init_monotone.
+lia.
+```
+
+**Result**: ✅ Lemma compiles successfully
+
+---
+
+#### 2. Added Three Helper Lemmas for fold_left Manipulation (Lines 3915-3962)
+
+**Created**:
+1. **`fold_left_add_init_shift`** (lines 3915-3928): Distributes initial accumulator over fold_left
+   ```coq
+   fold_left (fun acc y => acc + f y) l init = 
+   init + fold_left (fun acc y => acc + f y) l 0
+   ```
+
+2. **`fold_left_sum_insert_middle`** (lines 3930-3943): Decomposes fold_left over concatenated lists with middle element
+   ```coq
+   fold_left f (l1 ++ x :: l2) 0 = 
+   fold_left f l1 0 + f x + fold_left f l2 0
+   ```
+
+3. **`fold_left_app_sum`** (lines 3945-3953): Sums fold_left over appended lists
+   ```coq
+   fold_left f (l1 ++ l2) 0 = 
+   fold_left f l1 0 + fold_left f l2 0
+   ```
+
+**Purpose**: These lemmas provide arithmetic manipulation infrastructure for proving Case 1 of `fold_left_sum_bound_subset`.
+
+---
+
+#### 3. Implemented `fold_left_sum_bound_subset` with NoDup Preconditions (Lines 3964-4103)
+
+**Lemma Statement**:
+```coq
+Lemma fold_left_sum_bound_subset :
+  forall (f : nat * nat -> nat) (sub super : list (nat * nat)),
+    NoDup sub ->
+    NoDup super ->
+    (forall x, In x sub -> In x super) ->
+    fold_left (fun sum ik => sum + f ik) sub 0 <=
+    fold_left (fun sum ik => sum + f ik) super 0.
+```
+
+**Proof Structure**:
+- **Base Case**: `super = []` → `sub = []` by subset property → both sums are 0 ✅ COMPLETE
+- **Inductive Case**: `super = x :: super'`
+  - **Case 1** (`x ∈ sub`): ⚠️ **95% COMPLETE** (one arithmetic step admitted)
+    - Decomposes `sub = sub1 ++ x :: sub2` using `in_split`
+    - Extracts NoDup properties for decomposed lists
+    - Proves `sub1 ++ sub2 ⊆ super'`
+    - Applies induction hypothesis
+    - Uses helper lemmas to manipulate fold_left expressions
+    - **ADMITTED**: Final arithmetic step (line ~4082)
+  - **Case 2** (`x ∉ sub`): ✅ COMPLETE
+    - Shows `sub ⊆ super'`
+    - Applies IH and monotonicity lemma
+
+**Admitted Step** (Case 1, line 4066-4082):
+```
+Goal: fold_left f sub1 0 + f x + fold_left f sub2 0 <= 
+      f x + fold_left f super' 0
+From IH: fold_left f sub1 0 + fold_left f sub2 0 <= fold_left f super' 0
+```
+
+**Challenge**: After multiple rewrites, the goal pattern doesn't match for subsequent tactical manipulation. Neither `lia`, `ring`, nor manual rewrites succeed because automation doesn't handle the fold_left terms.
+
+**TODO**: Complete this final arithmetic step by either:
+1. Finding the right sequence of Nat lemmas and rewrites
+2. Proving a specialized helper lemma for this exact pattern
+3. Using more powerful automation (omega, micromega, etc.)
+
+---
+
+#### 4. Fixed `witness_to_T2_in_T2` Type Conversion Error (Lines 4130-4145)
+
+**Problem**: Lemma used `is_valid_trace A B T` but `witness_to_T2_correct` requires `is_valid_trace_aux T`.
+
+**Solution**: Extract `is_valid_trace_aux` component using `andb_prop`:
+```coq
+Proof.
+  intros A B C T1 T2 Hval1 Hval2 ik Hik.
+  (* Extract is_valid_trace_aux from is_valid_trace *)
+  unfold is_valid_trace in Hval1, Hval2.
+  apply andb_prop in Hval1 as [Hval1_rest Hnodup1].
+  apply andb_prop in Hval1_rest as [Hvalid1 Hval1_aux].
+  apply andb_prop in Hval2 as [Hval2_rest Hnodup2].
+  apply andb_prop in Hval2_rest as [Hvalid2 Hval2_aux].
+  (* Now apply witness_to_T2_correct with the right form *)
+  apply witness_to_T2_correct; assumption.
+Qed.
+```
+
+**Result**: ✅ Lemma proven, file compiles successfully
+
+---
+
+### Compilation Status
+✅ **SUCCESS** - Distance.v compiles with warnings only (no errors)
+
+### Key Insights
+
+1. **Hypothesis Management in Coq**: When decomposing lists with `in_split`, NoDup hypotheses get consumed. Solution: Create separate assertions before consuming hypotheses.
+
+2. **Helper Lemma Strategy**: Breaking down complex fold_left manipulations into atomic helper lemmas (shift, insert, append) makes the main proof more tractable.
+
+3. **Automation Limitations**: Coq's `lia` and `ring` tactics don't understand fold_left terms. Manual manipulation or specialized lemmas required.
+
+4. **Type Conversion Patterns**: When predicates are defined as conjunctions (using `&&`), use `andb_prop` to extract individual components rather than trying to use the compound form directly.
+
+### Errors Encountered & Fixes
+
+| Error | Location | Root Cause | Fix |
+|-------|----------|------------|-----|
+| Unification failure | Line 3909 | Wrong lemma (fold_left_add_lower_bound) | Replace with fold_left_add_init_monotone |
+| NoDup consumed | Line ~3968 | Reused hypothesis after destructing | Create separate assertions |
+| Wrong IH arg order | Line ~3988 | Mismatched expected signature | Reorder to: IH H_NoDup_super' (sub1 ++ sub2) ... |
+| fold_left pattern mismatch | Line ~4075 | Goal doesn't match rewrite target | Admitted final step with TODO |
+| No such assumption | Line 4138 | Type mismatch (is_valid_trace vs aux) | Extract aux component with andb_prop |
+
+### Time Tracking
+- **Infrastructure Development**: ~2 hours
+- **Debugging & Compilation**: ~1 hour
+- **Session Total**: ~3 hours
+- **Cumulative**: 8.5 hours / 56-85 hours estimated
+
+### Next Steps
+1. Complete admitted arithmetic step in `fold_left_sum_bound_subset` Case 1
+2. Build witness-based fold_left bound infrastructure
+3. Prove `change_cost_compose_bound` using completed infrastructure
+4. Update ADMITTED_LEMMAS_STATUS.md with progress
+5. Create git commit documenting infrastructure work
+
+### Git Status
+```
+Modified: docs/verification/core/theories/Distance.v
+- Added 3 helper lemmas (48 lines)
+- Implemented fold_left_sum_bound_subset (140 lines, 95% complete)
+- Fixed witness_to_T2_in_T2 (9 lines)
+```
+
+---
+
