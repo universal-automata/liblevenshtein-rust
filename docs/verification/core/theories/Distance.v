@@ -2789,68 +2789,140 @@ Proof.
     discriminate H_compat.
 Qed.
 
+(** ** Sub-Phase 3.3A: Witness Injectivity Infrastructure *)
+
 (**
-   TEMPORARY ADMIT: This proof requires developing a theory of sum bounds over
-   injective functions. The mathematical idea is clear:
+   === INFRASTRUCTURE DEVELOPMENT ===
 
-   If f: comp → T1 is injective, then:
-     Σ_{x ∈ comp} g(f(x)) ≤ Σ_{y ∈ T1} g(y)
+   This section develops the foundational theory needed for Lemmas 2, 3, and 4.
 
-   This would be about 60-120 lines of careful fold_left reasoning, including:
-   1. Defining injectivity for list membership
-   2. Proving sum over image is ≤ sum over codomain
-   3. Applying to our specific witness functions
+   The key insight: compose_trace with valid traces (having compatible_pairs
+   and NoDup properties) creates witness mappings that are INJECTIVE, preventing
+   unbounded reuse that would otherwise make sum bounds fail.
 
-   For now, we admit this lemma to continue with the overall proof structure,
-   and can return to prove it rigorously later.
-*)
-(**
-   Helper lemma: Map each element in comp to its witness pair, creating a list of
-   pairs from T1 × T2. The sum over comp is bounded by the sum over this witness list.
-
-   Since witnesses can repeat, we use the fact that the sum over the witness list
-   (allowing duplicates) is still bounded by length(comp) times the maximum costs.
-   But this gives a weak bound.
-
-   BETTER APPROACH: We observe that comp is constructed specifically by compose_trace,
-   which has special structure. Instead of generic induction, we should induct on
-   the CONSTRUCTION of compose_trace itself.
+   We develop this infrastructure in three phases:
+   1. Witness Injectivity Theory (injectivity → cardinality bounds)
+   2. List Cardinality via Injections (image size bounds)
+   3. fold_left Sum Bounds (sum over injective image ≤ sum over codomain)
 *)
 
 (**
-   Key realization: We need to prove this using the DEFINITION of compose_trace,
-   not by generic induction on an arbitrary list that happens to equal comp.
+   Phase 1: Witness Injectivity Theory
 
-   The compose_trace function is defined as:
-   comp_helper T1 T2 = filter (has_witnesses T1 T2) (cartesian A_touched B_touched)
-
-   Each element in comp is CONSTRUCTED by finding witnesses, and we can leverage
-   this construction in the proof.
+   We formalize the notion that witness extraction from compose_trace creates
+   injective mappings when traces have compatible_pairs.
 *)
 
 (**
-   Revised helper: Prove pointwise bound for individual elements first, then
-   extend to full sums using a careful accounting argument.
+   Definition: Functional property for witness extraction.
 
-   The core insight: Although witnesses can be reused, the TOTAL usage is bounded.
-   Specifically, if we sum cost_comp(x) for all x in comp, each cost_comp(x)
-   is bounded by cost_T1(witness1(x)) + cost_T2(witness2(x)).
+   For each (i,k) in compose_trace T1 T2, there exists a UNIQUE j such that
+   (i,j) ∈ T1 and (j,k) ∈ T2.
+*)
+Definition has_unique_witness (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (ik : nat * nat) : Prop :=
+  let '(i, k) := ik in
+  In ik (compose_trace T1 T2) ->
+  exists! j, In (i, j) T1 /\ In (j, k) T2.
 
-   Even if witness1 maps multiple x values to the same element of T1, when we
-   sum over ALL of comp, the total cannot exceed sum(T1) + sum(T2) because...
+(**
+   Lemma: Witness extraction is well-defined for valid traces.
 
-   Wait, that's not obviously true! If all elements of comp map to the same
-   witness pair (w1, w2), then sum(comp) = |comp| * (cost_T1(w1) + cost_T2(w2)),
-   which could be >> sum(T1) + sum(T2).
+   Every element in compose_trace has a unique witness when both traces are valid.
+*)
+Lemma compose_witness_unique :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k : nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In (i, k) (compose_trace T1 T2) ->
+    exists! j, In (i, j) T1 /\ In (j, k) T2.
+Proof.
+  intros A B C T1 T2 i k Hval1 Hval2 Hin_comp.
 
-   So the statement IS FALSE in general without additional constraints!
+  (* First, get existence of witness from In_compose_trace *)
+  apply In_compose_trace in Hin_comp as [j [Hin1 Hin2]].
 
-   However, for our SPECIFIC case (compose_trace with valid traces), there
-   ARE additional constraints: the NoDup property and compatible_pairs ensure
-   that witnesses cannot be arbitrarily reused.
+  (* Now prove uniqueness using witness_j_unique_in_T1 and witness_k_unique_in_T2 *)
+  exists j. split.
+  - (* Existence: (i,j) ∈ T1 and (j,k) ∈ T2 *)
+    split; assumption.
 
-   This confirms that we need the injective witness mapping infrastructure.
-   Let me develop it properly.
+  - (* Uniqueness: if j' also witnesses, then j' = j *)
+    intros j' [Hin1' Hin2'].
+
+    (* Use witness_j_unique_in_T1: same i implies same j *)
+    symmetry.
+    eapply witness_j_unique_in_T1.
+    + exact Hval1.
+    + exact Hin1'.
+    + exact Hin1.
+Qed.
+
+(**
+   Helper: Extract the witness j for a given (i,k) in composition.
+
+   This is a constructive version using find. Returns Some j if witness exists.
+*)
+Definition extract_witness_j (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k : nat) : option nat :=
+  match find (fun p1 => let '(i1, j1) := p1 in i =? i1) T1 with
+  | Some (_, j) =>
+      if existsb (fun p2 => let '(j2, k2) := p2 in (j =? j2) && (k =? k2)) T2
+      then Some j
+      else None
+  | None => None
+  end.
+
+(**
+   Lemma: extract_witness_j is correct - it finds the unique witness.
+*)
+Lemma extract_witness_j_correct :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (i k j : nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In (i, k) (compose_trace T1 T2) ->
+    In (i, j) T1 ->
+    In (j, k) T2 ->
+    extract_witness_j A B C T1 T2 i k = Some j.
+Proof.
+  intros A B C T1 T2 i k j Hval1 Hval2 Hin_comp Hin1 Hin2.
+
+  unfold extract_witness_j.
+
+  (* find returns Some (i,j') for some j' with i =? i = true *)
+  assert (Hfind: exists j', find (fun p1 => let '(i1, j1) := p1 in i =? i1) T1 = Some (i, j')).
+  {
+    (* Use In_find lemma or prove by induction *)
+    admit. (* TODO: Prove using find_some property *)
+  }
+
+  destruct Hfind as [j' Hfind].
+  rewrite Hfind.
+
+  (* By witness uniqueness, j' = j *)
+  assert (Hj'_eq: j' = j).
+  {
+    admit. (* TODO: Extract from find result and use witness_j_unique_in_T1 *)
+  }
+
+  subst j'.
+
+  (* Now check existsb for (j,k) in T2 *)
+  assert (Hexists: existsb (fun p2 => let '(j2, k2) := p2 in (j =? j2) && (k =? k2)) T2 = true).
+  {
+    apply existsb_exists.
+    exists (j, k).
+    split.
+    - exact Hin2.
+    - simpl. rewrite Nat.eqb_refl. rewrite Nat.eqb_refl. reflexivity.
+  }
+
+  rewrite Hexists.
+  reflexivity.
+Admitted. (* TODO: Complete proof with find lemmas *)
+
+(**
+   Phase 2: List Cardinality via Injections
+
+   We prove that injective mappings preserve cardinality bounds.
 *)
 
 Lemma change_cost_compose_bound :

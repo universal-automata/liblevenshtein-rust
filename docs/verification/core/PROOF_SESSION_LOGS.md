@@ -193,17 +193,57 @@ Once this infrastructure exists:
 - Leave Lemmas 2-6 as well-documented admits with clear proof strategies
 - Focus effort on simpler standalone theorems if they exist elsewhere in the codebase
 
+### Decision Made
+
+**Path A Selected**: Proceed with witness injectivity infrastructure development
+
+**Rationale**: This unblocks Lemmas 2, 3, and 4 simultaneously, providing the most efficient path to completing the triangle inequality support.
+
 ### Next Actions
-1. Commit current progress (updated proof strategies, session logs)
-2. **Decision point**: Invest in infrastructure development OR document and defer
-3. Update ADMITTED_LEMMAS_STATUS.md with refined analysis
+1. ✅ Commit current progress (completed)
+2. ✅ Begin infrastructure development (Session 3)
+3. Update ADMITTED_LEMMAS_STATUS.md after completion
 
 ### Time Tracking
 - **Session Duration**: ~3 hours
 - **Status**: Comprehensive analysis complete, common infrastructure gap identified
 - **Files Modified**: Distance.v (improved documentation), PROOF_SESSION_LOGS.md
 - **Compilation**: ✅ SUCCESS (no new errors introduced)
-- **Next**: Strategic decision on infrastructure development vs. documentation
+- **Git Commit**: 6da05ca
+- **Next**: Session 3 - Build witness injectivity theory
+
+---
+
+## Session 3: 2025-11-23 - Infrastructure Development Phase
+
+### Objective
+Build the foundational infrastructure for witness injectivity, list cardinality, and fold_left sum bounds that will unlock Lemmas 2, 3, and 4.
+
+### Status
+🔄 **IN PROGRESS**
+
+### Approach
+
+**Phase 1: Witness Injectivity Theory** (5-7h estimated):
+1. Define witness extraction functions explicitly
+2. Prove witness extraction is well-defined (every element has a witness)
+3. Prove injectivity: witness uniqueness → function injectivity
+4. Connect to cardinality: injective function → domain size ≤ codomain size
+
+**Phase 2: List Cardinality via Injections** (2-3h estimated):
+1. Image of injective function has bounded size
+2. NoDup preservation through injective functions
+3. Subset bounds for list lengths
+
+**Phase 3: fold_left Sum Bounds** (3-5h estimated):
+1. Sum over injective image ≤ sum over codomain
+2. Pointwise bound preservation
+3. Application to witness-based decompositions
+
+### Time Tracking
+- **Session Start**: [Current time]
+- **Estimated Duration**: 10-15 hours
+- **Status**: Building Phase 1 (Witness Injectivity Theory)
 
 ---
 
