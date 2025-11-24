@@ -3175,6 +3175,141 @@ Proof.
 Qed.
 
 (**
+   Helper: filter preserves length bound.
+*)
+Lemma filter_length_le :
+  forall {A : Type} (f : A -> bool) (l : list A),
+    length (filter f l) <= length l.
+Proof.
+  intros A f l.
+  induction l as [| a l' IH].
+  - simpl. lia.
+  - simpl. destruct (f a); simpl; lia.
+Qed.
+
+(**
+   Helper: fold_left with cons increases length.
+*)
+Lemma fold_left_cons_length :
+  forall (i : nat) (l : list (nat * nat)) (acc : list (nat * nat)),
+    length (fold_left (fun acc2 p2 =>
+      let '(_, k) := p2 in (i, k) :: acc2) l acc) =
+    length acc + length l.
+Proof.
+  intros i l.
+  induction l as [| [j k] l' IH]; intro acc.
+  - simpl. lia.
+  - simpl. rewrite IH. simpl. lia.
+Qed.
+
+(**
+   Helper: NoDup on map fst means unique second components.
+*)
+Lemma NoDup_fst_unique_snd :
+  forall (T : list (nat * nat)) (a b c : nat),
+    NoDup (map fst T) ->
+    In (a, b) T ->
+    In (a, c) T ->
+    b = c.
+Proof.
+  intros T.
+  induction T as [| [x y] T' IH]; intros a b c HnodupFst Hin_ab Hin_ac.
+
+  (* Base case: T = [] *)
+  - inversion Hin_ab.
+
+  (* Inductive case: T = (x,y) :: T' *)
+  - simpl in HnodupFst.
+    inversion HnodupFst as [| ? ? Hnotin_x HnodupT']. subst.
+
+    (* Case analysis on whether (a,b) is the head or in tail *)
+    destruct Hin_ab as [Heq_ab | Hin_ab_tail].
+
+    + (* (a,b) = (x,y) *)
+      inversion Heq_ab. subst x y.
+
+      (* Similarly for (a,c) *)
+      destruct Hin_ac as [Heq_ac | Hin_ac_tail].
+
+      * (* (a,c) = (x,y) - but we just subbed, so it's (a,b) *)
+        inversion Heq_ac. reflexivity.
+
+      * (* (a,c) ∈ T', but (a,b) = head = (a,b) *)
+        (* So 'a' ∈ map fst T', but also 'a' is the head of map fst T *)
+        (* This violates NoDup *)
+        exfalso.
+        apply Hnotin_x.
+        apply in_map_iff.
+        exists (a, c). split; simpl; auto.
+
+    + (* (a,b) ∈ T' *)
+      destruct Hin_ac as [Heq_ac | Hin_ac_tail].
+
+      * (* (a,c) = (x,y) *)
+        inversion Heq_ac. subst x y.
+        (* So 'a' is the head and also ∈ map fst T' *)
+        exfalso.
+        apply Hnotin_x.
+        apply in_map_iff.
+        exists (a, b). split; simpl; auto.
+
+      * (* Both (a,b) and (a,c) ∈ T' *)
+        (* Use IH *)
+        eapply IH; eauto.
+Qed.
+
+(**
+   Helper: For NoDup list of pairs, filtering by first component gives ≤ 1 match.
+
+   This is intuitively true: NoDup (map fst T) means each value appears at most once
+   in the first components, so filtering for a specific first component value
+   can match at most one pair.
+
+   Full proof requires count_occ infrastructure and filter/NoDup interaction lemmas.
+   Admitted for now to unblock main cardinality bounds.
+*)
+Lemma filter_first_component_NoDup :
+  forall (T : list (nat * nat)) (j : nat),
+    NoDup (map fst T) ->
+    length (filter (fun p => let '(j2, _) := p in j =? j2) T) <= 1.
+Proof.
+  intros T j HnodupFst.
+
+  (* Case 1: j not in map fst T → filter is empty → length 0 ≤ 1 *)
+  (* Case 2: j in map fst T exactly once → filter has exactly one element → length 1 ≤ 1 *)
+  (* Requires: NoDup → count_occ ≤ 1, and filter length = count of matches *)
+
+  admit. (* TODO: Requires count_occ and filter/NoDup infrastructure *)
+Admitted.
+
+(**
+   Helper: Generalized fold_left length bound for compose_trace.
+
+   The fold_left processes each (i,j) pair, filtering T2 for matches.
+   For valid traces with NoDup on components, each filter produces at most 1 match.
+
+   Proof strategy: Induction on T1, showing that each iteration adds at most 1 element.
+   Challenge: After simpl, the fold_left structure doesn't match fold_left_cons_length pattern.
+   Requires more sophisticated fold_left rewriting lemmas.
+
+   Admitted for now to unblock testing of higher-level infrastructure.
+*)
+Lemma compose_fold_length_bound :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (acc : list (nat * nat)),
+    is_valid_trace B C T2 = true ->
+    (forall p, In p T1 -> is_valid_trace_aux T2 = true ->
+       length (filter (fun p2 => let '(j2, _) := p2 in (snd p) =? j2) T2) <= 1) ->
+    length (fold_left (fun acc' p1 =>
+      let '(i, j) := p1 in
+      let matches := filter (fun p2 => let '(j2, _) := p2 in j =? j2) T2 in
+      fold_left (fun acc2 p2 => let '(_, k) := p2 in (i, k) :: acc2) matches acc'
+    ) T1 acc) <= length acc + length T1.
+Proof.
+  intros A B C T1 T2 acc Hval2 Hfilter_bound.
+  admit. (* TODO: Requires advanced fold_left rewriting infrastructure *)
+Admitted.
+
+(**
    Application: Composition is bounded by T1.
 
    The witness mapping comp → T1 is injective, so |comp| ≤ |T1|.
@@ -3187,43 +3322,12 @@ Lemma compose_witness_bounded_T1 :
 Proof.
   intros A B C T1 T2 Hval1 Hval2.
 
-  (* Extract validity components *)
-  unfold is_valid_trace in *.
-  apply andb_true_iff in Hval1 as [Hrest1 Hnodup1].
-  apply andb_true_iff in Hrest1 as [Hbounds1 Haux1].
-  apply andb_true_iff in Hval2 as [Hrest2 Hnodup2].
-  apply andb_true_iff in Hrest2 as [Hbounds2 Haux2].
+  unfold compose_trace.
 
-  (* Get NoDup for T1 *)
-  assert (HnodupT1: NoDup T1).
-  {
-    apply is_valid_trace_implies_NoDup.
-    unfold is_valid_trace.
-    apply andb_true_iff. split.
-    - apply andb_true_iff. split; assumption.
-    - assumption.
-  }
+  (* Strategy: Apply compose_fold_length_bound with acc=[], showing each filter has ≤1 match *)
+  (* This requires NoDup infrastructure that we've only partially developed *)
 
-  (* Define witness extraction function comp → T1 *)
-  (* For each (i,k) ∈ comp, extract witness (i,j) ∈ T1 *)
-  assert (Hwitness_exists: forall ik, In ik (compose_trace T1 T2) ->
-    exists ij, In ij T1 /\ fst ij = fst ik).
-  {
-    intros [i k] Hin_comp.
-    apply In_compose_trace in Hin_comp as [j [Hin1 Hin2]].
-    exists (i, j). split.
-    - exact Hin1.
-    - simpl. reflexivity.
-  }
-
-  (* The key insight: this mapping is injective due to witness_pair_injective_T1 *)
-  (* However, proving this formally requires more infrastructure about partial functions *)
-  (* For now, we can use a simpler approach via touched positions *)
-
-  (* Alternative: Use that comp is built from T1, so length is bounded *)
-  (* This is actually provable from the definition of compose_trace *)
-
-  admit. (* TODO: Complete using injectivity or direct structural argument *)
+  admit. (* TODO: Complete using compose_fold_length_bound + filter_first_component_NoDup *)
 Admitted.
 
 (**
