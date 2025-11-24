@@ -154,17 +154,24 @@ With matching syntax, the proof completed using:
 
 ---
 
-### 3. change_cost_compose_bound (Line 2807) - Infrastructure Development
+### 3. change_cost_compose_bound (Line 4150) - Infrastructure Development
 **What it proves**: Σ(subst_costs in composition) ≤ Σ(subst_costs in T1) + Σ(subst_costs in T2)
 
-**Current state**: Admitted. Requires substantial fold_left infrastructure development.
+**Current state**: Admitted. Phase 1 infrastructure 33% complete (1 of 3 key lemmas proven).
+
+**Latest progress** (2025-11-24):
+- ✅ **`fold_left_sum_bound_subset` (line 3982) - PROVEN with Qed (line 4102)**
+  - Proves: sum over NoDup subset ≤ sum over NoDup superset
+  - Key infrastructure lemma for fold_left reasoning
+  - Completed with helper lemma `add_middle_preserves_le` (line 3964)
+  - Proof uses case analysis on membership with careful NoDup decomposition
 
 **Revised analysis** (2025-11-23): After deep exploration during `trace_composition_cost_bound` completion, this proof requires:
 
 **Infrastructure needed**:
-1. **fold_left sum bounds over partial functions** - Not currently in codebase
-2. **Injective mapping preservation** - Theory for witness-based extraction
-3. **Triangle inequality composition** - Combining subst_cost bounds across intermediate lists
+1. ✅ **fold_left sum bounds over subsets** - `fold_left_sum_bound_subset` now proven!
+2. ⚠️ **Injective mapping preservation** - Theory for witness-based extraction (still needed)
+3. ⚠️ **Triangle inequality composition** - Combining subst_cost bounds across intermediate lists (still needed)
 
 **Proof strategy**:
 1. Each `(i,k) ∈ comp` has unique witnesses `(i,j) ∈ T1` and `(j,k) ∈ T2`

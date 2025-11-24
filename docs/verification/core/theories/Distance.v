@@ -3961,6 +3961,15 @@ Proof.
   lia.
 Qed.
 
+(* Helper lemma: Adding the same value to both sides of an inequality preserves it *)
+Lemma add_middle_preserves_le :
+  forall a b c d : nat,
+    a + b <= c ->
+    a + d + b <= d + c.
+Proof.
+  intros. lia.
+Qed.
+
 (**
    Main Lemma: Sum over a subset is bounded by sum over the superset.
 
@@ -4058,28 +4067,22 @@ Proof.
 
       (* Now IH: fold_left f sub1 0 + fold_left f sub2 0 <= fold_left f super' 0 *)
 
-      (* Use fold_left_add_init_shift to rewrite RHS as: f x + fold_left f super' 0 *)
-      rewrite fold_left_add_init_shift.
+      (* Now we need to show:
+         fold_left f sub1 0 + f x + fold_left f sub2 0 <= fold_left f super' (f x)
 
-      (* Goal: fold_left f sub1 0 + f x + fold_left f sub2 0 <= f x + fold_left f super' 0 *)
+         We have IH: fold_left f sub1 0 + fold_left f sub2 0 <= fold_left f super' 0
 
-      (* TODO: Complete the final arithmetic step
-         Goal: fold_left f sub1 0 + f x + fold_left f sub2 0 <= f x + fold_left f super' 0
-         From IH: fold_left f sub1 0 + fold_left f sub2 0 <= fold_left f super' 0
+         Use fold_left_add_init_shift to rewrite RHS *)
+      assert (H_rhs_eq: fold_left (fun sum ik => sum + f ik) super' (f x) =
+                        f x + fold_left (fun sum ik => sum + f ik) super' 0).
+      { apply fold_left_add_init_shift. }
 
-         This should follow by:
-         1. Rearranging LHS: (a + fx + b) = (a + b + fx) by commutativity
-         2. From IH: (a + b) <= s
-         3. Adding fx to both sides: (a + b + fx) <= (s + fx)
-         4. Commuting RHS: (s + fx) = (fx + s)
+      rewrite H_rhs_eq.
 
-         Issue: After multiple rewrites (fold_left_sum_insert_middle, fold_left_app_sum,
-         fold_left_add_init_shift), the goal no longer matches the expected pattern for
-         subsequent rewrites. Need to either:
-         - Find the right sequence of lemma applications, or
-         - Prove an additional helper lemma about fold_left arithmetic
-      *)
-      admit.
+      (* Now: fold_left f sub1 0 + f x + fold_left f sub2 0 <= f x + fold_left f super' 0
+         Apply helper lemma *)
+      apply add_middle_preserves_le.
+      exact IH.
 
     + (* Case 2: x ∉ sub *)
       (* Then sub ⊆ super' (since every element of sub is in x::super', but x ∉ sub) *)
@@ -4100,7 +4103,7 @@ Proof.
       transitivity (fold_left (fun sum ik => sum + f ik) super' 0).
       * exact IH.
       * apply fold_left_sum_cons_le.
-Admitted. (* TODO: Complete Case 1 final arithmetic step (line ~4082) *)
+Qed.
 
 (**
    Helper: The image of witness_to_T1 over compose_trace is a subset of T1.
