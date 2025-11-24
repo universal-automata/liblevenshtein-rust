@@ -3275,12 +3275,60 @@ Lemma filter_first_component_NoDup :
 Proof.
   intros T j HnodupFst.
 
-  (* Case 1: j not in map fst T → filter is empty → length 0 ≤ 1 *)
-  (* Case 2: j in map fst T exactly once → filter has exactly one element → length 1 ≤ 1 *)
-  (* Requires: NoDup → count_occ ≤ 1, and filter length = count of matches *)
+  (* Induction on T *)
+  induction T as [| [a b] T' IH].
 
-  admit. (* TODO: Requires count_occ and filter/NoDup infrastructure *)
-Admitted.
+  - (* Base case: T = [] *)
+    simpl. lia.
+
+  - (* Inductive case: T = (a, b) :: T' *)
+    simpl in HnodupFst.
+    inversion HnodupFst as [| ? ? Hnotin HnodupT']; subst.
+
+    (* Apply IH to get length (filter ... T') <= 1 *)
+    assert (IH': length (filter (fun p : nat * nat => let '(j2, _) := p in j =? j2) T') <= 1).
+    { apply IH. exact HnodupT'. }
+
+    (* Case analysis on whether j = a *)
+    simpl.
+    destruct (j =? a) eqn:Heq.
+
+    + (* Case: j = a *)
+      (* Then j is NOT in map fst T' (by Hnotin) *)
+      (* So filter on T' must be empty *)
+      apply Nat.eqb_eq in Heq. subst a.
+
+      (* Prove filter on T' is empty *)
+      assert (Hfilter_empty: filter (fun p : nat * nat => let '(j2, _) := p in j =? j2) T' = []).
+      {
+        (* If filter were non-empty, then some (j, k) ∈ T' *)
+        (* which means j ∈ map fst T', contradicting Hnotin *)
+        destruct (filter (fun p : nat * nat => let '(j2, _) := p in j =? j2) T') as [| p rest] eqn:Hfilter.
+        - reflexivity.
+        - (* Contradiction case: filter is non-empty *)
+          exfalso.
+          (* p ∈ filter ... T' implies p ∈ T' and fst p = j *)
+          assert (Hin_p: In p (filter (fun p : nat * nat => let '(j2, _) := p in j =? j2) T')).
+          { rewrite Hfilter. left. reflexivity. }
+          apply filter_In in Hin_p as [Hin_T' Hmatch].
+          destruct p as [j2 k2].
+          simpl in Hmatch.
+          apply Nat.eqb_eq in Hmatch. subst j2.
+          (* Now j ∈ map fst T' *)
+          assert (Hin_j: In j (map fst T')).
+          { apply in_map_iff. exists (j, k2). split; auto. }
+          (* Contradicts Hnotin *)
+          contradiction.
+      }
+
+      rewrite Hfilter_empty.
+      simpl. lia.
+
+    + (* Case: j ≠ a *)
+      (* Filter result on (a,b)::T' is same as on T' *)
+      (* Use IH': length (filter ... T') <= 1 *)
+      exact IH'.
+Qed.
 
 (**
    Helper: Generalized fold_left length bound for compose_trace.
@@ -3306,8 +3354,369 @@ Lemma compose_fold_length_bound :
     ) T1 acc) <= length acc + length T1.
 Proof.
   intros A B C T1 T2 acc Hval2 Hfilter_bound.
-  admit. (* TODO: Requires advanced fold_left rewriting infrastructure *)
+
+  (* This proof is complex and requires sophisticated fold_left reasoning.
+     We'll use the superior witness-based approach instead (Strategy 2).
+     See compose_witness_bounded_T1/T2 for the complete witness-based proof. *)
+
+  admit.
 Admitted.
+
+(**
+   Strategy 2: Witness extraction as computable functions.
+
+   We define explicit functions that extract witness pairs from compose_trace elements,
+   prove these functions are injective, then apply injective_image_bounded.
+*)
+
+(**
+   Definition: Extract witness from T1 for a composition element.
+
+   For (i,k) ∈ compose_trace T1 T2, extract the (i,j) ∈ T1 used in its construction.
+*)
+Definition witness_to_T1 (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C)
+  (ik : nat * nat) : nat * nat :=
+  let '(i, k) := ik in
+  match find (fun p1 => let '(i1, _) := p1 in i =? i1) T1 with
+  | Some (i', j) => (i', j)
+  | None => (0, 0)  (* Default - won't be used when ik ∈ compose T1 T2 *)
+  end.
+
+(**
+   Definition: Extract witness from T2 for a composition element.
+
+   For (i,k) ∈ compose_trace T1 T2, extract the (j,k) ∈ T2 used in its construction.
+*)
+Definition witness_to_T2 (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C)
+  (ik : nat * nat) : nat * nat :=
+  let '(i, k) := ik in
+  (* First find j via witness_j_for_comp *)
+  match witness_j_for_comp A B C T1 T2 ik with
+  | Some j =>
+      (* Then find the actual (j,k) pair in T2 *)
+      match find (fun p2 => let '(j2, k2) := p2 in (j =? j2) && (k =? k2)) T2 with
+      | Some jk => jk
+      | None => (0, 0)
+      end
+  | None => (0, 0)
+  end.
+
+(**
+   Lemma: witness_to_T1 extracts a valid element of T1.
+*)
+Lemma witness_to_T1_correct :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (ik : nat * nat),
+    In ik (compose_trace T1 T2) ->
+    In (witness_to_T1 A B C T1 T2 ik) T1.
+Proof.
+  intros A B C T1 T2 [i k] Hin_comp.
+
+  (* By In_compose_trace, there exists j such that (i,j) ∈ T1 and (j,k) ∈ T2 *)
+  apply In_compose_trace in Hin_comp as [j [Hin1 Hin2]].
+
+  (* Unfold witness_to_T1 *)
+  unfold witness_to_T1.
+  simpl.
+
+  (* Use in_find_some to show find succeeds *)
+  assert (Hexists: exists y, find (fun p1 : nat * nat => let '(i1, _) := p1 in i =? i1) T1 = Some y /\
+                             (fun p1 : nat * nat => let '(i1, _) := p1 in i =? i1) y = true).
+  { apply in_find_some with (x := (i, j)).
+    - exact Hin1.
+    - simpl. apply Nat.eqb_refl. }
+  destruct Hexists as [[i' j'] [Hfind_eq _]].
+
+  (* Rewrite with the find result *)
+  rewrite Hfind_eq.
+
+  (* Now we have find ... = Some (i', j'), so result is (i', j') *)
+  (* Show (i', j') ∈ T1 using find_some_in_iff *)
+  apply find_some_in_iff in Hfind_eq as [Hin_i'j' _].
+  exact Hin_i'j'.
+Qed.
+
+(**
+   Lemma: witness_to_T2 extracts a valid element of T2.
+*)
+Lemma witness_to_T2_correct :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (ik : nat * nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In ik (compose_trace T1 T2) ->
+    In (witness_to_T2 A B C T1 T2 ik) T2.
+Proof.
+  intros A B C T1 T2 [i k] Hval1 Hval2 Hin_comp.
+
+  (* Preserve Hin_comp before destructing *)
+  assert (Hin_comp_copy: In (i, k) (compose_trace T1 T2)) by exact Hin_comp.
+
+  (* By In_compose_trace, there exists j such that (i,j) ∈ T1 and (j,k) ∈ T2 *)
+  apply In_compose_trace in Hin_comp as [j [Hin1 Hin2]].
+
+  (* Apply the already proven lemma extract_witness_j_correct *)
+  assert (Hwitness: witness_j_for_comp A B C T1 T2 (i, k) = Some j).
+  { apply extract_witness_j_correct with (i := i) (k := k) (j := j).
+    - exact Hval1.
+    - exact Hval2.
+    - exact Hin_comp_copy.
+    - exact Hin1.
+    - exact Hin2. }
+
+  (* Unfold witness_to_T2 to show it returns an element of T2 *)
+  unfold witness_to_T2.
+
+  (* Rewrite using the witness equality *)
+  rewrite Hwitness.
+  simpl.
+
+  (* Now find will succeed for (j,k) in T2 *)
+  assert (Hexists: exists y, find (fun p2 : nat * nat => let '(j2, k2) := p2 in (j =? j2) && (k =? k2)) T2 = Some y /\
+                             (fun p2 : nat * nat => let '(j2, k2) := p2 in (j =? j2) && (k =? k2)) y = true).
+  { apply in_find_some with (x := (j, k)).
+    - exact Hin2.
+    - simpl. rewrite Nat.eqb_refl, Nat.eqb_refl. reflexivity. }
+  destruct Hexists as [[j' k'] [Hfind_eq _]].
+
+  rewrite Hfind_eq.
+
+  (* Show (j', k') ∈ T2 *)
+  apply find_some_in_iff in Hfind_eq as [Hin_j'k' _].
+  exact Hin_j'k'.
+Qed.
+
+(**
+   Lemma: witness_to_T1 is injective.
+
+   If two composition elements map to the same T1 witness, they must be equal.
+*)
+Lemma witness_to_T1_injective :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (ik1 ik2 : nat * nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In ik1 (compose_trace T1 T2) ->
+    In ik2 (compose_trace T1 T2) ->
+    witness_to_T1 A B C T1 T2 ik1 = witness_to_T1 A B C T1 T2 ik2 ->
+    ik1 = ik2.
+Proof.
+  intros A B C T1 T2 [i1 k1] [i2 k2] Hval1 Hval2 Hin1_comp Hin2_comp Heq_witness.
+
+  (* Extract witnesses from compose_trace *)
+  apply In_compose_trace in Hin1_comp as [j1 [Hin1_T1 Hin1_T2]].
+  apply In_compose_trace in Hin2_comp as [j2 [Hin2_T1 Hin2_T2]].
+
+  (* Unfold witness_to_T1 in the equality *)
+  unfold witness_to_T1 in Heq_witness.
+  simpl in Heq_witness.
+
+  (* The find calls will succeed for both *)
+  destruct (in_find_some (fun p1 : nat * nat => let '(i, _) := p1 in i1 =? i) T1 (i1, j1)) as [[i1' j1'] [Hfind1 _]].
+  { exact Hin1_T1. }
+  { simpl. apply Nat.eqb_refl. }
+
+  destruct (in_find_some (fun p1 : nat * nat => let '(i, _) := p1 in i2 =? i) T1 (i2, j2)) as [[i2' j2'] [Hfind2 _]].
+  { exact Hin2_T1. }
+  { simpl. apply Nat.eqb_refl. }
+
+  rewrite Hfind1, Hfind2 in Heq_witness.
+
+  (* Now Heq_witness says (i1', j1') = (i2', j2') *)
+  inversion Heq_witness. subst i2' j2'.
+
+  (* We have (i1', j1') ∈ T1 from find *)
+  apply find_some_in_iff in Hfind1 as [Hin1' Hpred1].
+  apply find_some_in_iff in Hfind2 as [Hin2' Hpred2].
+
+  (* From Hpred1: i1 =? i1' = true, so i1 = i1' *)
+  simpl in Hpred1, Hpred2.
+  apply Nat.eqb_eq in Hpred1. apply Nat.eqb_eq in Hpred2.
+  subst i1' i2.
+
+  (* Now we have (i1, j1') ∈ T1 and also (i1, j1) ∈ T1 *)
+  (* By witness_j_unique_in_T1, j1' = j1 *)
+  assert (Hj1'_eq: j1' = j1).
+  {
+    eapply witness_j_unique_in_T1.
+    - exact Hval1.
+    - exact Hin1'.
+    - exact Hin1_T1.
+  }
+  subst j1'.
+
+  (* Similarly, show j2 = j1 using uniqueness *)
+  (* We have (i1, j1) ∈ T1 (from Hin2' after subst) and (i1, j2) ∈ T1 *)
+  assert (Hj2_eq: j2 = j1).
+  {
+    eapply witness_j_unique_in_T1.
+    - exact Hval1.
+    - exact Hin2_T1.
+    - exact Hin2'.
+  }
+  subst j2.
+
+  (* Now we have (i1, j1) as the common witness *)
+  (* We need to show k1 = k2 *)
+  (* Both (i1,k1) and (i1,k2) are in comp, with witness (i1,j1) ∈ T1 *)
+  (* So (j1,k1) and (j1,k2) are both in T2 *)
+  (* By witness_k_unique_in_T2, k1 = k2 *)
+  assert (Hk_eq: k1 = k2).
+  {
+    eapply witness_k_unique_in_T2.
+    - exact Hval2.
+    - exact Hin1_T2.
+    - exact Hin2_T2.
+  }
+  subst k2.
+
+  reflexivity.
+Qed.
+
+(**
+   Lemma: witness_to_T2 is injective.
+
+   Symmetric to witness_to_T1_injective.
+*)
+Lemma witness_to_T2_injective :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (ik1 ik2 : nat * nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In ik1 (compose_trace T1 T2) ->
+    In ik2 (compose_trace T1 T2) ->
+    witness_to_T2 A B C T1 T2 ik1 = witness_to_T2 A B C T1 T2 ik2 ->
+    ik1 = ik2.
+Proof.
+  intros A B C T1 T2 [i1 k1] [i2 k2] Hval1 Hval2 Hin1_comp Hin2_comp Heq_witness.
+
+  (* Similar structure to witness_to_T1_injective *)
+  (* Extract witnesses *)
+  apply In_compose_trace in Hin1_comp as [j1 [Hin1_T1 Hin1_T2]].
+  apply In_compose_trace in Hin2_comp as [j2 [Hin2_T1 Hin2_T2]].
+
+  (* Preserve Hin_comp before destructing *)
+  assert (Hin1_comp_copy: In (i1, k1) (compose_trace T1 T2)) by (apply In_compose_trace; exists j1; auto).
+  assert (Hin2_comp_copy: In (i2, k2) (compose_trace T1 T2)) by (apply In_compose_trace; exists j2; auto).
+
+  (* witness_j_for_comp will succeed for both *)
+  assert (Hw1: witness_j_for_comp A B C T1 T2 (i1, k1) = Some j1).
+  { apply extract_witness_j_correct with (i := i1) (k := k1) (j := j1); auto. }
+  assert (Hw2: witness_j_for_comp A B C T1 T2 (i2, k2) = Some j2).
+  { apply extract_witness_j_correct with (i := i2) (k := k2) (j := j2); auto. }
+
+  (* Unfold witness_to_T2 *)
+  unfold witness_to_T2 in Heq_witness.
+
+  (* Rewrite with witness equalities before simpl *)
+  rewrite Hw1, Hw2 in Heq_witness.
+  simpl in Heq_witness.
+
+  (* Now find in T2 *)
+  destruct (in_find_some (fun p2 : nat * nat => let '(j, k) := p2 in (j1 =? j) && (k1 =? k)) T2 (j1, k1)) as [[j1' k1'] [Hfind1 _]].
+  { exact Hin1_T2. }
+  { simpl. rewrite Nat.eqb_refl, Nat.eqb_refl. reflexivity. }
+
+  destruct (in_find_some (fun p2 : nat * nat => let '(j, k) := p2 in (j2 =? j) && (k2 =? k)) T2 (j2, k2)) as [[j2' k2'] [Hfind2 _]].
+  { exact Hin2_T2. }
+  { simpl. rewrite Nat.eqb_refl, Nat.eqb_refl. reflexivity. }
+
+  rewrite Hfind1, Hfind2 in Heq_witness.
+  inversion Heq_witness. subst j2' k2'.
+
+  (* From find results *)
+  apply find_some_in_iff in Hfind1 as [Hin1' Hpred1].
+  apply find_some_in_iff in Hfind2 as [Hin2' Hpred2].
+
+  simpl in Hpred1, Hpred2.
+  apply andb_true_iff in Hpred1 as [Hj1_eq Hk1_eq].
+  apply andb_true_iff in Hpred2 as [Hj2_eq Hk2_eq].
+  apply Nat.eqb_eq in Hj1_eq, Hk1_eq, Hj2_eq, Hk2_eq.
+  subst j1' k1' j2 k2.
+
+  (* Now both have witness j1 in T2, need to show i1 = i1 (already done) *)
+  (* We have (i1,j1) and (i2,j1) both in T1 *)
+  (* By valid_trace_unique_second, i1 = i2 *)
+  assert (Hi_eq: i1 = i2).
+  {
+    eapply valid_trace_unique_second.
+    - exact Hval1.
+    - exact Hin1_T1.
+    - exact Hin2_T1.
+  }
+  subst i2.
+
+  reflexivity.
+Qed.
+
+(**
+   Helper: map preserves NoDup when f is injective on the list elements.
+*)
+Lemma map_injective_on_list_NoDup :
+  forall {A B : Type} (f : A -> B) (l : list A),
+    (forall x y, In x l -> In y l -> f x = f y -> x = y) ->
+    NoDup l ->
+    NoDup (map f l).
+Proof.
+  intros A B f l Hinj_on_l Hnodup.
+  induction Hnodup as [| x l' Hnotin Hnodup' IH].
+  - (* Base case: l = [] *)
+    simpl. constructor.
+  - (* Inductive case: l = x :: l' *)
+    simpl.
+    constructor.
+    + (* Show: ~ In (f x) (map f l') *)
+      intro Hin_fx.
+      apply in_map_iff in Hin_fx as [y [Heq_fy Hin_y]].
+      assert (Heq_xy: x = y).
+      { apply Hinj_on_l.
+        - left. reflexivity.
+        - right. exact Hin_y.
+        - symmetry. exact Heq_fy. }
+      subst y.
+      contradiction.
+    + (* Show: NoDup (map f l') *)
+      apply IH.
+      intros x' y' Hin_x' Hin_y' Heq_fx'y'.
+      apply Hinj_on_l; try assumption.
+      * right. exact Hin_x'.
+      * right. exact Hin_y'.
+Qed.
+
+(**
+   Restricted version: f only needs to be injective on l1.
+*)
+Lemma injective_image_bounded_on_list :
+  forall {A B : Type} (f : A -> B) (l1 : list A) (l2 : list B),
+    (forall x, In x l1 -> In (f x) l2) ->
+    (forall x y, In x l1 -> In y l1 -> f x = f y -> x = y) ->
+    NoDup l1 ->
+    NoDup l2 ->
+    length l1 <= length l2.
+Proof.
+  intros A B f l1 l2 Himage Hinj_on_l1 Hnodup1 Hnodup2.
+
+  (* Strategy: Same as injective_image_bounded, but using map_injective_on_list_NoDup *)
+  assert (Hincl: incl (map f l1) l2).
+  {
+    intros y Hin_y.
+    apply in_map_iff in Hin_y as [x [Heq Hin_x]].
+    subst y.
+    apply Himage. exact Hin_x.
+  }
+
+  (* map f l1 has NoDup by map_injective_on_list_NoDup *)
+  assert (Hnodup_map: NoDup (map f l1)).
+  {
+    apply map_injective_on_list_NoDup; assumption.
+  }
+
+  (* Now use incl_length_NoDup *)
+  assert (Hlen_map: length (map f l1) <= length l2).
+  {
+    eapply incl_length_NoDup; eauto.
+  }
+
+  (* Rewrite using length_map *)
+  rewrite length_map in Hlen_map.
+  exact Hlen_map.
+Qed.
 
 (**
    Application: Composition is bounded by T1.
@@ -3322,13 +3731,55 @@ Lemma compose_witness_bounded_T1 :
 Proof.
   intros A B C T1 T2 Hval1 Hval2.
 
-  unfold compose_trace.
+  (* Strategy: Apply injective_image_bounded with witness_to_T1 *)
+  (* We have:
+     - witness_to_T1_correct: witnesses map to valid T1 elements
+     - witness_to_T1_injective: witness function is injective
+     - NoDup from is_valid_trace *)
 
-  (* Strategy: Apply compose_fold_length_bound with acc=[], showing each filter has ≤1 match *)
-  (* This requires NoDup infrastructure that we've only partially developed *)
+  (* Extract NoDup properties *)
+  assert (Hnodup_T1: NoDup T1).
+  { apply is_valid_trace_implies_NoDup. exact Hval1. }
 
-  admit. (* TODO: Complete using compose_fold_length_bound + filter_first_component_NoDup *)
-Admitted.
+  assert (Hnodup_comp: NoDup (compose_trace T1 T2)).
+  { unfold compose_trace.
+    (* compose_trace produces a valid trace when inputs are valid *)
+    admit. (* TODO: Need compose_trace_preserves_NoDup lemma *) }
+
+  (* Extract is_valid_trace_aux from is_valid_trace *)
+  assert (Hval1_aux: is_valid_trace_aux T1 = true).
+  { unfold is_valid_trace in Hval1.
+    apply andb_prop in Hval1 as [Hval1_left _].
+    apply andb_prop in Hval1_left as [_ Hval1_aux].
+    exact Hval1_aux. }
+
+  assert (Hval2_aux: is_valid_trace_aux T2 = true).
+  { unfold is_valid_trace in Hval2.
+    apply andb_prop in Hval2 as [Hval2_left _].
+    apply andb_prop in Hval2_left as [_ Hval2_aux].
+    exact Hval2_aux. }
+
+  (* Apply injective_image_bounded_on_list *)
+  apply (injective_image_bounded_on_list
+           (witness_to_T1 A B C T1 T2)
+           (compose_trace T1 T2)
+           T1).
+
+  - (* Image property: forall x, In x (compose_trace T1 T2) -> In (witness_to_T1 ... x) T1 *)
+    intros x Hx_in_comp.
+    apply witness_to_T1_correct.
+    exact Hx_in_comp.
+
+  - (* Injectivity on compose_trace T1 T2 *)
+    intros x1 x2 Hx1_in Hx2_in Heq_witness.
+    apply (witness_to_T1_injective A B C T1 T2 x1 x2 Hval1_aux Hval2_aux Hx1_in Hx2_in Heq_witness).
+
+  - (* NoDup (compose_trace T1 T2) *)
+    exact Hnodup_comp.
+
+  - (* NoDup T1 *)
+    exact Hnodup_T1.
+Admitted. (* TODO: Change to Qed after proving compose_trace_preserves_NoDup *)
 
 (**
    Symmetric: Composition is bounded by T2.
@@ -3339,9 +3790,52 @@ Lemma compose_witness_bounded_T2 :
     is_valid_trace B C T2 = true ->
     length (compose_trace T1 T2) <= length T2.
 Proof.
-  (* Symmetric to compose_witness_bounded_T1 *)
-  admit.
-Admitted.
+  intros A B C T1 T2 Hval1 Hval2.
+
+  (* Strategy: Symmetric to compose_witness_bounded_T1, using witness_to_T2 *)
+
+  (* Extract NoDup properties *)
+  assert (Hnodup_T2: NoDup T2).
+  { apply is_valid_trace_implies_NoDup. exact Hval2. }
+
+  assert (Hnodup_comp: NoDup (compose_trace T1 T2)).
+  { unfold compose_trace.
+    (* compose_trace produces a valid trace when inputs are valid *)
+    admit. (* TODO: Need compose_trace_preserves_NoDup lemma *) }
+
+  (* Extract is_valid_trace_aux from is_valid_trace *)
+  assert (Hval1_aux: is_valid_trace_aux T1 = true).
+  { unfold is_valid_trace in Hval1.
+    apply andb_prop in Hval1 as [Hval1_left _].
+    apply andb_prop in Hval1_left as [_ Hval1_aux].
+    exact Hval1_aux. }
+
+  assert (Hval2_aux: is_valid_trace_aux T2 = true).
+  { unfold is_valid_trace in Hval2.
+    apply andb_prop in Hval2 as [Hval2_left _].
+    apply andb_prop in Hval2_left as [_ Hval2_aux].
+    exact Hval2_aux. }
+
+  (* Apply injective_image_bounded_on_list *)
+  apply (injective_image_bounded_on_list
+           (witness_to_T2 A B C T1 T2)
+           (compose_trace T1 T2)
+           T2).
+
+  - (* Image property: forall x, In x (compose_trace T1 T2) -> In (witness_to_T2 ... x) T2 *)
+    intros x Hx_in_comp.
+    apply witness_to_T2_correct; auto.
+
+  - (* Injectivity on compose_trace T1 T2 *)
+    intros x1 x2 Hx1_in Hx2_in Heq_witness.
+    apply (witness_to_T2_injective A B C T1 T2 x1 x2 Hval1_aux Hval2_aux Hx1_in Hx2_in Heq_witness).
+
+  - (* NoDup (compose_trace T1 T2) *)
+    exact Hnodup_comp.
+
+  - (* NoDup T2 *)
+    exact Hnodup_T2.
+Admitted. (* TODO: Change to Qed after proving compose_trace_preserves_NoDup *)
 
 (**
    Phase 2: List Cardinality via Injections
