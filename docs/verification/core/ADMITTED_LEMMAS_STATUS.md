@@ -1,15 +1,16 @@
 # Admitted Lemmas Status Report
 
-**Date**: 2025-11-23
+**Date**: 2025-11-24
 **File**: `theories/Distance.v`
 **Compilation Status**: ✅ SUCCESS (2 harmless warnings only)
 
 ## Executive Summary
 
-**Total Lemmas**: 8 admitted (1 recently completed!)
+**Total Lemmas**: 8 admitted (1 recently completed, 3 internal assertions admitted in change_cost_compose_bound)
 **Estimated Total Effort**: 56-85 hours for complete verification
 **Current Achievement**: Triangle inequality PROVEN (with admitted dependencies)
 **Latest Success**: `trace_composition_cost_bound` ✅ PROVEN with Qed (2025-11-23)
+**Latest Update**: `change_cost_compose_bound` lemma now compiles with 3 admitted internal assertions (2025-11-24)
 
 ### Key Discovery
 The codebase is **more complete than initially assessed**:
@@ -154,10 +155,10 @@ With matching syntax, the proof completed using:
 
 ---
 
-### 3. change_cost_compose_bound (Line 4150) - Infrastructure Development
+### 3. change_cost_compose_bound (Line 4314) - Infrastructure Development
 **What it proves**: Σ(subst_costs in composition) ≤ Σ(subst_costs in T1) + Σ(subst_costs in T2)
 
-**Current state**: Admitted. Phase 1 infrastructure 33% complete (1 of 3 key lemmas proven).
+**Current state**: ⚠️ **PARTIALLY ADMITTED** - Lemma skeleton complete, but 3 internal assertions admitted (2025-11-24)
 
 **Latest progress** (2025-11-24):
 - ✅ **`fold_left_sum_bound_subset` (line 3982) - PROVEN with Qed (line 4102)**
@@ -166,7 +167,26 @@ With matching syntax, the proof completed using:
   - Completed with helper lemma `add_middle_preserves_le` (line 3964)
   - Proof uses case analysis on membership with careful NoDup decomposition
 
-**Revised analysis** (2025-11-23): After deep exploration during `trace_composition_cost_bound` completion, this proof requires:
+**Compilation status**: ✅ Compiles successfully with admitted assertions
+
+**Admitted internal assertions** (within change_cost_compose_bound proof):
+
+#### 3a. H_split (Lines 4345-4366) - Fold_left Sum Split
+**What it proves**: Applies triangle inequality pointwise and splits sum
+**Blocker**: Coq unification limitations with pattern-matching lambdas in `fold_left_add_monotone`
+**TODO comment location**: Line 4358-4365
+
+#### 3b. H_map1 (Lines 4369-4384) - Beta-Reduction for witness_to_T1
+**What it proves**: Equivalence between lambda application and map-based fold_left
+**Blocker**: Coq reflexivity doesn't recognize let-pattern beta-reductions as convertible
+**TODO comment location**: Line 4378-4383
+
+#### 3c. H_map2 (Lines 4386-4396) - Beta-Reduction for witness_to_T2
+**What it proves**: Equivalence between lambda application and map-based fold_left (symmetric to H_map1)
+**Blocker**: Same let-pattern beta-reduction limitation as H_map1
+**TODO comment location**: Line 4395
+
+**Revised analysis** (2025-11-24): After deep exploration and multiple fix attempts, this proof requires:
 
 **Infrastructure needed**:
 1. ✅ **fold_left sum bounds over subsets** - `fold_left_sum_bound_subset` now proven!

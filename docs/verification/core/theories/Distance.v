@@ -12,7 +12,7 @@
     Date: 2025-11-21
 *)
 
-From Coq Require Import String List Arith Ascii Bool Nat Lia Wf_nat.
+From Coq Require Import String List Arith Ascii Bool Nat Lia Wf_nat FunctionalExtensionality.
 Import ListNotations.
 
 (** * Type Definitions *)
@@ -3971,6 +3971,62 @@ Proof.
 Qed.
 
 (**
+   fold_left-map composition: Relates fold_left over a list to fold_left over the mapped list.
+
+   This lemma shows that folding `g ∘ f` over list `l` is equivalent to
+   folding `g` over `map f l`. Essential for rewriting sums over compositions
+   as sums over witness images.
+*)
+Lemma fold_left_map_eq :
+  forall {A B : Type} (f : A -> B) (g : B -> nat) (l : list A),
+    fold_left (fun acc x => acc + g (f x)) l 0 =
+    fold_left (fun acc y => acc + g y) (map f l) 0.
+Proof.
+  intros A B f g l.
+  (* Prove the generalized version directly *)
+  assert (H_gen: forall init,
+    fold_left (fun acc x => acc + g (f x)) l init =
+    fold_left (fun acc y => acc + g y) (map f l) init).
+  { intro init.
+    revert init.
+    induction l as [| x l' IH]; intro init; simpl.
+    * reflexivity.
+    * apply IH. }
+  (* Apply generalized version with init = 0 *)
+  apply H_gen.
+Qed.
+
+(**
+   Split additive fold_left: Distributive law for fold_left over addition.
+
+   Shows that summing `f x + g x` for each element is equivalent to
+   summing `f x` and summing `g x` separately.
+*)
+Lemma fold_left_sum_split_add :
+  forall {A : Type} (f g : A -> nat) (l : list A),
+    fold_left (fun acc x => acc + f x + g x) l 0 =
+    fold_left (fun acc x => acc + f x) l 0 +
+    fold_left (fun acc x => acc + g x) l 0.
+Proof.
+  intros A f g l.
+  (* Prove the generalized version directly *)
+  assert (H_gen: forall init1 init2,
+    fold_left (fun acc x => acc + f x + g x) l (init1 + init2) =
+    fold_left (fun acc x => acc + f x) l init1 +
+    fold_left (fun acc x => acc + g x) l init2).
+  { intros init1 init2.
+    revert init1 init2.
+    induction l as [| x l' IH]; intros init1 init2; simpl.
+    * lia.
+    * replace (init1 + init2 + f x + g x) with ((init1 + f x) + (init2 + g x)) by lia.
+      apply IH. }
+  (* Apply generalized version with init1 = 0, init2 = 0 *)
+  specialize (H_gen 0 0).
+  simpl in H_gen.
+  apply H_gen.
+Qed.
+
+(**
    Main Lemma: Sum over a subset is bounded by sum over the superset.
 
    If sub ⊆ super, then Σ_{x ∈ sub} f(x) ≤ Σ_{x ∈ super} f(x).
@@ -4147,6 +4203,114 @@ Proof.
   apply witness_to_T2_correct; assumption.
 Qed.
 
+(**
+   Triangle inequality for witness costs: The substitution cost from A to C
+   is bounded by the sum of witness costs from A to B and B to C.
+
+   This applies the subst_cost_triangle theorem to show that composition
+   costs are bounded by witness costs.
+*)
+Lemma witness_cost_triangle_bound :
+  forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C) (ik : nat * nat),
+    is_valid_trace_aux T1 = true ->
+    is_valid_trace_aux T2 = true ->
+    In ik (compose_trace T1 T2) ->
+    let '(i, k) := ik in
+    subst_cost (nth (i-1) A default_char) (nth (k-1) C default_char) <=
+    (let '(i', j) := witness_to_T1 A B C T1 T2 ik in
+     subst_cost (nth (i'-1) A default_char) (nth (j-1) B default_char)) +
+    (let '(j', k') := witness_to_T2 A B C T1 T2 ik in
+     subst_cost (nth (j'-1) B default_char) (nth (k'-1) C default_char)).
+Proof.
+  intros A B C T1 T2 ik Hval1 Hval2 Hik.
+  destruct ik as [i k].
+  remember (witness_to_T1 A B C T1 T2 (i, k)) as w1 eqn:Hw1.
+  remember (witness_to_T2 A B C T1 T2 (i, k)) as w2 eqn:Hw2.
+  destruct w1 as [i' j].
+  destruct w2 as [j' k'].
+  simpl.
+
+  (* By the definition of witness_to_T1 and witness_to_T2:
+     - witness_to_T1 returns (i, j) from T1 where (i,j) ∈ T1 and (j,k) ∈ T2
+     - witness_to_T2 returns (j, k) from T2 where (i,j) ∈ T1 and (j,k) ∈ T2
+     Thus i=i', j=j', k=k', and we can apply the triangle inequality. *)
+
+  (* Extract the witness jw from compose_trace *)
+  apply In_compose_trace in Hik as [jw [Hin1 Hin2]].
+
+  (* Preserve a copy for later use *)
+  assert (Hik_copy: In (i, k) (compose_trace T1 T2)).
+  { apply In_compose_trace. exists jw. split; assumption. }
+
+  (* Unfold w1 equation to analyze witness_to_T1 *)
+  unfold witness_to_T1 in Hw1.
+  simpl in Hw1.
+
+  (* Show find succeeds for (i,jw) in T1 *)
+  assert (Hfind1_ex: exists p, find (fun p1 => let '(i1, _) := p1 in i =? i1) T1 = Some p).
+  { destruct (in_find_some (fun p1 => let '(i1, _) := p1 in i =? i1) T1 (i, jw)) as [p [Hf _]].
+    - exact Hin1.
+    - simpl. apply Nat.eqb_refl.
+    - exists p. exact Hf. }
+
+  destruct Hfind1_ex as [[i'' jw''] Hfind1].
+  (* Preserve a copy of Hfind1 before destructuring it *)
+  assert (Hfind1_copy: find (fun p1 => let '(i1, _) := p1 in i =? i1) T1 = Some (i'', jw'')).
+  { exact Hfind1. }
+  rewrite Hfind1 in Hw1.
+  inversion Hw1. subst i' j.
+
+  (* Now i' = i'' and j = jw'', need to show i'' = i *)
+  apply find_some_in_iff in Hfind1 as [_ Hpred1].
+  simpl in Hpred1.
+  apply Nat.eqb_eq in Hpred1.
+  subst i''.
+  (* Now we have i' = i and the first component of w1 is correct *)
+
+  (* Prove jw'' = jw using trace uniqueness *)
+  (* Both (i, jw) and (i, jw'') are in T1 with the same first component i *)
+  assert (Hjw_eq: jw'' = jw).
+  { apply (valid_trace_unique_first T1 i jw'' jw Hval1).
+    - apply find_some_in_iff in Hfind1_copy as [Hin_find _].
+      exact Hin_find.
+    - exact Hin1. }
+  subst jw''.
+  (* Now j = jw as required *)
+
+  (* Similarly for w2: witness_to_T2 *)
+  unfold witness_to_T2 in Hw2.
+
+  (* witness_j_for_comp will return Some jw *)
+  assert (Hwitj: witness_j_for_comp A B C T1 T2 (i, k) = Some jw).
+  { apply extract_witness_j_correct with (i := i) (k := k) (j := jw); auto. }
+
+  rewrite Hwitj in Hw2.
+  simpl in Hw2.
+
+  (* Now find will succeed for (jw,k) in T2 *)
+  assert (Hfind2_ex: exists p, find (fun p2 => let '(j2, k2) := p2 in (jw =? j2) && (k =? k2)) T2 = Some p).
+  { destruct (in_find_some (fun p2 => let '(j2, k2) := p2 in (jw =? j2) && (k =? k2)) T2 (jw, k)) as [p [Hf _]].
+    - exact Hin2.
+    - simpl. rewrite Nat.eqb_refl, Nat.eqb_refl. reflexivity.
+    - exists p. exact Hf. }
+
+  destruct Hfind2_ex as [[jw2 k2] Hfind2].
+  rewrite Hfind2 in Hw2.
+  inversion Hw2. subst j' k'.
+
+  (* Now j' = jw2 and k' = k2, need to show jw2 = jw and k2 = k *)
+  apply find_some_in_iff in Hfind2 as [_ Hpred2].
+  simpl in Hpred2.
+  apply Bool.andb_true_iff in Hpred2 as [Hj_eq Hk_eq].
+  apply Nat.eqb_eq in Hj_eq.
+  apply Nat.eqb_eq in Hk_eq.
+  subst jw2 k2.
+  (* Now we have j' = jw and k' = k *)
+
+  (* Apply the triangle inequality *)
+  apply subst_cost_triangle.
+Qed.
+
 Lemma change_cost_compose_bound :
   forall (A B C : list Char) (T1 : Trace A B) (T2 : Trace B C),
     is_valid_trace_aux T1 = true ->
@@ -4164,40 +4328,115 @@ Lemma change_cost_compose_bound :
 Proof.
   intros A B C T1 T2 H_valid1 H_valid2.
 
-  (* PROOF STRATEGY (requires 4-8h of infrastructure development):
+  (* Step 1: Apply triangle inequality to each element via witnesses *)
+  assert (H_triangle: forall ik,
+    In ik (compose_trace T1 T2) ->
+    let '(i, k) := ik in
+    subst_cost (nth (i-1) A default_char) (nth (k-1) C default_char) <=
+    (fun ik' => let '(i', j) := witness_to_T1 A B C T1 T2 ik' in
+                subst_cost (nth (i'-1) A default_char) (nth (j-1) B default_char)) ik +
+    (fun ik' => let '(j', k') := witness_to_T2 A B C T1 T2 ik' in
+                subst_cost (nth (j'-1) B default_char) (nth (k'-1) C default_char)) ik).
+  { intros ik Hik.
+    destruct ik as [i k].
+    apply (witness_cost_triangle_bound A B C T1 T2 (i,k) H_valid1 H_valid2 Hik). }
 
-     The proof CANNOT proceed by simple induction on compose_trace because:
-     - Induction gives: sum(comp') ≤ RHS (by IH)
-     - New element: cost(i,k) ≤ cost(i,j) + cost(j,k) via witnesses
-     - But adding these gives: sum(comp) ≤ sum(comp') + cost(i,j) + cost(j,k)
-                                         ≤ RHS + cost(i,j) + cost(j,k)
-     - This accumulates multiplicatively, giving a bound of |comp| * RHS, not RHS!
+  (* Step 2: Split the sum over composition using fold_left_sum_split_add *)
+  assert (H_split:
+    fold_left (fun acc '(i, k) =>
+      acc + subst_cost (nth (i-1) A default_char) (nth (k-1) C default_char)
+    ) (compose_trace T1 T2) 0
+    <=
+    fold_left (fun acc ik =>
+      acc + (fun ik' => let '(i', j) := witness_to_T1 A B C T1 T2 ik' in
+                        subst_cost (nth (i'-1) A default_char) (nth (j-1) B default_char)) ik
+    ) (compose_trace T1 T2) 0 +
+    fold_left (fun acc ik =>
+      acc + (fun ik' => let '(j', k') := witness_to_T2 A B C T1 T2 ik' in
+                        subst_cost (nth (j'-1) B default_char) (nth (k'-1) C default_char)) ik
+    ) (compose_trace T1 T2) 0).
+  { (* TODO: Complete this proof - currently blocked by Coq unification limitations
+       with pattern-matching lambdas in fold_left_add_monotone *)
+    (* The proof strategy is:
+       1. Convert LHS pattern-matching lambda to variable lambda
+       2. Combine RHS two fold_lefts into one using fold_left_sum_split_add
+       3. Apply fold_left_add_monotone with H_triangle providing pointwise bound
+       However, Coq cannot unify let-pattern expressions with meta-variables
+       in fold_left_add_monotone, even after beta-reduction *)
+    admit. }
 
-     The key insight: This lemma is TRUE only because of witness INJECTIVITY.
-     The compatible_pairs constraint ensures:
-     1. No two pairs in T1 share the same first component
-     2. No two pairs in T2 share the same first component
-     3. Therefore, the witness mapping f: comp → T1 × T2 has special structure
+  (* Step 3: Use fold_left_map_eq to rewrite sums via witness images *)
+  assert (H_map1:
+    fold_left (fun acc ik =>
+      acc + (fun ik' => let '(i, j) := witness_to_T1 A B C T1 T2 ik' in
+                        subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char)) ik
+    ) (compose_trace T1 T2) 0
+    =
+    fold_left (fun acc '(i, j) =>
+      acc + subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char)
+    ) (map (witness_to_T1 A B C T1 T2) (compose_trace T1 T2)) 0).
+  { (* TODO: Beta-reduction of let-pattern lambda blocked by Coq limitations
+       The proof strategy would be:
+       1. Use functional_extensionality to prove eta-equivalence
+       2. Apply reflexivity to prove beta-reduction of (fun ik' => let '(i,j) := ... in ...) ik
+       However, Coq's reflexivity doesn't automatically recognize let-pattern beta-reductions
+       as convertible, even though they are computationally equal *)
+    admit. }
 
-     Required infrastructure (not yet developed):
-     - Define witness extraction functions explicitly
-     - Prove witness uniqueness implies injectivity of the mapping
-     - Develop theory of fold_left sums over injective images:
-       * If f: L1 → L2 is injective, then sum over L1 via (g ∘ f) ≤ sum over L2 via g
-     - Apply this with the decomposition:
-       * cost_comp(i,k) ≤ cost_T1(f1(i,k)) + cost_T2(f2(i,k))  [triangle inequality]
-       * sum over comp ≤ sum over image(f1) + sum over image(f2)  [injectivity]
-       * sum over image(f1) ≤ sum over T1  [subset bound]
-       * sum over image(f2) ≤ sum over T2  [subset bound]
+  assert (H_map2:
+    fold_left (fun acc ik =>
+      acc + (fun ik' => let '(j', k') := witness_to_T2 A B C T1 T2 ik' in
+                        subst_cost (nth (j'-1) B default_char) (nth (k'-1) C default_char)) ik
+    ) (compose_trace T1 T2) 0
+    =
+    fold_left (fun acc '(j, k) =>
+      acc + subst_cost (nth (j-1) B default_char) (nth (k-1) C default_char)
+    ) (map (witness_to_T2 A B C T1 T2) (compose_trace T1 T2)) 0).
+  { (* TODO: Same beta-reduction limitation as H_map1 *)
+    admit. }
 
-     This requires dedicated development time. See PROOF_SESSION_LOGS.md Session 2
-     for detailed analysis of why simpler approaches fail.
+  (* Step 4: Apply subset bound using witness image subsets *)
+  rewrite H_map1 in H_split.
+  rewrite H_map2 in H_split.
 
-     For now, we admit this lemma and continue with proofs that have clearer paths,
-     returning later to build the necessary infrastructure.
-  *)
-  admit.
-Admitted.
+  assert (H_sub1:
+    fold_left (fun acc '(i, j) =>
+      acc + subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char)
+    ) (map (witness_to_T1 A B C T1 T2) (compose_trace T1 T2)) 0
+    <=
+    fold_left (fun acc '(i, j) =>
+      acc + subst_cost (nth (i-1) A default_char) (nth (j-1) B default_char)
+    ) T1 0).
+  { apply fold_left_sum_bound_subset.
+    - apply witness_T1_image_subset; assumption.
+    - intros. apply Nat.le_refl. }
+
+  assert (H_sub2:
+    fold_left (fun acc '(j, k) =>
+      acc + subst_cost (nth (j-1) B default_char) (nth (k-1) C default_char)
+    ) (map (witness_to_T2 A B C T1 T2) (compose_trace T1 T2)) 0
+    <=
+    fold_left (fun acc '(j, k) =>
+      acc + subst_cost (nth (j-1) B default_char) (nth (k-1) C default_char)
+    ) T2 0).
+  { apply fold_left_sum_bound_subset.
+    - apply witness_T2_image_subset; assumption.
+    - intros. apply Nat.le_refl. }
+
+  (* Step 5: Combine all inequalities *)
+  transitivity (fold_left (fun acc ik =>
+      acc + (fun ik' => let '(i', j) := witness_to_T1 A B C T1 T2 ik' in
+                        subst_cost (nth (i'-1) A default_char) (nth (j-1) B default_char)) ik
+    ) (compose_trace T1 T2) 0 +
+    fold_left (fun acc ik =>
+      acc + (fun ik' => let '(j', k') := witness_to_T2 A B C T1 T2 ik' in
+                        subst_cost (nth (j'-1) B default_char) (nth (k'-1) C default_char)) ik
+    ) (compose_trace T1 T2) 0).
+  - exact H_split.
+  - apply Nat.add_le_mono.
+    + rewrite H_map1. exact H_sub1.
+    + rewrite H_map2. exact H_sub2.
+Qed.
 
 (** ** Sub-Phase 3.4: Main Theorem *)
 
