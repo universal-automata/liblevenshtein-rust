@@ -627,4 +627,77 @@ Proof.
   exact H_fixed.
 Qed.
 
+(** * Rule ID Uniqueness (Closed-World Proof) *)
+
+(** Complete list of all Zompist rules *)
+Definition all_zompist_rules : list RewriteRule :=
+  [ rule_ch_to_tsh; rule_sh_to_sh; rule_ph_to_f;
+    rule_c_to_s_before_front; rule_c_to_k_elsewhere; rule_g_to_j_before_front;
+    rule_silent_e_final; rule_gh_silent;
+    phonetic_th_to_t; phonetic_qu_to_kw; phonetic_kw_to_qu;
+    rule_x_expand; rule_y_to_z ].
+
+(** Extract all rule IDs *)
+Definition all_rule_ids : list nat := map rule_id all_zompist_rules.
+
+(** Prove NoDup for the literal list of IDs *)
+Lemma NoDup_13_distinct_nats :
+  NoDup [1%nat; 2%nat; 3%nat; 20%nat; 21%nat; 22%nat; 33%nat; 34%nat;
+         100%nat; 101%nat; 102%nat; 200%nat; 201%nat].
+Proof.
+  repeat constructor; simpl; intuition discriminate.
+Qed.
+
+(** Prove the IDs equal the expected list *)
+Lemma all_rule_ids_eq :
+  all_rule_ids = [1%nat; 2%nat; 3%nat; 20%nat; 21%nat; 22%nat; 33%nat; 34%nat;
+                  100%nat; 101%nat; 102%nat; 200%nat; 201%nat].
+Proof. reflexivity. Qed.
+
+(** NoDup for rule IDs *)
+Lemma all_rule_ids_NoDup : NoDup all_rule_ids.
+Proof.
+  rewrite all_rule_ids_eq.
+  exact NoDup_13_distinct_nats.
+Qed.
+
+(** Helper: If two rules have the same ID and are in a NoDup-ID list, they must be equal *)
+Lemma In_map_same_id_unique :
+  forall (l : list RewriteRule) (r1 r2 : RewriteRule),
+    NoDup (map rule_id l) ->
+    In r1 l -> In r2 l ->
+    rule_id r1 = rule_id r2 ->
+    r1 = r2.
+Proof.
+  induction l as [| x xs IH]; intros r1 r2 Hnodup Hin1 Hin2 Heq.
+  - destruct Hin1.
+  - simpl in Hnodup. inversion Hnodup as [| ? ? Hnotin Hnodup_xs]. subst.
+    destruct Hin1 as [H1 | H1]; destruct Hin2 as [H2 | H2].
+    + congruence.
+    + subst r1. exfalso.
+      apply Hnotin. rewrite in_map_iff.
+      exists r2. split; [symmetry; exact Heq | exact H2].
+    + subst r2. exfalso.
+      apply Hnotin. rewrite in_map_iff.
+      exists r1. split; [exact Heq | exact H1].
+    + apply IH; assumption.
+Qed.
+
+(** The closed-world theorem for Zompist rules:
+    Within the known rule set, rule IDs uniquely identify rules. *)
+Theorem rule_id_unique_in_zompist :
+  forall r1 r2 : RewriteRule,
+    In r1 all_zompist_rules ->
+    In r2 all_zompist_rules ->
+    rule_id r1 = rule_id r2 ->
+    r1 = r2.
+Proof.
+  intros r1 r2 Hin1 Hin2 Heq.
+  apply (In_map_same_id_unique all_zompist_rules r1 r2 all_rule_ids_NoDup Hin1 Hin2 Heq).
+Qed.
+
+(** Verify this theorem has no axiom dependencies *)
+(* Print Assumptions rule_id_unique_in_zompist. *)
+(* Should print: Closed under the global context *)
+
 End ZompistRules.

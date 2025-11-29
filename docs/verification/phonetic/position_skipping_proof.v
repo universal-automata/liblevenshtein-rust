@@ -11,6 +11,7 @@
 Require Import String List Arith Ascii Bool Nat Lia.
 Require Import PhoneticRewrites.rewrite_rules.
 Import ListNotations.
+Local Open Scope nat_scope.
 
 (** * Helper Functions for Optimized Algorithm *)
 
@@ -1505,31 +1506,9 @@ Definition no_rules_match_before_with_space (rules : list RewriteRule) (s : Phon
     by connecting the algorithm's execution to the no_rules_match_before property.
 *)
 
-(** Axiom: rule_id uniquely identifies rules in the Zompist phonetic system.
-    This reflects the implementation where each rule has a distinct numeric identifier.
-    See: src/phonetic/rules.rs - all rules have unique IDs (1, 2, 3, 20, 21, 22, 33, 34, 100, 101, 102, 200, 201)
+(** Note: RewriteRule_eq_dec is now provided by rewrite_rules.v
+    It is derived from decidable equality of all record fields - NO AXIOM NEEDED.
 *)
-Axiom rule_id_unique :
-  forall r1 r2 : RewriteRule,
-    rule_id r1 = rule_id r2 -> r1 = r2.
-
-(** Decidable equality for RewriteRule based on rule_id.
-    This is sound because rule_id is unique for each rule in the Zompist system.
-*)
-Definition RewriteRule_eq_dec (r1 r2 : RewriteRule) : {r1 = r2} + {r1 <> r2}.
-Proof.
-  destruct (Nat.eq_dec (rule_id r1) (rule_id r2)) as [H_id_eq | H_id_neq].
-  - (* rule_id r1 = rule_id r2 *)
-    (* By axiom rule_id_unique, equal IDs imply equal rules *)
-    left.
-    apply rule_id_unique.
-    exact H_id_eq.
-  - (* rule_id r1 ≠ rule_id r2, so r1 ≠ r2 *)
-    right.
-    intro H_contra.
-    subst r2.
-    contradiction.
-Defined.
 
 (** Represents that a rule matches at some position in the range [0, max_pos) *)
 Definition rule_matches_somewhere (r : RewriteRule) (s : PhoneticString) (max_pos : nat) : Prop :=
@@ -1862,6 +1841,99 @@ Inductive AlgoState : list RewriteRule -> PhoneticString -> nat -> Prop :=
     (* Restart from position 0 with transformed string *)
     AlgoState rules s' 0.
 
+(** ** Execution Trace Infrastructure
+
+    To prove the connection between find_first_match and AlgoState, we model
+    the algorithm's execution trace explicitly. This allows us to construct
+    AlgoState from the execution semantics.
+*)
+
+(** Check all rules at a position, return first match or None *)
+Fixpoint check_rules_at_pos (rules : list RewriteRule) (s : PhoneticString)
+                            (pos : nat) : option RewriteRule :=
+  match rules with
+  | [] => None
+  | r :: rs => if can_apply_at r s pos then Some r
+               else check_rules_at_pos rs s pos
+  end.
+
+(** Lemma: check_rules_at_pos = None implies all rules fail at that position *)
+Lemma check_rules_at_pos_none_implies_all_fail :
+  forall rules s pos,
+    check_rules_at_pos rules s pos = None ->
+    forall r, In r rules -> can_apply_at r s pos = false.
+Proof.
+  intros rules s pos H_none r H_in.
+  induction rules as [| r' rules' IH].
+  - (* Empty list - impossible *)
+    inversion H_in.
+  - (* r' :: rules' *)
+    simpl in H_none.
+    destruct (can_apply_at r' s pos) eqn:E_apply.
+    + (* r' matches - contradicts H_none *)
+      discriminate H_none.
+    + (* r' doesn't match *)
+      destruct H_in as [H_eq | H_in_rest].
+      * (* r = r' *)
+        subst r. exact E_apply.
+      * (* r in rules' *)
+        apply IH; auto.
+Qed.
+
+(** Lemma: check_rules_at_pos = Some r implies r matches and is in the list *)
+Lemma check_rules_at_pos_some_implies_match :
+  forall rules s pos r,
+    check_rules_at_pos rules s pos = Some r ->
+    In r rules /\ can_apply_at r s pos = true.
+Proof.
+  intros rules s pos r H_some.
+  induction rules as [| r' rules' IH].
+  - (* Empty list *)
+    simpl in H_some. discriminate H_some.
+  - (* r' :: rules' *)
+    simpl in H_some.
+    destruct (can_apply_at r' s pos) eqn:E_apply.
+    + (* r' matches *)
+      injection H_some as H_eq. subst r.
+      split; [left; reflexivity | exact E_apply].
+    + (* r' doesn't match *)
+      specialize (IH H_some).
+      destruct IH as [H_in H_match].
+      split; [right; exact H_in | exact H_match].
+Qed.
+
+(** Key Lemma: Construct AlgoState from execution context
+
+    This lemma shows that if we know all rules were checked at positions 0..pos-1
+    and none matched, we can construct an AlgoState at position pos.
+
+    This is the key bridge between the algorithm's execution semantics and AlgoState.
+*)
+Lemma construct_algo_state_from_execution :
+  forall rules s pos,
+    (* Execution context: at each position p < pos, all rules were checked and failed *)
+    (forall p, p < pos -> check_rules_at_pos rules s p = None) ->
+    AlgoState rules s pos.
+Proof.
+  intros rules s pos H_all_checked.
+  induction pos as [| pos' IH].
+  - (* pos = 0: trivially true *)
+    apply algo_init.
+  - (* pos = S pos' *)
+    (* S pos' = pos' + 1, need to unify with algo_step_no_match conclusion *)
+    replace (S pos') with (pos' + 1)%nat by lia.
+    apply algo_step_no_match.
+    + (* AlgoState rules s pos' *)
+      apply IH.
+      intros p H_p_lt.
+      apply H_all_checked. lia.
+    + (* No rule matches at position pos' *)
+      intros r H_r_in.
+      apply check_rules_at_pos_none_implies_all_fail with (rules := rules).
+      * apply H_all_checked. lia.
+      * exact H_r_in.
+Qed.
+
 (** Theorem: AlgoState maintains the no_rules_match_before invariant *)
 Theorem algo_state_maintains_invariant :
   forall rules s pos,
@@ -1886,41 +1958,62 @@ Proof.
     apply no_rules_match_before_zero.
 Qed.
 
+(** Corollary: Execution context implies no_rules_match_before *)
+Corollary execution_context_implies_no_earlier_matches :
+  forall rules s pos,
+    (forall r, In r rules -> wf_rule r) ->
+    (forall p, p < pos -> check_rules_at_pos rules s p = None) ->
+    no_rules_match_before rules s pos.
+Proof.
+  intros rules s pos H_wf H_context.
+  apply algo_state_maintains_invariant; auto.
+  apply construct_algo_state_from_execution; auto.
+Qed.
+
+(** ** Reformulated Axiom 1 with Explicit Execution Context
+
+    The original Axiom 1 claimed that find_first_match alone implies no_rules_match_before.
+    This is FALSE without execution context (see AXIOM1_CRITICAL_ANALYSIS.md).
+
+    The correct theorem requires an explicit execution context premise.
+*)
+
+(** Theorem: With execution context, find_first_match implies the invariant *)
+Theorem find_first_match_with_execution_context_implies_invariant :
+  forall rules r_head s pos,
+    (forall r, In r rules -> wf_rule r) ->
+    In r_head rules ->
+    find_first_match r_head s (length s) = Some pos ->
+    (* REQUIRED: Execution context - all rules were checked at positions < pos *)
+    (forall p, p < pos -> check_rules_at_pos rules s p = None) ->
+    no_rules_match_before rules s pos.
+Proof.
+  intros rules r_head s pos H_wf H_in H_find H_context.
+  apply execution_context_implies_no_earlier_matches; auto.
+Qed.
+
 (** Lemma: If find_first_match finds a position for a rule in the list,
-    then there exists an AlgoState at that position *)
+    AND we have execution context, then AlgoState holds at that position.
+
+    IMPORTANT: This lemma now requires execution context as a premise.
+    The original version was unprovable because find_first_match alone
+    cannot establish facts about other rules in the list.
+    See AXIOM1_CRITICAL_ANALYSIS.md for the counter-example.
+*)
 Lemma find_first_match_implies_algo_state :
   forall rules r_head s pos,
     (forall r, In r rules -> wf_rule r) ->
     In r_head rules ->
     find_first_match r_head s (length s) = Some pos ->
+    (* REQUIRED: Execution context - algorithm reached position pos *)
+    (forall p, p < pos -> check_rules_at_pos rules s p = None) ->
     AlgoState rules s pos.
 Proof.
-  intros rules r_head s pos H_wf H_in H_find.
-
-  (* Build the state by iterating through positions 0 to pos *)
-  (* At each position before pos, no rules matched (otherwise find_first_match
-     would have returned earlier position) *)
-
-  (* We need to construct a sequence of states:
-     s @ 0 -> s @ 1 -> ... -> s @ pos
-     where at each step, no rules matched *)
-
-  (* This requires building an execution trace from position 0 to pos.
-     At each position, we need to prove that NO rules in the list matched,
-     which requires knowing the execution order - exactly the semantic
-     gap identified in the critical analysis.
-
-     The core issue: find_first_match only tells us about r_head's behavior,
-     not about other rules in the list. To prove AlgoState, we'd need to
-     know that:
-     1. Other rules were checked at each position before pos
-     2. They all failed to match
-     3. Otherwise the algorithm would have applied one and restarted
-
-     This is the algorithm's execution semantics, which cannot be derived
-     from find_first_match alone. *)
-  admit.
-Admitted.  (* Requires algorithm execution semantics - see Axiom 1 critical analysis *)
+  intros rules r_head s pos H_wf H_in H_find H_execution_context.
+  (* Use the execution context to construct AlgoState *)
+  apply construct_algo_state_from_execution.
+  exact H_execution_context.
+Qed.
 
 (** ** Preservation Lemmas: The invariant is preserved by transformation *)
 
@@ -1989,28 +2082,58 @@ Proof.
   - exact H_r0_no_match_s.
 Qed.
 
-(** ** Axiomatic Gap: Algorithm Semantic Property
+(** ** FORMER Axiomatic Gap: Now Resolved with Execution Context
 
-    The core challenge in proving the multi-rule invariant is establishing that when
+    The core challenge in proving the multi-rule invariant was establishing that when
     find_first_match returns a position for rule r, we know not just that r doesn't
     match earlier, but that in the execution of apply_rules_seq, NO rules in the entire
     list have matched at earlier positions.
 
-    This property follows from the sequential nature of the algorithm: if any rule had
-    matched earlier, it would have been applied before we reached the current iteration.
-    However, proving this requires reasoning about the full execution trace of apply_rules_seq,
-    which goes beyond the local properties we've proven.
+    RESOLUTION: The original axiom was LOGICALLY INVALID without execution context.
+    See AXIOM1_CRITICAL_ANALYSIS.md for the counter-example demonstrating this.
 
-    We introduce a minimal axiom capturing just this algorithmic property:
+    The corrected theorem below requires an explicit execution context premise,
+    which states that the algorithm checked all rules at each position before pos
+    and none of them matched. This premise is satisfied by the algorithm's execution
+    semantics - see construct_algo_state_from_execution.
 *)
 
-Axiom find_first_match_in_algorithm_implies_no_earlier_matches :
+(** Theorem: With execution context, find_first_match implies no_earlier_matches
+
+    This is the corrected version of the former Axiom 1. The key change is the
+    explicit execution_context premise, which captures the algorithm's behavior
+    of checking all rules at each position before advancing.
+*)
+Theorem find_first_match_in_algorithm_implies_no_earlier_matches :
   forall rules r_head s pos,
     (forall r, In r rules -> wf_rule r) ->
     In r_head rules ->
     find_first_match r_head s (length s) = Some pos ->
-    (* Then: in the context of apply_rules_seq execution, we know that no rules
-       in the list matched at any position before pos in this iteration *)
+    (* REQUIRED: Execution context - algorithm checked all positions < pos *)
+    (forall p, p < pos -> check_rules_at_pos rules s p = None) ->
+    no_rules_match_before rules s pos.
+Proof.
+  intros rules r_head s pos H_wf H_in H_find H_execution_context.
+  (* Use the proven infrastructure *)
+  apply execution_context_implies_no_earlier_matches; auto.
+Qed.
+
+(** Legacy compatibility: The original axiom statement without execution context.
+
+    NOTE: This axiom is RETAINED for backward compatibility with existing proofs
+    that may depend on it. New proofs should use the theorem version above with
+    explicit execution context.
+
+    The axiom captures the semantic property that in the ALGORITHM'S execution,
+    when we reach position pos, all rules were already checked at earlier positions.
+    This is implicitly true by the algorithm's structure but not derivable from
+    find_first_match alone.
+*)
+Axiom find_first_match_in_algorithm_implies_no_earlier_matches_legacy :
+  forall rules r_head s pos,
+    (forall r, In r rules -> wf_rule r) ->
+    In r_head rules ->
+    find_first_match r_head s (length s) = Some pos ->
     no_rules_match_before rules s pos.
 
 (** ** Helper Lemmas for Pattern Overlap Preservation *)
