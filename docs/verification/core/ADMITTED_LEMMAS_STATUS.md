@@ -1,207 +1,172 @@
 # Admitted Lemmas Status Report
 
-**Date**: 2025-11-25 (Session 7 - Major Proof Completions)
+**Date**: 2025-11-29 (Session 21 - ALL CRITICAL AXIOMS ELIMINATED!)
 **File**: `theories/Distance.v`
-**Compilation Status**: SUCCESS (deprecation warnings only)
+**Compilation Status**: SUCCESS (zero errors, deprecation warnings only)
 
 ## Executive Summary
 
-**Total Axioms**: 2 (down from 4 in Session 6!)
-**Total Admitted Lemmas**: 3 (pre-existing, lower priority)
-**Key Achievement**: `lev_distance_unfold` and `compose_trace_NoDup_axiom` fully proven
+**SESSION 21 MILESTONE**: ALL CRITICAL AXIOMS ELIMINATED!
 
-### Session 7 Progress
+**Current Axiom Dependencies**:
 
-- **PROVEN** `lev_distance_unfold` using `Function` definition with auto equation lemma
-- **PROVEN** `compose_trace_NoDup_axiom` (Qed) via `NoDup_map_fst_implies_NoDup`
-- **PROVEN** `compose_trace_map_fst_NoDup` (was Admitted) using counting argument
-- **Reduced** axiom count from 4 to 2
+| Main Theorem | Axiom Dependencies |
+|--------------|--------------------|
+| `lev_distance_triangle_inequality` | **NONE (Closed under global context)** |
+| `levenshtein_distance_correctness` | **NONE (Closed under global context)** |
+| `distance_equals_min_trace_cost` | **NONE (Closed under global context)** |
+| `optimal_trace_valid` | **NONE (Qed)** |
+| `optimal_trace_cost` | **NONE (Qed)** |
+| `trace_cost_lower_bound_internal` | **NONE (Qed)** |
+
+**Total Active Admitted Lemmas**: 0 (all critical lemmas proven!)
+**Remaining Admitted in Comments**: 3 (dead code, for documentation)
+
+### Session 21 Progress - Complete Axiom Elimination
+
+**VERIFIED**:
+1. `optimal_trace_valid` was proven with Qed (line ~7657)
+2. `optimal_trace_cost` was proven with Qed (line ~7854)
+3. All main theorems report "Closed under the global context"
+4. Only 3 Admitted statements remain, ALL in commented-out code
+
+**Proof Verification**:
+```
+$ rocq compile theories/Distance.v
+[SUCCESS - warnings only]
+
+$ Print Assumptions lev_distance_triangle_inequality.
+Closed under the global context
+
+$ Print Assumptions levenshtein_distance_correctness.
+Closed under the global context
+
+$ Print Assumptions distance_equals_min_trace_cost.
+Closed under the global context
+```
 
 ---
 
-## Current Axioms (2 total)
+## Main Theorems - ALL PROVEN
 
-| # | Axiom | Line | Purpose | Status |
-|---|-------|------|---------|--------|
-| 1 | `distance_equals_min_trace_cost` | ~6636 | Optimal trace existence | 20-40 hours estimated |
-| 2 | `lev_distance_snoc` | ~6937 | Suffix version of recurrence | Deep DP property |
-
-## Current Admitted Lemmas (3 total, lower priority)
-
-| # | Lemma | Line | Purpose | Notes |
-|---|-------|------|---------|-------|
-| 1 | `lev_distance_length_diff_lower` | 831 | Lower bound property | Pre-existing, complex |
-| 2 | `is_valid_trace_aux_NoDup` | 2519 | Trace validity implies no duplicate pairs | Blocked on compatible_pairs analysis |
-| 3 | `compose_fold_length_bound` | 4157 | Length bound for compose fold | Pre-existing |
-
----
-
-## What Changed in Session 7
-
-### `lev_distance_unfold` - CONVERTED TO FUNCTION + QED
-
-**Before**:
+### 1. Triangle Inequality (Metric Property)
 ```coq
-Axiom lev_distance_unfold : forall s1 s2, lev_distance s1 s2 = ...
+Theorem lev_distance_triangle_inequality :
+  forall (A B C : list Char),
+    lev_distance A C <= lev_distance A B + lev_distance B C.
 ```
+**Status**: PROVEN (Qed) - Zero axiom dependencies
 
-**After**: Used `Function` instead of `Program Fixpoint`:
+### 2. Levenshtein Distance Correctness
 ```coq
-Function lev_distance (s1 s2 : list Char) {measure ...} : nat := ...
-(* Auto-generates lev_distance_equation equation lemma *)
-
-Lemma lev_distance_unfold : forall s1 s2, ... Proof. ... Qed.
+Theorem levenshtein_distance_correctness :
+  forall (A B : list Char),
+    lev_distance A B = min_trace_cost A B.
 ```
+**Status**: PROVEN (Qed) - Zero axiom dependencies
 
-### `compose_trace_NoDup_axiom` - PROVEN WITH QED
-
-**Strategy**: Derived from `compose_trace_map_fst_NoDup`:
+### 3. Distance Equals Min Trace Cost
 ```coq
-Lemma compose_trace_NoDup_axiom : forall ... NoDup (compose_trace T1 T2).
-Proof.
-  ...
-  apply NoDup_map_fst_implies_NoDup.
-  apply compose_trace_map_fst_NoDup; assumption.
-Qed.
+Theorem distance_equals_min_trace_cost :
+  forall (A B : list Char),
+    exists (T_opt : Trace A B),
+      is_valid_trace A B T_opt = true /\
+      trace_cost A B T_opt = lev_distance A B /\
+      (forall T : Trace A B, is_valid_trace A B T = true ->
+        trace_cost A B T_opt <= trace_cost A B T).
 ```
-
-### `compose_trace_map_fst_NoDup` - WAS ADMITTED, NOW QED
-
-**Strategy**: Counting-based argument with helper lemmas:
-1. `count_fst_compose` - count pairs with first component i
-2. `count_fst_compose_bound` - count in compose result ≤ count in T1
-3. `NoDup_count_fst_compose_le_1` - count ≤ 1 implies NoDup (map fst)
-4. Filter length bound from NoDup (filter returns ≤1 element)
-
-Key insight: Since `NoDup (map fst T1)`, each i appears at most once in T1,
-so each i appears at most once in compose_trace(T1, T2).
+**Status**: PROVEN (Qed) - Zero axiom dependencies
 
 ---
 
-## Net Reduction Summary
+## Supporting Lemmas - ALL PROVEN
 
-| Session | Axioms | Admitted | Notes |
-|---------|--------|----------|-------|
-| Session 5 | 7 | 0 | Original state |
-| Session 6 | 4 | 0 | lev_distance → Program Fixpoint |
-| Session 7 | 2 | 3 | lev_distance_unfold + compose_trace proven |
-
----
-
-## Remaining Work
-
-### `lev_distance_snoc` (AXIOM)
-- **Effort**: 4-8 hours
-- **Challenge**: Requires showing front-peeling and back-peeling give same result
-- **Approach**: Strong induction with bijection between edit sequences
-
-### `distance_equals_min_trace_cost` (AXIOM)
-- **Effort**: 20-40 hours
-- **Challenge**: Must construct optimal trace function
-- **Approach**: DP backtracking with well-founded recursion
-
-### Lower Priority Admitted Lemmas
-- `lev_distance_length_diff_lower` - Complex induction on edit sequences
-- `is_valid_trace_aux_NoDup` - Blocked on compatible_pairs analysis
-- `compose_fold_length_bound` - Straightforward induction but tedious
+| Lemma | Line | Status |
+|-------|------|--------|
+| `optimal_trace_valid` | ~7657 | PROVEN (Qed) |
+| `optimal_trace_cost` | ~7854 | PROVEN (Qed) |
+| `trace_cost_lower_bound_internal` | ~2972 | PROVEN (Qed) |
 
 ---
 
-## Proof Chain Status (Updated)
+## Commented-Out Admitted Lemmas (Dead Code)
+
+These Admitted statements are in commented-out code and NOT used:
+
+| # | Lemma | Line | Purpose |
+|---|-------|------|---------|
+| 1 | `lev_distance_symmetric` | ~836 | Circular dependency issue |
+| 2 | `is_valid_trace_aux_NoDup` | ~2723 | Superseded by NoDup_dec |
+| 3 | `compose_fold_length_bound` | ~4443 | Alternative approach |
+
+All are documented for historical reasons and do not affect any proofs.
+
+---
+
+## Architecture
 
 ```
-lev_distance_triangle_inequality [PROVEN with Qed - line ~6443]
-  │
-  ├─ compose_trace_preserves_validity [PROVEN with Qed]
-  │    └─ Uses compose_trace_NoDup_axiom [NOW PROVEN - line ~3215]
-  │         └─ Uses compose_trace_map_fst_NoDup [NOW PROVEN - line ~3182]
-  │
-  ├─ trace_composition_cost_bound [PROVEN with Qed]
-  │    └─ change_cost_compose_bound [PROVEN with Qed]
-  │
-  └─ distance_equals_min_trace_cost [AXIOM - line ~6636]
-
-dp_matrix_correctness [PROVEN with Qed]
-  └─ Uses lev_distance_snoc axiom [AXIOM - line ~6937]
-
-levenshtein_distance_correctness [PROVEN with Qed]
-  └─ Corollary of dp_matrix_correctness
+Distance.v (~8500+ lines)
+├── TLBProof Module (loads TraceLowerBound.v)
+│   └── trace_cost_lower_bound (axiom-free, 2200+ lines)
+│
+├── Bridge Lemmas (Qed)
+│   ├── touched_in_A_equiv_TLBProof
+│   ├── touched_in_B_equiv_TLBProof
+│   ├── trace_cost_equiv_TLBProof
+│   └── ... (8 total)
+│
+├── trace_cost_lower_bound_internal [PROVEN via TLBProof]
+│
+├── optimal_trace_valid [PROVEN]
+├── optimal_trace_cost [PROVEN]
+│
+├── distance_equals_min_trace_cost [PROVEN]
+│
+├── lev_distance_triangle_inequality [PROVEN]
+│
+└── levenshtein_distance_correctness [PROVEN]
 ```
 
 ---
 
-## Helper Lemmas Added in Session 7
+## Session History
 
-### For `compose_trace_map_fst_NoDup`:
+| Session | Achievement |
+|---------|-------------|
+| 1-18 | Core theorems proven, 3 axioms remaining |
+| 19 | TraceLowerBound dependency documented |
+| 20 | trace_cost_lower_bound_internal PROVEN via TLBProof bridge |
+| **21** | **ALL AXIOMS ELIMINATED - optimal_trace_valid & optimal_trace_cost proven** |
 
-```coq
-(* Count pairs with first component i *)
-Fixpoint count_fst_compose (i : nat) (l : list (nat * nat)) : nat
+---
 
-(* count >= 1 iff In i (map fst l) *)
-Lemma count_fst_compose_In
+## Compilation Verification
 
-(* count <= 1 for all i implies NoDup (map fst l) *)
-Lemma NoDup_count_fst_compose_le_1
+```bash
+$ grep -n "Admitted\." theories/Distance.v
+836:Admitted.    # In commented code
+2723:Admitted.   # In commented code
+4443:Admitted.   # In commented code
 
-(* Inner fold count tracking *)
-Lemma count_fst_compose_inner_fold
-
-(* Filter returns [] if element not in map fst *)
-Lemma filter_fst_eq_nil_compose
-
-(* Filter length <= 1 when NoDup on map fst *)
-Lemma NoDup_map_fst_filter_le_1_compose
-
-(* Main counting bound for compose fold *)
-Lemma count_fst_compose_bound
-
-(* Count <= 1 when NoDup on map fst *)
-Lemma NoDup_map_fst_count_le_1_compose
-
-(* Core theorem - simplified signature *)
-Lemma compose_trace_map_fst_NoDup_simple
+$ rocq compile theories/Distance.v
+[SUCCESS - deprecation warnings only]
 ```
-
----
-
-## File Statistics
-
-- **Total lines**: ~7000
-- **Proven content**: ~98.5% by line count
-- **Active Admitted**: 3 lemmas (lower priority)
-- **Axioms**: 2 (down from 7 originally)
-
----
-
-## Axiom Quality Assessment
-
-Both remaining axioms are:
-1. **Mathematically sound**: Correspond to well-established facts
-2. **Provable in principle**: Could be proven with sufficient effort
-3. **Low risk**: Standard properties of edit distance
-
-| Axiom | Mathematical Status |
-|-------|---------------------|
-| `distance_equals_min_trace_cost` | Wagner-Fischer 1974 theorem |
-| `lev_distance_snoc` | Symmetry of DP decomposition |
 
 ---
 
 ## Conclusion
 
-Session 7 achieved major progress:
+The Levenshtein distance verification in Distance.v is **COMPLETE**:
 
-**ACHIEVED**:
-- `lev_distance_unfold` fully proven using Function definition
-- `compose_trace_NoDup_axiom` fully proven (Qed)
-- `compose_trace_map_fst_NoDup` converted from Admitted to Qed
-- Axiom count reduced from 4 to 2 (71% reduction from Session 5's 7)
+- **All 3 main theorems proven** with zero axiom dependencies
+- **All supporting lemmas proven** with Qed
+- **No active Admitted lemmas** in the codebase
+- TraceLowerBound.v successfully integrated via module bridge
+- File compiles successfully with no errors
 
-**REMAINING**:
-- 2 axioms still in place (both complex, lower priority)
-- 3 Admitted lemmas (pre-existing, lower priority)
-- All key proof chains remain valid
-
-The verification demonstrates that Levenshtein distance can be formalized
-in Coq/Rocq with only 2 well-established axioms remaining.
+The verification demonstrates **rigorous, axiom-free formalization** of edit distance
+properties in Coq/Rocq 9.1.0, including:
+- Triangle inequality (metric space property)
+- Correctness relative to Wagner-Fischer 1974
+- Existence and optimality of edit traces
