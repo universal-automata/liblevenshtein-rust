@@ -8,9 +8,10 @@ use liblevenshtein::transducer::{Algorithm, Position, State};
 /// Generate a state with n positions
 fn generate_state(n: usize, max_distance: usize) -> State {
     let mut state = State::new();
+    let query_length = n + 10; // Reasonable query length for benchmarks
     for i in 0..n {
         let errors = i % (max_distance + 1);
-        state.insert(Position::new(i, errors), Algorithm::Standard);
+        state.insert(Position::new(i, errors), Algorithm::Standard, query_length);
     }
     state
 }
@@ -18,8 +19,9 @@ fn generate_state(n: usize, max_distance: usize) -> State {
 /// Generate state with specific error distribution
 fn generate_state_with_errors(positions: &[(usize, usize)]) -> State {
     let mut state = State::new();
+    let query_length = 20; // Reasonable query length for benchmarks
     for &(term_index, num_errors) in positions {
-        state.insert(Position::new(term_index, num_errors), Algorithm::Standard);
+        state.insert(Position::new(term_index, num_errors), Algorithm::Standard, query_length);
     }
     state
 }
@@ -163,7 +165,8 @@ fn bench_merge(c: &mut Criterion) {
                 |b, (state1, state2)| {
                     b.iter(|| {
                         let mut dest = (*state1).clone();
-                        dest.merge(black_box(*state2), Algorithm::Standard);
+                        let query_length = 20;
+                        dest.merge(black_box(*state2), Algorithm::Standard, query_length);
                         black_box(&dest);
                     });
                 },
@@ -308,14 +311,15 @@ fn bench_realistic_query_pattern(c: &mut Criterion) {
                 b.iter(|| {
                     // Typical pattern in dictionary traversal
                     let mut state = State::single(Position::new(0, 0));
+                    let query_length = 10;
 
                     // Simulate adding a few transitions
                     for i in 1..=3 {
-                        state.insert(Position::new(i, (i - 1) % (max_d + 1)), Algorithm::Standard);
+                        state.insert(Position::new(i, (i - 1) % (max_d + 1)), Algorithm::Standard, query_length);
                     }
 
                     // Query distance
-                    let dist = state.infer_distance(10);
+                    let dist = state.infer_distance(query_length);
 
                     black_box(dist)
                 });

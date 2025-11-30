@@ -35,7 +35,7 @@ fn bench_compact_after_insertions(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     // Setup: Create DAWG with terms
-                    let dawg = DynamicDawg::new();
+                    let dawg: DynamicDawg<()> = DynamicDawg::new();
                     for term in &terms {
                         dawg.insert(term);
                     }
@@ -65,7 +65,7 @@ fn bench_compact_after_deletions(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     // Setup: Create DAWG, insert terms, delete half
-                    let dawg = DynamicDawg::new();
+                    let dawg: DynamicDawg<()> = DynamicDawg::new();
                     for term in &terms {
                         dawg.insert(term);
                     }
@@ -99,7 +99,7 @@ fn bench_minimize_vs_compact(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("minimize", size), size, |b, _| {
             b.iter_batched(
                 || {
-                    let dawg = DynamicDawg::new();
+                    let dawg: DynamicDawg<()> = DynamicDawg::new();
                     for term in &terms {
                         dawg.insert(term);
                     }
@@ -117,7 +117,7 @@ fn bench_minimize_vs_compact(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("compact", size), size, |b, _| {
             b.iter_batched(
                 || {
-                    let dawg = DynamicDawg::new();
+                    let dawg: DynamicDawg<()> = DynamicDawg::new();
                     for term in &terms {
                         dawg.insert(term);
                     }

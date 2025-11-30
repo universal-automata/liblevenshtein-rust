@@ -42,7 +42,7 @@ fn bench_online_subsumption(c: &mut Criterion) {
                         b.iter(|| {
                             let mut state = State::new();
                             for pos in *positions {
-                                state.insert(black_box(*pos), black_box(*algorithm));
+                                state.insert(black_box(*pos), black_box(*algorithm), query_length);
                             }
                             black_box(state)
                         });
@@ -85,7 +85,7 @@ fn bench_batch_subsumption(c: &mut Criterion) {
                             }
 
                             // Then remove subsumed positions (simulating unsubsume)
-                            batch_unsubsume(&mut state_positions, black_box(*algorithm));
+                            batch_unsubsume(&mut state_positions, black_box(*algorithm), query_length);
 
                             // Sort (like C++ does)
                             state_positions.sort();
@@ -102,15 +102,15 @@ fn bench_batch_subsumption(c: &mut Criterion) {
 }
 
 /// Simulate C++ batch unsubsumption
-fn batch_unsubsume(positions: &mut Vec<Position>, algorithm: Algorithm) {
+fn batch_unsubsume(positions: &mut Vec<Position>, algorithm: Algorithm, query_length: usize) {
     let mut to_remove = Vec::new();
 
     // Nested loop like C++ implementation
     for i in 0..positions.len() {
         for j in (i + 1)..positions.len() {
-            if positions[i].subsumes(&positions[j], algorithm) {
+            if positions[i].subsumes(&positions[j], algorithm, query_length) {
                 to_remove.push(j);
-            } else if positions[j].subsumes(&positions[i], algorithm) {
+            } else if positions[j].subsumes(&positions[i], algorithm, query_length) {
                 to_remove.push(i);
                 break; // Don't check more if outer is subsumed
             }
@@ -152,7 +152,7 @@ fn bench_subsumption_by_distance(c: &mut Criterion) {
                     b.iter(|| {
                         let mut state = State::new();
                         for pos in *positions {
-                            state.insert(black_box(*pos), black_box(*algorithm));
+                            state.insert(black_box(*pos), black_box(*algorithm), query_length);
                         }
                         black_box(state)
                     });
@@ -169,7 +169,7 @@ fn bench_no_subsumption(c: &mut Criterion) {
     let mut group = c.benchmark_group("no_subsumption");
 
     for &pos_count in &[10, 50, 100, 200] {
-        let _query_length = pos_count; // Each position at different index
+        let query_length = pos_count; // Each position at different index
 
         // Create positions that don't subsume each other
         let mut positions = Vec::new();
@@ -190,7 +190,7 @@ fn bench_no_subsumption(c: &mut Criterion) {
                     b.iter(|| {
                         let mut state = State::new();
                         for pos in *positions {
-                            state.insert(black_box(*pos), black_box(*algorithm));
+                            state.insert(black_box(*pos), black_box(*algorithm), query_length);
                         }
                         black_box(state)
                     });
@@ -208,6 +208,7 @@ fn bench_all_subsumed(c: &mut Criterion) {
 
     for &pos_count in &[10, 50, 100, 200] {
         let max_distance = 10;
+        let query_length = 20; // Fixed query length for subsumption testing
 
         // Create positions where (0,0) subsumes all others
         let mut positions = vec![Position::new(0, 0)];
@@ -229,7 +230,7 @@ fn bench_all_subsumed(c: &mut Criterion) {
                     b.iter(|| {
                         let mut state = State::new();
                         for pos in *positions {
-                            state.insert(black_box(*pos), black_box(*algorithm));
+                            state.insert(black_box(*pos), black_box(*algorithm), query_length);
                         }
                         black_box(state)
                     });

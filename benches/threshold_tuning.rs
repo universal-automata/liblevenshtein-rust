@@ -47,7 +47,7 @@ fn extract_nodes(dict: &DawgDictionary) -> Vec<DawgNode> {
     let mut visited = std::collections::HashMap::new();
 
     fn visit_node(
-        node: &impl DictionaryNode,
+        node: &impl DictionaryNode<Unit = u8>,
         nodes: &mut Vec<DawgNode>,
         visited: &mut std::collections::HashMap<usize, usize>,
         node_id: usize,

@@ -29,7 +29,7 @@ fn bench_contains_no_bloom(c: &mut Criterion) {
 
     for size in [100, 500, 1000, 5000].iter() {
         let terms = generate_terms(*size);
-        let dawg = DynamicDawg::with_config(f32::INFINITY, None); // No Bloom filter
+        let dawg: DynamicDawg<()> = DynamicDawg::with_config(f32::INFINITY, None); // No Bloom filter
 
         for term in &terms {
             dawg.insert(term);
@@ -64,7 +64,7 @@ fn bench_contains_with_bloom(c: &mut Criterion) {
 
     for size in [100, 500, 1000, 5000].iter() {
         let terms = generate_terms(*size);
-        let dawg = DynamicDawg::with_config(f32::INFINITY, Some(*size)); // With Bloom filter
+        let dawg: DynamicDawg<()> = DynamicDawg::with_config(f32::INFINITY, Some(*size)); // With Bloom filter
 
         for term in &terms {
             dawg.insert(term);
@@ -99,7 +99,7 @@ fn bench_contains_mostly_negative_no_bloom(c: &mut Criterion) {
 
     for size in [1000, 5000].iter() {
         let terms = generate_terms(*size);
-        let dawg = DynamicDawg::with_config(f32::INFINITY, None); // No Bloom filter
+        let dawg: DynamicDawg<()> = DynamicDawg::with_config(f32::INFINITY, None); // No Bloom filter
 
         for term in &terms {
             dawg.insert(term);
@@ -136,7 +136,7 @@ fn bench_contains_mostly_negative_with_bloom(c: &mut Criterion) {
 
     for size in [1000, 5000].iter() {
         let terms = generate_terms(*size);
-        let dawg = DynamicDawg::with_config(f32::INFINITY, Some(*size)); // With Bloom filter
+        let dawg: DynamicDawg<()> = DynamicDawg::with_config(f32::INFINITY, Some(*size)); // With Bloom filter
 
         for term in &terms {
             dawg.insert(term);

@@ -141,8 +141,9 @@ fn bench_min_distance_integration(c: &mut Criterion) {
     // Test with different state sizes
     for size in [2, 4, 6, 8] {
         let mut state = State::new();
+        let query_length = 20;
         for i in 0..size {
-            state.insert(Position::new(i, i % 3), Algorithm::Standard);
+            state.insert(Position::new(i, i % 3), Algorithm::Standard, query_length);
         }
 
         group.bench_function(&format!("{}_positions", size), |b| {

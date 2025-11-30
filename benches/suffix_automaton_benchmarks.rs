@@ -28,7 +28,7 @@ fn bench_construction_varying_corpus_size(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(total_chars as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let dict = SuffixAutomaton::from_texts(black_box(texts.clone()));
+                let dict: SuffixAutomaton<()> = SuffixAutomaton::from_texts(black_box(texts.clone()));
                 black_box(dict);
             });
         });
@@ -47,7 +47,7 @@ fn bench_incremental_insertion(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(total_chars as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let dict = SuffixAutomaton::new();
+                let dict: SuffixAutomaton<()> = SuffixAutomaton::new();
                 for text in black_box(&texts) {
                     dict.insert(text);
                 }
@@ -64,7 +64,7 @@ fn bench_query_varying_corpus_size(c: &mut Criterion) {
 
     for size in [10, 50, 100, 500].iter() {
         let texts = generate_corpus(*size);
-        let dict = SuffixAutomaton::from_texts(texts.clone());
+        let dict: SuffixAutomaton<()> = SuffixAutomaton::from_texts(texts.clone());
         let transducer = Transducer::new(dict, Algorithm::Standard);
 
         group.throughput(Throughput::Elements(*size as u64));
@@ -83,7 +83,7 @@ fn bench_query_varying_corpus_size(c: &mut Criterion) {
 /// Benchmark: Substring query performance with varying distances
 fn bench_query_varying_distance(c: &mut Criterion) {
     let texts = generate_corpus(100);
-    let dict = SuffixAutomaton::from_texts(texts);
+    let dict: SuffixAutomaton<()> = SuffixAutomaton::from_texts(texts);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("suffix_automaton_query_distance");
 
@@ -104,7 +104,7 @@ fn bench_query_varying_distance(c: &mut Criterion) {
 fn bench_query_varying_query_length(c: &mut Criterion) {
     let text =
         "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.";
-    let dict = SuffixAutomaton::from_text(text);
+    let dict: SuffixAutomaton<()> = SuffixAutomaton::from_text(text);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("suffix_automaton_query_length");
 
@@ -129,7 +129,7 @@ fn bench_query_varying_query_length(c: &mut Criterion) {
 /// Benchmark: Ordered query performance
 fn bench_ordered_query(c: &mut Criterion) {
     let texts = generate_corpus(100);
-    let dict = SuffixAutomaton::from_texts(texts);
+    let dict: SuffixAutomaton<()> = SuffixAutomaton::from_texts(texts);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("suffix_automaton_ordered_query");
 
@@ -166,7 +166,7 @@ fn bench_code_search(c: &mut Criterion) {
         r#"match result { Ok(value) => println!("Success: {}", value), Err(e) => eprintln!("Error: {}", e) }"#,
     ];
 
-    let dict = SuffixAutomaton::from_texts(code_samples);
+    let dict: SuffixAutomaton<()> = SuffixAutomaton::from_texts(code_samples);
     let transducer = Transducer::new(dict, Algorithm::Standard);
     let mut group = c.benchmark_group("suffix_automaton_code_search");
 
@@ -198,14 +198,14 @@ fn bench_dynamic_updates(c: &mut Criterion) {
     let mut group = c.benchmark_group("suffix_automaton_dynamic");
 
     group.bench_function("insert_single", |b| {
-        let dict = SuffixAutomaton::new();
+        let dict: SuffixAutomaton<()> = SuffixAutomaton::new();
         b.iter(|| {
             dict.insert(black_box("The quick brown fox jumps over the lazy dog"));
         });
     });
 
     group.bench_function("insert_remove_cycle", |b| {
-        let dict = SuffixAutomaton::new();
+        let dict: SuffixAutomaton<()> = SuffixAutomaton::new();
         let text = "The quick brown fox jumps over the lazy dog";
         b.iter(|| {
             dict.insert(black_box(text));
@@ -214,7 +214,7 @@ fn bench_dynamic_updates(c: &mut Criterion) {
     });
 
     group.bench_function("compaction", |b| {
-        let dict = SuffixAutomaton::new();
+        let dict: SuffixAutomaton<()> = SuffixAutomaton::new();
         // Build up some data
         for i in 0..100 {
             dict.insert(&format!("text number {}", i));

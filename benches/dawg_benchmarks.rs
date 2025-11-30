@@ -74,7 +74,7 @@ fn bench_dynamic_dawg_insertion(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let dawg = DynamicDawg::default();
+                let dawg: DynamicDawg<()> = DynamicDawg::default();
                 for term in &terms {
                     dawg.insert(black_box(term));
                 }
@@ -155,7 +155,7 @@ fn bench_dynamic_dawg_minimize(c: &mut Criterion) {
 
     for size in [100, 500, 1000].iter() {
         let terms = generate_terms(*size);
-        let dawg = DynamicDawg::default();
+        let dawg: DynamicDawg<()> = DynamicDawg::default();
         for term in &terms {
             dawg.insert(term);
         }

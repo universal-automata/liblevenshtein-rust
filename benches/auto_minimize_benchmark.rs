@@ -33,7 +33,7 @@ fn bench_insert_no_auto_minimize(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let dawg = DynamicDawg::new(); // No auto-minimize (f32::INFINITY)
+                let dawg: DynamicDawg<()> = DynamicDawg::new(); // No auto-minimize (f32::INFINITY)
                 for term in &terms {
                     dawg.insert(black_box(term));
                 }
@@ -54,7 +54,7 @@ fn bench_insert_with_auto_minimize_1_5(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let dawg = DynamicDawg::with_auto_minimize_threshold(1.5);
+                let dawg: DynamicDawg<()> = DynamicDawg::with_auto_minimize_threshold(1.5);
                 for term in &terms {
                     dawg.insert(black_box(term));
                 }
@@ -75,7 +75,7 @@ fn bench_insert_with_auto_minimize_2_0(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let dawg = DynamicDawg::with_auto_minimize_threshold(2.0);
+                let dawg: DynamicDawg<()> = DynamicDawg::with_auto_minimize_threshold(2.0);
                 for term in &terms {
                     dawg.insert(black_box(term));
                 }

@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use liblevenshtein::transducer::{Algorithm, Position};
+use liblevenshtein::transducer::{Algorithm, Position, Unrestricted};
 use smallvec::SmallVec;
 
 // Re-export internal functions for benchmarking
@@ -252,6 +252,7 @@ fn bench_transition_state(c: &mut Criterion) {
                             let dict_char = query[0];
                             let next = transition_state(
                                 black_box(state),
+                                Unrestricted,
                                 black_box(dict_char),
                                 black_box(&query[..]),
                                 *max_d,
@@ -296,6 +297,7 @@ fn bench_transition_by_state_size(c: &mut Criterion) {
                     b.iter(|| {
                         let next = transition_state(
                             black_box(state),
+                            Unrestricted,
                             black_box(b'a'),
                             black_box(&query[..]),
                             *max_d,
@@ -337,6 +339,7 @@ fn bench_prefix_mode(c: &mut Criterion) {
                     b.iter(|| {
                         let next = transition_state(
                             black_box(state),
+                            Unrestricted,
                             black_box(b't'),
                             black_box(&query[..]),
                             2,
@@ -379,6 +382,7 @@ fn bench_algorithm_comparison(c: &mut Criterion) {
                 b.iter(|| {
                     let next = transition_state(
                         black_box(state),
+                        Unrestricted,
                         black_box(b'a'),
                         black_box(&query[..]),
                         max_distance,
