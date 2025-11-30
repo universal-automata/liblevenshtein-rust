@@ -352,26 +352,17 @@ pub fn apply_rules_seq(rules: &[RewriteRule], s: &[Phone], fuel: usize) -> Optio
 // Optimized rule application with conditional position skipping (byte-level)
 // ============================================================================
 
-/// Apply rules with position skipping optimization (byte-level).
+/// Apply rules with automatic optimization selection (byte-level).
+///
+/// **DEPRECATED**: Benchmarks show position skipping optimization causes 1-15%
+/// overhead for typical English dictionary words. Use [`apply_rules_seq`] for
+/// normal workloads, or [`apply_rules_seq_optimized`] only for very long strings
+/// (100+ chars) with high rule match density (e.g., repetitive patterns).
 ///
 /// **Formal Specification**: `docs/verification/phonetic/position_skipping_proof.v`
 ///
-/// This function automatically determines whether position skipping is safe
-/// based on whether any rules use `Context::Final`. If safe, it enables the
-/// optimization; otherwise, it falls back to standard sequential application.
-///
-/// # Position Skipping Optimization
-///
-/// After applying a rule at position `last_pos`, the next search starts from
-/// `last_pos` instead of 0. This is SAFE when no rules use `Context::Final`
-/// because all other contexts depend only on local structure, not string length.
-///
-/// # When Optimization is Disabled
-///
-/// The optimization is disabled when any rule uses `Context::Final`, because:
-/// - `Final` matches when `pos == s.len()` (depends on string length)
-/// - When strings are shortened, positions that were non-final become final
-/// - Counter-example: `[a,b,c]` → `[a,b]` causes position 2 to become final
+/// This function previously auto-detected when position skipping was safe and
+/// enabled it. As of v0.8.0, it simply delegates to the standard implementation.
 ///
 /// # Arguments
 ///
@@ -383,14 +374,14 @@ pub fn apply_rules_seq(rules: &[RewriteRule], s: &[Phone], fuel: usize) -> Optio
 ///
 /// - `Some(result)` with the transformed string
 /// - `None` if fuel is exhausted
+#[deprecated(
+    since = "0.8.0",
+    note = "Use apply_rules_seq for typical workloads. Use apply_rules_seq_optimized only for long repetitive strings (100+ chars)."
+)]
 pub fn apply_rules_seq_opt(rules: &[RewriteRule], s: &[Phone], fuel: usize) -> Option<Vec<Phone>> {
-    if has_position_dependent_rules(rules) {
-        // Fall back to standard sequential application (safe but slower)
-        apply_rules_seq(rules, s, fuel)
-    } else {
-        // Use position skipping optimization (proven safe for this rule set)
-        apply_rules_seq_optimized(rules, s, fuel)
-    }
+    // No longer auto-applies optimization - delegates to standard implementation
+    // Benchmarks showed optimization causes overhead for typical dictionary words
+    apply_rules_seq(rules, s, fuel)
 }
 
 /// Apply rules with position skipping optimization enabled (byte-level).
@@ -616,24 +607,40 @@ pub fn apply_rules_seq_char(
 // Optimized rule application with conditional position skipping (character-level)
 // ============================================================================
 
-/// Apply rules with position skipping optimization (character-level).
+/// Apply rules with automatic optimization selection (character-level).
+///
+/// **DEPRECATED**: Benchmarks show position skipping optimization causes 1-15%
+/// overhead for typical English dictionary words. Use [`apply_rules_seq_char`] for
+/// normal workloads, or [`apply_rules_seq_optimized_char`] only for very long strings
+/// (100+ chars) with high rule match density (e.g., repetitive patterns).
 ///
 /// **Formal Specification**: `docs/verification/phonetic/position_skipping_proof.v`
 ///
-/// This is the character-level variant of [`apply_rules_seq_opt`].
-/// See that function for detailed documentation on the position skipping optimization.
+/// This function previously auto-detected when position skipping was safe and
+/// enabled it. As of v0.8.0, it simply delegates to the standard implementation.
+///
+/// # Arguments
+///
+/// - `rules` - The list of rewrite rules to apply
+/// - `s` - The phonetic string
+/// - `fuel` - Maximum number of iterations
+///
+/// # Returns
+///
+/// - `Some(result)` with the transformed string
+/// - `None` if fuel is exhausted
+#[deprecated(
+    since = "0.8.0",
+    note = "Use apply_rules_seq_char for typical workloads. Use apply_rules_seq_optimized_char only for long repetitive strings (100+ chars)."
+)]
 pub fn apply_rules_seq_opt_char(
     rules: &[RewriteRuleChar],
     s: &[PhoneChar],
     fuel: usize,
 ) -> Option<Vec<PhoneChar>> {
-    if has_position_dependent_rules_char(rules) {
-        // Fall back to standard sequential application (safe but slower)
-        apply_rules_seq_char(rules, s, fuel)
-    } else {
-        // Use position skipping optimization (proven safe for this rule set)
-        apply_rules_seq_optimized_char(rules, s, fuel)
-    }
+    // No longer auto-applies optimization - delegates to standard implementation
+    // Benchmarks showed optimization causes overhead for typical dictionary words
+    apply_rules_seq_char(rules, s, fuel)
 }
 
 /// Apply rules with position skipping optimization enabled (character-level).

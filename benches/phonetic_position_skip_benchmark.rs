@@ -17,6 +17,8 @@ use liblevenshtein::phonetic::{
     apply_rules_seq, apply_rules_seq_opt, apply_rules_seq_optimized, orthography_rules,
     phonetic_rules, test_rules, zompist_rules, Context, Phone, RewriteRule,
 };
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 // ============================================================================
 // Test Data Generation
@@ -479,6 +481,232 @@ fn bench_position_skipping_simple(c: &mut Criterion) {
 }
 
 // ============================================================================
+// Dictionary Benchmark: Real English Words
+// ============================================================================
+
+/// Word length categories for dictionary benchmarks.
+#[derive(Debug, Clone, Copy)]
+enum WordCategory {
+    /// Short words (3-5 chars) - typical English words
+    Short,
+    /// Medium words (6-10 chars) - common English words
+    Medium,
+    /// Long words (11-15 chars) - longer English words
+    Long,
+    /// Very long words (16+ chars) - compound/technical words
+    VeryLong,
+}
+
+impl WordCategory {
+    fn range(&self) -> (usize, usize) {
+        match self {
+            WordCategory::Short => (3, 5),
+            WordCategory::Medium => (6, 10),
+            WordCategory::Long => (11, 15),
+            WordCategory::VeryLong => (16, usize::MAX),
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            WordCategory::Short => "short_3-5",
+            WordCategory::Medium => "medium_6-10",
+            WordCategory::Long => "long_11-15",
+            WordCategory::VeryLong => "very_long_16+",
+        }
+    }
+}
+
+/// Load dictionary words from the system dictionary file.
+///
+/// Returns words grouped by length category.
+fn load_dictionary_words() -> Option<Vec<(WordCategory, Vec<String>)>> {
+    let dict_path = "/usr/share/dict/words";
+    let file = File::open(dict_path).ok()?;
+    let reader = BufReader::new(file);
+
+    let mut short_words = Vec::new();
+    let mut medium_words = Vec::new();
+    let mut long_words = Vec::new();
+    let mut very_long_words = Vec::new();
+
+    for line in reader.lines().take(50000) {
+        // Limit to 50k words for reasonable benchmark time
+        if let Ok(word) = line {
+            let word = word.trim().to_lowercase();
+            // Filter to ASCII-only words for byte-level Phone representation
+            if word.chars().all(|c| c.is_ascii_alphabetic()) && word.len() >= 3 {
+                let len = word.len();
+                match len {
+                    3..=5 => short_words.push(word),
+                    6..=10 => medium_words.push(word),
+                    11..=15 => long_words.push(word),
+                    _ if len >= 16 => very_long_words.push(word),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    // Keep only a sample from each category for benchmarking
+    short_words.truncate(100);
+    medium_words.truncate(100);
+    long_words.truncate(50);
+    very_long_words.truncate(25);
+
+    Some(vec![
+        (WordCategory::Short, short_words),
+        (WordCategory::Medium, medium_words),
+        (WordCategory::Long, long_words),
+        (WordCategory::VeryLong, very_long_words),
+    ])
+}
+
+/// Convert a string to a Phone vector for rule application.
+fn string_to_phones(s: &str) -> Vec<Phone> {
+    s.bytes()
+        .map(|b| {
+            if b"aeiouAEIOU".contains(&b) {
+                Phone::Vowel(b.to_ascii_lowercase())
+            } else {
+                Phone::Consonant(b.to_ascii_lowercase())
+            }
+        })
+        .collect()
+}
+
+/// Benchmark: Position skipping with real English dictionary words.
+///
+/// **Scientific Experiment**: Tests H₁ with real-world word distributions.
+///
+/// **Hypothesis**:
+/// - H₀: Position skipping provides no benefit for typical English words
+/// - H₁: Longer words (15+ chars) show measurable improvement
+///
+/// **Expected Results**:
+/// - Short (3-5 chars): ~1.0× (overhead may exceed benefit)
+/// - Medium (6-10 chars): ~1.0× (near break-even point)
+/// - Long (11-15 chars): ~1.0-1.5× (marginal benefit)
+/// - Very long (16+ chars): ~1.5-2× (significant benefit)
+fn bench_dictionary_position_skipping(c: &mut Criterion) {
+    // Load dictionary words
+    let word_groups = match load_dictionary_words() {
+        Some(groups) => groups,
+        None => {
+            eprintln!("Warning: Could not load dictionary from /usr/share/dict/words");
+            return;
+        }
+    };
+
+    let phon_rules = phonetic_rules();
+    assert!(
+        !has_final_context(&phon_rules),
+        "phonetic_rules should not contain Context::Final for optimization safety"
+    );
+
+    let mut group = c.benchmark_group("phonetic_dictionary_position_skipping");
+
+    for (category, words) in &word_groups {
+        if words.is_empty() {
+            continue;
+        }
+
+        // Convert words to Phone vectors
+        let phone_words: Vec<Vec<Phone>> = words.iter().map(|w| string_to_phones(w)).collect();
+
+        // Calculate average length for the category
+        let avg_len: usize = phone_words.iter().map(|w| w.len()).sum::<usize>() / phone_words.len();
+        let word_count = phone_words.len();
+
+        group.throughput(Throughput::Elements(word_count as u64));
+
+        // Standard implementation
+        group.bench_with_input(
+            BenchmarkId::new(format!("{}/standard", category.name()), avg_len),
+            &(&phon_rules, &phone_words),
+            |b, (rules, words)| {
+                b.iter(|| {
+                    for word in *words {
+                        let fuel = word.len() * 100;
+                        black_box(apply_rules_seq(black_box(*rules), black_box(word), black_box(fuel)));
+                    }
+                })
+            },
+        );
+
+        // Optimized implementation (position skipping)
+        group.bench_with_input(
+            BenchmarkId::new(format!("{}/optimized", category.name()), avg_len),
+            &(&phon_rules, &phone_words),
+            |b, (rules, words)| {
+                b.iter(|| {
+                    for word in *words {
+                        let fuel = word.len() * 100;
+                        black_box(apply_rules_seq_optimized(
+                            black_box(*rules),
+                            black_box(word),
+                            black_box(fuel),
+                        ));
+                    }
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark: Concatenated compound phrases for position skipping.
+///
+/// Tests longer strings that concatenate multiple words, simulating:
+/// - Code identifiers: "spell_checker_module"
+/// - Technical terms: "internationalization_standards"
+/// - Compound phrases: "the_quick_brown_fox_jumps"
+fn bench_compound_phrases_position_skipping(c: &mut Criterion) {
+    let phon_rules = phonetic_rules();
+
+    // Create compound phrases of varying lengths
+    let phrases: Vec<(usize, Vec<Phone>)> = vec![
+        (20, string_to_phones("spell_checker_module")),
+        (25, string_to_phones("internationalization_api")),
+        (30, string_to_phones("the_quick_brown_fox_jumps_ov")),
+        (40, string_to_phones("internationalization_standards_committee")),
+        (50, string_to_phones("counterrevolutionary_internationalization_")),
+    ];
+
+    let mut group = c.benchmark_group("phonetic_compound_phrases_position_skipping");
+
+    for (target_len, phrase) in &phrases {
+        let actual_len = phrase.len();
+        let fuel = actual_len * 100;
+
+        group.throughput(Throughput::Elements(actual_len as u64));
+
+        // Standard implementation
+        group.bench_with_input(
+            BenchmarkId::new("standard", target_len),
+            &(&phon_rules, phrase, fuel),
+            |b, (rules, input, fuel)| {
+                b.iter(|| apply_rules_seq(black_box(*rules), black_box(*input), black_box(*fuel)))
+            },
+        );
+
+        // Optimized implementation
+        group.bench_with_input(
+            BenchmarkId::new("optimized", target_len),
+            &(&phon_rules, phrase, fuel),
+            |b, (rules, input, fuel)| {
+                b.iter(|| {
+                    apply_rules_seq_optimized(black_box(*rules), black_box(*input), black_box(*fuel))
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+// ============================================================================
 // Criterion Configuration
 // ============================================================================
 
@@ -492,5 +720,7 @@ criterion_group!(
     bench_position_skipping_comparison,
     bench_position_skipping_localized,
     bench_position_skipping_simple,
+    bench_dictionary_position_skipping,
+    bench_compound_phrases_position_skipping,
 );
 criterion_main!(benches);

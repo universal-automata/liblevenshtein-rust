@@ -24,6 +24,7 @@ use criterion::{
     Throughput,
 };
 use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+use liblevenshtein::dictionary::{Dictionary, MutableMappedDictionary};
 use rayon::prelude::*;
 use rustc_hash::FxHashSet;
 

@@ -4,6 +4,19 @@
 //! Zompist's English spelling rules, with formal correctness guarantees from
 //! Coq/Rocq proofs.
 //!
+//! # Rule Application Functions
+//!
+//! | Function | Use Case |
+//! |----------|----------|
+//! | [`apply_rules_seq`] | **Default** - use for all typical workloads (dictionary words, phrases) |
+//! | [`apply_rules_seq_optimized`] | **Opt-in** - use only for very long strings (100+ chars) with repetitive patterns |
+//! | [`apply_rules_seq_opt`] | **Deprecated** - now just calls `apply_rules_seq` |
+//!
+//! The position skipping optimization in `apply_rules_seq_optimized` provides up to
+//! 26.6× speedup for synthetic repetitive strings, but causes 1-15% overhead for
+//! typical English dictionary words. See `docs/verification/phonetic/POSITION_SKIPPING_BENCHMARK_RESULTS.md`
+//! for detailed benchmark results.
+//!
 //! # Formal Verification
 //!
 //! All algorithms in this module are proven correct in Coq/Rocq. The proofs

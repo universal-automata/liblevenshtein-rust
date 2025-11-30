@@ -98,8 +98,9 @@ fn bench_realistic_query_simulation(c: &mut Criterion) {
             }
 
             // Simulate some work with states
+            let query_length = 10;
             for state in &mut states {
-                state.insert(Position::new(0, 0), Algorithm::Standard);
+                state.insert(Position::new(0, 0), Algorithm::Standard, query_length);
             }
 
             // Release states
