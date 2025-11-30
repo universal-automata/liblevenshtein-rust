@@ -78,13 +78,20 @@ pub mod types;
 mod properties;
 
 // Re-export main types (byte-level)
-pub use application::{apply_rule_at, apply_rules_seq, MAX_EXPANSION_FACTOR};
+pub use application::{
+    apply_rule_at, apply_rules_seq, apply_rules_seq_opt, apply_rules_seq_optimized,
+    can_apply_at, find_first_match_from, has_position_dependent_rules, MAX_EXPANSION_FACTOR,
+};
 pub use matching::{context_matches, pattern_matches_at, phone_eq};
 pub use rules::{orthography_rules, phonetic_rules, test_rules, zompist_rules};
 pub use types::{Context, Phone, RewriteRule};
 
 // Re-export character-level types
-pub use application::{apply_rule_at_char, apply_rules_seq_char};
+pub use application::{
+    apply_rule_at_char, apply_rules_seq_char, apply_rules_seq_opt_char,
+    apply_rules_seq_optimized_char, can_apply_at_char, find_first_match_from_char,
+    has_position_dependent_rules_char,
+};
 pub use matching::{context_matches_char, pattern_matches_at_char, phone_eq_char};
 pub use rules::{
     orthography_rules_char, phonetic_rules_char, test_rules_char, zompist_rules_char,

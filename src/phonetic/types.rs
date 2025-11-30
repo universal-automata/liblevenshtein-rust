@@ -97,6 +97,30 @@ pub enum Context {
     Anywhere,
 }
 
+impl Context {
+    /// Returns true if this context depends on string length.
+    ///
+    /// **Formal Specification**: `docs/verification/phonetic/position_skipping_proof.v:1202-1211`
+    ///
+    /// Only `Final` is position-dependent because:
+    /// - `Final` matches when `pos == s.len()` (depends on string length)
+    /// - All other contexts depend only on local structure (position within bounds, adjacent characters)
+    ///
+    /// This method is used to determine whether position skipping optimization is safe.
+    /// Position skipping is SAFE when no rules use `Context::Final`.
+    ///
+    /// # Counter-example (why Final is position-dependent)
+    ///
+    /// From `position_skipping_proof.v:3424-3444`:
+    /// - Original: `s = [a, b, c]` (length 3), position 2 is NOT final
+    /// - After shortening: `s' = [a, b]` (length 2), position 2 IS now final
+    /// - A rule with `Final` context might match at a position that was previously skipped
+    #[inline]
+    pub fn is_position_dependent(&self) -> bool {
+        matches!(self, Context::Final)
+    }
+}
+
 /// A phonetic rewrite rule (byte-level).
 ///
 /// **Formal Specification**: `docs/verification/phonetic/rewrite_rules.v:62-68`
@@ -194,6 +218,19 @@ pub enum ContextChar {
     AfterVowel(Vec<char>),
     /// No context restriction
     Anywhere,
+}
+
+impl ContextChar {
+    /// Returns true if this context depends on string length.
+    ///
+    /// **Formal Specification**: `docs/verification/phonetic/position_skipping_proof.v:1202-1211`
+    ///
+    /// Character-level variant of [`Context::is_position_dependent`].
+    /// See that method for detailed documentation.
+    #[inline]
+    pub fn is_position_dependent(&self) -> bool {
+        matches!(self, ContextChar::Final)
+    }
 }
 
 /// A phonetic rewrite rule (character-level).

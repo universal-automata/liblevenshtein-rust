@@ -63,9 +63,9 @@ use liblevenshtein::phonetic::*;
 use liblevenshtein::transducer::Algorithm;
 
 fn main() {
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!("Comprehensive Phonetic + Levenshtein Fuzzy Matching Demonstration");
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!();
 
     // Example dictionary with common English words
@@ -89,9 +89,9 @@ fn main() {
 /// 2. Normalize user query using the same rules
 /// 3. Apply standard Levenshtein matching on normalized forms
 fn example_1_basic_phonetic_normalization(dictionary: &[&str]) {
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!("EXAMPLE 1: Basic Phonetic Normalization + Levenshtein");
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!();
     println!("Approach: Pre-normalize with orthography rules, then apply Levenshtein");
     println!();
@@ -174,9 +174,9 @@ fn example_1_basic_phonetic_normalization(dictionary: &[&str]) {
 ///
 /// Demonstrates handling typographical errors with standard edit operations.
 fn example_2_standard_levenshtein_edits(dictionary: &[&str]) {
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!("EXAMPLE 2: Standard Levenshtein Edits");
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!();
     println!("Handling: Insertion, Deletion, Substitution errors");
     println!();
@@ -245,9 +245,9 @@ fn example_2_standard_levenshtein_edits(dictionary: &[&str]) {
 ///
 /// Demonstrates handling adjacent character swaps using the Transposition algorithm.
 fn example_3_transposition_errors(dictionary: &[&str]) {
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!("EXAMPLE 3: Transposition Errors (Adjacent Character Swaps)");
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!();
     println!("Using Algorithm::Transposition for Damerau-Levenshtein distance");
     println!();
@@ -317,9 +317,9 @@ fn example_3_transposition_errors(dictionary: &[&str]) {
 ///
 /// Demonstrates handling queries with multiple error types simultaneously.
 fn example_4_combined_errors(dictionary: &[&str]) {
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!("EXAMPLE 4: Combined Errors (Phonetic + Typographical + Transposition)");
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!();
     println!("Handling multiple error types in a single query");
     println!();
@@ -387,9 +387,9 @@ fn example_4_combined_errors(dictionary: &[&str]) {
 ///
 /// Compares different matching strategies to show the value of combining approaches.
 fn example_5_comparison_matrix(dictionary: &[&str]) {
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!("EXAMPLE 5: Comparison Matrix (With/Without Phonetic Normalization)");
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!();
 
     let ortho_rules = orthography_rules();
@@ -402,7 +402,7 @@ fn example_5_comparison_matrix(dictionary: &[&str]) {
 
     // Transducer 1: No phonetic normalization
     let dict_trie_raw = DoubleArrayTrie::from_terms(
-        dictionary.iter().map(|s| s.to_string()).collect()
+        dictionary.iter().map(|s| s.to_string())
     );
     let transducer_raw = Transducer::new(dict_trie_raw, Algorithm::Transposition);
 
@@ -476,9 +476,9 @@ fn example_5_comparison_matrix(dictionary: &[&str]) {
 ///
 /// Discusses performance characteristics and trade-offs.
 fn example_6_performance_notes() {
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!("EXAMPLE 6: Performance Notes and Best Practices");
-    println!("─".repeat(80));
+    println!("{}", "─".repeat(80));
     println!();
 
     println!("PERFORMANCE CHARACTERISTICS:");
