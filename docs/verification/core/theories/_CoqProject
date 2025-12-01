@@ -1,0 +1,51 @@
+-Q . Liblevenshtein.Core
+
+# Tier 1: Foundation
+Core/Definitions.v
+
+# Tier 2: Core Algorithm
+Core/LevDistance.v
+Core/MinLemmas.v
+
+# Tier 3: Metric Properties
+Core/MetricProperties.v
+
+# Tier 4: Trace Infrastructure
+Trace/TraceBasics.v
+Trace/TouchedPositions.v
+Trace/TraceCost.v
+# Trace/TraceComposition.v  # TODO
+
+# Tier 5: Cardinality & Witnesses
+Cardinality/NoDupInclusion.v
+# Cardinality/WitnessInjectivity.v  # TODO
+
+# Tier 6: Composition Bounds
+# Composition/PigeonholeBounds.v  # TODO
+
+# Tier 7: Optimal Trace
+OptimalTrace/Construction.v
+# OptimalTrace/Validity.v  # TODO
+# OptimalTrace/CostEquality.v  # TODO
+
+# Tier 8: Main Theorems
+# MainTheorems.v  # TODO (requires: distance_equals_min_trace_cost,
+#                         compose_trace_preserves_validity, trace_composition_cost_bound)
+
+# LowerBound modules (from TraceLowerBound.v)
+LowerBound/Definitions.v
+LowerBound/HasPredicates.v
+LowerBound/ShiftTrace11.v
+LowerBound/ShiftTraceA.v
+LowerBound/ShiftTraceB.v
+LowerBound/BoundHelpers.v
+LowerBound/PigeonholeBounds.v
+LowerBound/NoDupPreservation.v
+LowerBound/ShiftTrace11Lemmas.v
+LowerBound/MonotonicityLemmas.v
+LowerBound/TraceCostFold.v
+LowerBound/MainTheorem.v
+
+# Original monolithic files (excluded from build - decomposed into modular components)
+# Distance.v  # Contains broken Load path, decomposed into Core/, Trace/, Cardinality/, OptimalTrace/
+# TraceLowerBound.v  # Decomposed into LowerBound/
