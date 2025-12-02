@@ -149,3 +149,76 @@ Proof.
   unfold list_inter.
   apply (filter_length_le _ l1).
 Qed.
+
+(** Inclusion-exclusion bound for two NoDup lists bounded by [1..n].
+    |l1| + |l2| <= n + |l1 ∩ l2| *)
+Lemma NoDup_incl_exclusion :
+  forall l1 l2 n,
+    NoDup l1 -> NoDup l2 ->
+    (forall x, In x l1 -> 1 <= x <= n) ->
+    (forall x, In x l2 -> 1 <= x <= n) ->
+    length l1 + length l2 <= n + length (list_inter l1 l2).
+Proof.
+  intros l1 l2 n Hnodup1 Hnodup2 Hbound1 Hbound2.
+  (* Split l1 into intersection and difference - length identity *)
+  assert (H_split: length l1 = length (list_inter l1 l2) +
+                                length (filter (fun x => negb (existsb (fun y => x =? y) l2)) l1)).
+  { clear Hnodup1 Hnodup2 Hbound1 Hbound2.
+    induction l1 as [|a l1' IH].
+    - simpl. reflexivity.
+    - simpl.
+      destruct (existsb (fun y => a =? y) l2) eqn:Hexists.
+      + simpl. rewrite IH. lia.
+      + simpl. rewrite IH. lia. }
+  set (diff := filter (fun x => negb (existsb (fun y => x =? y) l2)) l1).
+  assert (Hdiff_disjoint: forall x, In x diff -> ~ In x l2).
+  { intros x Hin.
+    unfold diff in Hin.
+    rewrite filter_In in Hin.
+    destruct Hin as [_ Hneg].
+    intro Hin2.
+    rewrite negb_true_iff in Hneg.
+    assert (Hexists: existsb (fun y => x =? y) l2 = true).
+    { apply existsb_exists.
+      exists x. split.
+      - exact Hin2.
+      - apply Nat.eqb_refl. }
+    rewrite Hexists in Hneg.
+    discriminate. }
+  assert (Hdiff_bound: forall x, In x diff -> 1 <= x <= n).
+  { intros x Hin.
+    unfold diff in Hin.
+    rewrite filter_In in Hin.
+    destruct Hin as [Hin _].
+    apply Hbound1. exact Hin. }
+  assert (Hdiff_nodup: NoDup diff).
+  { unfold diff.
+    apply NoDup_filter.
+    exact Hnodup1. }
+  (* Key: diff ++ l2 has NoDup and all elements in [1..n] *)
+  assert (H_union_nodup: NoDup (diff ++ l2)).
+  { apply NoDup_app.
+    - exact Hdiff_nodup.
+    - exact Hnodup2.
+    - intros x Hdiff_in Hl2_in.
+      apply (Hdiff_disjoint x Hdiff_in Hl2_in). }
+  assert (H_union_bound: forall x, In x (diff ++ l2) -> 1 <= x <= n).
+  { intros x Hin.
+    apply in_app_or in Hin as [Hin_diff | Hin_l2].
+    - apply Hdiff_bound. exact Hin_diff.
+    - apply Hbound2. exact Hin_l2. }
+  (* Union is subset of [1..n], so |union| <= n *)
+  assert (H_union_le_n: length (diff ++ l2) <= n).
+  { (* All elements are in [1..n], so |union| <= n *)
+    transitivity (length (seq 1 n)).
+    - apply NoDup_incl_length.
+      + exact H_union_nodup.
+      + intros x Hin.
+        specialize (H_union_bound x Hin).
+        apply in_seq. lia.
+    - rewrite seq_length. lia. }
+  rewrite length_app in H_union_le_n.
+  unfold diff in H_union_le_n.
+  rewrite H_split.
+  lia.
+Qed.

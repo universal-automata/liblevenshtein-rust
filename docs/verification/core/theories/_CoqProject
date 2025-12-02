@@ -14,23 +14,34 @@ Core/MetricProperties.v
 Trace/TraceBasics.v
 Trace/TouchedPositions.v
 Trace/TraceCost.v
-# Trace/TraceComposition.v  # TODO
+Trace/TraceComposition.v
 
 # Tier 5: Cardinality & Witnesses
 Cardinality/NoDupInclusion.v
-# Cardinality/WitnessInjectivity.v  # TODO
+Cardinality/NoDupPreservation.v
 
-# Tier 6: Composition Bounds
-# Composition/PigeonholeBounds.v  # TODO
+# Tier 6: Triangle Support
+Triangle/SubstCostTriangle.v
 
-# Tier 7: Optimal Trace
+# Tier 7: Composition
+Composition/WitnessLemmas.v
+Composition/CompositionNoDup.v
+Composition/CompositionValidity.v
+Composition/CostBounds.v
+
+# Tier 8: Optimal Trace
 OptimalTrace/Construction.v
-# OptimalTrace/Validity.v  # TODO
-# OptimalTrace/CostEquality.v  # TODO
+OptimalTrace/Validity.v
+OptimalTrace/CostEquality.v
 
-# Tier 8: Main Theorems
-# MainTheorems.v  # TODO (requires: distance_equals_min_trace_cost,
-#                         compose_trace_preserves_validity, trace_composition_cost_bound)
+# Tier 9: Main Theorems
+Triangle/TriangleInequality.v
+MainTheorems.v
+
+# Tier 10: DP Matrix
+DPMatrix/MatrixOps.v
+DPMatrix/SnocLemmas.v
+DPMatrix/Correctness.v
 
 # LowerBound modules (from TraceLowerBound.v)
 LowerBound/Definitions.v
