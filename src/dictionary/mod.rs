@@ -137,6 +137,7 @@ pub mod dynamic_dawg_char;
 pub mod dynamic_dawg_char_zipper;
 pub mod dynamic_dawg_zipper;
 pub mod factory;
+pub mod iterator;
 #[cfg(feature = "pathmap-backend")]
 pub mod pathmap;
 #[cfg(feature = "pathmap-backend")]
@@ -152,6 +153,7 @@ pub mod value;
 pub mod zipper;
 
 pub use char_unit::CharUnit;
+pub use iterator::{DictionaryIterator, DictionaryTermIterator};
 pub use value::DictionaryValue;
 pub use zipper::{DictZipper, ValuedDictZipper};
 

@@ -4,6 +4,8 @@
 //! "near-minimal" structure. Perfect minimality can be restored via
 //! explicit compaction.
 
+use crate::dictionary::dynamic_dawg_zipper::DynamicDawgZipper;
+use crate::dictionary::iterator::DictionaryIterator;
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 use parking_lot::RwLock;
@@ -1253,6 +1255,65 @@ impl<V: DictionaryValue> DynamicDawgInner<V> {
 
         self.nodes[node_idx].is_final = true;
         self.term_count += 1;
+    }
+}
+
+impl<V: DictionaryValue> DynamicDawg<V> {
+    /// Iterate over all `(term, value)` pairs as raw byte vectors.
+    ///
+    /// Returns an iterator yielding `(Vec<u8>, V)` tuples in depth-first order.
+    /// This is more efficient than `iter()` as it avoids UTF-8 string allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+    ///
+    /// let dict: DynamicDawg<u32> = DynamicDawg::new();
+    /// dict.insert_with_value("cat", 1);
+    /// dict.insert_with_value("dog", 2);
+    ///
+    /// for (term_bytes, value) in dict.iter_bytes() {
+    ///     let term = String::from_utf8(term_bytes).unwrap();
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter_bytes(&self) -> DictionaryIterator<DynamicDawgZipper<V>> {
+        let zipper = DynamicDawgZipper::new_from_dict(self);
+        DictionaryIterator::new(zipper)
+    }
+
+    /// Iterate over all `(term, value)` pairs as UTF-8 strings.
+    ///
+    /// Returns an iterator yielding `(String, V)` tuples in depth-first order.
+    /// For better performance with raw bytes, use `iter_bytes()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::dynamic_dawg::DynamicDawg;
+    ///
+    /// let dict: DynamicDawg<u32> = DynamicDawg::new();
+    /// dict.insert_with_value("cat", 1);
+    /// dict.insert_with_value("dog", 2);
+    ///
+    /// for (term, value) in dict.iter() {
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (String, V)> + '_ {
+        self.iter_bytes()
+            .map(|(bytes, value)| (String::from_utf8_lossy(&bytes).into_owned(), value))
+    }
+}
+
+impl<V: DictionaryValue> IntoIterator for &DynamicDawg<V> {
+    type Item = (Vec<u8>, V);
+    type IntoIter = DictionaryIterator<DynamicDawgZipper<V>>;
+
+    /// Creates an iterator over all `(term, value)` pairs as raw byte vectors.
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_bytes()
     }
 }
 

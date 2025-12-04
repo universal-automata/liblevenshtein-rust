@@ -33,6 +33,8 @@
 //! - Cache-sensitive applications
 //! - Scenarios requiring occasional updates
 
+use crate::dictionary::double_array_trie_zipper::DoubleArrayTrieZipper;
+use crate::dictionary::iterator::{DictionaryIterator, DictionaryTermIterator};
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode};
 use std::sync::Arc;
@@ -690,6 +692,104 @@ impl<V: DictionaryValue> DoubleArrayTrie<V> {
         let state_count = self.state_count();
         let edges_bytes: usize = self.shared.edges.iter().map(|e| e.len()).sum();
         state_count * 4 + state_count * 4 + (state_count + 7) / 8 + edges_bytes
+    }
+
+    /// Iterate over all terms as raw byte vectors (without values).
+    ///
+    /// Returns an iterator yielding `Vec<u8>` in depth-first order.
+    /// Use this for dictionaries created without values.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::double_array_trie::DoubleArrayTrie;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms(vec!["cat", "dog", "cats"]);
+    ///
+    /// for term_bytes in dict.iter_terms() {
+    ///     let term = String::from_utf8(term_bytes).unwrap();
+    ///     println!("Term: {}", term);
+    /// }
+    /// ```
+    pub fn iter_terms(&self) -> DictionaryTermIterator<DoubleArrayTrieZipper<V>> {
+        let zipper = DoubleArrayTrieZipper::new_from_dict(self);
+        DictionaryTermIterator::new(zipper)
+    }
+
+    /// Iterate over all `(term, value)` pairs as raw byte vectors.
+    ///
+    /// Returns an iterator yielding `(Vec<u8>, V)` tuples in depth-first order.
+    /// This is more efficient than `iter()` as it avoids UTF-8 string allocation.
+    ///
+    /// **Note**: This only works for dictionaries created with `from_terms_with_values()`.
+    /// For dictionaries without values, use `iter_terms()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::double_array_trie::DoubleArrayTrie;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms_with_values(vec![
+    ///     ("cat", 1), ("dog", 2), ("cats", 3)
+    /// ]);
+    ///
+    /// for (term_bytes, value) in dict.iter_bytes() {
+    ///     let term = String::from_utf8(term_bytes).unwrap();
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter_bytes(&self) -> DictionaryIterator<DoubleArrayTrieZipper<V>> {
+        let zipper = DoubleArrayTrieZipper::new_from_dict(self);
+        DictionaryIterator::new(zipper)
+    }
+
+    /// Iterate over all `(term, value)` pairs as UTF-8 strings.
+    ///
+    /// Returns an iterator yielding `(String, V)` tuples in depth-first order.
+    /// For better performance with raw bytes, use `iter_bytes()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::double_array_trie::DoubleArrayTrie;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms_with_values(vec![
+    ///     ("cat", 1), ("dog", 2)
+    /// ]);
+    ///
+    /// for (term, value) in dict.iter() {
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (String, V)> + '_ {
+        self.iter_bytes()
+            .map(|(bytes, value)| (String::from_utf8_lossy(&bytes).into_owned(), value))
+    }
+}
+
+impl<V: DictionaryValue> IntoIterator for &DoubleArrayTrie<V> {
+    type Item = (Vec<u8>, V);
+    type IntoIter = DictionaryIterator<DoubleArrayTrieZipper<V>>;
+
+    /// Creates an iterator over all `(term, value)` pairs as raw byte vectors.
+    ///
+    /// This enables the idiomatic `for (term, value) in &dict` syntax.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::double_array_trie::DoubleArrayTrie;
+    ///
+    /// let dict = DoubleArrayTrie::from_terms_with_values(vec![
+    ///     ("hello", 1), ("world", 2)
+    /// ]);
+    ///
+    /// for (term_bytes, value) in &dict {
+    ///     println!("{:?} -> {}", term_bytes, value);
+    /// }
+    /// ```
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_bytes()
     }
 }
 

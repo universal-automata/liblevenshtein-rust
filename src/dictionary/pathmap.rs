@@ -1,5 +1,7 @@
 //! PathMap-backed dictionary implementation.
 
+use crate::dictionary::iterator::DictionaryIterator;
+use crate::dictionary::pathmap_zipper::PathMapZipper;
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{
     Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode, SyncStrategy,
@@ -259,6 +261,63 @@ impl<V: DictionaryValue> PathMapDictionary<V> {
         let bytes = term.as_bytes();
         let map = self.map.read().unwrap();
         map.get_val_at(bytes).cloned()
+    }
+
+    /// Iterate over all `(term, value)` pairs as raw byte vectors.
+    ///
+    /// Returns an iterator yielding `(Vec<u8>, V)` tuples in depth-first order.
+    /// This is more efficient than `iter()` as it avoids UTF-8 string allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+    ///
+    /// let dict = PathMapDictionary::<u32>::new();
+    /// dict.insert_with_value("cat", 1);
+    /// dict.insert_with_value("dog", 2);
+    ///
+    /// for (term_bytes, value) in dict.iter_bytes() {
+    ///     let term = String::from_utf8(term_bytes).unwrap();
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter_bytes(&self) -> DictionaryIterator<PathMapZipper<V>> {
+        let zipper = PathMapZipper::new_from_dict(self);
+        DictionaryIterator::new(zipper)
+    }
+
+    /// Iterate over all `(term, value)` pairs as UTF-8 strings.
+    ///
+    /// Returns an iterator yielding `(String, V)` tuples in depth-first order.
+    /// For better performance with raw bytes, use `iter_bytes()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::dictionary::pathmap::PathMapDictionary;
+    ///
+    /// let dict = PathMapDictionary::<u32>::new();
+    /// dict.insert_with_value("cat", 1);
+    /// dict.insert_with_value("dog", 2);
+    ///
+    /// for (term, value) in dict.iter() {
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (String, V)> + '_ {
+        self.iter_bytes()
+            .map(|(bytes, value)| (String::from_utf8_lossy(&bytes).into_owned(), value))
+    }
+}
+
+impl<V: DictionaryValue> IntoIterator for &PathMapDictionary<V> {
+    type Item = (Vec<u8>, V);
+    type IntoIter = DictionaryIterator<PathMapZipper<V>>;
+
+    /// Creates an iterator over all `(term, value)` pairs as raw byte vectors.
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_bytes()
     }
 }
 

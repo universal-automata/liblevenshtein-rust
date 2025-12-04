@@ -23,6 +23,8 @@
 //! - Edit distance must be measured in characters, not bytes
 //! - Correctness is more important than maximum performance
 
+use crate::dictionary::double_array_trie_char_zipper::DoubleArrayTrieCharZipper;
+use crate::dictionary::iterator::DictionaryIterator;
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{Dictionary, DictionaryNode, MappedDictionary, MappedDictionaryNode};
 use std::sync::Arc;
@@ -345,6 +347,63 @@ impl<V: DictionaryValue> DoubleArrayTrieChar<V> {
         } else {
             None
         }
+    }
+
+    /// Iterate over all `(term, value)` pairs as character vectors.
+    ///
+    /// Returns an iterator yielding `(Vec<char>, V)` tuples in depth-first order.
+    /// This is more efficient than `iter()` as it avoids String allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+    ///
+    /// let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+    ///     ("café", 1), ("naïve", 2)
+    /// ]);
+    ///
+    /// for (chars, value) in dict.iter_chars() {
+    ///     let term: String = chars.iter().collect();
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter_chars(&self) -> DictionaryIterator<DoubleArrayTrieCharZipper<V>> {
+        let zipper = DoubleArrayTrieCharZipper::new_from_dict(self);
+        DictionaryIterator::new(zipper)
+    }
+
+    /// Iterate over all `(term, value)` pairs as UTF-8 strings.
+    ///
+    /// Returns an iterator yielding `(String, V)` tuples in depth-first order.
+    /// For better performance with raw characters, use `iter_chars()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::double_array_trie_char::DoubleArrayTrieChar;
+    ///
+    /// let dict = DoubleArrayTrieChar::from_terms_with_values(vec![
+    ///     ("café", 1), ("naïve", 2)
+    /// ]);
+    ///
+    /// for (term, value) in dict.iter() {
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (String, V)> + '_ {
+        self.iter_chars()
+            .map(|(chars, value)| (chars.into_iter().collect::<String>(), value))
+    }
+}
+
+impl<V: DictionaryValue> IntoIterator for &DoubleArrayTrieChar<V> {
+    type Item = (Vec<char>, V);
+    type IntoIter = DictionaryIterator<DoubleArrayTrieCharZipper<V>>;
+
+    /// Creates an iterator over all `(term, value)` pairs as character vectors.
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_chars()
     }
 }
 

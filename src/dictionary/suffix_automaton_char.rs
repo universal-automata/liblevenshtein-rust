@@ -106,6 +106,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use crate::dictionary::iterator::{DictionaryIterator, DictionaryTermIterator};
+use crate::dictionary::suffix_automaton_char_zipper::SuffixAutomatonCharZipper;
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 
@@ -802,6 +804,85 @@ impl<V: DictionaryValue> SuffixAutomatonChar<V> {
     pub fn source_texts(&self) -> Vec<String> {
         let inner = self.inner.read().unwrap();
         inner.source_texts.clone()
+    }
+
+    /// Iterate over all substrings as character vectors (without values).
+    ///
+    /// Returns an iterator yielding `Vec<char>` in depth-first order.
+    /// This is useful for dictionaries created without values.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
+    ///
+    /// let dict = SuffixAutomatonChar::<()>::from_text("日本");
+    ///
+    /// for chars in dict.iter_terms() {
+    ///     let substring: String = chars.iter().collect();
+    ///     println!("Substring: {}", substring);
+    /// }
+    /// ```
+    pub fn iter_terms(&self) -> DictionaryTermIterator<SuffixAutomatonCharZipper<V>> {
+        let zipper = SuffixAutomatonCharZipper::new_from_dict(self);
+        DictionaryTermIterator::new(zipper)
+    }
+
+    /// Iterate over all `(substring, value)` pairs as character vectors.
+    ///
+    /// Returns an iterator yielding `(Vec<char>, V)` tuples in depth-first order.
+    /// Note: This yields all indexed substrings, not just complete terms.
+    ///
+    /// **Note**: This only works for dictionaries created with values.
+    /// For dictionaries without values, use `iter_terms()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
+    ///
+    /// let dict = SuffixAutomatonChar::<u32>::new();
+    /// dict.insert_with_value("café", 42);
+    ///
+    /// for (chars, value) in dict.iter_chars() {
+    ///     let substring: String = chars.iter().collect();
+    ///     println!("{} -> {}", substring, value);
+    /// }
+    /// ```
+    pub fn iter_chars(&self) -> DictionaryIterator<SuffixAutomatonCharZipper<V>> {
+        let zipper = SuffixAutomatonCharZipper::new_from_dict(self);
+        DictionaryIterator::new(zipper)
+    }
+
+    /// Iterate over all `(substring, value)` pairs as UTF-8 strings.
+    ///
+    /// Returns an iterator yielding `(String, V)` tuples in depth-first order.
+    /// Note: This yields all indexed substrings, not just complete terms.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::suffix_automaton_char::SuffixAutomatonChar;
+    ///
+    /// let dict = SuffixAutomatonChar::<()>::from_text("café");
+    ///
+    /// for (substring, _) in dict.iter() {
+    ///     println!("Substring: {}", substring);
+    /// }
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (String, V)> + '_ {
+        self.iter_chars()
+            .map(|(chars, value)| (chars.into_iter().collect::<String>(), value))
+    }
+}
+
+impl<V: DictionaryValue> IntoIterator for &SuffixAutomatonChar<V> {
+    type Item = (Vec<char>, V);
+    type IntoIter = DictionaryIterator<SuffixAutomatonCharZipper<V>>;
+
+    /// Creates an iterator over all `(substring, value)` pairs as character vectors.
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_chars()
     }
 }
 

@@ -105,6 +105,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use crate::dictionary::iterator::{DictionaryIterator, DictionaryTermIterator};
+use crate::dictionary::suffix_automaton_zipper::SuffixAutomatonZipper;
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 
@@ -801,6 +803,85 @@ impl<V: DictionaryValue> SuffixAutomaton<V> {
     pub fn source_texts(&self) -> Vec<String> {
         let inner = self.inner.read().unwrap();
         inner.source_texts.clone()
+    }
+
+    /// Iterate over all substrings as raw byte vectors (without values).
+    ///
+    /// Returns an iterator yielding `Vec<u8>` in depth-first order.
+    /// Note: This yields all indexed substrings, not just complete terms.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    ///
+    /// let dict = SuffixAutomaton::<()>::from_text("hello");
+    ///
+    /// for bytes in dict.iter_terms() {
+    ///     let substring = String::from_utf8(bytes).unwrap();
+    ///     println!("Substring: {}", substring);
+    /// }
+    /// ```
+    pub fn iter_terms(&self) -> DictionaryTermIterator<SuffixAutomatonZipper<V>> {
+        let zipper = SuffixAutomatonZipper::new_from_dict(self);
+        DictionaryTermIterator::new(zipper)
+    }
+
+    /// Iterate over all `(substring, value)` pairs as raw byte vectors.
+    ///
+    /// Returns an iterator yielding `(Vec<u8>, V)` tuples in depth-first order.
+    /// Note: This yields all indexed substrings, not just complete terms.
+    ///
+    /// **Note**: This only works for dictionaries created with values.
+    /// For dictionaries without values, use `iter_terms()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    ///
+    /// let dict = SuffixAutomaton::<u32>::new();
+    /// dict.insert_with_value("hello", 42);
+    ///
+    /// for (bytes, value) in dict.iter_bytes() {
+    ///     let substring = String::from_utf8(bytes).unwrap();
+    ///     println!("{} -> {}", substring, value);
+    /// }
+    /// ```
+    pub fn iter_bytes(&self) -> DictionaryIterator<SuffixAutomatonZipper<V>> {
+        let zipper = SuffixAutomatonZipper::new_from_dict(self);
+        DictionaryIterator::new(zipper)
+    }
+
+    /// Iterate over all `(substring, value)` pairs as UTF-8 strings.
+    ///
+    /// Returns an iterator yielding `(String, V)` tuples in depth-first order.
+    /// Note: This yields all indexed substrings, not just complete terms.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::suffix_automaton::SuffixAutomaton;
+    ///
+    /// let dict = SuffixAutomaton::<()>::from_text("hello");
+    ///
+    /// for (substring, _) in dict.iter() {
+    ///     println!("Substring: {}", substring);
+    /// }
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (String, V)> + '_ {
+        self.iter_bytes()
+            .map(|(bytes, value)| (String::from_utf8_lossy(&bytes).into_owned(), value))
+    }
+}
+
+impl<V: DictionaryValue> IntoIterator for &SuffixAutomaton<V> {
+    type Item = (Vec<u8>, V);
+    type IntoIter = DictionaryIterator<SuffixAutomatonZipper<V>>;
+
+    /// Creates an iterator over all `(substring, value)` pairs as raw byte vectors.
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_bytes()
     }
 }
 

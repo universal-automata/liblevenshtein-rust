@@ -14,6 +14,8 @@
 //! - **Speed**: ~5-10% slower due to UTF-8 decoding
 //! - **Correctness**: Proper Unicode semantics (e.g., "" → "¡" = distance 1, not 2)
 
+use crate::dictionary::dynamic_dawg_char_zipper::DynamicDawgCharZipper;
+use crate::dictionary::iterator::DictionaryIterator;
 use crate::dictionary::value::DictionaryValue;
 use crate::dictionary::{Dictionary, DictionaryNode, SyncStrategy};
 use parking_lot::RwLock;
@@ -1262,6 +1264,65 @@ impl<V: DictionaryValue> DynamicDawgCharInner<V> {
 
         self.nodes[node_idx].is_final = true;
         self.term_count += 1;
+    }
+}
+
+impl<V: DictionaryValue> DynamicDawgChar<V> {
+    /// Iterate over all `(term, value)` pairs as character vectors.
+    ///
+    /// Returns an iterator yielding `(Vec<char>, V)` tuples in depth-first order.
+    /// This is more efficient than `iter()` as it avoids String allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::dynamic_dawg_char::DynamicDawgChar;
+    ///
+    /// let dict: DynamicDawgChar<u32> = DynamicDawgChar::new();
+    /// dict.insert_with_value("café", 1);
+    /// dict.insert_with_value("naïve", 2);
+    ///
+    /// for (chars, value) in dict.iter_chars() {
+    ///     let term: String = chars.iter().collect();
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter_chars(&self) -> DictionaryIterator<DynamicDawgCharZipper<V>> {
+        let zipper = DynamicDawgCharZipper::new_from_dict(self);
+        DictionaryIterator::new(zipper)
+    }
+
+    /// Iterate over all `(term, value)` pairs as UTF-8 strings.
+    ///
+    /// Returns an iterator yielding `(String, V)` tuples in depth-first order.
+    /// For better performance with raw characters, use `iter_chars()` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use liblevenshtein::dictionary::dynamic_dawg_char::DynamicDawgChar;
+    ///
+    /// let dict: DynamicDawgChar<u32> = DynamicDawgChar::new();
+    /// dict.insert_with_value("café", 1);
+    /// dict.insert_with_value("naïve", 2);
+    ///
+    /// for (term, value) in dict.iter() {
+    ///     println!("{} -> {}", term, value);
+    /// }
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (String, V)> + '_ {
+        self.iter_chars()
+            .map(|(chars, value)| (chars.into_iter().collect::<String>(), value))
+    }
+}
+
+impl<V: DictionaryValue> IntoIterator for &DynamicDawgChar<V> {
+    type Item = (Vec<char>, V);
+    type IntoIter = DictionaryIterator<DynamicDawgCharZipper<V>>;
+
+    /// Creates an iterator over all `(term, value)` pairs as character vectors.
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_chars()
     }
 }
 
