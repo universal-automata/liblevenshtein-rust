@@ -3,8 +3,22 @@
 # Tier 1: Foundation
 Core/Definitions.v
 
+# Tier A: Automaton (Levenshtein Automata Verification)
+Automaton/Position.v
+Automaton/Subsumption.v
+Automaton/AntiChain.v
+Automaton/CharVector.v
+Automaton/State.v
+Automaton/Transition.v
+Automaton/Acceptance.v
+Automaton/Soundness.v
+Automaton/Completeness.v
+Automaton/MainTheorem.v
+
 # Tier 2: Core Algorithm
 Core/LevDistance.v
+Core/DamerauLevDistanceDef.v
+Core/MergeSplitDistance.v
 Core/MinLemmas.v
 
 # Tier 3: Metric Properties
@@ -15,6 +29,7 @@ Trace/TraceBasics.v
 Trace/TouchedPositions.v
 Trace/TraceCost.v
 Trace/TraceComposition.v
+Trace/DamerauTrace.v
 
 # Tier 5: Cardinality & Witnesses
 Cardinality/NoDupInclusion.v
@@ -28,13 +43,15 @@ Composition/WitnessLemmas.v
 Composition/CompositionNoDup.v
 Composition/CompositionValidity.v
 Composition/CostBounds.v
+Composition/DamerauComposition.v
 
 # Tier 8: Optimal Trace
 OptimalTrace/Construction.v
 OptimalTrace/Validity.v
 OptimalTrace/CostEquality.v
 
-# Tier 9: Main Theorems
+# Tier 9: Main Theorems (including DamerauLevDistance which imports DamerauComposition)
+Core/DamerauLevDistance.v
 Triangle/TriangleInequality.v
 MainTheorems.v
 

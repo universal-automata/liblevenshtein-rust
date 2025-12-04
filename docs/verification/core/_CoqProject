@@ -4,25 +4,84 @@
 # used across multiple liblevenshtein components (contextual completion, transducer,
 # phonetic transformation, etc.).
 #
-# Namespace: Liblevenshtein.Core.Verification
+# Namespace: Liblevenshtein.Core
 #
 # Dependencies: Coq Standard Library, Lia (linear integer arithmetic)
 #
 # Author: Formal Verification Team
 # Date: 2025-11-21
 
--R theories Liblevenshtein.Core.Verification
+-R theories Liblevenshtein.Core
 
-# Core theory files (to be compiled in dependency order)
+# Core definitions (base layer - no dependencies)
+theories/Core/Definitions.v
 
-# Distance metrics and string similarity
+# Core min3 lemmas
+theories/Core/MinLemmas.v
+
+# Distance metrics (depend on Definitions, MinLemmas)
+theories/Core/LevDistance.v
+theories/Core/DamerauLevDistance.v
+theories/Core/MergeSplitDistance.v
+theories/Core/MetricProperties.v
+
+# DPMatrix lemmas
+theories/DPMatrix/SnocLemmas.v
+theories/DPMatrix/MatrixOps.v
+theories/DPMatrix/Correctness.v
+
+# Automaton components
+theories/Automaton/Position.v
+theories/Automaton/CharVector.v
+theories/Automaton/State.v
+theories/Automaton/Transition.v
+theories/Automaton/AntiChain.v
+theories/Automaton/Subsumption.v
+theories/Automaton/Acceptance.v
+theories/Automaton/Soundness.v
+theories/Automaton/Completeness.v
+theories/Automaton/MainTheorem.v
+
+# Trace components
+theories/Trace/TraceBasics.v
+theories/Trace/TraceCost.v
+theories/Trace/TouchedPositions.v
+theories/Trace/TraceComposition.v
+
+# Triangle inequality
+theories/Triangle/SubstCostTriangle.v
+theories/Triangle/TriangleInequality.v
+
+# Cardinality lemmas
+theories/Cardinality/NoDupInclusion.v
+theories/Cardinality/NoDupPreservation.v
+
+# Composition lemmas
+theories/Composition/WitnessLemmas.v
+theories/Composition/CostBounds.v
+theories/Composition/CompositionValidity.v
+theories/Composition/CompositionNoDup.v
+
+# Optimal trace construction
+theories/OptimalTrace/Construction.v
+theories/OptimalTrace/CostEquality.v
+theories/OptimalTrace/Validity.v
+
+# Lower bound proofs
+theories/LowerBound/Definitions.v
+theories/LowerBound/HasPredicates.v
+theories/LowerBound/BoundHelpers.v
+theories/LowerBound/MonotonicityLemmas.v
+theories/LowerBound/NoDupPreservation.v
+theories/LowerBound/PigeonholeBounds.v
+theories/LowerBound/ShiftTraceA.v
+theories/LowerBound/ShiftTraceB.v
+theories/LowerBound/ShiftTrace11.v
+theories/LowerBound/ShiftTrace11Lemmas.v
+theories/LowerBound/TraceCostFold.v
+theories/LowerBound/MainTheorem.v
+
+# Legacy/combined files (may have circular deps)
 theories/Distance.v
-
-# TODO: UTF-8 string operations and character validity
-# theories/Strings.v
-
-# TODO: Generic tree operations, well-formedness, and traversal
-# theories/Trees.v
-
-# TODO: Checkpoint stack with undo/redo semantics
-# theories/Checkpoints.v
+theories/TraceLowerBound.v
+theories/MainTheorems.v
