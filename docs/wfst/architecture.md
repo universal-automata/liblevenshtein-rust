@@ -16,11 +16,12 @@
 6. [Weight Schemes and Scoring](#weight-schemes-and-scoring)
 7. [Lattice Representation](#lattice-representation)
 8. [Integration with liblevenshtein-rust](#integration-with-liblevenshtein-rust)
-9. [Integration with Large Language Models](#integration-with-large-language-models)
-10. [Comparison with Industry Systems](#comparison-with-industry-systems)
-11. [Performance Characteristics](#performance-characteristics)
-12. [Deployment Modes](#deployment-modes)
-13. [References](#references)
+9. [Integration with MORK](#integration-with-mork-metta-optimal-reduction-kernel)
+10. [Integration with Large Language Models](#integration-with-large-language-models)
+11. [Comparison with Industry Systems](#comparison-with-industry-systems)
+12. [Performance Characteristics](#performance-characteristics)
+13. [Deployment Modes](#deployment-modes)
+14. [References](#references)
 
 ---
 
@@ -1239,6 +1240,167 @@ impl PhoneticRegex {
 - Export to OpenFST FAR format
 - Optimize for latency (caching, lazy evaluation)
 - Add deployment modes (Fast/Balanced/Accurate)
+
+---
+
+## Integration with MORK (MeTTa Optimal Reduction Kernel)
+
+### Overview
+
+MORK provides MeTTa pattern matching and query execution over PathMap-backed knowledge graphs. The WFST architecture integrates with MORK to enable **fuzzy pattern matching** in MeTTa queries.
+
+### Architecture Alignment
+
+```
+                         MORK Query Pipeline
+                                 |
+            +--------------------+--------------------+
+            |                    |                    |
+    BTMSource (exact)    ACTSource (exact)    FuzzySource (new)
+            |                    |                    |
+            v                    v                    v
+    ReadZipperUntracked  ACTMmapZipper    TransducerZipper (new)
+                                              |
+                                    +---------+---------+
+                                    |         |         |
+                                 Standard  Phonetic   Lattice
+                                    |         |         |
+                                    v         v         v
+                              liblevenshtein transducer
+                                    |
+                                    v
+                             PathMapDictionary
+```
+
+### Key Integration Points
+
+| liblevenshtein Component | MORK Integration | Purpose |
+|--------------------------|------------------|---------|
+| Transducer | FuzzySource | Fuzzy symbol matching in queries |
+| Lattice | LatticeZipper | Ranked multi-candidate results |
+| PhoneticNfa | WFST composition | Sound-alike pattern matching |
+| PathMapDictionary | Shared storage | Single dictionary for both systems |
+
+### MORK Pattern Matching Synergies
+
+MORK's pattern matching capabilities directly support the WFST pipeline:
+
+#### NFA Representation in MORK
+
+```metta
+; NFA state encoding as S-expressions
+(state q0 [(trans a q0) (trans b q1)])
+(state q1 [(trans b q1) (trans ε acc)])
+(accepting acc)
+
+; Pattern to find epsilon closure
+Pattern: (state ?Q [(trans ε ?R) . ?rest])
+Result: Bindings {?Q → q1, ?R → acc}
+```
+
+#### CFG Productions as Pattern/Template Pairs
+
+```metta
+; CFG Rule: NP → DT N
+Pattern:  (np (dt ?D) (n ?N))
+Template: (noun_phrase ?D ?N)
+
+; Error Production: Article error
+Pattern:  (np (dt "a") (n ?N))  ; where is_vowel_initial(?N)
+Template: (np (dt "an") (n ?N))
+Cost: 0.5
+```
+
+**Benefit**: MORK's `transform_multi_multi_()` (space.rs:1221) handles CFG-style transformations natively.
+
+### Integration Phases
+
+| Phase | Component | Deliverable |
+|-------|-----------|-------------|
+| **A** | FuzzySource | Basic fuzzy matching in MORK queries |
+| **B** | Lattice | DAG output, n-best paths, weighted edges |
+| **C** | Full WFST | Phonetic NFA, FST composition |
+| **D** | Grammar | CFG via MORK patterns, structural correction |
+
+### Example Usage
+
+```metta
+; Phase A: Basic fuzzy matching
+!(match &space (fuzzy "colr" 2 $result) $result)
+; Returns: color, colour, collar, ...
+
+; Phase B: Ranked results
+!(match &space (fuzzy-ranked "phone" 3 5) $results)
+; Returns: [(phone 0.0) (fone 0.3) (phon 0.5) ...]
+
+; Phase C: Phonetic pattern matching
+!(match &space
+    (wfst-query
+        (pattern "(ph|f)(one|oan)")
+        (max-dist 2)
+        (phonetic english)
+        (top-k 10))
+    $results)
+```
+
+### Key MORK Functions
+
+| Function | Location | Purpose |
+|----------|----------|---------|
+| `match2()` | expr/src/lib.rs:921 | Recursive structural pattern matching |
+| `unify()` | expr/src/lib.rs:1849 | Robinson's unification with variable binding |
+| `query_multi_i()` | kernel/src/space.rs:992 | Multi-source query with lattice support |
+| `transform_multi_multi_()` | kernel/src/space.rs:1221 | Pattern → template transformation |
+
+### Three-Tier Architecture with MORK
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Tier 1: Lexical (liblevenshtein)                            │
+│   FST/Levenshtein automata → Word lattice                   │
+│   Files: src/transducer/, src/lattice/, src/wfst/           │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Tier 2: Syntactic (MORK)                                    │
+│   - CFG rules compiled to pattern/template pairs            │
+│   - query_multi_i() matches against lattice                 │
+│   - transform_multi_multi_() applies corrections            │
+│   - Output: Valid parse forest + corrections                │
+│   Files: kernel/src/sources.rs, kernel/src/space.rs         │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Tier 3: Semantic (Type checker / LLM)                       │
+│   Final ranking and validation                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Lattice Processing Efficiency
+
+MORK's `query_multi_i()` handles lattices efficiently:
+
+```
+FST Lattice (Tier 1)
+    ↓ O(K×N) edges (not K^N paths)
+MORK Pattern Matching (Tier 2)
+    ↓ CFG productions as patterns
+Parse Forest + Corrections
+```
+
+**Complexity**: O(K×N) edge processing instead of O(K^N) path enumeration.
+
+### Documentation
+
+For detailed implementation guides, see:
+
+- [MORK Integration Overview](../integration/mork/README.md)
+- [FuzzySource Implementation](../integration/mork/fuzzy_source.md) (Phase A)
+- [Lattice Integration](../integration/mork/lattice_integration.md) (Phase B)
+- [WFST Composition](../integration/mork/wfst_composition.md) (Phase C)
+- [Grammar Correction](../integration/mork/grammar_correction.md) (Phase D)
+- [Structural Repair](../integration/mork/structural_repair.md) (Future)
+- [PathMap Infrastructure](../integration/pathmap/README.md)
 
 ---
 
