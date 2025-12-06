@@ -1,0 +1,413 @@
+# Native Type Theory (OSLF)
+
+This document presents the OSLF (Operational Semantics via Lawvere and Fibrations)
+construction for deriving type systems from operational semantics. This is the
+mathematical foundation for full semantic type checking in MeTTa.
+
+---
+
+## Table of Contents
+
+1. [The Core Idea](#the-core-idea)
+2. [λ-Theories with Equality](#λ-theories-with-equality)
+3. [The Presheaf Construction](#the-presheaf-construction)
+4. [The Internal Language Functor](#the-internal-language-functor)
+5. [Native Types](#native-types)
+6. [Behavioral Types](#behavioral-types)
+7. [Application to MeTTa](#application-to-metta)
+
+---
+
+## The Core Idea
+
+Native Type Theory provides a systematic way to derive a type system from any
+operational semantics. The key insight is a 2-functor composition:
+
+```
+                    P                     L
+    λ-theory  ─────────>  presheaf topos  ─────────>  type system
+       T                      P(T)                      LP(T)
+```
+
+Where:
+- **T** is the operational semantics formalized as a λ-theory
+- **P** is the presheaf construction (categorical completion)
+- **L** is the internal language functor (extracts the type theory)
+
+The resulting type system LP(T) is called **native** because:
+1. Types arise directly from the syntax (no external imposition)
+2. The construction preserves all structural properties
+3. Behavioral reasoning emerges naturally from the internal graph
+
+---
+
+## λ-Theories with Equality
+
+### Definition: λ-Theory
+
+A **λ-theory** T consists of:
+
+1. **Sorts**: A set S of type sorts (e.g., `Term`, `State`, `Name`)
+2. **Operations**: Typed function symbols f : s₁ × ... × sₙ → s
+3. **Equations**: Equality axioms between terms
+
+### Example: Simple λ-Theory for Terms
+
+```
+Theory T_Terms:
+  Sorts: T (terms)
+
+  Operations:
+    var  : 1 → T           ; Variables
+    app  : T × T → T       ; Application
+    lam  : T → T           ; Abstraction
+
+  Equations:
+    app(lam(M), N) = M[N]  ; β-reduction (as equation)
+```
+
+### MeTTa as a λ-Theory
+
+MeTTa can be formalized with:
+
+```
+Theory T_MeTTa:
+  Sorts: Term, Atom, List, MSet, State, KB, Receipt
+
+  Operations:
+    ; Term constructors
+    atom    : Atom → Term
+    list    : List → Term
+    mset    : MSet → Term
+
+    ; List constructors
+    nil     : 1 → List
+    cons    : Term × List → List
+
+    ; Multiset constructors
+    empty   : 1 → MSet
+    insert  : Term × MSet → MSet
+
+    ; State constructor
+    state   : Term × KB × MSet × MSet → State
+
+  Equations:
+    ; Multiset commutativity
+    insert(x, insert(y, m)) = insert(y, insert(x, m))
+
+    ; Multiset associativity
+    insert(x, insert(y, insert(z, m))) = insert(x, insert(z, insert(y, m)))
+```
+
+---
+
+## The Presheaf Construction
+
+### Definition: Presheaf Category
+
+Given a λ-theory T viewed as a category, the **presheaf category** P(T) consists of:
+
+- **Objects**: Functors F : T^op → Set (contravariant functors to sets)
+- **Morphisms**: Natural transformations between functors
+
+### The Yoneda Embedding
+
+The **Yoneda embedding** y : T → P(T) maps each sort s to its representable presheaf:
+
+```
+y(s) = Hom_T(−, s)
+```
+
+This embedding is:
+- **Full and faithful** (preserves all structure)
+- **Preserves limits** (products become products)
+
+### Key Properties of P(T)
+
+The presheaf category P(T) is a **topos**, meaning it has:
+
+1. **All finite limits** (products, equalizers, pullbacks)
+2. **Exponentials** [P, Q] for any presheaves P, Q
+3. **Subobject classifier** Ω (the "type of propositions")
+4. **Power objects** ΩP for predicate formation
+
+### Computing Internal Homs
+
+For presheaves P, Q, the internal hom [P, Q] is:
+
+```
+[P, Q](c) = Nat(y(c) × P, Q)
+```
+
+This represents "functions from P to Q" as a presheaf itself.
+
+---
+
+## The Internal Language Functor
+
+### Definition: Internal Language
+
+Every topos E has an **internal language** L(E), which is a type theory with:
+
+- **Types** from objects of E
+- **Terms** from morphisms of E
+- **Propositions** from subobjects (maps to Ω)
+- **Quantifiers** from adjoints to substitution
+
+### The Functor L
+
+L : Topos → TypeTheory extracts:
+
+```
+L(E) = ⟨Types, Terms, Props, ⊢⟩
+```
+
+Where:
+- Types = objects of E
+- Terms(A) = global elements 1 → A
+- Props(A) = subobjects of A (maps A → Ω)
+- ⊢ = derivability from categorical structure
+
+### Composition LP
+
+Composing P and L gives the native type theory:
+
+```
+LP(T) = L(P(T))
+```
+
+This type theory:
+- Has all sorts from T as types
+- Has all operations from T as term formers
+- Has predicates (types) for any property definable over terms
+- Supports full higher-order reasoning
+
+---
+
+## Native Types
+
+### Definition: Native Type
+
+A **native type** in LP(T) is a predicate φ : A → Ω over some object A, expressing
+a property that terms of sort A may satisfy.
+
+### Structural Types (Codespaces)
+
+Predicates on term constructors give **structural types**:
+
+```
+; Type of lists with length ≥ 2
+LongList(l) := ∃x,y,t. l = cons(x, cons(y, t))
+
+; Type of non-empty multisets
+NonEmpty(m) := ∃x,m'. m = insert(x, m')
+```
+
+### Type Formation Rules
+
+From the internal language, we get type formation rules:
+
+```
+Γ ⊢ A type    Γ, x:A ⊢ φ(x) prop
+─────────────────────────────────
+      Γ ⊢ {x:A | φ(x)} type
+
+Γ ⊢ A type    Γ ⊢ B type
+─────────────────────────
+   Γ ⊢ A → B type
+   Γ ⊢ A × B type
+```
+
+### Substitution as Pattern Matching
+
+Given a morphism f : B → A and a predicate φ : A → Ω, we can form the **substitution**:
+
+```
+φ[f] : B → Ω
+φ[f](b) = φ(f(b))
+```
+
+This captures pattern matching: φ[unify(p, −)] checks if a term matches pattern p
+with predicate φ on the result.
+
+---
+
+## Behavioral Types
+
+The key innovation of OSLF is **behavioral types** that reason about computation.
+
+### The Internal Graph
+
+MeTTa's rewrite rules form a graph internal to P(T):
+
+```
+G = ⟨s, t⟩ : E → State × State
+```
+
+Where:
+- E = the object of "edges" (rewrite rule applications)
+- s : E → State = source (state before rewrite)
+- t : E → State = target (state after rewrite)
+
+### Step Operators
+
+From the internal graph, we define operators on predicates:
+
+```
+; Possible next step (existential)
+F!(φ) = [s]; ∃t(φ)
+       = λstate. ∃e:E. s(e) = state ∧ φ(t(e))
+
+; Necessary next step (universal)
+F*(φ) = ∀t(φ[s])
+       = λstate. ∀e:E. s(e) = state ⟹ φ(t(e))
+```
+
+### Reachability Modalities
+
+Iterating step operators gives reachability:
+
+```
+; Eventually (finite iterations of F!)
+◇φ = μX. φ ∨ F!(X)
+
+; Always (finite iterations of F*)
+□φ = νX. φ ∧ F*(X)
+```
+
+### Behavioral Type Examples
+
+```
+; Type of states that can reach output
+CanOutput := ◇(hasOutput)
+
+; Type of states that always terminate
+Terminating := ◇(isFinal)
+
+; Type of states that never modify KB
+KBPure := □(kbUnchanged)
+```
+
+### Bisimulation as a Type
+
+The paper shows bisimulation can be encoded as an **inductive type**:
+
+```
+Bisim := μφ. S(φ)
+```
+
+Where S is the simulation relation step. Two states are bisimilar if they satisfy
+the greatest fixed point of the simulation condition.
+
+---
+
+## Application to MeTTa
+
+### Step 1: Formalize MeTTa as T_MeTTa
+
+(See [01-metta-operational-semantics.md](./01-metta-operational-semantics.md))
+
+### Step 2: Construct P(T_MeTTa)
+
+The presheaf category gives:
+- Representable presheaves for each sort (Term, State, etc.)
+- Internal homs for function types
+- Power objects for predicate types
+
+### Step 3: Extract LP(T_MeTTa)
+
+The internal language provides:
+- Dependent types over MeTTa terms
+- Predicates on knowledge bases
+- Behavioral modalities for reasoning about evaluation
+
+### Example Types in LP(T_MeTTa)
+
+```
+; Query that always succeeds
+Decidable(p) := □(match(p, k) ≠ ∅)
+
+; Safe knowledge base modification
+SafeAdd(t) := ∀k. consistent(k) ⟹ consistent(k ∪ {t})
+
+; Terminating computation
+Terminates(i) := ◇(w = ∅ ∧ i = ε)
+```
+
+### Refined Binding
+
+OSLF supports **refined binding** where pattern variables have constrained types:
+
+```
+; Query pattern where $x must be a number
+(parent $x:Number Bob)
+
+; Encoded as hom type
+[$x : Number, parent($x, Bob)]
+```
+
+This is represented using the internal hom [φ, ψ] for conditioned contexts.
+
+---
+
+## The OSLF Construction Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        T_MeTTa                                   │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Sorts: Term, State, KB, ...                              │   │
+│  │ Ops: cons, insert, state, query, chain, ...              │   │
+│  │ Eqs: multiset commutativity, ...                         │   │
+│  │ Graph: rewrite rules as edges                            │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │ P (presheaf construction)
+                             ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                        P(T_MeTTa)                                │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Objects: Presheaves (generalized term spaces)            │   │
+│  │ Morphisms: Natural transformations                       │   │
+│  │ Internal hom: [P,Q] function spaces                      │   │
+│  │ Ω: Subobject classifier (propositions)                   │   │
+│  │ Internal graph: Rewrite dynamics preserved               │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │ L (internal language)
+                             ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                       LP(T_MeTTa)                                │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Types: {x:A | φ(x)}, A → B, A × B, ∀x:A.B, ∃x:A.B        │   │
+│  │ Props: Predicates φ : A → Ω                              │   │
+│  │ Modalities: F!, F*, ◇, □ (behavioral)                    │   │
+│  │ Bisimulation: μφ.S(φ) (inductive type)                   │   │
+│  │ Refined binding: [φ, ψ] (conditioned contexts)           │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Summary
+
+Native Type Theory (OSLF) provides:
+
+1. **Systematic derivation** of types from operational semantics
+2. **Structural types** via predicates on term constructors
+3. **Behavioral types** via internal graph modalities
+4. **Bisimulation** as an inductive type
+5. **Refined binding** for constrained pattern variables
+
+This is the full theoretical foundation for semantic type checking in MeTTa. For a
+simpler approach when binding can be eliminated, see
+[03-gph-enriched-lawvere.md](./03-gph-enriched-lawvere.md).
+
+---
+
+## References
+
+- Williams, P. & Stay, M. "Native Type Theory." EPTCS 372, pp. 116-132, 2022.
+- Jacobs, B. "Categorical Logic and Type Theory." Elsevier, 1998.
+- See [bibliography.md](../reference/bibliography.md) for complete references.

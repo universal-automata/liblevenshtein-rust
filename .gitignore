@@ -104,3 +104,5 @@ docs/verification/**/.Makefile.d
 perf.data*
 flamegraph.svg
 .lia.cache
+
+*.bak
