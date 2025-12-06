@@ -261,6 +261,152 @@ what remains to be built for full semantic type checking in MeTTa via OSLF.
 5. No gradual typing mode
 6. BUT: mettatron bridge provides PathMap conversion
 
+### For Dialogue Context Layer (Phase 7)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Dialogue Context Components                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  DialogueState      │  │  Turn tracking      │              │
+│  │  struct             │  │  (history window)   │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  Entity Registry    │  │  Coreference        │              │
+│  │  (cross-turn)       │  │  resolution         │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  Topic Graph        │  │  Speaker Models     │              │
+│  │  (discourse)        │  │  (vocabulary/style) │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  PathMap schema     │  │  MeTTa predicates   │              │
+│  │  for dialogue       │  │  for coreference    │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Gaps**:
+1. No DialogueState struct for conversation tracking
+2. No turn history with sliding window management
+3. No EntityRegistry for cross-turn entity tracking
+4. No CoreferenceResolver for pronouns and references
+5. No TopicGraph for discourse structure
+6. No SpeakerModel for participant vocabulary/style
+7. No PathMap schema for dialogue storage
+8. No MeTTa predicates for coreference and coherence
+
+**Documentation**: [Dialogue Context Layer](../dialogue/README.md)
+
+### For LLM Integration Layer (Phase 8)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    LLM Integration Components                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  PromptPreprocessor │  │  Context Injection  │              │
+│  │  pipeline           │  │  formatting         │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  ResponsePost-      │  │  Hallucination      │              │
+│  │  processor          │  │  Detector           │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  Claim extraction   │  │  Knowledge base     │              │
+│  │                     │  │  verification       │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  Coherence checker  │  │  RAG retrieval      │              │
+│  │                     │  │  integration        │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Gaps**:
+1. No PromptPreprocessor for user input correction
+2. No context injection and formatting pipeline
+3. No ResponsePostprocessor for LLM output validation
+4. No HallucinationDetector for fabricated content
+5. No claim extraction from responses
+6. No knowledge base verification
+7. No coherence checking against dialogue context
+8. No RAG integration for context retrieval
+
+**Documentation**: [LLM Integration Layer](../llm-integration/README.md)
+
+### For Agent Learning Layer (Phase 9)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Agent Learning Components                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  FeedbackCollector  │  │  Signal detection   │              │
+│  │                     │  │  (implicit/explicit)│              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  PatternLearner     │  │  Pattern clustering │              │
+│  │  (error extraction) │  │  & generalization   │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  UserPreference     │  │  Vocabulary and     │              │
+│  │  Modeler            │  │  style profiling    │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  Online weight      │  │  Threshold          │              │
+│  │  updater            │  │  adaptation         │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  Model versioning   │  │  A/B testing        │              │
+│  │  & checkpointing    │  │  support            │              │
+│  │  ❌ Not implemented │  │  ❌ Not implemented │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Gaps**:
+1. No FeedbackCollector for user response tracking
+2. No signal detection (implicit accept/reject timing, explicit ratings)
+3. No PatternLearner for error pattern extraction
+4. No pattern clustering and generalization
+5. No UserPreferenceModeler for personalization
+6. No vocabulary and style profiling
+7. No online weight update algorithms
+8. No threshold adaptation per user/domain
+9. No model versioning and checkpointing
+10. No A/B testing support
+
+**Documentation**: [Agent Learning Layer](../agent-learning/README.md)
+
 ---
 
 ## TOGL Graph Foundations
@@ -513,7 +659,10 @@ TOGL components should be integrated as follows:
 | 4: Full OSLF | 6 | 0 | 0 | 6 |
 | 5: WFST Integration | 6 | 1 | 1 | 4 |
 | 6: Rholang Integration | 5 | 0 | 0 | 5 |
-| **Total** | **39** | **2** | **2** | **35** |
+| 7: Dialogue Context | 8 | 0 | 0 | 8 |
+| 8: LLM Integration | 8 | 0 | 0 | 8 |
+| 9: Agent Learning | 10 | 0 | 0 | 10 |
+| **Total** | **65** | **2** | **2** | **61** |
 
 ### Gap Categories
 
@@ -541,6 +690,30 @@ TOGL components should be integrated as follows:
 - Grammar storage in MORK Space
 - Type predicate storage integration
 
+**Dialogue Context Gaps** (conversational correction):
+- DialogueState and turn tracking infrastructure
+- EntityRegistry and coreference resolution
+- TopicGraph for discourse structure
+- SpeakerModel for participant vocabulary/style
+- PathMap schema for dialogue storage
+- MeTTa predicates for coreference and coherence
+
+**LLM Integration Gaps** (agent input/output correction):
+- PromptPreprocessor pipeline
+- Context injection and formatting
+- ResponsePostprocessor for output validation
+- HallucinationDetector for fabricated content
+- Claim extraction and verification
+- RAG integration for context retrieval
+
+**Agent Learning Gaps** (feedback-driven adaptation):
+- FeedbackCollector for user response tracking
+- PatternLearner for error pattern extraction
+- UserPreferenceModeler for personalization
+- Online weight update algorithms
+- Threshold adaptation per user/domain
+- Model versioning and A/B testing support
+
 ---
 
 ## Priority Assessment
@@ -557,18 +730,43 @@ TOGL components should be integrated as follows:
 1. **Gph-theory representation** - Cleaner operational semantics
 2. **Reachability modalities** - Common behavioral properties
 3. **Compiler integration** - Practical type checking
+4. **DialogueState infrastructure** - Required for conversational correction
+5. **PromptPreprocessor** - Required for LLM agent input correction
+6. **ResponsePostprocessor** - Required for LLM agent output validation
 
 ### Nice to Have
 
 1. **Full presheaf construction** - Maximum expressiveness
 2. **Refined binding** - Advanced pattern types
 3. **Bisimulation encoding** - Process equivalence
+4. **HallucinationDetector** - Fabricated content detection
+5. **PatternLearner** - Feedback-driven error pattern learning
+6. **UserPreferenceModeler** - Personalized correction
+
+### Conversational Priority (Dialogue + LLM)
+
+| Priority | Component | Rationale |
+|----------|-----------|-----------|
+| P0 | DialogueState | Foundation for all context tracking |
+| P0 | Turn tracking | Required for multi-turn coherence |
+| P1 | EntityRegistry | Enables coreference resolution |
+| P1 | PromptPreprocessor | Cleans input before LLM |
+| P1 | ResponsePostprocessor | Validates LLM output |
+| P2 | CoreferenceResolver | Resolves pronouns across turns |
+| P2 | HallucinationDetector | Detects fabricated content |
+| P2 | Context injection | Adds dialogue history to prompts |
+| P3 | TopicGraph | Tracks discourse structure |
+| P3 | FeedbackCollector | Captures user corrections |
+| P3 | PatternLearner | Learns from feedback |
+| P4 | SpeakerModel | Per-participant vocabulary |
+| P4 | Online weight updater | Incremental learning |
+| P4 | Threshold adaptation | Per-user/domain tuning |
 
 ---
 
 ## Effort Estimates
 
-### By Component
+### By Component (Core OSLF)
 
 | Component | Complexity | Estimated Effort |
 |-----------|------------|------------------|
@@ -593,6 +791,47 @@ TOGL components should be integrated as follows:
 | Type predicate storage | Medium | 3-5 days |
 | Tier pipeline | High | 5-8 days |
 
+### By Component (Dialogue Context)
+
+| Component | Complexity | Estimated Effort |
+|-----------|------------|------------------|
+| DialogueState struct | Low | 2-3 days |
+| Turn tracking (sliding window) | Low | 1-2 days |
+| EntityRegistry | Medium | 3-5 days |
+| CoreferenceResolver | High | 7-10 days |
+| TopicGraph | Medium | 5-7 days |
+| SpeakerModel | Medium | 3-5 days |
+| PathMap dialogue schema | Low | 2-3 days |
+| MeTTa coreference predicates | Medium | 3-5 days |
+
+### By Component (LLM Integration)
+
+| Component | Complexity | Estimated Effort |
+|-----------|------------|------------------|
+| PromptPreprocessor pipeline | Medium | 3-5 days |
+| Context injection formatting | Low | 2-3 days |
+| ResponsePostprocessor | Medium | 3-5 days |
+| HallucinationDetector | High | 7-10 days |
+| Claim extraction | Medium | 3-5 days |
+| Knowledge base verification | Medium | 5-7 days |
+| Coherence checker | Medium | 3-5 days |
+| RAG integration | Medium | 5-7 days |
+
+### By Component (Agent Learning)
+
+| Component | Complexity | Estimated Effort |
+|-----------|------------|------------------|
+| FeedbackCollector | Low | 2-3 days |
+| Signal detection (implicit/explicit) | Medium | 3-5 days |
+| PatternLearner (extraction) | Medium | 5-7 days |
+| Pattern clustering/generalization | High | 7-10 days |
+| UserPreferenceModeler | Medium | 5-7 days |
+| Vocabulary/style profiling | Medium | 3-5 days |
+| Online weight updater | High | 7-10 days |
+| Threshold adaptation | Medium | 3-5 days |
+| Model versioning | Medium | 3-5 days |
+| A/B testing support | Medium | 5-7 days |
+
 ### By Phase
 
 | Phase | Total Effort | Dependencies |
@@ -604,16 +843,26 @@ TOGL components should be integrated as follows:
 | 4: Full OSLF | 30-45 days | Phase 3, Phase 0.5 |
 | 5: WFST Integration | 15-25 days | liblevenshtein, MORK, PathMap |
 | 6: Rholang Integration | 10-15 days | Phase 3+ |
+| 7: Dialogue Context | 27-40 days | Phase 5 (WFST), PathMap |
+| 8: LLM Integration | 32-47 days | Phase 7 |
+| 9: Agent Learning | 44-64 days | Phase 8 |
 
 ### Total Estimate
 
 - **Minimum viable** (Phases 0.5-basic + 1-3 + Rholang): 50-80 days
 - **With WFST** (Phases 0.5-basic + 1-3 + WFST + Rholang): 65-105 days
-- **Full OSLF with TOGL** (all phases): 115-175 days
+- **Full OSLF with TOGL** (Phases 0.5-6): 115-175 days
+- **With Dialogue Context** (Phases 0.5-7): 142-215 days
+- **With LLM Integration** (Phases 0.5-8): 174-262 days
+- **Full System** (all phases including Agent Learning): 218-326 days
 
 **Note**: TOGL Phase 0.5 can be partially implemented. Basic graph functor and
 path enumeration (8-12 days) are required for Phase 1. Full TOGL (well-formedness,
 equivalence, OSLF embedding) is only needed for Phase 4.
+
+**Note**: Phases 7-9 (Dialogue, LLM, Learning) can be developed in parallel with
+Phases 1-4 (OSLF) since they primarily depend on Phase 5 (WFST Integration)
+and PathMap infrastructure.
 
 ---
 
@@ -680,6 +929,72 @@ equivalence, OSLF embedding) is only needed for Phase 4.
     - Unified three-tier pipeline
     - Cross-tier weight composition
 
+### Dialogue Context Goals (Phase 7)
+
+11. **DialogueState infrastructure**
+    - Define DialogueState struct with PathMap backing
+    - Implement turn tracking with sliding window
+    - Create PathMap schema for dialogue storage
+    - See [Dialogue Context Layer](../dialogue/README.md)
+
+12. **Entity and coreference tracking**
+    - Implement EntityRegistry for cross-turn entity tracking
+    - Build CoreferenceResolver for pronoun resolution
+    - Add salience-based ranking for candidates
+    - See [Coreference Resolution](../dialogue/02-coreference-resolution.md)
+
+13. **Discourse structure**
+    - Implement TopicGraph for topic tracking
+    - Add coherence relation classification
+    - Build topic shift detection
+    - See [Topic Management](../dialogue/03-topic-management.md)
+
+### LLM Integration Goals (Phase 8)
+
+14. **Prompt preprocessing pipeline**
+    - Build PromptPreprocessor with correction integration
+    - Add context injection for dialogue history
+    - Implement entity resolution before LLM call
+    - See [Prompt Preprocessing](../llm-integration/01-prompt-preprocessing.md)
+
+15. **Response postprocessing pipeline**
+    - Build ResponsePostprocessor for output validation
+    - Add coherence checking against dialogue context
+    - Implement correction application to responses
+    - See [Output Postprocessing](../llm-integration/02-output-postprocessing.md)
+
+16. **Hallucination detection**
+    - Implement HallucinationDetector with claim extraction
+    - Add knowledge base verification
+    - Build confidence scoring for claims
+    - See [Hallucination Detection](../llm-integration/03-hallucination-detection.md)
+
+### Agent Learning Goals (Phase 9)
+
+17. **Feedback collection**
+    - Implement FeedbackCollector for user response tracking
+    - Add implicit signal detection (timing, edits)
+    - Build explicit rating collection
+    - See [Feedback Collection](../agent-learning/01-feedback-collection.md)
+
+18. **Pattern learning**
+    - Build PatternLearner for error pattern extraction
+    - Add pattern clustering and generalization
+    - Implement rule generation from patterns
+    - See [Pattern Learning](../agent-learning/02-pattern-learning.md)
+
+19. **User preference modeling**
+    - Implement UserPreferenceModeler for personalization
+    - Add vocabulary and style profiling
+    - Build domain-specific preference tracking
+    - See [User Preferences](../agent-learning/03-user-preferences.md)
+
+20. **Online learning**
+    - Implement online weight update algorithms
+    - Add threshold adaptation per user/domain
+    - Build model versioning and A/B testing support
+    - See [Online Learning](../agent-learning/04-online-learning.md)
+
 ---
 
 ## Summary
@@ -699,6 +1014,9 @@ Major gaps remain in:
 - ❌ Rholang type integration
 - ❌ WFST tier pipeline
 - ❌ FuzzySource trait for PathMap/MORK
+- ❌ Dialogue context management
+- ❌ LLM integration layer
+- ❌ Agent learning layer
 
 The recommended approach is incremental:
 
@@ -720,6 +1038,75 @@ The recommended approach is incremental:
    the complete presheaf construction and internal language extraction,
    using full TOGL for OSLF embedding.
 
+5. **Dialogue context** (Phase 7): Add DialogueState, EntityRegistry, and
+   CoreferenceResolver for multi-turn conversational correction. Build on
+   PathMap for persistent dialogue storage.
+   See [Dialogue Context Layer](../dialogue/README.md).
+
+6. **LLM integration** (Phase 8): Add PromptPreprocessor and ResponsePostprocessor
+   for LLM agent input/output correction. Implement HallucinationDetector for
+   fabricated content detection.
+   See [LLM Integration Layer](../llm-integration/README.md).
+
+7. **Agent learning** (Phase 9): Add FeedbackCollector, PatternLearner, and
+   UserPreferenceModeler for feedback-driven adaptation. Implement online
+   learning for continuous improvement.
+   See [Agent Learning Layer](../agent-learning/README.md).
+
 This layered approach builds toward the complete vision while providing
 practical value at each stage. TOGL provides the mathematical rigor for
 graph-based semantic reasoning that underlies all subsequent phases.
+
+### Phase Dependencies
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│                      PHASE DEPENDENCY GRAPH                           │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Phase 0.5: TOGL ─────────────────────────────────────────────────┐  │
+│       │                                                            │  │
+│       ▼                                                            │  │
+│  Phase 1: Gph-theories                                             │  │
+│       │                                                            │  │
+│       ▼                                                            │  │
+│  Phase 2: Predicates                                               │  │
+│       │                                                            │  │
+│       ▼                                                            │  │
+│  Phase 3: Behavioral ─────────┐                                    │  │
+│       │                       │                                    │  │
+│       ▼                       │                                    │  │
+│  Phase 4: Full OSLF ◄─────────┘                                    │  │
+│                                                                       │
+│  ═══════════════════════════════════════════════════════════════════ │
+│  (Parallel development track starting from WFST integration)         │
+│  ═══════════════════════════════════════════════════════════════════ │
+│                                                                       │
+│  liblevenshtein + MORK + PathMap                                     │
+│       │                                                               │
+│       ▼                                                               │
+│  Phase 5: WFST Integration                                           │
+│       │                                                               │
+│       ├───────────────────┐                                          │
+│       ▼                   │                                          │
+│  Phase 6: Rholang         │                                          │
+│  Integration              │                                          │
+│                           ▼                                          │
+│                   Phase 7: Dialogue Context                          │
+│                           │                                          │
+│                           ▼                                          │
+│                   Phase 8: LLM Integration                           │
+│                           │                                          │
+│                           ▼                                          │
+│                   Phase 9: Agent Learning                            │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Related Documentation
+
+- [Architecture Overview](../correction-wfst/01-architecture-overview.md)
+- [Dialogue Context Layer](../dialogue/README.md)
+- [LLM Integration Layer](../llm-integration/README.md)
+- [Agent Learning Layer](../agent-learning/README.md)
+- [Implementation Roadmap](../implementation/04-implementation-roadmap.md)

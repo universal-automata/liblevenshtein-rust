@@ -1,7 +1,9 @@
 # Unified Correction WFST Architecture
 
-This document introduces the three-tier Weighted Finite State Transducer (WFST)
+This document introduces the multi-tier Weighted Finite State Transducer (WFST)
 architecture for correction across written, spoken, and programming languages.
+The architecture includes the foundational three-tier WFST plus additional layers
+for dialogue context, LLM integration, and adaptive learning.
 
 **Sources**:
 - liblevenshtein: `/home/dylon/Workspace/f1r3fly.io/liblevenshtein-rust/`
@@ -16,16 +18,25 @@ architecture for correction across written, spoken, and programming languages.
 - [Grammar Correction](../../integration/mork/grammar_correction.md) - Phase D details
 - [PathMap Integration](../../integration/pathmap/README.md) - Shared storage layer
 
+**Extended Architecture Docs**:
+- [Dialogue Context Layer](../dialogue/README.md) - Discourse semantics and coreference
+- [LLM Integration Layer](../llm-integration/README.md) - Prompt preprocessing and response validation
+- [Agent Learning Layer](../agent-learning/README.md) - Feedback collection and online learning
+
 ---
 
 ## Table of Contents
 
 1. [Problem Statement](#problem-statement)
-2. [Three-Tier Architecture](#three-tier-architecture)
-3. [MORK Integration Phases](#mork-integration-phases)
-4. [Why Layered Correction?](#why-layered-correction)
-5. [PathMap as Universal Storage](#pathmap-as-universal-storage)
-6. [Performance Considerations](#performance-considerations)
+2. [Extended Architecture Overview](#extended-architecture-overview)
+3. [Three-Tier WFST Core](#three-tier-wfst-core)
+4. [Dialogue Context Layer](#dialogue-context-layer)
+5. [LLM Integration Layer](#llm-integration-layer)
+6. [Agent Learning Layer](#agent-learning-layer)
+7. [MORK Integration Phases](#mork-integration-phases)
+8. [Why Layered Correction?](#why-layered-correction)
+9. [PathMap as Universal Storage](#pathmap-as-universal-storage)
+10. [Performance Considerations](#performance-considerations)
 
 ---
 
@@ -46,9 +57,93 @@ A unified architecture must handle all these while maintaining:
 
 ---
 
-## Three-Tier Architecture
+## Extended Architecture Overview
 
-The correction system uses three progressively refined tiers:
+The complete correction architecture extends the three-tier WFST core with additional layers
+for dialogue context, LLM integration, and adaptive learning. This multi-layer design enables:
+
+- **Conversational correction**: Understanding context across dialogue turns
+- **LLM agent integration**: Pre/post-processing for language model interactions
+- **Personalization**: Learning from user feedback and preferences
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│          EXTENDED CORRECTION ARCHITECTURE (Full Stack)                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                    DIALOGUE CONTEXT LAYER                          │ │
+│  │  Turn History │ Entity Registry │ Topic Graph │ Speaker Models     │ │
+│  │  [Discourse semantics, coreference resolution, topic tracking]     │ │
+│  │  See: ../dialogue/README.md                                        │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                              │                                          │
+│  ┌───────────────────────────┼────────────────────────────────────────┐ │
+│  │                           ▼                                        │ │
+│  │               THREE-TIER WFST CORE                                 │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │ │
+│  │  │ Tier 1:      │→ │ Tier 2:      │→ │ Tier 3:      │             │ │
+│  │  │ Lexical      │  │ Syntactic    │  │ Semantic     │             │ │
+│  │  │ (libleven.)  │  │ (MORK/CFG)   │  │ (MeTTaIL)    │             │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘             │ │
+│  │  [Edit distance, phonetic rules, grammar validation, type checking]│ │
+│  │  See: #three-tier-wfst-core below                                  │ │
+│  └───────────────────────────────────────────────────────────────────┘ │
+│                              │                                          │
+│  ┌───────────────────────────┼────────────────────────────────────────┐ │
+│  │                           ▼                                        │ │
+│  │               PRAGMATIC REASONING LAYER                            │ │
+│  │  Speech Act Classifier │ Implicature Resolver │ Relevance Ranker   │ │
+│  │  [Intent detection, indirect speech acts, contextual relevance]    │ │
+│  │  See: ../dialogue/04-pragmatic-reasoning.md                        │ │
+│  └───────────────────────────────────────────────────────────────────┘ │
+│                              │                                          │
+│  ┌───────────────────────────┼────────────────────────────────────────┐ │
+│  │                           ▼                                        │ │
+│  │               LLM INTEGRATION LAYER                                │ │
+│  │  ┌────────────────────────────────────────────────────────────┐   │ │
+│  │  │ PROMPT PREPROCESSING                                       │   │ │
+│  │  │ Correction → Coreference → Context Injection → RAG         │   │ │
+│  │  └────────────────────────────┬───────────────────────────────┘   │ │
+│  │                               ▼                                    │ │
+│  │                       ┌──────────────┐                            │ │
+│  │                       │   LLM API    │                            │ │
+│  │                       └──────┬───────┘                            │ │
+│  │                              ▼                                     │ │
+│  │  ┌────────────────────────────────────────────────────────────┐   │ │
+│  │  │ RESPONSE POSTPROCESSING                                    │   │ │
+│  │  │ Coherence Check → Fact Verification → Hallucination Detect │   │ │
+│  │  └────────────────────────────────────────────────────────────┘   │ │
+│  │  See: ../llm-integration/README.md                                │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                              │                                          │
+│  ┌───────────────────────────┼────────────────────────────────────────┐ │
+│  │                           ▼                                        │ │
+│  │               AGENT LEARNING LAYER                                 │ │
+│  │  Feedback Collection │ Pattern Learning │ User Preferences         │ │
+│  │  Online Learning │ Threshold Adaptation │ Model Versioning         │ │
+│  │  [Adaptive correction weights, personalized dictionaries]          │ │
+│  │  See: ../agent-learning/README.md                                  │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer Summary
+
+| Layer | Components | Purpose |
+|-------|------------|---------|
+| **Dialogue Context** | Turn History, Entity Registry, Topic Graph | Multi-turn conversation tracking |
+| **WFST Core** | Lexical, Syntactic, Semantic Tiers | Fundamental correction pipeline |
+| **Pragmatic** | Speech Acts, Implicatures, Relevance | Intent understanding |
+| **LLM Integration** | Preprocessing, Postprocessing | LLM agent support |
+| **Agent Learning** | Feedback, Patterns, Preferences | Adaptive personalization |
+
+---
+
+## Three-Tier WFST Core
+
+The foundational correction system uses three progressively refined tiers:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -135,6 +230,160 @@ The correction system uses three progressively refined tiers:
 | **1** | liblevenshtein | Lexical candidates via edit distance | Fastest |
 | **2** | MORK/PathMap | Syntactic filtering via CFG | Fast |
 | **3** | MeTTaIL/Rholang | Semantic type checking | Thorough |
+
+---
+
+## Dialogue Context Layer
+
+The dialogue context layer extends correction capabilities for multi-turn conversations,
+enabling context-aware corrections that consider the full discourse history.
+
+**Full documentation**: [Dialogue Context Documentation](../dialogue/README.md)
+
+### Components
+
+| Component | Purpose | PathMap Key |
+|-----------|---------|-------------|
+| **Turn Tracker** | Conversation history with sliding window | `/dialogue/{id}/turn/` |
+| **Entity Registry** | Cross-turn entity tracking and coreference | `/dialogue/{id}/entity/` |
+| **Topic Graph** | Discourse structure and topic continuity | `/dialogue/{id}/topic/` |
+| **Speaker Models** | Per-participant vocabulary and style | `/dialogue/{id}/speaker/` |
+
+### Key Capabilities
+
+1. **Coreference Resolution**: Resolves pronouns and references across turns
+   - Pronoun resolution: "it" → "the document"
+   - Definite description binding: "the file" → specific file entity
+   - See: [Coreference Resolution](../dialogue/02-coreference-resolution.md)
+
+2. **Discourse Coherence**: Validates corrections maintain conversation flow
+   - Coherence relations (Elaboration, Question-Answer, Contrast)
+   - Topic continuity checking
+   - See: [Discourse Semantics](../dialogue/01-discourse-semantics.md)
+
+3. **Topic Management**: Tracks and validates topic shifts
+   - Topic extraction and clustering
+   - Drift detection and validation
+   - See: [Topic Management](../dialogue/03-topic-management.md)
+
+### Integration with WFST Core
+
+```
+Dialogue Context → WFST Core
+─────────────────────────────
+• Entity salience affects candidate ranking
+• Topic keywords influence lexical tier
+• Speaker vocabulary personalizes dictionary
+• Discourse coherence validates semantic tier
+```
+
+---
+
+## LLM Integration Layer
+
+The LLM integration layer provides preprocessing and postprocessing for language model
+interactions, ensuring corrected input and validated output.
+
+**Full documentation**: [LLM Integration Documentation](../llm-integration/README.md)
+
+### Preprocessing Pipeline
+
+Transforms user input before LLM processing:
+
+```
+User Input → Correction → Coreference → Context Injection → RAG → LLM Prompt
+```
+
+| Stage | Function | Documentation |
+|-------|----------|---------------|
+| **Correction** | Three-tier WFST fixes errors | This document |
+| **Coreference** | Resolves references using dialogue context | [02-coreference-resolution.md](../dialogue/02-coreference-resolution.md) |
+| **Context Injection** | Formats dialogue history for prompt | [04-context-injection.md](../llm-integration/04-context-injection.md) |
+| **RAG** | Retrieves relevant knowledge | [04-context-injection.md](../llm-integration/04-context-injection.md) |
+
+**Documentation**: [Prompt Preprocessing](../llm-integration/01-prompt-preprocessing.md)
+
+### Postprocessing Pipeline
+
+Validates and corrects LLM responses:
+
+```
+LLM Response → Coherence → Fact Check → Hallucination → Correction → Final Output
+```
+
+| Stage | Function | Documentation |
+|-------|----------|---------------|
+| **Coherence Check** | Validates response addresses query | [02-output-postprocessing.md](../llm-integration/02-output-postprocessing.md) |
+| **Fact Verification** | Checks factual claims against knowledge | [03-hallucination-detection.md](../llm-integration/03-hallucination-detection.md) |
+| **Hallucination Detection** | Identifies fabricated content | [03-hallucination-detection.md](../llm-integration/03-hallucination-detection.md) |
+| **Correction** | Three-tier WFST fixes errors | This document |
+
+**Documentation**: [Output Postprocessing](../llm-integration/02-output-postprocessing.md)
+
+### Hallucination Types
+
+| Type | Detection Method | Example |
+|------|------------------|---------|
+| **Fabricated Fact** | Knowledge base mismatch | Invented statistics |
+| **Nonexistent Entity** | Entity registry lookup | Made-up person names |
+| **Temporal Error** | Timeline validation | Wrong date claims |
+| **Contradiction** | Dialogue consistency | Conflicting statements |
+
+**Documentation**: [Hallucination Detection](../llm-integration/03-hallucination-detection.md)
+
+---
+
+## Agent Learning Layer
+
+The agent learning layer provides adaptive correction through feedback collection,
+pattern learning, and online weight updates.
+
+**Full documentation**: [Agent Learning Documentation](../agent-learning/README.md)
+
+### Components
+
+| Component | Purpose | Documentation |
+|-----------|---------|---------------|
+| **Feedback Collection** | Capture user responses to corrections | [01-feedback-collection.md](../agent-learning/01-feedback-collection.md) |
+| **Pattern Learning** | Extract error patterns from feedback | [02-pattern-learning.md](../agent-learning/02-pattern-learning.md) |
+| **User Preferences** | Model individual user characteristics | [03-user-preferences.md](../agent-learning/03-user-preferences.md) |
+| **Online Learning** | Incremental weight and threshold updates | [04-online-learning.md](../agent-learning/04-online-learning.md) |
+
+### Feedback Flow
+
+```
+User Action → Signal Detection → Normalization → Learning Update
+───────────────────────────────────────────────────────────────
+Accept (fast)     → Strong positive   → +0.8 to +1.0
+Accept (slow)     → Weak positive     → +0.3 to +0.5
+Modify            → Correction signal → Pattern extraction
+Reject            → Negative signal   → -0.8 to -1.0
+Ignore            → Weak negative     → -0.1 to -0.3
+```
+
+### Learned Adaptations
+
+| Adaptation | Scope | Effect |
+|------------|-------|--------|
+| **Edit Weights** | Global/User | Character-level substitution costs |
+| **Feature Weights** | Global/User | Ranking factor importance |
+| **Thresholds** | User/Domain | Correction confidence cutoffs |
+| **Vocabulary** | User | Personal dictionary additions |
+| **Patterns** | Global | Recognized error→correction pairs |
+
+### PathMap Storage
+
+```
+/learning/
+    /patterns/                 # Learned error patterns
+    /user/{user_id}/          # Per-user profiles
+        /vocabulary/          # Personal dictionary
+        /weights/             # Personalized weights
+        /thresholds/          # Confidence thresholds
+    /models/                  # Version-controlled models
+        /current/             # Active model
+        /checkpoints/         # Historical snapshots
+```
 
 ---
 
@@ -420,25 +669,68 @@ PathMap serves as the shared storage layer across all tiers:
 
 ## Summary
 
-The three-tier architecture provides:
+The extended correction architecture provides:
 
-1. **Comprehensive Correction**: Lexical, syntactic, and semantic
-2. **Efficient Filtering**: Each tier reduces candidates
-3. **Unified Storage**: PathMap as shared layer
-4. **Extensible Design**: New tiers or languages easily added
+1. **Comprehensive Correction**: Lexical, syntactic, and semantic (three-tier WFST core)
+2. **Conversational Support**: Multi-turn dialogue context and coreference resolution
+3. **LLM Integration**: Pre/post-processing for language model agent interactions
+4. **Adaptive Learning**: Feedback-driven personalization and online weight updates
+5. **Efficient Filtering**: Each tier reduces candidates before expensive processing
+6. **Unified Storage**: PathMap as shared layer across all components
 
-Key integration points:
-- **liblevenshtein** ↔ **PathMap**: FuzzySource trait
-- **MORK** ↔ **PathMap**: Native storage backend
-- **MeTTaTron** ↔ **PathMap**: Type predicate storage
-- **Rholang** ↔ **PathMap**: Par conversion
+### Core Integration Points
+
+| From | To | Interface |
+|------|-----|-----------|
+| **liblevenshtein** | PathMap | FuzzySource trait |
+| **MORK** | PathMap | Native storage backend |
+| **MeTTaTron** | PathMap | Type predicate storage |
+| **Rholang** | PathMap | Par conversion |
+| **Dialogue Context** | WFST Core | Entity salience, speaker vocab |
+| **LLM Layer** | WFST Core | Pre/post-processing pipeline |
+| **Agent Learning** | All Layers | Adaptive weights and thresholds |
+
+### Layer Dependencies
+
+```
+Dialogue Context Layer
+        │
+        ▼
+Three-Tier WFST Core ←────────────────────────────┐
+        │                                          │
+        ▼                                          │
+Pragmatic Reasoning Layer                          │
+        │                                          │
+        ▼                                          │
+LLM Integration Layer                              │
+        │                                          │
+        ▼                                          │
+Agent Learning Layer ──────────────────────────────┘
+        │                  (feedback loop)
+        ▼
+   PathMap Storage
+```
 
 ---
 
 ## References
 
+### WFST Core Documentation
+
 - See [02-tier1-lexical-correction.md](./02-tier1-lexical-correction.md) for Tier 1 details
 - See [03-tier2-syntactic-validation.md](./03-tier2-syntactic-validation.md) for Tier 2 details
 - See [04-tier3-semantic-type-checking.md](./04-tier3-semantic-type-checking.md) for Tier 3 details
 - See [05-data-flow.md](./05-data-flow.md) for complete data flow
+- See [06-integration-possibilities.md](./06-integration-possibilities.md) for use cases
+
+### Extended Layer Documentation
+
+- See [Dialogue Context Layer](../dialogue/README.md) for conversation tracking
+- See [LLM Integration Layer](../llm-integration/README.md) for agent support
+- See [Agent Learning Layer](../agent-learning/README.md) for adaptive correction
+
+### Integration Documentation
+
+- See [MORK Integration](../../integration/mork/README.md) for Phases A-D
+- See [PathMap Integration](../../integration/pathmap/README.md) for shared storage
 - See [bibliography.md](../reference/bibliography.md) for complete references
