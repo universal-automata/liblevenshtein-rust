@@ -7,9 +7,10 @@ This document describes the integration of liblevenshtein's WFST-based approxima
 1. [Executive Summary](#executive-summary)
 2. [Architecture Overview](#architecture-overview)
 3. [Integration Phases](#integration-phases)
-4. [MORK Pattern Matching Synergies](#mork-pattern-matching-synergies)
-5. [Implementation Guide](#implementation-guide)
-6. [Related Documentation](#related-documentation)
+4. [Extended Architecture Layers](#extended-architecture-layers)
+5. [MORK Pattern Matching Synergies](#mork-pattern-matching-synergies)
+6. [Implementation Guide](#implementation-guide)
+7. [Related Documentation](#related-documentation)
 
 ---
 
@@ -193,6 +194,47 @@ This document describes the integration of liblevenshtein's WFST-based approxima
 
 **Details**: See [grammar_correction.md](./grammar_correction.md)
 
+### Phase D Extensions for Dialogue
+
+Phase D grammar correction can be enhanced for dialogue-aware processing:
+
+**Dialogue-Aware Grammar Rules**:
+```metta
+; Context-sensitive article correction
+Pattern:  (np (dt "a") (n ?N))
+Template: (np (dt (context-article ?N &dialogue)) (n ?N))
+; Uses dialogue context to determine "a" vs "an" vs "the"
+
+; Pronoun resolution via coreference
+Pattern:  (pronoun ?P)
+Template: (resolved-entity (resolve-coref ?P &entity-registry))
+```
+
+**Integration with Dialogue Layer**:
+- `query_multi_i()` can access dialogue history via PathMap
+- Entity salience affects pattern matching priority
+- Speaker vocabulary personalizes dictionary lookups
+
+---
+
+## Extended Architecture Layers
+
+The three-tier WFST core is extended with additional layers for conversational and LLM agent support:
+
+| Layer | Components | MORK Integration |
+|-------|------------|------------------|
+| **Dialogue Context** | Turn Tracker, Entity Registry, Topic Graph | MORK patterns for coreference, topic queries |
+| **Pragmatic Reasoning** | Speech Act Classifier, Implicature Resolver | MORK rules for indirect speech acts |
+| **LLM Integration** | Preprocessor, Postprocessor, Hallucination Detector | MORK fact queries for verification |
+| **Agent Learning** | Feedback Collector, Pattern Learner | MORK patterns for learned corrections |
+
+These layers build on top of the three-tier WFST architecture, using PathMap as the shared storage layer and MORK for pattern-based queries.
+
+**See**:
+- [Dialogue Context Layer](../../mettail/dialogue/README.md) - Coreference resolution and topic tracking
+- [LLM Integration](../../mettail/llm-integration/README.md) - Prompt preprocessing and response validation
+- [Agent Learning](../../mettail/agent-learning/README.md) - Feedback integration and personalization
+
 ---
 
 ## MORK Pattern Matching Synergies
@@ -327,6 +369,13 @@ pub trait Semiring: Clone + Copy + PartialEq {
 - `pathmap-book/src/` - PathMap documentation
 - `src/zipper.rs` - Zipper trait definitions
 
+### Extended Correction Layers
+
+- [Dialogue Context Layer](../../mettail/dialogue/README.md) - Coreference resolution and topic tracking
+- [LLM Integration](../../mettail/llm-integration/README.md) - Prompt preprocessing and response validation
+- [Agent Learning](../../mettail/agent-learning/README.md) - Feedback integration and personalization
+- [Correction WFST Architecture](../../mettail/correction-wfst/01-architecture-overview.md) - Full three-tier architecture overview
+
 ---
 
 ## Phase Dependencies
@@ -367,6 +416,10 @@ Phase D (Grammar)
 
 ## Changelog
 
+- **2024-12-06**: Extended architecture documentation
+  - Added Extended Architecture Layers section for dialogue/LLM/agent learning
+  - Added Phase D Extensions for Dialogue with dialogue-aware grammar rules
+  - Added cross-references to MeTTaIL extended correction documentation
 - **2024-12-05**: Initial documentation created
-- Phases A-D defined with acceptance criteria
-- MORK synergies documented
+  - Phases A-D defined with acceptance criteria
+  - MORK synergies documented

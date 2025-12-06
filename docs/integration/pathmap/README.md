@@ -1,7 +1,7 @@
 # PathMap Integration Infrastructure
 
 **Status**: Active Integration
-**Last Updated**: 2024-12-05
+**Last Updated**: 2024-12-06
 
 ---
 
@@ -13,8 +13,9 @@
 4. [Shared Zipper Pattern](#shared-zipper-pattern)
 5. [PathMapDictionary Implementation](#pathmapdictionary-implementation)
 6. [Integration with MORK](#integration-with-mork)
-7. [Performance Characteristics](#performance-characteristics)
-8. [Configuration Guide](#configuration-guide)
+7. [Extended PathMap Schemas](#extended-pathmap-schemas)
+8. [Performance Characteristics](#performance-characteristics)
+9. [Configuration Guide](#configuration-guide)
 
 ---
 
@@ -59,6 +60,8 @@ PathMap is a trie-based prefix-compressed key-value store that serves as the sha
 | **Memory efficiency** | Prefix compression reduces memory footprint |
 | **Cache coherence** | All projects read from same memory-mapped trie |
 | **Zipper compatibility** | Unified navigation abstraction across all projects |
+| **Dialogue persistence** | Conversation history and entity state preserved across sessions |
+| **Learning storage** | User preferences and learned patterns stored efficiently |
 
 ---
 
@@ -504,6 +507,108 @@ impl Source for FuzzySource {
 
 ---
 
+## Extended PathMap Schemas
+
+Beyond dictionary storage, PathMap supports the extended correction architecture with schemas for dialogue state, agent configuration, and knowledge storage.
+
+### Dialogue State Schema
+
+PathMap stores conversation context for dialogue-aware correction:
+
+```
+/dialogue/{dialogue_id}/
+    /meta/
+        created_at -> timestamp
+        participants -> [participant_id, ...]
+        status -> active|archived
+    /turn/{turn_id}/
+        raw -> raw text bytes
+        corrected -> corrected text bytes
+        speaker -> participant_id
+        timestamp -> unix timestamp
+        speech_act -> encoded speech act
+        entities/ -> entity mentions
+        topics/ -> topic references
+    /entity/{entity_id}/
+        name -> canonical name
+        type -> entity type
+        attributes/ -> key-value attributes
+        introduced_at -> turn_id
+    /coref/{entity_id}/
+        {mention_idx} -> (turn_id, span_start, span_end)
+    /topic/{topic_id}/
+        label -> topic label
+        parent -> parent topic_id (optional)
+        keywords/ -> {keyword} -> count
+        active_turns/ -> [turn_id, ...]
+```
+
+### Agent Configuration Schema
+
+PathMap stores LLM agent configuration and learned patterns:
+
+```
+/agent/{agent_id}/
+    /config/
+        endpoint -> LLM endpoint configuration
+        max_tokens -> token limit
+        correction_level -> 0.0-1.0
+    /feedback/
+        /pattern/{pattern_id}/
+            error_pattern -> pattern specification
+            correction -> correction template
+            confidence -> float
+            support_count -> int
+    /user/{user_id}/
+        formality_level -> 0.0-1.0
+        vocabulary_level -> 0.0-1.0
+        personal_dictionary/ -> {word} -> true
+        ignored_words/ -> {word} -> true
+        error_patterns/ -> [pattern_id, ...]
+```
+
+### Knowledge Base Schema
+
+PathMap stores facts for hallucination detection and fact checking:
+
+```
+/knowledge/
+    /entity/{entity_id}/
+        canonical_name -> string
+        type -> entity type
+        aliases/ -> [alias, ...]
+    /fact/{fact_id}/
+        subject -> entity_id
+        predicate -> relation name
+        object -> entity_id or value
+        confidence -> 0.0-1.0
+```
+
+### Usage with Extended Layers
+
+```rust
+use pathmap::PathMap;
+
+// Store dialogue turn
+fn store_turn(pathmap: &PathMap, dialogue_id: &str, turn: &Turn) {
+    let base = format!("/dialogue/{}/turn/{}", dialogue_id, turn.id);
+    pathmap.insert(format!("{}/raw", base).as_bytes(), turn.raw.as_bytes());
+    pathmap.insert(format!("{}/speaker", base).as_bytes(), turn.speaker.as_bytes());
+    pathmap.insert(format!("{}/timestamp", base).as_bytes(), &turn.timestamp.to_le_bytes());
+}
+
+// Store learned error pattern
+fn store_pattern(pathmap: &PathMap, agent_id: &str, pattern: &ErrorPattern) {
+    let base = format!("/agent/{}/feedback/pattern/{}", agent_id, pattern.id);
+    pathmap.insert(format!("{}/error_pattern", base).as_bytes(), pattern.error.as_bytes());
+    pathmap.insert(format!("{}/correction", base).as_bytes(), pattern.correction.as_bytes());
+}
+```
+
+**See**: [Dialogue Context Layer](../../mettail/dialogue/README.md) for usage details.
+
+---
+
 ## Performance Characteristics
 
 ### Memory Efficiency
@@ -642,10 +747,19 @@ pathmap = { path = "../../PathMap" }
 
 ## Related Documentation
 
+### Core Integration
+
 - [MORK Integration Overview](../mork/README.md) - Full MORK integration architecture
 - [FuzzySource Implementation](../mork/fuzzy_source.md) - Phase A details
 - [PathMap Book](https://github.com/your-org/PathMap/pathmap-book/) - PathMap documentation
 - [Zipper Pattern](https://en.wikipedia.org/wiki/Zipper_(data_structure)) - Theoretical background
+
+### Extended Architecture
+
+- [Dialogue Context Layer](../../mettail/dialogue/README.md) - Turn history and coreference resolution
+- [Agent Learning Layer](../../mettail/agent-learning/README.md) - Feedback patterns and user preferences
+- [LLM Integration](../../mettail/llm-integration/README.md) - Context injection using PathMap
+- [Correction WFST Architecture](../../mettail/correction-wfst/01-architecture-overview.md) - Full three-tier architecture overview
 
 ---
 
